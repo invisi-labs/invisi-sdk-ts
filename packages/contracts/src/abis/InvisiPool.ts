@@ -14,6 +14,7 @@ export const invisiPoolAbi = [
           { name: "amount", type: "uint256" },
         ],
       },
+      { name: "nonce", type: "bytes32" },
     ],
     outputs: [],
   },
@@ -122,6 +123,8 @@ export const invisiPoolAbi = [
     name: "PayPublic",
     inputs: [
       { name: "receiverCommitment", type: "bytes32", indexed: true },
+      { name: "paymentCommitment", type: "bytes32", indexed: false },
+      { name: "leafIndex", type: "uint32", indexed: false },
       { name: "tokenAddress", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
     ],
@@ -131,7 +134,21 @@ export const invisiPoolAbi = [
     name: "PayShielded",
     inputs: [
       { name: "paymentCommitment", type: "bytes32", indexed: true },
+      { name: "paymentLeafIndex", type: "uint32", indexed: false },
       { name: "changeCommitment", type: "bytes32", indexed: false },
+      { name: "changeLeafIndex", type: "uint32", indexed: false },
+      { name: "tokenAddress", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "PayShieldedNote",
+    inputs: [
+      { name: "noteNullifier", type: "bytes32", indexed: true },
+      { name: "paymentCommitment", type: "bytes32", indexed: false },
+      { name: "paymentLeafIndex", type: "uint32", indexed: false },
+      { name: "changeCommitment", type: "bytes32", indexed: false },
+      { name: "changeLeafIndex", type: "uint32", indexed: false },
       { name: "tokenAddress", type: "address", indexed: true },
     ],
   },

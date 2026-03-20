@@ -17,4 +17,15 @@ describe("invisiPoolAbi", () => {
     expect(names).toContain("settleBatch")
     expect(names).toContain("withdrawNote")
   })
+
+  it("payPublic has nonce parameter", () => {
+    const payPublic = invisiPoolAbi.find(
+      (x) => x.type === "function" && x.name === "payPublic"
+    )
+    expect(payPublic).toBeDefined()
+    const inputs = (payPublic as { inputs: Array<{ name: string; type: string }> }).inputs
+    const nonce = inputs.find((i) => i.name === "nonce")
+    expect(nonce).toBeDefined()
+    expect(nonce!.type).toBe("bytes32")
+  })
 })
