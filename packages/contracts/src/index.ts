@@ -1,1 +1,2 @@
-export const VERSION = "0.0.1"
+export { invisiPoolAbi } from "./abis/InvisiPool"
+export type { InvisiPoolAbi } from "./types"
