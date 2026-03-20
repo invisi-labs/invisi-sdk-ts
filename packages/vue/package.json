@@ -13,6 +13,10 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "dependencies": {
+    "@invisi/payer": "workspace:*",
+    "viem": "^2.0.0"
+  },
   "peerDependencies": {
     "vue": ">=3.4.0"
   },
@@ -23,6 +27,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "vue": "^3.4.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"

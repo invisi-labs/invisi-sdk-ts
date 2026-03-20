@@ -1,1 +1,2 @@
-export const VERSION = "0.0.1"
+export { useDeposit } from "./useDeposit"
+export type { UseDepositResult } from "./useDeposit"
