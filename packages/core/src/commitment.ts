@@ -1,10 +1,21 @@
 import { poseidonHash } from "./poseidon"
 
-export async function computeReceiverCommitment(claimingKey: bigint): Promise<`0x${string}`> {
-  return poseidonHash([claimingKey])
+/** receiverCommitment = Poseidon2(claimingKey, receivingAddress) */
+export async function computeReceiverCommitment(
+  claimingKey: bigint,
+  receivingAddress: bigint
+): Promise<`0x${string}`> {
+  return poseidonHash([claimingKey, receivingAddress])
 }
 
-export async function computePaymentCommitment(claimingKey: bigint, amount: bigint): Promise<`0x${string}`> {
-  const rc = await computeReceiverCommitment(claimingKey)
-  return poseidonHash([BigInt(rc), amount])
+/**
+ * paymentCommitment = Poseidon2(receiverCommitment, tokenAddress, amount, nonce)
+ */
+export async function computePaymentCommitment(
+  receiverCommitment: `0x${string}`,
+  tokenAddress: bigint,
+  amount: bigint,
+  nonce: bigint
+): Promise<`0x${string}`> {
+  return poseidonHash([BigInt(receiverCommitment), tokenAddress, amount, nonce])
 }
