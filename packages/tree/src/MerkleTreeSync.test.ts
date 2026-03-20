@@ -24,6 +24,7 @@ describe("MerkleTreeSync", () => {
       client,
       poolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
+      treeType: "payment",
     })
     await sync.start()
     expect(tree.size).toBe(0)
@@ -41,6 +42,7 @@ describe("MerkleTreeSync", () => {
       client,
       poolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
+      treeType: "payment",
     })
     await sync.start()
     expect(tree.size).toBe(2)
@@ -53,6 +55,7 @@ describe("MerkleTreeSync", () => {
       client,
       poolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
+      treeType: "payment",
     })
     await sync.start()
     expect(client.watchContractEvent).toHaveBeenCalled()
@@ -67,9 +70,74 @@ describe("MerkleTreeSync", () => {
       client,
       poolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
+      treeType: "payment",
     })
     await sync.start()
     sync.stop()
     expect(unwatch).toHaveBeenCalled()
+  })
+
+  it("note tree extracts changeCommitment from PayShielded", async () => {
+    const events = [
+      {
+        args: {
+          paymentCommitment: "0x" + "01".padStart(64, "0"),
+          paymentLeafIndex: 0,
+          changeCommitment: "0x" + "ff".padStart(64, "0"),
+          changeLeafIndex: 0,
+        },
+        eventName: "PayShielded",
+      },
+    ]
+    const client = createMockClient(events)
+    const sync = new MerkleTreeSync({
+      tree,
+      client,
+      poolAddress: "0x0000000000000000000000000000000000000001",
+      fromBlock: 0n,
+      treeType: "note",
+    })
+    await sync.start()
+    expect(tree.size).toBe(1) // changeCommitment inserted
+  })
+
+  it("note tree skips zero changeCommitment", async () => {
+    const events = [
+      {
+        args: {
+          paymentCommitment: "0x" + "01".padStart(64, "0"),
+          paymentLeafIndex: 0,
+          changeCommitment: "0x" + "00".padStart(64, "0"),
+          changeLeafIndex: 0,
+        },
+        eventName: "PayShielded",
+      },
+    ]
+    const client = createMockClient(events)
+    const sync = new MerkleTreeSync({
+      tree,
+      client,
+      poolAddress: "0x0000000000000000000000000000000000000001",
+      fromBlock: 0n,
+      treeType: "note",
+    })
+    await sync.start()
+    expect(tree.size).toBe(0) // zero commitment skipped
+  })
+
+  it("note tree ignores PayPublic events", async () => {
+    const events = [
+      { args: { paymentCommitment: "0x" + "01".padStart(64, "0"), leafIndex: 0 }, eventName: "PayPublic" },
+    ]
+    const client = createMockClient(events)
+    const sync = new MerkleTreeSync({
+      tree,
+      client,
+      poolAddress: "0x0000000000000000000000000000000000000001",
+      fromBlock: 0n,
+      treeType: "note",
+    })
+    await sync.start()
+    expect(tree.size).toBe(0) // PayPublic has no change commitment
   })
 })

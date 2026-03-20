@@ -10,7 +10,7 @@ export interface ChainDeployment {
   env: "mainnet" | "testnet"
   deployedAt: string
   InvisiPool: ContractDeployment
-  SingleWithdrawVerifier: ContractDeployment
-  BatchWithdrawVerifier: ContractDeployment
+  SingleSettleVerifier: ContractDeployment
+  BatchSettleVerifier: ContractDeployment
   ShieldedPaymentVerifier: ContractDeployment
 }

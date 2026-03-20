@@ -1,11 +1,14 @@
 import { invisiPoolAbi } from "@invisi/contracts"
 import type { InMemoryMerkleTree } from "./InMemoryMerkleTree"
 
+export type TreeType = "payment" | "note"
+
 export interface MerkleTreeSyncOptions {
   tree: InMemoryMerkleTree
   client: any
   poolAddress: string
   fromBlock: bigint
+  treeType: TreeType
 }
 
 interface LeafEntry {
@@ -22,6 +25,7 @@ export class MerkleTreeSync {
   private readonly client: any
   private readonly poolAddress: string
   private readonly fromBlock: bigint
+  private readonly treeType: TreeType
 
   private _synced = false
   private _lastSyncedBlock = 0n
@@ -32,6 +36,7 @@ export class MerkleTreeSync {
     this.client = opts.client
     this.poolAddress = opts.poolAddress
     this.fromBlock = opts.fromBlock
+    this.treeType = opts.treeType
   }
 
   get synced(): boolean {
@@ -97,16 +102,31 @@ export class MerkleTreeSync {
       const name = event.eventName
       const args = event.args
 
-      if (name === "PayPublic") {
-        leaves.push({
-          commitment: BigInt(args.paymentCommitment),
-          leafIndex: Number(args.leafIndex),
-        })
-      } else if (name === "PayShielded" || name === "PayShieldedNote") {
-        leaves.push({
-          commitment: BigInt(args.paymentCommitment),
-          leafIndex: Number(args.paymentLeafIndex),
-        })
+      if (this.treeType === "payment") {
+        // Payment tree: extract paymentCommitment from all payment events
+        if (name === "PayPublic") {
+          leaves.push({
+            commitment: BigInt(args.paymentCommitment),
+            leafIndex: Number(args.leafIndex),
+          })
+        } else if (name === "PayShielded" || name === "PayShieldedNote") {
+          leaves.push({
+            commitment: BigInt(args.paymentCommitment),
+            leafIndex: Number(args.paymentLeafIndex),
+          })
+        }
+      } else {
+        // Note tree: extract changeCommitment from shielded events (skip if zero)
+        if (name === "PayShielded" || name === "PayShieldedNote") {
+          const cc = args.changeCommitment
+          const cli = args.changeLeafIndex
+          if (cc && BigInt(cc) !== 0n && cli != null) {
+            leaves.push({
+              commitment: BigInt(cc),
+              leafIndex: Number(cli),
+            })
+          }
+        }
       }
     }
 

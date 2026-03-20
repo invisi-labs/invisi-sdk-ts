@@ -48,6 +48,7 @@ export class InvisiTreeManager {
       client: this.client,
       poolAddress: this.poolAddress,
       fromBlock: this.fromBlock,
+      treeType: "payment",
     })
 
     this._noteSync = new MerkleTreeSync({
@@ -55,6 +56,7 @@ export class InvisiTreeManager {
       client: this.client,
       poolAddress: this.poolAddress,
       fromBlock: this.fromBlock,
+      treeType: "note",
     })
 
     await Promise.all([this._paymentSync.start(), this._noteSync.start()])
