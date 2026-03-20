@@ -31,7 +31,7 @@ export class InMemoryMerkleTree {
     this.zeros = new Array(DEPTH + 1)
     this.zeros[0] = 0n
     for (let i = 1; i <= DEPTH; i++) {
-      this.zeros[i] = await hash2(this.zeros[i - 1], this.zeros[i - 1])
+      this.zeros[i] = await hash2(this.zeros[i - 1]!, this.zeros[i - 1]!)
     }
     this.layers = new Array(DEPTH + 1)
     for (let i = 0; i <= DEPTH; i++) {
@@ -44,10 +44,11 @@ export class InMemoryMerkleTree {
   }
 
   getRoot(): bigint {
-    if (this.layers[DEPTH].length === 0) {
-      return this.zeros[DEPTH]
+    const topLayer = this.layers[DEPTH]!
+    if (topLayer.length === 0) {
+      return this.zeros[DEPTH]!
     }
-    return this.layers[DEPTH][0]
+    return topLayer[0]!
   }
 
   async insert(leaf: bigint): Promise<number> {
@@ -56,21 +57,22 @@ export class InMemoryMerkleTree {
       throw new Error("tree full")
     }
 
-    this.layers[0][index] = leaf
+    this.layers[0]![index] = leaf
 
     let currentIndex = index
     for (let level = 0; level < DEPTH; level++) {
       const parentIndex = currentIndex >> 1
       const isRight = currentIndex & 1
 
+      const layerLevel = this.layers[level]!
       const left = isRight
-        ? this.layers[level][currentIndex - 1]
-        : this.layers[level][currentIndex]
+        ? layerLevel[currentIndex - 1]!
+        : layerLevel[currentIndex]!
       const right = isRight
-        ? this.layers[level][currentIndex]
-        : (this.layers[level][currentIndex + 1] ?? this.zeros[level])
+        ? layerLevel[currentIndex]!
+        : (layerLevel[currentIndex + 1] ?? this.zeros[level]!)
 
-      this.layers[level + 1][parentIndex] = await hash2(left, right)
+      this.layers[level + 1]![parentIndex] = await hash2(left, right)
       currentIndex = parentIndex
     }
 
@@ -89,7 +91,7 @@ export class InMemoryMerkleTree {
     for (let level = 0; level < DEPTH; level++) {
       const isRight = currentIndex & 1
       const siblingIndex = isRight ? currentIndex - 1 : currentIndex + 1
-      merklePath[level] = this.layers[level][siblingIndex] ?? this.zeros[level]
+      merklePath[level] = this.layers[level]![siblingIndex] ?? this.zeros[level]!
       currentIndex >>= 1
     }
 

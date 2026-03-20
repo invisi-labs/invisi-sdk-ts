@@ -58,7 +58,7 @@ describe("InMemoryMerkleTree", () => {
     // Reconstruct: index=0 means all bits are 0, current is always left child
     let current = leaf
     for (let i = 0; i < 16; i++) {
-      const h = await poseidonHash([current, merklePath[i]])
+      const h = await poseidonHash([current, merklePath[i]!])
       current = BigInt(h)
     }
     expect(current).toBe(root)
@@ -81,10 +81,10 @@ describe("InMemoryMerkleTree", () => {
     for (let i = 0; i < 16; i++) {
       const isRight = idx & 1
       if (isRight) {
-        const h = await poseidonHash([merklePath[i], current])
+        const h = await poseidonHash([merklePath[i]!, current])
         current = BigInt(h)
       } else {
-        const h = await poseidonHash([current, merklePath[i]])
+        const h = await poseidonHash([current, merklePath[i]!])
         current = BigInt(h)
       }
       idx >>= 1
