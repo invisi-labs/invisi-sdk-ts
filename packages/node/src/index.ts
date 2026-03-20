@@ -1,1 +1,2 @@
-export const VERSION = "0.0.1"
+export { generateProof, checkBBAvailable } from "./prover"
+export type { ProveParams } from "./prover"
