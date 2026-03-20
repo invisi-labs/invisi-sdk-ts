@@ -14,6 +14,7 @@ export interface PayPublicCalldata {
   paymentCommitment: `0x${string}`
   data: `0x${string}`
   approveAmount: bigint
+  value?: bigint
 }
 
 export async function buildPayPublicCalldata(
