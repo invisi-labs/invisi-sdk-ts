@@ -1,1 +1,5 @@
-export const VERSION = "0.0.1"
+export { InMemoryMerkleTree } from "./InMemoryMerkleTree"
+export { MerkleTreeSync } from "./MerkleTreeSync"
+export type { MerkleTreeSyncOptions } from "./MerkleTreeSync"
+export { InvisiTreeManager } from "./InvisiTreeManager"
+export type { InvisiTreeManagerOptions } from "./InvisiTreeManager"
