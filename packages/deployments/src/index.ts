@@ -1,1 +1,2 @@
-export const VERSION = "0.0.1"
+export { getDeployment, getSupportedChainIds } from "./registry"
+export type { ChainDeployment, ContractDeployment } from "./types"
