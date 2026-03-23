@@ -12,10 +12,15 @@ describe("invisiPoolAbi", () => {
       .map((x) => (x as { name: string }).name)
     expect(names).toContain("payPublic")
     expect(names).toContain("payShielded")
-    expect(names).toContain("payShieldedNote")
     expect(names).toContain("settleSingle")
     expect(names).toContain("settleBatch")
-    expect(names).toContain("withdrawNote")
+    expect(names).toContain("getTreeCount")
+    expect(names).toContain("getPaymentTreeRoot")
+    expect(names).toContain("isTreeFull")
+    // Note: payShieldedNote and withdrawNote have been removed
+    expect(names).not.toContain("payShieldedNote")
+    expect(names).not.toContain("withdrawNote")
+    expect(names).not.toContain("getNoteTreeRoot")
   })
 
   it("payPublic has nonce parameter", () => {

@@ -8,6 +8,7 @@ export interface PayPublicParams {
   receiverCommitment: `0x${string}`
   tokenAddress: `0x${string}`
   amount: bigint
+  treeId: bigint
 }
 
 export interface PayPublicCalldata {
@@ -46,6 +47,7 @@ export async function buildPayPublicCalldata(
       params.receiverCommitment,
       { addr: params.tokenAddress, amount: params.amount },
       nonceHex,
+      params.treeId,
     ],
   })
 

@@ -13,6 +13,7 @@ export interface SettleSingleParams {
   tokenAddress: `0x${string}`
   merkleRoot: `0x${string}`
   proof: `0x${string}`
+  treeId: bigint
 }
 export interface SettleSingleCalldata { nullifier: `0x${string}`; data: `0x${string}` }
 
@@ -36,6 +37,7 @@ export async function buildSettleSingleCalldata(
       params.receivingAddress,
       params.tokenAddress,
       params.amount,
+      params.treeId,
     ],
   })
   return { nullifier: nullifier as `0x${string}`, data }
