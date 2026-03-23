@@ -77,14 +77,14 @@ describe("MerkleTreeSync", () => {
     expect(unwatch).toHaveBeenCalled()
   })
 
-  it("note tree extracts changeCommitment from PayShielded", async () => {
+  it("payment tree extracts both commitments from PayShielded", async () => {
     const events = [
       {
         args: {
           paymentCommitment: "0x" + "01".padStart(64, "0"),
           paymentLeafIndex: 0,
           changeCommitment: "0x" + "ff".padStart(64, "0"),
-          changeLeafIndex: 0,
+          changeLeafIndex: 1,
         },
         eventName: "PayShielded",
       },
@@ -95,39 +95,25 @@ describe("MerkleTreeSync", () => {
       client,
       poolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
-      treeType: "note",
+      treeType: "payment",
     })
     await sync.start()
-    expect(tree.size).toBe(1) // changeCommitment inserted
+    expect(tree.size).toBe(2) // paymentCommitment + changeCommitment both inserted
   })
 
-  it("note tree skips zero changeCommitment", async () => {
+  it("payment tree inserts PayPublic and PayShielded in leafIndex order", async () => {
     const events = [
       {
         args: {
-          paymentCommitment: "0x" + "01".padStart(64, "0"),
-          paymentLeafIndex: 0,
-          changeCommitment: "0x" + "00".padStart(64, "0"),
-          changeLeafIndex: 0,
+          paymentCommitment: "0x" + "aa".padStart(64, "0"),
+          paymentLeafIndex: 2,
+          changeCommitment: "0x" + "bb".padStart(64, "0"),
+          changeLeafIndex: 3,
         },
         eventName: "PayShielded",
       },
-    ]
-    const client = createMockClient(events)
-    const sync = new MerkleTreeSync({
-      tree,
-      client,
-      poolAddress: "0x0000000000000000000000000000000000000001",
-      fromBlock: 0n,
-      treeType: "note",
-    })
-    await sync.start()
-    expect(tree.size).toBe(0) // zero commitment skipped
-  })
-
-  it("note tree ignores PayPublic events", async () => {
-    const events = [
       { args: { paymentCommitment: "0x" + "01".padStart(64, "0"), leafIndex: 0 }, eventName: "PayPublic" },
+      { args: { paymentCommitment: "0x" + "02".padStart(64, "0"), leafIndex: 1 }, eventName: "PayPublic" },
     ]
     const client = createMockClient(events)
     const sync = new MerkleTreeSync({
@@ -135,9 +121,9 @@ describe("MerkleTreeSync", () => {
       client,
       poolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
-      treeType: "note",
+      treeType: "payment",
     })
     await sync.start()
-    expect(tree.size).toBe(0) // PayPublic has no change commitment
+    expect(tree.size).toBe(4) // 2 PayPublic + 2 from PayShielded
   })
 })

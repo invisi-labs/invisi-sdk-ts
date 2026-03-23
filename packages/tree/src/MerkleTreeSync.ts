@@ -1,7 +1,7 @@
 import { invisiPoolAbi } from "@invisi/contracts"
 import type { InMemoryMerkleTree } from "./InMemoryMerkleTree"
 
-export type TreeType = "payment" | "note"
+export type TreeType = "payment"
 
 export interface MerkleTreeSyncOptions {
   tree: InMemoryMerkleTree
@@ -17,8 +17,8 @@ interface LeafEntry {
 }
 
 /**
- * Syncs an InMemoryMerkleTree with on-chain events from InvisiPool.
- * Scans historical events then subscribes to new ones.
+ * Syncs an InMemoryMerkleTree with on-chain Payment Tree events from InvisiPool.
+ * Tracks paymentCommitment and changeCommitment (both in Payment Tree).
  */
 export class MerkleTreeSync {
   private readonly tree: InMemoryMerkleTree
@@ -102,31 +102,22 @@ export class MerkleTreeSync {
       const name = event.eventName
       const args = event.args
 
-      if (this.treeType === "payment") {
-        // Payment tree: extract paymentCommitment from all payment events
-        if (name === "PayPublic") {
-          leaves.push({
-            commitment: BigInt(args.paymentCommitment),
-            leafIndex: Number(args.leafIndex),
-          })
-        } else if (name === "PayShielded" || name === "PayShieldedNote") {
-          leaves.push({
-            commitment: BigInt(args.paymentCommitment),
-            leafIndex: Number(args.paymentLeafIndex),
-          })
-        }
-      } else {
-        // Note tree: extract changeCommitment from shielded events (skip if zero)
-        if (name === "PayShielded" || name === "PayShieldedNote") {
-          const cc = args.changeCommitment
-          const cli = args.changeLeafIndex
-          if (cc && BigInt(cc) !== 0n && cli != null) {
-            leaves.push({
-              commitment: BigInt(cc),
-              leafIndex: Number(cli),
-            })
-          }
-        }
+      // Payment tree: extract all leaves written to Payment Tree
+      if (name === "PayPublic") {
+        leaves.push({
+          commitment: BigInt(args.paymentCommitment),
+          leafIndex: Number(args.leafIndex),
+        })
+      } else if (name === "PayShielded") {
+        // Both paymentCommitment and changeCommitment are in Payment Tree
+        leaves.push({
+          commitment: BigInt(args.paymentCommitment),
+          leafIndex: Number(args.paymentLeafIndex),
+        })
+        leaves.push({
+          commitment: BigInt(args.changeCommitment),
+          leafIndex: Number(args.changeLeafIndex),
+        })
       }
     }
 

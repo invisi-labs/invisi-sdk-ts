@@ -10,7 +10,7 @@ function createMockClient(events: any[] = []) {
 }
 
 describe("InvisiTreeManager", () => {
-  it("starts both payment and note trees", async () => {
+  it("starts payment tree", async () => {
     const client = createMockClient()
     const manager = new InvisiTreeManager({
       client,
@@ -19,7 +19,6 @@ describe("InvisiTreeManager", () => {
     })
     await manager.start()
     expect(manager.paymentTree).toBeDefined()
-    expect(manager.noteTree).toBeDefined()
   })
 
   it("getPaymentProof works after inserting via events", async () => {
@@ -38,7 +37,7 @@ describe("InvisiTreeManager", () => {
     expect(proof.leafIndex).toBe(0)
   })
 
-  it("stop stops both trees", async () => {
+  it("stop unsubscribes payment sync", async () => {
     const unwatch = vi.fn()
     const client = createMockClient()
     client.watchContractEvent = vi.fn().mockReturnValue(unwatch)
@@ -49,6 +48,33 @@ describe("InvisiTreeManager", () => {
     })
     await manager.start()
     manager.stop()
-    expect(unwatch).toHaveBeenCalledTimes(2) // payment + note
+    expect(unwatch).toHaveBeenCalledTimes(1) // only payment sync
+  })
+
+  it("tracks both paymentCommitment and changeCommitment from PayShielded", async () => {
+    const events = [
+      {
+        args: {
+          paymentCommitment: "0x" + "01".padStart(64, "0"),
+          paymentLeafIndex: 0,
+          changeCommitment: "0x" + "ff".padStart(64, "0"),
+          changeLeafIndex: 1,
+        },
+        eventName: "PayShielded",
+      },
+    ]
+    const client = createMockClient(events)
+    const manager = new InvisiTreeManager({
+      client,
+      poolAddress: "0x0000000000000000000000000000000000000001",
+      fromBlock: 0n,
+    })
+    await manager.start()
+    expect(manager.paymentTree.size).toBe(2)
+    // Both commitments provable
+    const proof0 = manager.getPaymentProof(0)
+    const proof1 = manager.getPaymentProof(1)
+    expect(proof0.leafIndex).toBe(0)
+    expect(proof1.leafIndex).toBe(1)
   })
 })
