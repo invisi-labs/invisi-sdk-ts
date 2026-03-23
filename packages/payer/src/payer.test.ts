@@ -4,6 +4,7 @@ import { buildPayPublicCalldata } from "./payer"
 describe("buildPayPublicCalldata", () => {
   it("returns calldata with paymentCommitment, nonce, and ERC20 data", async () => {
     const result = await buildPayPublicCalldata({
+      treeId: 1n,
       receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
@@ -16,6 +17,7 @@ describe("buildPayPublicCalldata", () => {
 
   it("generates different nonces on each call", async () => {
     const params = {
+      treeId: 1n,
       receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,

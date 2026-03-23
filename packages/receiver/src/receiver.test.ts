@@ -25,6 +25,7 @@ describe("buildSettleSingleCalldata", () => {
   it("returns nullifier and calldata with nonce", async () => {
     const inv = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn })
     const result = await buildSettleSingleCalldata({
+      treeId: 1n,
       claimingKey: inv.claimingKey,
       amount: 100_000_000n,
       nonce: 12345n,
