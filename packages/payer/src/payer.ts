@@ -58,3 +58,94 @@ export async function buildPayPublicCalldata(
     approveAmount: params.amount,
   }
 }
+
+export interface PayShieldedParams {
+  proof: `0x${string}`
+  paymentCommitment: `0x${string}`
+  changeCommitment: `0x${string}`
+  inputAmount: bigint
+  tokenAddress: `0x${string}`
+  treeId: bigint
+}
+
+export interface PayShieldedCalldata {
+  data: `0x${string}`
+  approveAmount: bigint
+}
+
+export async function buildPayShieldedCalldata(
+  params: PayShieldedParams
+): Promise<PayShieldedCalldata> {
+  const data = encodeFunctionData({
+    abi: invisiPoolAbi,
+    functionName: "payShielded",
+    args: [
+      params.proof,
+      params.paymentCommitment,
+      params.changeCommitment,
+      params.inputAmount,
+      params.tokenAddress,
+      params.treeId,
+    ],
+  })
+
+  return {
+    data,
+    approveAmount: params.inputAmount,
+  }
+}
+
+/** Payer's local record of change from a shielded payment, for later recovery via settleSingle */
+export interface ChangeRecord {
+  treeId: bigint
+  leafIndex: number
+  claimingKey: bigint
+  receivingAddress: `0x${string}`
+  tokenAddress: `0x${string}`
+  amount: bigint
+  nonce: bigint
+}
+
+export interface SettleChangeParams {
+  claimingKey: bigint
+  receivingAddress: `0x${string}`
+  tokenAddress: `0x${string}`
+  amount: bigint
+  nonce: bigint
+  merkleRoot: `0x${string}`
+  proof: `0x${string}`
+  treeId: bigint
+}
+
+export interface SettleChangeCalldata {
+  nullifier: `0x${string}`
+  data: `0x${string}`
+}
+
+export async function buildSettleChangeCalldata(
+  params: SettleChangeParams
+): Promise<SettleChangeCalldata> {
+  const { computeNullifier } = await import("@invisi/core")
+  const nullifier = await computeNullifier(
+    params.claimingKey,
+    BigInt(params.tokenAddress),
+    params.amount,
+    params.nonce
+  )
+
+  const data = encodeFunctionData({
+    abi: invisiPoolAbi,
+    functionName: "settleSingle",
+    args: [
+      params.proof,
+      params.merkleRoot,
+      nullifier as `0x${string}`,
+      params.receivingAddress,
+      params.tokenAddress,
+      params.amount,
+      params.treeId,
+    ],
+  })
+
+  return { nullifier: nullifier as `0x${string}`, data }
+}

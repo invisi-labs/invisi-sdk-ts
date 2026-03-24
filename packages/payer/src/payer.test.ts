@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildPayPublicCalldata } from "./payer"
+import { buildPayPublicCalldata, buildPayShieldedCalldata, buildSettleChangeCalldata } from "./payer"
 
 describe("buildPayPublicCalldata", () => {
   it("returns calldata with paymentCommitment, nonce, and ERC20 data", async () => {
@@ -25,5 +25,37 @@ describe("buildPayPublicCalldata", () => {
     const a = await buildPayPublicCalldata(params)
     const b = await buildPayPublicCalldata(params)
     expect(a.nonce).not.toBe(b.nonce)
+  })
+})
+
+describe("buildPayShieldedCalldata", () => {
+  it("returns encoded calldata for payShielded", async () => {
+    const result = await buildPayShieldedCalldata({
+      proof: "0xdeadbeef" as `0x${string}`,
+      paymentCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      changeCommitment: ("0x" + "cd".repeat(32)) as `0x${string}`,
+      inputAmount: 200_000_000n,
+      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+      treeId: 1n,
+    })
+    expect(result.data).toMatch(/^0x/)
+    expect(result.approveAmount).toBe(200_000_000n)
+  })
+})
+
+describe("buildSettleChangeCalldata", () => {
+  it("returns nullifier and calldata", async () => {
+    const result = await buildSettleChangeCalldata({
+      claimingKey: 42n,
+      receivingAddress: "0x000000000000000000000000000000000000dead",
+      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+      amount: 53_000_000n,
+      nonce: 12345n,
+      merkleRoot: ("0x" + "bb".repeat(32)) as `0x${string}`,
+      proof: "0xdeadbeef" as `0x${string}`,
+      treeId: 1n,
+    })
+    expect(result.nullifier).toMatch(/^0x[0-9a-f]{64}$/i)
+    expect(result.data).toMatch(/^0x/)
   })
 })
