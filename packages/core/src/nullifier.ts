@@ -1,11 +1,15 @@
 import { poseidonHash } from "./poseidon"
+import { D_NULL } from "./domains"
 
-/** nullifier = Poseidon2(claimingKey, tokenAddress, amount, nonce) */
-export async function computeNullifier(
-  claimingKey: bigint,
+export async function computePaymentNullifier(
+  chainId: bigint,
+  nullifierKey: bigint,
   tokenAddress: bigint,
   amount: bigint,
   nonce: bigint
 ): Promise<`0x${string}`> {
-  return poseidonHash([claimingKey, tokenAddress, amount, nonce])
+  return poseidonHash([D_NULL, chainId, nullifierKey, tokenAddress, amount, nonce])
 }
+
+/** @deprecated Use computePaymentNullifier */
+export const computeNullifier = computePaymentNullifier

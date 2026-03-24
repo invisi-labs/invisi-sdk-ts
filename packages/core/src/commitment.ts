@@ -1,38 +1,34 @@
 import { poseidonHash } from "./poseidon"
+import { D_IDENT, D_PAY } from "./domains"
 
-/** receiverCommitment = Poseidon2(claimingKey, receivingAddress) */
-export async function computeReceiverCommitment(
-  claimingKey: bigint,
+export async function computeIdentityCommitment(
+  nullifierKey: bigint,
   receivingAddress: bigint
 ): Promise<`0x${string}`> {
-  return poseidonHash([claimingKey, receivingAddress])
+  return poseidonHash([D_IDENT, nullifierKey, receivingAddress])
 }
 
-/**
- * paymentCommitment = Poseidon2(receiverCommitment, tokenAddress, amount, nonce)
- */
 export async function computePaymentCommitment(
-  receiverCommitment: `0x${string}`,
+  chainId: bigint,
+  identityCommitment: `0x${string}`,
   tokenAddress: bigint,
   amount: bigint,
   nonce: bigint
 ): Promise<`0x${string}`> {
-  return poseidonHash([BigInt(receiverCommitment), tokenAddress, amount, nonce])
+  return poseidonHash([D_PAY, chainId, BigInt(identityCommitment), tokenAddress, amount, nonce])
 }
 
-/**
- * changeCommitment = Poseidon2(Poseidon2(changeClaimingKey, changeReceivingAddress), tokenAddress, amount, nonce)
- *
- * Structurally identical to paymentCommitment, but claimingKey belongs to the payer.
- * changeReceivingAddress is the payer's designated change receiving address.
- */
 export async function computeChangeCommitment(
-  changeClaimingKey: bigint,
+  chainId: bigint,
+  changeNullifierKey: bigint,
   changeReceivingAddress: bigint,
   tokenAddress: bigint,
   amount: bigint,
   nonce: bigint
 ): Promise<`0x${string}`> {
-  const changeReceiverCommitment = await poseidonHash([changeClaimingKey, changeReceivingAddress])
-  return poseidonHash([BigInt(changeReceiverCommitment), tokenAddress, amount, nonce])
+  const changeIdentityComm = await computeIdentityCommitment(changeNullifierKey, changeReceivingAddress)
+  return poseidonHash([D_PAY, chainId, BigInt(changeIdentityComm), tokenAddress, amount, nonce])
 }
+
+/** @deprecated Use computeIdentityCommitment */
+export const computeReceiverCommitment = computeIdentityCommitment
