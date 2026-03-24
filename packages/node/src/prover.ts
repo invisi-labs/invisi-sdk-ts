@@ -7,7 +7,7 @@ import { promisify } from "node:util"
 const execFileAsync = promisify(execFile)
 
 export interface ProveParams {
-  circuitName: "single_settle" | "batch_settle" | "shielded_payment"
+  circuitName: "batch_settle_1" | "batch_settle_3" | "batch_settle_10" | "batch_settle_100" | "shielded_payment"
   witness: Record<string, string>
   bbBin?: string
   nargoBin?: string

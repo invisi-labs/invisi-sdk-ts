@@ -49,7 +49,7 @@ describe("checkBBAvailable", () => {
 describe("generateProof", () => {
   it("returns a 0x-prefixed hex proof", async () => {
     const proof = await generateProof({
-      circuitName: "single_settle",
+      circuitName: "batch_settle_1",
       witness: { claiming_key: "42", amount: "1000000000000000000" },
     })
     expect(proof).toMatch(/^0x[0-9a-f]+$/i)
