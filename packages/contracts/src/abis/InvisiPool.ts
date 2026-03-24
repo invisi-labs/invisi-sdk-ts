@@ -35,22 +35,7 @@ export const invisiPoolAbi = [
   },
   {
     type: "function",
-    name: "settleSingle",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "proof", type: "bytes" },
-      { name: "merkleRoot", type: "bytes32" },
-      { name: "nullifier", type: "bytes32" },
-      { name: "receivingAddress", type: "address" },
-      { name: "tokenAddress", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "treeId", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "settleBatch",
+    name: "withdraw",
     stateMutability: "nonpayable",
     inputs: [
       { name: "proof", type: "bytes" },
@@ -162,24 +147,15 @@ export const invisiPoolAbi = [
   },
   {
     type: "event",
-    name: "SingleSettle",
+    name: "Withdraw",
     inputs: [
-      { name: "nullifier", type: "bytes32", indexed: true },
-      { name: "receivingAddress", type: "address", indexed: true },
-      { name: "tokenAddress", type: "address", indexed: true },
-      { name: "amount", type: "uint256", indexed: false },
-      { name: "treeId", type: "uint256", indexed: false },
-    ],
-  },
-  {
-    type: "event",
-    name: "BatchSettle",
-    inputs: [
+      { name: "merkleRoot", type: "bytes32", indexed: true },
       { name: "nullifiers", type: "bytes32[]", indexed: false },
+      { name: "totalAmount", type: "uint256", indexed: false },
       { name: "receivingAddress", type: "address", indexed: true },
       { name: "tokenAddress", type: "address", indexed: true },
-      { name: "totalAmount", type: "uint256", indexed: false },
       { name: "treeId", type: "uint256", indexed: false },
+      { name: "count", type: "uint256", indexed: false },
     ],
   },
   {

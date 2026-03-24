@@ -12,11 +12,13 @@ describe("invisiPoolAbi", () => {
       .map((x) => (x as { name: string }).name)
     expect(names).toContain("payPublic")
     expect(names).toContain("payShielded")
-    expect(names).toContain("settleSingle")
-    expect(names).toContain("settleBatch")
+    expect(names).toContain("withdraw")
     expect(names).toContain("getTreeCount")
     expect(names).toContain("getPaymentTreeRoot")
     expect(names).toContain("isTreeFull")
+    // Note: settleSingle and settleBatch have been replaced by unified withdraw
+    expect(names).not.toContain("settleSingle")
+    expect(names).not.toContain("settleBatch")
     // Note: payShieldedNote and withdrawNote have been removed
     expect(names).not.toContain("payShieldedNote")
     expect(names).not.toContain("withdrawNote")
