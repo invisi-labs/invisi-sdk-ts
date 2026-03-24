@@ -95,7 +95,7 @@ export async function buildPayShieldedCalldata(
   }
 }
 
-/** Payer's local record of change from a shielded payment, for later recovery via settleSingle */
+/** Payer's local record of change from a shielded payment, for later recovery via withdraw */
 export interface ChangeRecord {
   treeId: bigint
   leafIndex: number
@@ -135,14 +135,14 @@ export async function buildSettleChangeCalldata(
 
   const data = encodeFunctionData({
     abi: invisiPoolAbi,
-    functionName: "settleSingle",
+    functionName: "withdraw",
     args: [
       params.proof,
       params.merkleRoot,
-      nullifier as `0x${string}`,
+      [nullifier as `0x${string}`],
+      params.amount,
       params.receivingAddress,
       params.tokenAddress,
-      params.amount,
       params.treeId,
     ],
   })
