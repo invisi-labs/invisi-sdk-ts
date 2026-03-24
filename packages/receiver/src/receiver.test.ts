@@ -7,6 +7,9 @@ describe("generateInvoice", () => {
       masterKey: 12345n,
       invoiceId: 1n,
       receivingAddress: 0xdeadn,
+      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+      amount: 100_000_000n,
+      treeId: 1n,
     })
     expect(inv.claimingKey).toBeTypeOf("bigint")
     expect(inv.receiverCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
@@ -14,16 +17,30 @@ describe("generateInvoice", () => {
   })
 
   it("different addresses produce different commitments", async () => {
-    const a = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn })
-    const b = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xbeefn })
+    const a = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
+    const b = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xbeefn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
     expect(a.claimingKey).toBe(b.claimingKey)
     expect(a.receiverCommitment).not.toBe(b.receiverCommitment)
+  })
+
+  it("includes treeId, tokenAddress and amount in invoice", async () => {
+    const inv = await generateInvoice({
+      masterKey: 12345n,
+      invoiceId: 1n,
+      receivingAddress: 0xdeadn,
+      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+      amount: 100_000_000n,
+      treeId: 3n,
+    })
+    expect(inv.treeId).toBe(3n)
+    expect(inv.tokenAddress).toBe(("0x" + "aa".repeat(20)) as `0x${string}`)
+    expect(inv.amount).toBe(100_000_000n)
   })
 })
 
 describe("buildSettleSingleCalldata", () => {
   it("returns nullifier and calldata with nonce", async () => {
-    const inv = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn })
+    const inv = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
     const result = await buildSettleSingleCalldata({
       treeId: 1n,
       claimingKey: inv.claimingKey,
