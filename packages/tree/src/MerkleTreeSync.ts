@@ -9,6 +9,7 @@ export interface MerkleTreeSyncOptions {
   poolAddress: string
   fromBlock: bigint
   treeType: TreeType
+  treeId: bigint
 }
 
 interface LeafEntry {
@@ -26,6 +27,7 @@ export class MerkleTreeSync {
   private readonly poolAddress: string
   private readonly fromBlock: bigint
   private readonly treeType: TreeType
+  private readonly treeId: bigint
 
   private _synced = false
   private _lastSyncedBlock = 0n
@@ -37,6 +39,7 @@ export class MerkleTreeSync {
     this.poolAddress = opts.poolAddress
     this.fromBlock = opts.fromBlock
     this.treeType = opts.treeType
+    this.treeId = opts.treeId
   }
 
   get synced(): boolean {
@@ -101,6 +104,9 @@ export class MerkleTreeSync {
     for (const event of events) {
       const name = event.eventName
       const args = event.args
+
+      // Filter by treeId
+      if (BigInt(args.treeId) !== this.treeId) continue
 
       // Payment tree: extract all leaves written to Payment Tree
       if (name === "PayPublic") {

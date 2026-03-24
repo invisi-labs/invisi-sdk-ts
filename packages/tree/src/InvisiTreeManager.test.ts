@@ -23,7 +23,7 @@ describe("InvisiTreeManager", () => {
 
   it("getPaymentProof works after inserting via events", async () => {
     const events = [
-      { args: { paymentCommitment: "0x" + "ab".padStart(64, "0"), leafIndex: 0 }, eventName: "PayPublic" },
+      { args: { paymentCommitment: "0x" + "ab".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayPublic" },
     ]
     const client = createMockClient(events)
     const manager = new InvisiTreeManager({
@@ -59,6 +59,7 @@ describe("InvisiTreeManager", () => {
           paymentLeafIndex: 0,
           changeCommitment: "0x" + "ff".padStart(64, "0"),
           changeLeafIndex: 1,
+          treeId: 1n,
         },
         eventName: "PayShielded",
       },

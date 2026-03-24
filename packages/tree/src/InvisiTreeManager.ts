@@ -38,6 +38,7 @@ export class InvisiTreeManager {
       poolAddress: this.poolAddress,
       fromBlock: this.fromBlock,
       treeType: "payment",
+      treeId: 1n, // TODO(Task 3): refactor to support multiple treeIds
     })
 
     await this._paymentSync.start()
