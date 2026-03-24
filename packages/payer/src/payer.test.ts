@@ -4,6 +4,7 @@ import { buildPayPublicCalldata, buildPayShieldedCalldata, buildSettleChangeCall
 describe("buildPayPublicCalldata", () => {
   it("returns calldata with paymentCommitment, nonce, and ERC20 data", async () => {
     const result = await buildPayPublicCalldata({
+      chainId: 1n,
       treeId: 1n,
       receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
@@ -17,6 +18,7 @@ describe("buildPayPublicCalldata", () => {
 
   it("generates different nonces on each call", async () => {
     const params = {
+      chainId: 1n,
       treeId: 1n,
       receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
@@ -46,7 +48,8 @@ describe("buildPayShieldedCalldata", () => {
 describe("buildSettleChangeCalldata", () => {
   it("returns nullifier and calldata", async () => {
     const result = await buildSettleChangeCalldata({
-      claimingKey: 42n,
+      chainId: 1n,
+      nullifierKey: 42n,
       receivingAddress: "0x000000000000000000000000000000000000dead",
       tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       amount: 53_000_000n,

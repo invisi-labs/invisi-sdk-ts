@@ -1,9 +1,9 @@
 import { encodeFunctionData } from "viem"
-import { deriveClaimingKey, computeReceiverCommitment } from "@invisi/core"
+import { deriveNullifierKey, computeIdentityCommitment } from "@invisi/core"
 import { invisiPoolAbi } from "@invisi/contracts"
 
 export interface GenerateInvoiceParams { masterKey: bigint; invoiceId: bigint; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint }
-export interface Invoice { invoiceId: bigint; claimingKey: bigint; receiverCommitment: `0x${string}`; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint }
+export interface Invoice { invoiceId: bigint; nullifierKey: bigint; receiverCommitment: `0x${string}`; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint }
 
 export interface BatchCircuitInfo {
   name: string
@@ -27,9 +27,9 @@ export interface WithdrawCalldata {
 }
 
 export async function generateInvoice(params: GenerateInvoiceParams): Promise<Invoice> {
-  const claimingKey = await deriveClaimingKey(params.masterKey, params.invoiceId)
-  const receiverCommitment = await computeReceiverCommitment(claimingKey, params.receivingAddress)
-  return { invoiceId: params.invoiceId, claimingKey, receiverCommitment, receivingAddress: params.receivingAddress, tokenAddress: params.tokenAddress, amount: params.amount, treeId: params.treeId }
+  const nullifierKey = await deriveNullifierKey(params.masterKey, params.invoiceId)
+  const receiverCommitment = await computeIdentityCommitment(nullifierKey, params.receivingAddress)
+  return { invoiceId: params.invoiceId, nullifierKey, receiverCommitment, receivingAddress: params.receivingAddress, tokenAddress: params.tokenAddress, amount: params.amount, treeId: params.treeId }
 }
 
 export function selectBatchCircuit(count: number): BatchCircuitInfo {

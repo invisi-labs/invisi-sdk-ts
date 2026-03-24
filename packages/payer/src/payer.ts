@@ -5,6 +5,7 @@ import { invisiPoolAbi } from "@invisi/contracts"
 const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 
 export interface PayPublicParams {
+  chainId: bigint
   receiverCommitment: `0x${string}`
   tokenAddress: `0x${string}`
   amount: bigint
@@ -29,11 +30,13 @@ function generateNonce(): bigint {
 export async function buildPayPublicCalldata(
   params: PayPublicParams
 ): Promise<PayPublicCalldata> {
-  const { poseidonHash } = await import("@invisi/core")
+  const { poseidonHash, D_PAY } = await import("@invisi/core")
   const nonce = generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
   const paymentCommitment = await poseidonHash([
+    D_PAY,
+    params.chainId,
     BigInt(params.receiverCommitment) % FIELD_MODULUS,
     BigInt(params.tokenAddress) % FIELD_MODULUS,
     params.amount % FIELD_MODULUS,
@@ -99,7 +102,7 @@ export async function buildPayShieldedCalldata(
 export interface ChangeRecord {
   treeId: bigint
   leafIndex: number
-  claimingKey: bigint
+  nullifierKey: bigint
   receivingAddress: `0x${string}`
   tokenAddress: `0x${string}`
   amount: bigint
@@ -107,7 +110,8 @@ export interface ChangeRecord {
 }
 
 export interface SettleChangeParams {
-  claimingKey: bigint
+  chainId: bigint
+  nullifierKey: bigint
   receivingAddress: `0x${string}`
   tokenAddress: `0x${string}`
   amount: bigint
@@ -125,9 +129,10 @@ export interface SettleChangeCalldata {
 export async function buildSettleChangeCalldata(
   params: SettleChangeParams
 ): Promise<SettleChangeCalldata> {
-  const { computeNullifier } = await import("@invisi/core")
-  const nullifier = await computeNullifier(
-    params.claimingKey,
+  const { computePaymentNullifier } = await import("@invisi/core")
+  const nullifier = await computePaymentNullifier(
+    params.chainId,
+    params.nullifierKey,
     BigInt(params.tokenAddress),
     params.amount,
     params.nonce
