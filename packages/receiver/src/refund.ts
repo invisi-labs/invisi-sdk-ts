@@ -119,11 +119,9 @@ export interface RefundDependencies {
  * Encodes the string as UTF-8 bytes, interprets as big-endian integer, reduces mod FIELD_MODULUS.
  */
 export function stringIdToBigInt(id: string): bigint {
-  const encoder = new TextEncoder()
-  const bytes = encoder.encode(id)
   let result = 0n
-  for (const byte of bytes) {
-    result = (result << 8n) | BigInt(byte)
+  for (let i = 0; i < id.length; i++) {
+    result = (result << 8n) | BigInt(id.charCodeAt(i))
   }
   return result % FIELD_MODULUS
 }
