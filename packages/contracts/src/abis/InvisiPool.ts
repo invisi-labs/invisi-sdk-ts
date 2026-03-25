@@ -119,6 +119,76 @@ export const invisiPoolAbi = [
     outputs: [],
   },
 
+  // ── Credit functions ────────────────────────────────────────────────────
+  {
+    type: "function",
+    name: "depositCredit",
+    inputs: [
+      { name: "receiverCommitment", type: "bytes32" },
+      { name: "payerCommitment", type: "bytes32" },
+      {
+        name: "asset",
+        type: "tuple",
+        components: [
+          { name: "addr", type: "address" },
+          { name: "amount", type: "uint256" },
+        ],
+      },
+      { name: "nonce", type: "bytes32" },
+      { name: "expiry", type: "uint256" },
+      { name: "nullifierKeyHash", type: "bytes32" },
+      { name: "treeId", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "creditDraw",
+    inputs: [
+      { name: "proof", type: "bytes" },
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "merkleRoot", type: "bytes32" },
+          { name: "nullifiers", type: "bytes32[]" },
+          { name: "totalAmount", type: "uint256" },
+          { name: "receivingAddress", type: "address" },
+          { name: "tokenAddress", type: "address" },
+          { name: "treeId", type: "uint256" },
+          { name: "remainderCommitments", type: "bytes32[]" },
+          { name: "expiry", type: "uint256" },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "reclaim",
+    inputs: [
+      { name: "proof", type: "bytes" },
+      { name: "merkleRoot", type: "bytes32" },
+      { name: "nullifier", type: "bytes32" },
+      { name: "amount", type: "uint256" },
+      { name: "receivingAddress", type: "address" },
+      { name: "tokenAddress", type: "address" },
+      { name: "treeId", type: "uint256" },
+      { name: "expiry", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "COOLDOWN_PERIOD",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+
   // ── Events ───────────────────────────────────────────────────────────────
   {
     type: "event",
@@ -179,6 +249,49 @@ export const invisiPoolAbi = [
     inputs: [
       { name: "circuitType", type: "uint8", indexed: true },
       { name: "newVerifier", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "CreditDeposit",
+    inputs: [
+      { name: "commitment", type: "bytes32", indexed: true },
+      { name: "leafIndex", type: "uint32", indexed: false },
+      { name: "receiverCommitment", type: "bytes32", indexed: false },
+      { name: "payerCommitment", type: "bytes32", indexed: false },
+      { name: "tokenAddress", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "expiry", type: "uint256", indexed: false },
+      { name: "nullifierKeyHash", type: "bytes32", indexed: false },
+      { name: "treeId", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "CreditDraw",
+    inputs: [
+      { name: "merkleRoot", type: "bytes32", indexed: true },
+      { name: "nullifiers", type: "bytes32[]", indexed: false },
+      { name: "totalAmount", type: "uint256", indexed: false },
+      { name: "receivingAddress", type: "address", indexed: true },
+      { name: "tokenAddress", type: "address", indexed: true },
+      { name: "treeId", type: "uint256", indexed: false },
+      { name: "count", type: "uint256", indexed: false },
+      { name: "remainderCommitments", type: "bytes32[]", indexed: false },
+      { name: "expiry", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "CreditReclaim",
+    inputs: [
+      { name: "merkleRoot", type: "bytes32", indexed: true },
+      { name: "nullifier", type: "bytes32", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "receivingAddress", type: "address", indexed: true },
+      { name: "tokenAddress", type: "address", indexed: false },
+      { name: "treeId", type: "uint256", indexed: false },
+      { name: "expiry", type: "uint256", indexed: false },
     ],
   },
 ] as const
