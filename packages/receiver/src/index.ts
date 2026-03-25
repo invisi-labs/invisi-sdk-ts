@@ -7,3 +7,17 @@ export type {
   CreditDrawCalldata,
   BuildCreditDrawCalldataParams,
 } from "./credit"
+
+export { refund, resumeRefund, buildRefundPayPublicCalldata, stringIdToBigInt } from "./refund"
+export type {
+  RefundParams,
+  RefundResult,
+  ResumeRefundParams,
+  RefundDependencies,
+  OriginalPaymentRecord,
+  BuildRefundPayPublicCalldataParams,
+  LookupOriginalPayment,
+  SendTransaction,
+  WaitForPayConfirmation,
+  SubmitWithdraw,
+} from "./refund"
