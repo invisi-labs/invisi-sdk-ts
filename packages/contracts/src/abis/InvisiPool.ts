@@ -51,6 +51,126 @@ export const invisiPoolAbi = [
     outputs: [],
   },
 
+  // ── Meta-transaction (WithSig) ────────────────────────────────────────
+  {
+    type: "function",
+    name: "payPublicWithSig",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "receiverCommitment", type: "bytes32" },
+      {
+        name: "asset",
+        type: "tuple",
+        components: [
+          { name: "addr", type: "address" },
+          { name: "amount", type: "uint256" },
+        ],
+      },
+      { name: "nonce", type: "bytes32" },
+      { name: "treeId", type: "uint256" },
+      { name: "refundLink", type: "bytes32" },
+      {
+        name: "permit",
+        type: "tuple",
+        components: [
+          { name: "deadline", type: "uint256" },
+          { name: "v", type: "uint8" },
+          { name: "r", type: "bytes32" },
+          { name: "s", type: "bytes32" },
+        ],
+      },
+      { name: "signer", type: "address" },
+      { name: "sigNonce", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+      { name: "signature", type: "bytes" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "payShieldedWithSig",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "proof", type: "bytes" },
+      { name: "paymentCommitment", type: "bytes32" },
+      { name: "changeCommitment", type: "bytes32" },
+      { name: "inputAmount", type: "uint256" },
+      { name: "tokenAddress", type: "address" },
+      { name: "treeId", type: "uint256" },
+      { name: "refundLink", type: "bytes32" },
+      {
+        name: "meta",
+        type: "tuple",
+        components: [
+          {
+            name: "permit",
+            type: "tuple",
+            components: [
+              { name: "deadline", type: "uint256" },
+              { name: "v", type: "uint8" },
+              { name: "r", type: "bytes32" },
+              { name: "s", type: "bytes32" },
+            ],
+          },
+          { name: "signer", type: "address" },
+          { name: "sigNonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "signature", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "depositCreditWithSig",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "receiverCommitment", type: "bytes32" },
+      { name: "payerCommitment", type: "bytes32" },
+      {
+        name: "asset",
+        type: "tuple",
+        components: [
+          { name: "addr", type: "address" },
+          { name: "amount", type: "uint256" },
+        ],
+      },
+      { name: "nonce", type: "bytes32" },
+      { name: "expiry", type: "uint256" },
+      { name: "nullifierKeyHash", type: "bytes32" },
+      { name: "treeId", type: "uint256" },
+      {
+        name: "meta",
+        type: "tuple",
+        components: [
+          {
+            name: "permit",
+            type: "tuple",
+            components: [
+              { name: "deadline", type: "uint256" },
+              { name: "v", type: "uint8" },
+              { name: "r", type: "bytes32" },
+              { name: "s", type: "bytes32" },
+            ],
+          },
+          { name: "signer", type: "address" },
+          { name: "sigNonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "signature", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "invalidateNonce",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+
   // ── View functions ───────────────────────────────────────────────────────
   {
     type: "function",
@@ -79,6 +199,13 @@ export const invisiPoolAbi = [
     stateMutability: "view",
     inputs: [{ name: "nullifier", type: "bytes32" }],
     outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "nonces",
+    stateMutability: "view",
+    inputs: [{ name: "signer", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",
@@ -302,6 +429,16 @@ export const invisiPoolAbi = [
     inputs: [
       { name: "refundLink", type: "bytes32", indexed: true },
       { name: "refundPaymentCommitment", type: "bytes32", indexed: true },
+    ],
+  },
+
+  // ── Meta-transaction events ───────────────────────────────────────────
+  {
+    type: "event",
+    name: "NonceInvalidated",
+    inputs: [
+      { name: "signer", type: "address", indexed: true },
+      { name: "newNonce", type: "uint256", indexed: false },
     ],
   },
 ] as const
