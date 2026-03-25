@@ -5,3 +5,10 @@ export { D_NKEY, D_IDENT, D_PAY, D_NULL, D_CREDIT, D_CNULL, D_NKHASH, D_DERIVE }
 export { computeIdentityCommitment, computePaymentCommitment, computeChangeCommitment, computeReceiverCommitment } from "./commitment"
 export { computePaymentNullifier, computeNullifier } from "./nullifier"
 export { deriveNullifierKey, deriveClaimingKey } from "./keyDerivation"
+export {
+  computeNullifierKeyHash,
+  computeCreditCommitment,
+  computeCreditNullifier,
+  deriveRemainderNonce,
+  deriveRemainderNullifierKey,
+} from "./creditCommitment"
