@@ -16,6 +16,7 @@ export const invisiPoolAbi = [
       },
       { name: "nonce", type: "bytes32" },
       { name: "treeId", type: "uint256" },
+      { name: "refundLink", type: "bytes32" },
     ],
     outputs: [],
   },
@@ -30,6 +31,7 @@ export const invisiPoolAbi = [
       { name: "inputAmount", type: "uint256" },
       { name: "tokenAddress", type: "address" },
       { name: "treeId", type: "uint256" },
+      { name: "refundLink", type: "bytes32" },
     ],
     outputs: [],
   },
@@ -292,6 +294,14 @@ export const invisiPoolAbi = [
       { name: "tokenAddress", type: "address", indexed: false },
       { name: "treeId", type: "uint256", indexed: false },
       { name: "expiry", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "RefundLinked",
+    inputs: [
+      { name: "refundLink", type: "bytes32", indexed: true },
+      { name: "refundPaymentCommitment", type: "bytes32", indexed: true },
     ],
   },
 ] as const

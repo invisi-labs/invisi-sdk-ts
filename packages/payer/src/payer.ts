@@ -10,6 +10,7 @@ export interface PayPublicParams {
   tokenAddress: `0x${string}`
   amount: bigint
   treeId: bigint
+  refundLink?: bigint
 }
 
 export interface PayPublicCalldata {
@@ -51,6 +52,7 @@ export async function buildPayPublicCalldata(
       { addr: params.tokenAddress, amount: params.amount },
       nonceHex,
       params.treeId,
+      ("0x" + (params.refundLink ?? 0n).toString(16).padStart(64, "0")) as `0x${string}`,
     ],
   })
 
@@ -69,6 +71,7 @@ export interface PayShieldedParams {
   inputAmount: bigint
   tokenAddress: `0x${string}`
   treeId: bigint
+  refundLink?: bigint
 }
 
 export interface PayShieldedCalldata {
@@ -89,6 +92,7 @@ export async function buildPayShieldedCalldata(
       params.inputAmount,
       params.tokenAddress,
       params.treeId,
+      ("0x" + (params.refundLink ?? 0n).toString(16).padStart(64, "0")) as `0x${string}`,
     ],
   })
 
