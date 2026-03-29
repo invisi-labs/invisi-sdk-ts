@@ -18,19 +18,6 @@ interface LeafEntry {
 }
 
 /**
- * A sequentially-inserted commitment that has no explicit leaf index.
- * Used for CreditDraw remainder commitments, which are inserted by the contract
- * in order but not emitted with individual leaf indices.
- */
-interface SequentialLeafEntry {
-  commitment: bigint
-  /** Event log index within the block, used to preserve insertion order */
-  logIndex: number
-  /** Position within the remainderCommitments array of the same event */
-  positionInEvent: number
-}
-
-/**
  * Syncs an InMemoryMerkleTree with on-chain Payment Tree events from InvisiPool.
  * Tracks paymentCommitment, changeCommitment, credit deposits, and credit draw remainders.
  */
@@ -84,6 +71,7 @@ export class MerkleTreeSync {
       address: this.poolAddress,
       fromBlock: this.fromBlock,
       toBlock: latestBlock,
+      args: { treeId: this.treeId },
     })
 
     await this._applyEvents(events)
@@ -94,6 +82,7 @@ export class MerkleTreeSync {
     this._unwatch = this.client.watchContractEvent({
       abi: invisiPoolAbi,
       address: this.poolAddress,
+      args: { treeId: this.treeId },
       onLogs: async (logs: any[]) => {
         await this._applyEvents(logs)
       },
@@ -101,83 +90,63 @@ export class MerkleTreeSync {
   }
 
   private async _applyEvents(events: any[]): Promise<void> {
-    const { indexed, sequential } = this._parseEvents(events)
+    const leaves = this._parseEvents(events)
 
-    // Insert indexed leaves (known leaf indices) in order
-    indexed.sort((a, b) => a.leafIndex - b.leafIndex)
-    for (const leaf of indexed) {
-      await this.tree.insert(leaf.commitment)
-    }
-
-    // Insert sequential leaves (CreditDraw remainders) in log+position order.
-    // NOTE: This only works correctly when indexed leaves have already been
-    // inserted, since the tree's internal nextLeafIndex must match the contract's
-    // state at the time these events were emitted. This relies on the assumption
-    // that all indexed-leaf events (PayPublic, PayShielded, CreditDeposit) always
-    // come before or at the same block as the CreditDraw event that follows them.
-    sequential.sort((a, b) => a.logIndex - b.logIndex || a.positionInEvent - b.positionInEvent)
-    for (const leaf of sequential) {
+    // Insert all leaves (known leaf indices) in order
+    leaves.sort((a, b) => a.leafIndex - b.leafIndex)
+    for (const leaf of leaves) {
       await this.tree.insert(leaf.commitment)
     }
   }
 
-  private _parseEvents(events: any[]): { indexed: LeafEntry[]; sequential: SequentialLeafEntry[] } {
-    const indexed: LeafEntry[] = []
-    const sequential: SequentialLeafEntry[] = []
+  private _parseEvents(events: any[]): LeafEntry[] {
+    const leaves: LeafEntry[] = []
 
     for (const event of events) {
       const name = event.eventName
       const args = event.args
 
-      // Filter by treeId
-      if (BigInt(args.treeId) !== this.treeId) continue
+      // treeId is filtered at the RPC layer via getContractEvents/watchContractEvent args
 
       // Payment tree: extract all leaves written to Payment Tree
       if (name === "PayPublic") {
-        indexed.push({
+        leaves.push({
           commitment: BigInt(args.paymentCommitment),
           leafIndex: Number(args.leafIndex),
         })
       } else if (name === "PayShielded") {
         // Both paymentCommitment and changeCommitment are in Payment Tree
-        indexed.push({
+        leaves.push({
           commitment: BigInt(args.paymentCommitment),
           leafIndex: Number(args.paymentLeafIndex),
         })
-        indexed.push({
+        leaves.push({
           commitment: BigInt(args.changeCommitment),
           leafIndex: Number(args.changeLeafIndex),
         })
       } else if (name === "CreditDeposit") {
         // Credit commitment is inserted at leafIndex (same pattern as PayPublic)
-        indexed.push({
+        leaves.push({
           commitment: BigInt(args.commitment),
           leafIndex: Number(args.leafIndex),
         })
       } else if (name === "CreditDraw") {
-        // CreditDraw inserts non-zero remainderCommitments sequentially into the tree.
-        // The event does not include individual leaf indices for each remainder.
-        // We use the event's log index and array position to preserve insertion order.
-        // The tree's InMemoryMerkleTree tracks nextLeafIndex internally, so sequential
-        // inserts will land in the correct positions as long as all prior insertions
-        // (from the same block or earlier blocks) are already applied.
-        const logIndex = Number(event.logIndex ?? 0)
+        // CreditDraw now emits remainderLeafIndices alongside remainderCommitments,
+        // so each remainder has a known leaf index — no sequential guessing needed.
         const remainders = args.remainderCommitments as `0x${string}`[]
-        let position = 0
-        for (const rc of remainders) {
-          const rcBig = BigInt(rc)
+        const indices = args.remainderLeafIndices as number[]
+        for (let i = 0; i < remainders.length; i++) {
+          const rcBig = BigInt(remainders[i]!)
           if (rcBig !== 0n) {
-            sequential.push({
+            leaves.push({
               commitment: rcBig,
-              logIndex,
-              positionInEvent: position,
+              leafIndex: Number(indices[i]!),
             })
-            position++
           }
         }
       }
     }
 
-    return { indexed, sequential }
+    return leaves
   }
 }

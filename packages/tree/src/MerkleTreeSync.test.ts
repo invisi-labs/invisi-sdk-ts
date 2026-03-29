@@ -4,7 +4,15 @@ import { InMemoryMerkleTree } from "./InMemoryMerkleTree"
 
 function createMockClient(events: any[] = []) {
   return {
-    getContractEvents: vi.fn().mockResolvedValue(events),
+    getContractEvents: vi.fn().mockImplementation((opts: any) => {
+      const treeIdFilter = opts?.args?.treeId
+      if (treeIdFilter != null) {
+        return Promise.resolve(
+          events.filter((e) => BigInt(e.args.treeId) === BigInt(treeIdFilter))
+        )
+      }
+      return Promise.resolve(events)
+    }),
     watchContractEvent: vi.fn().mockReturnValue(vi.fn()),
     getBlockNumber: vi.fn().mockResolvedValue(100n),
   } as any

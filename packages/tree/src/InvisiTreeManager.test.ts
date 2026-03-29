@@ -3,7 +3,15 @@ import { InvisiTreeManager } from "./InvisiTreeManager"
 
 function createMockClient(events: any[] = [], treeCount = 2n) {
   return {
-    getContractEvents: vi.fn().mockResolvedValue(events),
+    getContractEvents: vi.fn().mockImplementation((opts: any) => {
+      const treeIdFilter = opts?.args?.treeId
+      if (treeIdFilter != null) {
+        return Promise.resolve(
+          events.filter((e) => BigInt(e.args.treeId) === BigInt(treeIdFilter))
+        )
+      }
+      return Promise.resolve(events)
+    }),
     watchContractEvent: vi.fn().mockReturnValue(vi.fn()),
     getBlockNumber: vi.fn().mockResolvedValue(100n),
     readContract: vi.fn().mockResolvedValue(treeCount),

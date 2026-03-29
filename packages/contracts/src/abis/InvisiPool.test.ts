@@ -105,4 +105,80 @@ describe("invisiPoolAbi", () => {
     expect(nonce).toBeDefined()
     expect(nonce!.type).toBe("bytes32")
   })
+
+  it("PayPublic event has treeId indexed and new fields", () => {
+    const event = invisiPoolAbi.find(
+      (x) => x.type === "event" && x.name === "PayPublic"
+    )
+    expect(event).toBeDefined()
+    const inputs = (event as unknown as { inputs: Array<{ name: string; indexed: boolean }> }).inputs
+    const treeId = inputs.find((i) => i.name === "treeId")
+    expect(treeId?.indexed).toBe(true)
+    expect(inputs.some((i) => i.name === "receiverCommitment")).toBe(true)
+    expect(inputs.some((i) => i.name === "nonce")).toBe(true)
+    expect(inputs.some((i) => i.name === "refundLink")).toBe(true)
+  })
+
+  it("PayShielded event has payer indexed", () => {
+    const event = invisiPoolAbi.find(
+      (x) => x.type === "event" && x.name === "PayShielded"
+    )
+    expect(event).toBeDefined()
+    const inputs = (event as unknown as { inputs: Array<{ name: string; indexed: boolean }> }).inputs
+    const payer = inputs.find((i) => i.name === "payer")
+    expect(payer?.indexed).toBe(true)
+    const treeId = inputs.find((i) => i.name === "treeId")
+    expect(treeId?.indexed).toBe(true)
+  })
+
+  it("CreditDeposit event has depositor indexed", () => {
+    const event = invisiPoolAbi.find(
+      (x) => x.type === "event" && x.name === "CreditDeposit"
+    )
+    expect(event).toBeDefined()
+    const inputs = (event as unknown as { inputs: Array<{ name: string; indexed: boolean }> }).inputs
+    expect(inputs.find((i) => i.name === "depositor")?.indexed).toBe(true)
+    expect(inputs.some((i) => i.name === "nonce")).toBe(true)
+  })
+
+  it("CreditDraw event has remainderLeafIndices", () => {
+    const event = invisiPoolAbi.find(
+      (x) => x.type === "event" && x.name === "CreditDraw"
+    )
+    expect(event).toBeDefined()
+    const inputs = (event as unknown as { inputs: Array<{ name: string; type: string }> }).inputs
+    const field = inputs.find((i) => i.name === "remainderLeafIndices")
+    expect(field).toBeDefined()
+    expect(field!.type).toBe("uint32[]")
+  })
+
+  it("all events have treeId indexed where applicable", () => {
+    const eventsWithTreeId = ["PayPublic", "PayShielded", "Withdraw", "CreditDeposit", "CreditDraw", "CreditReclaim"]
+    for (const name of eventsWithTreeId) {
+      const event = invisiPoolAbi.find(
+        (x) => x.type === "event" && x.name === name
+      )
+      expect(event, `${name} event should exist`).toBeDefined()
+      const inputs = (event as unknown as { inputs: Array<{ name: string; indexed: boolean }> }).inputs
+      const treeId = inputs.find((i) => i.name === "treeId")
+      expect(treeId, `${name} should have treeId`).toBeDefined()
+      expect(treeId!.indexed, `${name}.treeId should be indexed`).toBe(true)
+    }
+  })
+
+  it("RefundLinked event is removed", () => {
+    const event = invisiPoolAbi.find(
+      (x) => x.type === "event" && x.name === "RefundLinked"
+    )
+    expect(event).toBeUndefined()
+  })
+
+  it("Withdraw event does not have count field", () => {
+    const event = invisiPoolAbi.find(
+      (x) => x.type === "event" && x.name === "Withdraw"
+    )
+    expect(event).toBeDefined()
+    const inputs = (event as unknown as { inputs: Array<{ name: string }> }).inputs
+    expect(inputs.some((i) => i.name === "count")).toBe(false)
+  })
 })
