@@ -216,35 +216,107 @@ export const invisiPoolAbi = [
   },
   {
     type: "function",
-    name: "getSupportedTokens",
+    name: "VERSION",
     stateMutability: "view",
     inputs: [],
-    outputs: [{ name: "", type: "address[]" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "emergencyAdmin",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "timelockAdmin",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getTokenConfig",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "registered", type: "bool" },
+          { name: "enabled", type: "bool" },
+          { name: "maxPerDeposit", type: "uint256" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "isTokenEnabled",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
   },
 
   // ── Admin functions ──────────────────────────────────────────────────────
+  // emergencyAdmin (instant)
   {
     type: "function",
-    name: "addSupportedToken",
+    name: "pause",
     stateMutability: "nonpayable",
-    inputs: [{ name: "tokenAddress", type: "address" }],
+    inputs: [],
     outputs: [],
   },
   {
     type: "function",
-    name: "removeSupportedToken",
+    name: "unpause",
     stateMutability: "nonpayable",
-    inputs: [{ name: "tokenAddress", type: "address" }],
+    inputs: [],
     outputs: [],
   },
   {
     type: "function",
-    name: "updateVerifier",
+    name: "pauseToken",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [],
+  },
+
+  // timelockAdmin (delayed)
+  {
+    type: "function",
+    name: "addToken",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "circuitType", type: "uint8" },
-      { name: "newVerifier", type: "address" },
+      { name: "token", type: "address" },
+      { name: "maxPerDeposit", type: "uint256" },
     ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "removeToken",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setTokenLimit",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "maxPerDeposit", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "unpauseToken",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "token", type: "address" }],
     outputs: [],
   },
 
@@ -365,19 +437,32 @@ export const invisiPoolAbi = [
   {
     type: "event",
     name: "TokenAdded",
-    inputs: [{ name: "tokenAddress", type: "address", indexed: true }],
+    inputs: [
+      { name: "token", type: "address", indexed: true },
+      { name: "maxPerDeposit", type: "uint256", indexed: false },
+    ],
   },
   {
     type: "event",
     name: "TokenRemoved",
-    inputs: [{ name: "tokenAddress", type: "address", indexed: true }],
+    inputs: [{ name: "token", type: "address", indexed: true }],
   },
   {
     type: "event",
-    name: "VerifierUpdated",
+    name: "TokenPaused",
+    inputs: [{ name: "token", type: "address", indexed: true }],
+  },
+  {
+    type: "event",
+    name: "TokenUnpaused",
+    inputs: [{ name: "token", type: "address", indexed: true }],
+  },
+  {
+    type: "event",
+    name: "TokenLimitUpdated",
     inputs: [
-      { name: "circuitType", type: "uint8", indexed: true },
-      { name: "newVerifier", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "maxPerDeposit", type: "uint256", indexed: false },
     ],
   },
   {
@@ -439,6 +524,26 @@ export const invisiPoolAbi = [
     inputs: [
       { name: "signer", type: "address", indexed: true },
       { name: "newNonce", type: "uint256", indexed: false },
+    ],
+  },
+  // ── Errors ─────────────────────────────────────────────────────────────
+  {
+    type: "error",
+    name: "TokenNotRegistered",
+    inputs: [{ name: "token", type: "address" }],
+  },
+  {
+    type: "error",
+    name: "TokenNotEnabled",
+    inputs: [{ name: "token", type: "address" }],
+  },
+  {
+    type: "error",
+    name: "ExceedsDepositLimit",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "maxPerDeposit", type: "uint256" },
     ],
   },
 ] as const
