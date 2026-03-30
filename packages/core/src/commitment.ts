@@ -30,5 +30,3 @@ export async function computeChangeCommitment(
   return poseidonHash([D_PAY, chainId, BigInt(changeIdentityComm), tokenAddress, amount, nonce])
 }
 
-/** @deprecated Use computeIdentityCommitment */
-export const computeReceiverCommitment = computeIdentityCommitment

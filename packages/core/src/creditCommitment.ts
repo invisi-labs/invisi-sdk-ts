@@ -9,7 +9,7 @@ export async function computeNullifierKeyHash(
 
 export async function computeCreditCommitment(
   chainId: bigint,
-  receiverCommitment: `0x${string}`,
+  identityCommitment: `0x${string}`,
   payerCommitment: `0x${string}`,
   tokenAddress: bigint,
   amount: bigint,
@@ -18,7 +18,7 @@ export async function computeCreditCommitment(
   nullifierKeyHash: `0x${string}`
 ): Promise<`0x${string}`> {
   return poseidonHash([
-    D_CREDIT, chainId, BigInt(receiverCommitment), BigInt(payerCommitment),
+    D_CREDIT, chainId, BigInt(identityCommitment), BigInt(payerCommitment),
     tokenAddress, amount, nonce, expiry, BigInt(nullifierKeyHash)
   ])
 }
