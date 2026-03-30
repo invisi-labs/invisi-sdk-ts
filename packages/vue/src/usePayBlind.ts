@@ -1,16 +1,16 @@
 import { ref } from "vue"
-import { buildPayPublicCalldata, type PayPublicParams, type PayPublicCalldata } from "@invisi/payer"
+import { buildPayBlindCalldata, type PayBlindParams, type PayBlindCalldata } from "@invisi/payer"
 
-export function useDeposit() {
+export function usePayBlind() {
   const status = ref<"idle" | "preparing" | "ready" | "error">("idle")
-  const calldata = ref<PayPublicCalldata | null>(null)
+  const calldata = ref<PayBlindCalldata | null>(null)
   const error = ref<Error | null>(null)
 
-  async function prepare(params: PayPublicParams) {
+  async function prepare(params: PayBlindParams) {
     status.value = "preparing"
     error.value = null
     try {
-      calldata.value = await buildPayPublicCalldata(params)
+      calldata.value = await buildPayBlindCalldata(params)
       status.value = "ready"
     } catch (e) {
       error.value = e instanceof Error ? e : new Error(String(e))

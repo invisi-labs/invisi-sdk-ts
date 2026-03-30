@@ -1,2 +1,2 @@
-export { useDeposit } from "./useDeposit"
-export { useShieldedDeposit } from "./useShieldedDeposit"
+export { usePayOpen } from "./usePayOpen"
+export { usePayBlind } from "./usePayBlind"

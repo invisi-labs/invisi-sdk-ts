@@ -1,4 +1,4 @@
-export { useDeposit } from "./useDeposit"
-export type { UseDepositResult } from "./useDeposit"
-export { useShieldedDeposit } from "./useShieldedDeposit"
-export type { UseShieldedDepositResult } from "./useShieldedDeposit"
+export { usePayOpen } from "./usePayOpen"
+export type { UsePayOpenResult } from "./usePayOpen"
+export { usePayBlind } from "./usePayBlind"
+export type { UsePayBlindResult } from "./usePayBlind"

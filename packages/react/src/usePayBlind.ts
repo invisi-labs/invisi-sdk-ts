@@ -1,25 +1,25 @@
 import { useState, useCallback } from "react"
-import { buildPayShieldedCalldata, type PayShieldedParams, type PayShieldedCalldata } from "@invisi/payer"
+import { buildPayBlindCalldata, type PayBlindParams, type PayBlindCalldata } from "@invisi/payer"
 
 type Status = "idle" | "preparing" | "ready" | "error"
 
-export interface UseShieldedDepositResult {
+export interface UsePayBlindResult {
   status: Status
-  calldata: PayShieldedCalldata | null
+  calldata: PayBlindCalldata | null
   error: Error | null
-  prepare: (params: PayShieldedParams) => Promise<void>
+  prepare: (params: PayBlindParams) => Promise<void>
 }
 
-export function useShieldedDeposit(): UseShieldedDepositResult {
+export function usePayBlind(): UsePayBlindResult {
   const [status, setStatus] = useState<Status>("idle")
-  const [calldata, setCalldata] = useState<PayShieldedCalldata | null>(null)
+  const [calldata, setCalldata] = useState<PayBlindCalldata | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
-  const prepare = useCallback(async (params: PayShieldedParams) => {
+  const prepare = useCallback(async (params: PayBlindParams) => {
     setStatus("preparing")
     setError(null)
     try {
-      const result = await buildPayShieldedCalldata(params)
+      const result = await buildPayBlindCalldata(params)
       setCalldata(result)
       setStatus("ready")
     } catch (e) {
