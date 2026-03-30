@@ -44,15 +44,15 @@ This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SD
 ```
 @invisi/core          ← Poseidon hash, commitments, nullifiers, key derivation
        ↓                  (uses @aztec/bb.js for Barretenberg cryptography)
-@invisi/contracts     ← InvisiPool ABI + TypeScript types (no dependencies)
+@invisi/contracts     ← InvisiProtocol ABI + TypeScript types (no dependencies)
 @invisi/deployments   ← Chain deployment registry (no dependencies)
        ↓
-@invisi/payer         ← buildPayPublicCalldata (uses viem + @invisi/contracts)
-@invisi/receiver      ← generateInvoice, buildSettleSingleCalldata
+@invisi/payer         ← buildPayOpenCalldata, buildPayBlindCalldata (uses viem + @invisi/contracts)
+@invisi/receiver      ← generateInvoice, buildWithdrawCalldata
                           (uses @invisi/core + @invisi/contracts + @invisi/deployments + viem)
        ↓
-@invisi/react         ← useDeposit() hook (wraps @invisi/payer)
-@invisi/vue           ← useDeposit() composable (wraps @invisi/payer)
+@invisi/react         ← usePayOpen() hook, usePayBlind() hook (wraps @invisi/payer)
+@invisi/vue           ← usePayOpen() composable, usePayBlind() composable (wraps @invisi/payer)
 
 @invisi/node          ← Server-side ZK proof generation via nargo + bb CLI
                           (uses @invisi/core, requires nargo & bb binaries)
@@ -61,7 +61,7 @@ This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SD
 ### Key Concepts
 
 - **Claiming key**: Derived per-invoice from a master key (`deriveClaimingKey(masterKey, invoiceId)` in `@invisi/core`). Used to compute commitments and nullifiers.
-- **Payment commitment**: `poseidonHash(receiverCommitment, amount)` — stored on-chain when a payer deposits.
+- **Payment commitment**: `poseidonHash(identityCommitment, amount)` — stored on-chain when a payer deposits.
 - **Nullifier**: `poseidonHash(claimingKey, amount)` — prevents double-spending during settlement.
 - **Proof circuits**: `single_withdraw`, `batch_withdraw`, `shielded_payment` — generated server-side by `@invisi/node` via two-step process: `nargo execute` (witness) then `bb prove` (proof).
 
