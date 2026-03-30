@@ -4,7 +4,7 @@ import {
   computeIdentityCommitment,
   computeRefundLink,
 } from "@invisi/core"
-import { invisiPoolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi/contracts"
 
 // BN254 field modulus
 const FIELD_MODULUS =
@@ -105,7 +105,7 @@ export type SubmitWithdraw = (params: {
 export interface RefundDependencies {
   masterKey: bigint
   chainId: bigint
-  poolAddress: Address
+  protocolAddress: Address
   lookupOriginalPayment: LookupOriginalPayment
   sendTransaction: SendTransaction
   waitForPayConfirmation: WaitForPayConfirmation
@@ -139,9 +139,9 @@ function toHex(value: bigint): Hex {
   return ("0x" + value.toString(16).padStart(64, "0")) as Hex
 }
 
-// ---------- buildRefundPayPublicCalldata ----------
+// ---------- buildRefundPayOpenCalldata ----------
 
-export interface BuildRefundPayPublicCalldataParams {
+export interface BuildRefundPayOpenCalldataParams {
   identityCommitment: Hex
   tokenAddress: Address
   refundAmount: bigint
@@ -150,12 +150,12 @@ export interface BuildRefundPayPublicCalldataParams {
   refundLink: Hex
 }
 
-export async function buildRefundPayPublicCalldata(
-  params: BuildRefundPayPublicCalldataParams
+export async function buildRefundPayOpenCalldata(
+  params: BuildRefundPayOpenCalldataParams
 ): Promise<{ data: Hex }> {
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
-    functionName: "payPublic",
+    abi: invisiProtocolAbi,
+    functionName: "payOpen",
     args: [
       params.identityCommitment,
       { addr: params.tokenAddress, amount: params.refundAmount },
@@ -216,7 +216,7 @@ export async function refund(
   )
 
   // 6. Build and send pay tx
-  const { data } = await buildRefundPayPublicCalldata({
+  const { data } = await buildRefundPayOpenCalldata({
     identityCommitment,
     tokenAddress: original.tokenAddress,
     refundAmount: params.refundAmount,
@@ -227,7 +227,7 @@ export async function refund(
 
   const payTxHash = await deps.sendTransaction({
     data,
-    to: deps.poolAddress,
+    to: deps.protocolAddress,
   })
 
   // 7. Wait for confirmation

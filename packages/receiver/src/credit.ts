@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem"
-import { invisiPoolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi/contracts"
 
 export interface CreditRecord {
   creditId: string
@@ -43,7 +43,7 @@ export interface BuildCreditDrawCalldataParams {
 
 export async function buildCreditDrawCalldata(params: BuildCreditDrawCalldataParams): Promise<CreditDrawCalldata> {
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
+    abi: invisiProtocolAbi,
     functionName: "creditDraw",
     args: [
       params.proof,

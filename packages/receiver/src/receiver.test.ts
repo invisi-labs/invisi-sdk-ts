@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { generateInvoice, selectBatchCircuit, buildWithdrawCalldata } from "./receiver"
 
 describe("generateInvoice", () => {
-  it("returns nullifierKey and receiverCommitment with receivingAddress", async () => {
+  it("returns nullifierKey and identityCommitment with receivingAddress", async () => {
     const inv = await generateInvoice({
       masterKey: 12345n,
       invoiceId: 1n,
@@ -12,7 +12,7 @@ describe("generateInvoice", () => {
       treeId: 1n,
     })
     expect(inv.nullifierKey).toBeTypeOf("bigint")
-    expect(inv.receiverCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
+    expect(inv.identityCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(inv.receivingAddress).toBe(0xdeadn)
   })
 
@@ -20,7 +20,7 @@ describe("generateInvoice", () => {
     const a = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
     const b = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xbeefn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
     expect(a.nullifierKey).toBe(b.nullifierKey)
-    expect(a.receiverCommitment).not.toBe(b.receiverCommitment)
+    expect(a.identityCommitment).not.toBe(b.identityCommitment)
   })
 
   it("includes treeId, tokenAddress and amount in invoice", async () => {

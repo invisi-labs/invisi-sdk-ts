@@ -8,14 +8,14 @@ export type {
   BuildCreditDrawCalldataParams,
 } from "./credit"
 
-export { refund, resumeRefund, buildRefundPayPublicCalldata, stringIdToBigInt } from "./refund"
+export { refund, resumeRefund, buildRefundPayOpenCalldata, stringIdToBigInt } from "./refund"
 export type {
   RefundParams,
   RefundResult,
   ResumeRefundParams,
   RefundDependencies,
   OriginalPaymentRecord,
-  BuildRefundPayPublicCalldataParams,
+  BuildRefundPayOpenCalldataParams,
   LookupOriginalPayment,
   SendTransaction,
   WaitForPayConfirmation,
