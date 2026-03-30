@@ -1,19 +1,19 @@
 import { encodeFunctionData } from "viem"
-import { invisiPoolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi/contracts"
 
 // BN254 field modulus
 const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 
-export interface PayPublicParams {
+export interface PayOpenParams {
   chainId: bigint
-  receiverCommitment: `0x${string}`
+  identityCommitment: `0x${string}`
   tokenAddress: `0x${string}`
   amount: bigint
   treeId: bigint
   refundLink?: bigint
 }
 
-export interface PayPublicCalldata {
+export interface PayOpenCalldata {
   paymentCommitment: `0x${string}`
   nonce: `0x${string}`
   data: `0x${string}`
@@ -28,9 +28,9 @@ function generateNonce(): bigint {
   return raw % FIELD_MODULUS
 }
 
-export async function buildPayPublicCalldata(
-  params: PayPublicParams
-): Promise<PayPublicCalldata> {
+export async function buildPayOpenCalldata(
+  params: PayOpenParams
+): Promise<PayOpenCalldata> {
   const { poseidonHash, D_PAY } = await import("@invisi/core")
   const nonce = generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
@@ -38,17 +38,17 @@ export async function buildPayPublicCalldata(
   const paymentCommitment = await poseidonHash([
     D_PAY,
     params.chainId,
-    BigInt(params.receiverCommitment) % FIELD_MODULUS,
+    BigInt(params.identityCommitment) % FIELD_MODULUS,
     BigInt(params.tokenAddress) % FIELD_MODULUS,
     params.amount % FIELD_MODULUS,
     nonce % FIELD_MODULUS,
   ])
 
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
-    functionName: "payPublic",
+    abi: invisiProtocolAbi,
+    functionName: "payOpen",
     args: [
-      params.receiverCommitment,
+      params.identityCommitment,
       { addr: params.tokenAddress, amount: params.amount },
       nonceHex,
       params.treeId,
@@ -64,7 +64,7 @@ export async function buildPayPublicCalldata(
   }
 }
 
-export interface PayShieldedParams {
+export interface PayBlindParams {
   proof: `0x${string}`
   paymentCommitment: `0x${string}`
   changeCommitment: `0x${string}`
@@ -74,17 +74,17 @@ export interface PayShieldedParams {
   refundLink?: bigint
 }
 
-export interface PayShieldedCalldata {
+export interface PayBlindCalldata {
   data: `0x${string}`
   approveAmount: bigint
 }
 
-export async function buildPayShieldedCalldata(
-  params: PayShieldedParams
-): Promise<PayShieldedCalldata> {
+export async function buildPayBlindCalldata(
+  params: PayBlindParams
+): Promise<PayBlindCalldata> {
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
-    functionName: "payShielded",
+    abi: invisiProtocolAbi,
+    functionName: "payBlind",
     args: [
       params.proof,
       params.paymentCommitment,
@@ -143,7 +143,7 @@ export async function buildSettleChangeCalldata(
   )
 
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
+    abi: invisiProtocolAbi,
     functionName: "withdraw",
     args: [
       params.proof,

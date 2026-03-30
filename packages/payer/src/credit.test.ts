@@ -6,7 +6,7 @@ describe("createCredit", () => {
     const result = await createCredit({
       payerMasterKey: 12345n,
       creditId: 1n,
-      receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       payerAddress: 0xdeadn,
       tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
@@ -18,7 +18,7 @@ describe("createCredit", () => {
     expect(result.data).toMatch(/^0x/)
     expect(result.approveAmount).toBe(100_000_000n)
     expect(result.authorization.creditId).toBe(1n)
-    expect(result.authorization.receiverCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
+    expect(result.authorization.identityCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(result.authorization.payerCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(result.authorization.nullifierKeyHash).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(result.authorization.creditNullifierKey).toBeTypeOf("bigint")
@@ -32,7 +32,7 @@ describe("createCredit", () => {
     const params = {
       payerMasterKey: 99n,
       creditId: 2n,
-      receiverCommitment: ("0x" + "cd".repeat(32)) as `0x${string}`,
+      identityCommitment: ("0x" + "cd".repeat(32)) as `0x${string}`,
       payerAddress: 0xbeefn,
       tokenAddress: ("0x" + "bb".repeat(20)) as `0x${string}`,
       amount: 50_000_000n,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
-  buildSignPayPublicTypedData,
-  buildSignPayShieldedTypedData,
+  buildSignPayOpenTypedData,
+  buildSignPayBlindTypedData,
   buildSignDepositCreditTypedData,
   getEIP712Domain,
   EMPTY_PERMIT,
@@ -21,12 +21,12 @@ describe("getEIP712Domain", () => {
   })
 })
 
-describe("buildSignPayPublicTypedData", () => {
+describe("buildSignPayOpenTypedData", () => {
   it("returns typed data with paymentCommitment and nonce", async () => {
-    const result = await buildSignPayPublicTypedData({
+    const result = await buildSignPayOpenTypedData({
       chainId: 1n,
       verifyingContract: MOCK_CONTRACT,
-      receiverCommitment: MOCK_COMMITMENT,
+      identityCommitment: MOCK_COMMITMENT,
       tokenAddress: MOCK_TOKEN,
       amount: 100_000_000n,
       treeId: 1n,
@@ -36,9 +36,9 @@ describe("buildSignPayPublicTypedData", () => {
 
     expect(result.paymentCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(result.nonce).toMatch(/^0x[0-9a-f]{64}$/i)
-    expect(result.typedData.primaryType).toBe("PayPublicWithSig")
+    expect(result.typedData.primaryType).toBe("PayOpenWithSig")
     expect(result.typedData.domain.name).toBe("InvisibleProtocol")
-    expect(result.typedData.message.receiverCommitment).toBe(MOCK_COMMITMENT)
+    expect(result.typedData.message.identityCommitment).toBe(MOCK_COMMITMENT)
     expect(result.typedData.message.sigNonce).toBe(0n)
     expect(result.typedData.message.deadline).toBe(9999999999n)
   })
@@ -47,25 +47,25 @@ describe("buildSignPayPublicTypedData", () => {
     const params = {
       chainId: 1n,
       verifyingContract: MOCK_CONTRACT,
-      receiverCommitment: MOCK_COMMITMENT,
+      identityCommitment: MOCK_COMMITMENT,
       tokenAddress: MOCK_TOKEN,
       amount: 100_000_000n,
       treeId: 1n,
       sigNonce: 0n,
       deadline: 9999999999n,
     }
-    const a = await buildSignPayPublicTypedData(params)
-    const b = await buildSignPayPublicTypedData(params)
+    const a = await buildSignPayOpenTypedData(params)
+    const b = await buildSignPayOpenTypedData(params)
     expect(a.nonce).not.toBe(b.nonce)
     expect(a.paymentCommitment).not.toBe(b.paymentCommitment)
   })
 
   it("includes refundLink when provided", async () => {
     const refundLink = ("0x" + "ff".repeat(32)) as `0x${string}`
-    const result = await buildSignPayPublicTypedData({
+    const result = await buildSignPayOpenTypedData({
       chainId: 1n,
       verifyingContract: MOCK_CONTRACT,
-      receiverCommitment: MOCK_COMMITMENT,
+      identityCommitment: MOCK_COMMITMENT,
       tokenAddress: MOCK_TOKEN,
       amount: 100_000_000n,
       treeId: 1n,
@@ -77,9 +77,9 @@ describe("buildSignPayPublicTypedData", () => {
   })
 })
 
-describe("buildSignPayShieldedTypedData", () => {
+describe("buildSignPayBlindTypedData", () => {
   it("returns typed data with correct primary type", () => {
-    const result = buildSignPayShieldedTypedData({
+    const result = buildSignPayBlindTypedData({
       chainId: 1n,
       verifyingContract: MOCK_CONTRACT,
       proof: "0xdeadbeef",
@@ -92,7 +92,7 @@ describe("buildSignPayShieldedTypedData", () => {
       deadline: 9999999999n,
     })
 
-    expect(result.typedData.primaryType).toBe("PayShieldedWithSig")
+    expect(result.typedData.primaryType).toBe("PayBlindWithSig")
     expect(result.typedData.message.proof).toBe("0xdeadbeef")
     expect(result.typedData.message.inputAmount).toBe(200_000_000n)
   })
@@ -104,7 +104,7 @@ describe("buildSignDepositCreditTypedData", () => {
     const result = buildSignDepositCreditTypedData({
       chainId: 1n,
       verifyingContract: MOCK_CONTRACT,
-      receiverCommitment: MOCK_COMMITMENT,
+      identityCommitment: MOCK_COMMITMENT,
       payerCommitment: ("0x" + "bb".repeat(32)) as `0x${string}`,
       tokenAddress: MOCK_TOKEN,
       amount: 500_000_000n,
@@ -118,7 +118,7 @@ describe("buildSignDepositCreditTypedData", () => {
 
     expect(result.typedData.primaryType).toBe("DepositCreditWithSig")
     expect(result.typedData.message.expiry).toBe(9999999999n)
-    expect(result.typedData.message.receiverCommitment).toBe(MOCK_COMMITMENT)
+    expect(result.typedData.message.identityCommitment).toBe(MOCK_COMMITMENT)
   })
 })
 

@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem"
-import { invisiPoolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi/contracts"
 
 const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 
@@ -12,7 +12,7 @@ function generateNonce(): bigint {
 
 export interface CreditAuthorization {
   creditId: bigint
-  receiverCommitment: `0x${string}`
+  identityCommitment: `0x${string}`
   payerCommitment: `0x${string}`
   creditNullifierKey: bigint
   nullifierKeyHash: `0x${string}`
@@ -27,7 +27,7 @@ export interface CreditAuthorization {
 export interface CreateCreditParams {
   payerMasterKey: bigint
   creditId: bigint
-  receiverCommitment: `0x${string}`
+  identityCommitment: `0x${string}`
   payerAddress: bigint
   tokenAddress: `0x${string}`
   amount: bigint
@@ -53,10 +53,10 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
+    abi: invisiProtocolAbi,
     functionName: "depositCredit",
     args: [
-      params.receiverCommitment,
+      params.identityCommitment,
       payerCommitment,
       { addr: params.tokenAddress, amount: params.amount },
       nonceHex,
@@ -69,7 +69,7 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
   return {
     authorization: {
       creditId: params.creditId,
-      receiverCommitment: params.receiverCommitment,
+      identityCommitment: params.identityCommitment,
       payerCommitment,
       creditNullifierKey,
       nullifierKeyHash,
@@ -103,7 +103,7 @@ export interface ReclaimCalldata {
 
 export async function buildReclaimCalldata(params: BuildReclaimCalldataParams): Promise<ReclaimCalldata> {
   const data = encodeFunctionData({
-    abi: invisiPoolAbi,
+    abi: invisiProtocolAbi,
     functionName: "reclaim",
     args: [
       params.proof,

@@ -51,9 +51,9 @@ const assetType = {
   ],
 } as const
 
-export const payPublicWithSigTypes = {
-  PayPublicWithSig: [
-    { name: "receiverCommitment", type: "bytes32" },
+export const payOpenWithSigTypes = {
+  PayOpenWithSig: [
+    { name: "identityCommitment", type: "bytes32" },
     { name: "asset", type: "Asset" },
     { name: "nonce", type: "bytes32" },
     { name: "treeId", type: "uint256" },
@@ -64,8 +64,8 @@ export const payPublicWithSigTypes = {
   ...assetType,
 } as const
 
-export const payShieldedWithSigTypes = {
-  PayShieldedWithSig: [
+export const payBlindWithSigTypes = {
+  PayBlindWithSig: [
     { name: "proof", type: "bytes" },
     { name: "paymentCommitment", type: "bytes32" },
     { name: "changeCommitment", type: "bytes32" },
@@ -80,7 +80,7 @@ export const payShieldedWithSigTypes = {
 
 export const depositCreditWithSigTypes = {
   DepositCreditWithSig: [
-    { name: "receiverCommitment", type: "bytes32" },
+    { name: "identityCommitment", type: "bytes32" },
     { name: "payerCommitment", type: "bytes32" },
     { name: "asset", type: "Asset" },
     { name: "nonce", type: "bytes32" },
@@ -95,22 +95,22 @@ export const depositCreditWithSigTypes = {
 
 // ─── Sign method return types ──────────────────────────────────────────────
 
-export interface SignPayPublicResult {
+export interface SignPayOpenResult {
   paymentCommitment: Hex
   nonce: Hex
   typedData: {
     domain: ReturnType<typeof getEIP712Domain>
-    types: typeof payPublicWithSigTypes
-    primaryType: "PayPublicWithSig"
+    types: typeof payOpenWithSigTypes
+    primaryType: "PayOpenWithSig"
     message: Record<string, unknown>
   }
 }
 
-export interface SignPayShieldedResult {
+export interface SignPayBlindResult {
   typedData: {
     domain: ReturnType<typeof getEIP712Domain>
-    types: typeof payShieldedWithSigTypes
-    primaryType: "PayShieldedWithSig"
+    types: typeof payBlindWithSigTypes
+    primaryType: "PayBlindWithSig"
     message: Record<string, unknown>
   }
 }
@@ -124,12 +124,12 @@ export interface SignDepositCreditResult {
   }
 }
 
-// ─── signPayPublic ───────────────────────────────────────────────────
+// ─── signPayOpen ───────────────────────────────────────────────────
 
-export interface SignPayPublicParams {
+export interface SignPayOpenParams {
   chainId: bigint
   verifyingContract: Address
-  receiverCommitment: Hex
+  identityCommitment: Hex
   tokenAddress: Address
   amount: bigint
   treeId: bigint
@@ -138,9 +138,9 @@ export interface SignPayPublicParams {
   deadline: bigint
 }
 
-export async function buildSignPayPublicTypedData(
-  params: SignPayPublicParams
-): Promise<SignPayPublicResult> {
+export async function buildSignPayOpenTypedData(
+  params: SignPayOpenParams
+): Promise<SignPayOpenResult> {
   const { poseidonHash, D_PAY } = await import("@invisi/core")
   const nonce = generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as Hex
@@ -148,7 +148,7 @@ export async function buildSignPayPublicTypedData(
   const paymentCommitment = await poseidonHash([
     D_PAY,
     params.chainId,
-    BigInt(params.receiverCommitment) % FIELD_MODULUS,
+    BigInt(params.identityCommitment) % FIELD_MODULUS,
     BigInt(params.tokenAddress) % FIELD_MODULUS,
     params.amount % FIELD_MODULUS,
     nonce % FIELD_MODULUS,
@@ -166,10 +166,10 @@ export async function buildSignPayPublicTypedData(
     nonce: nonceHex,
     typedData: {
       domain,
-      types: payPublicWithSigTypes,
-      primaryType: "PayPublicWithSig",
+      types: payOpenWithSigTypes,
+      primaryType: "PayOpenWithSig",
       message: {
-        receiverCommitment: params.receiverCommitment,
+        identityCommitment: params.identityCommitment,
         asset: { addr: params.tokenAddress, amount: params.amount },
         nonce: nonceHex,
         treeId: params.treeId,
@@ -181,9 +181,9 @@ export async function buildSignPayPublicTypedData(
   }
 }
 
-// ─── signPayShielded ─────────────────────────────────────────────────
+// ─── signPayBlind ─────────────────────────────────────────────────
 
-export interface SignPayShieldedParams {
+export interface SignPayBlindParams {
   chainId: bigint
   verifyingContract: Address
   proof: Hex
@@ -197,9 +197,9 @@ export interface SignPayShieldedParams {
   deadline: bigint
 }
 
-export function buildSignPayShieldedTypedData(
-  params: SignPayShieldedParams
-): SignPayShieldedResult {
+export function buildSignPayBlindTypedData(
+  params: SignPayBlindParams
+): SignPayBlindResult {
   const domain = getEIP712Domain({
     chainId: params.chainId,
     verifyingContract: params.verifyingContract,
@@ -210,8 +210,8 @@ export function buildSignPayShieldedTypedData(
   return {
     typedData: {
       domain,
-      types: payShieldedWithSigTypes,
-      primaryType: "PayShieldedWithSig",
+      types: payBlindWithSigTypes,
+      primaryType: "PayBlindWithSig",
       message: {
         proof: params.proof,
         paymentCommitment: params.paymentCommitment,
@@ -232,7 +232,7 @@ export function buildSignPayShieldedTypedData(
 export interface SignDepositCreditParams {
   chainId: bigint
   verifyingContract: Address
-  receiverCommitment: Hex
+  identityCommitment: Hex
   payerCommitment: Hex
   tokenAddress: Address
   amount: bigint
@@ -258,7 +258,7 @@ export function buildSignDepositCreditTypedData(
       types: depositCreditWithSigTypes,
       primaryType: "DepositCreditWithSig",
       message: {
-        receiverCommitment: params.receiverCommitment,
+        identityCommitment: params.identityCommitment,
         payerCommitment: params.payerCommitment,
         asset: { addr: params.tokenAddress, amount: params.amount },
         nonce: params.nonce,

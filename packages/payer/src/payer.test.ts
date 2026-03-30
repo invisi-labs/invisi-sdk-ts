@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest"
-import { buildPayPublicCalldata, buildPayShieldedCalldata, buildSettleChangeCalldata } from "./payer"
+import { buildPayOpenCalldata, buildPayBlindCalldata, buildSettleChangeCalldata } from "./payer"
 
-describe("buildPayPublicCalldata", () => {
+describe("buildPayOpenCalldata", () => {
   it("returns calldata with paymentCommitment, nonce, and ERC20 data", async () => {
-    const result = await buildPayPublicCalldata({
+    const result = await buildPayOpenCalldata({
       chainId: 1n,
       treeId: 1n,
-      receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
     })
@@ -20,19 +20,19 @@ describe("buildPayPublicCalldata", () => {
     const params = {
       chainId: 1n,
       treeId: 1n,
-      receiverCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
     }
-    const a = await buildPayPublicCalldata(params)
-    const b = await buildPayPublicCalldata(params)
+    const a = await buildPayOpenCalldata(params)
+    const b = await buildPayOpenCalldata(params)
     expect(a.nonce).not.toBe(b.nonce)
   })
 })
 
-describe("buildPayShieldedCalldata", () => {
-  it("returns encoded calldata for payShielded", async () => {
-    const result = await buildPayShieldedCalldata({
+describe("buildPayBlindCalldata", () => {
+  it("returns encoded calldata for payBlind", async () => {
+    const result = await buildPayBlindCalldata({
       proof: "0xdeadbeef" as `0x${string}`,
       paymentCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       changeCommitment: ("0x" + "cd".repeat(32)) as `0x${string}`,

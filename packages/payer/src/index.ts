@@ -1,7 +1,7 @@
-export { buildPayPublicCalldata, buildPayShieldedCalldata, buildSettleChangeCalldata } from "./payer"
+export { buildPayOpenCalldata, buildPayBlindCalldata, buildSettleChangeCalldata } from "./payer"
 export type {
-  PayPublicParams, PayPublicCalldata,
-  PayShieldedParams, PayShieldedCalldata,
+  PayOpenParams, PayOpenCalldata,
+  PayBlindParams, PayBlindCalldata,
   ChangeRecord, SettleChangeParams, SettleChangeCalldata,
 } from "./payer"
 
@@ -13,15 +13,15 @@ export type {
 } from "./credit"
 
 export {
-  buildSignPayPublicTypedData,
-  buildSignPayShieldedTypedData,
+  buildSignPayOpenTypedData,
+  buildSignPayBlindTypedData,
   buildSignDepositCreditTypedData,
   getEIP712Domain,
   EMPTY_PERMIT,
 } from "./metaTx"
 export type {
-  SignPayPublicParams, SignPayPublicResult,
-  SignPayShieldedParams, SignPayShieldedResult,
+  SignPayOpenParams, SignPayOpenResult,
+  SignPayBlindParams, SignPayBlindResult,
   SignDepositCreditParams, SignDepositCreditResult,
   EIP712DomainParams, TokenPermit,
 } from "./metaTx"
