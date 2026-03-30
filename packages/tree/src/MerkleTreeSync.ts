@@ -1,4 +1,4 @@
-import { invisiPoolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi/contracts"
 import type { InMemoryMerkleTree } from "./InMemoryMerkleTree"
 
 export type TreeType = "payment"
@@ -6,7 +6,7 @@ export type TreeType = "payment"
 export interface MerkleTreeSyncOptions {
   tree: InMemoryMerkleTree
   client: any
-  poolAddress: string
+  protocolAddress: string
   fromBlock: bigint
   treeType: TreeType
   treeId: bigint
@@ -24,7 +24,7 @@ interface LeafEntry {
 export class MerkleTreeSync {
   private readonly tree: InMemoryMerkleTree
   private readonly client: any
-  private readonly poolAddress: string
+  private readonly protocolAddress: string
   private readonly fromBlock: bigint
   private readonly treeType: TreeType
   private readonly treeId: bigint
@@ -36,7 +36,7 @@ export class MerkleTreeSync {
   constructor(opts: MerkleTreeSyncOptions) {
     this.tree = opts.tree
     this.client = opts.client
-    this.poolAddress = opts.poolAddress
+    this.protocolAddress = opts.protocolAddress
     this.fromBlock = opts.fromBlock
     this.treeType = opts.treeType
     this.treeId = opts.treeId
@@ -67,8 +67,8 @@ export class MerkleTreeSync {
     const latestBlock = await this.client.getBlockNumber()
 
     const events = await this.client.getContractEvents({
-      abi: invisiPoolAbi,
-      address: this.poolAddress,
+      abi: invisiProtocolAbi,
+      address: this.protocolAddress,
       fromBlock: this.fromBlock,
       toBlock: latestBlock,
       args: { treeId: this.treeId },
@@ -80,8 +80,8 @@ export class MerkleTreeSync {
 
   private _subscribe(): void {
     this._unwatch = this.client.watchContractEvent({
-      abi: invisiPoolAbi,
-      address: this.poolAddress,
+      abi: invisiProtocolAbi,
+      address: this.protocolAddress,
       args: { treeId: this.treeId },
       onLogs: async (logs: any[]) => {
         await this._applyEvents(logs)
@@ -109,12 +109,12 @@ export class MerkleTreeSync {
       // treeId is filtered at the RPC layer via getContractEvents/watchContractEvent args
 
       // Payment tree: extract all leaves written to Payment Tree
-      if (name === "PayPublic") {
+      if (name === "PayOpen") {
         leaves.push({
           commitment: BigInt(args.paymentCommitment),
           leafIndex: Number(args.leafIndex),
         })
-      } else if (name === "PayShielded") {
+      } else if (name === "PayBlind") {
         // Both paymentCommitment and changeCommitment are in Payment Tree
         leaves.push({
           commitment: BigInt(args.paymentCommitment),

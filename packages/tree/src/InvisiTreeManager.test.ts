@@ -23,7 +23,7 @@ describe("InvisiTreeManager", () => {
     const client = createMockClient([], 3n)
     const manager = new InvisiTreeManager({
       client,
-      poolAddress: "0x0000000000000000000000000000000000000001",
+      protocolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -32,13 +32,13 @@ describe("InvisiTreeManager", () => {
 
   it("getPaymentProof(treeId, leafIndex) returns proof for correct tree", async () => {
     const events = [
-      { args: { paymentCommitment: "0x" + "ab".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayPublic" },
-      { args: { paymentCommitment: "0x" + "cd".padStart(64, "0"), leafIndex: 0, treeId: 2n }, eventName: "PayPublic" },
+      { args: { paymentCommitment: "0x" + "ab".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayOpen" },
+      { args: { paymentCommitment: "0x" + "cd".padStart(64, "0"), leafIndex: 0, treeId: 2n }, eventName: "PayOpen" },
     ]
     const client = createMockClient(events, 3n)
     const manager = new InvisiTreeManager({
       client,
-      poolAddress: "0x0000000000000000000000000000000000000001",
+      protocolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -52,12 +52,12 @@ describe("InvisiTreeManager", () => {
 
   it("getTree returns the underlying tree", async () => {
     const events = [
-      { args: { paymentCommitment: "0x" + "01".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayPublic" },
+      { args: { paymentCommitment: "0x" + "01".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayOpen" },
     ]
     const client = createMockClient(events, 2n)
     const manager = new InvisiTreeManager({
       client,
-      poolAddress: "0x0000000000000000000000000000000000000001",
+      protocolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -69,7 +69,7 @@ describe("InvisiTreeManager", () => {
     const client = createMockClient([], 2n)
     const manager = new InvisiTreeManager({
       client,
-      poolAddress: "0x0000000000000000000000000000000000000001",
+      protocolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -82,7 +82,7 @@ describe("InvisiTreeManager", () => {
     client.watchContractEvent = vi.fn().mockReturnValue(unwatch)
     const manager = new InvisiTreeManager({
       client,
-      poolAddress: "0x0000000000000000000000000000000000000001",
+      protocolAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
