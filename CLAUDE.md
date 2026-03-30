@@ -44,6 +44,7 @@ This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SD
 ```
 @invisi/core          ← Poseidon hash, commitments, nullifiers, key derivation
        ↓                  (uses @aztec/bb.js for Barretenberg cryptography)
+@invisi/ipp           ← IPP data format, encoding, CAIP-2 (uses @msgpack/msgpack)
 @invisi/contracts     ← InvisiProtocol ABI + TypeScript types (no dependencies)
 @invisi/deployments   ← Chain deployment registry (no dependencies)
        ↓
