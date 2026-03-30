@@ -18,7 +18,7 @@ interface LeafEntry {
 }
 
 /**
- * Syncs an InMemoryMerkleTree with on-chain Payment Tree events from InvisiPool.
+ * Syncs an InMemoryMerkleTree with on-chain Payment Tree events from InvisiProtocol.
  * Tracks paymentCommitment, changeCommitment, credit deposits, and credit draw remainders.
  */
 export class MerkleTreeSync {
@@ -125,7 +125,7 @@ export class MerkleTreeSync {
           leafIndex: Number(args.changeLeafIndex),
         })
       } else if (name === "CreditDeposit") {
-        // Credit commitment is inserted at leafIndex (same pattern as PayPublic)
+        // Credit commitment is inserted at leafIndex (same pattern as PayOpen)
         leaves.push({
           commitment: BigInt(args.commitment),
           leafIndex: Number(args.leafIndex),

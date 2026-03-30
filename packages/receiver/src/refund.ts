@@ -29,7 +29,7 @@ export interface RefundParams {
   refundAmount: bigint
   /** optional override, default from original payment event; if provided, validate against on-chain record */
   payerAddress?: Address
-  /** use payShielded for privacy refund, default false */
+  /** use payBlind for privacy refund, default false */
   useShielded?: boolean
 }
 
@@ -38,7 +38,7 @@ export interface RefundResult {
   refundNonce: bigint
   /** on-chain anchor (0x-prefixed hex) */
   refundLink: Hex
-  /** payPublic/payShielded tx hash */
+  /** payOpen/payBlind tx hash */
   payTxHash: Hex
   /** withdraw tx hash */
   withdrawTxHash: Hex
