@@ -30,7 +30,7 @@ export interface RefundParams {
   /** optional override, default from original payment event; if provided, validate against on-chain record */
   payerAddress?: Address
   /** use payBlind for privacy refund, default false */
-  useShielded?: boolean
+  useBlind?: boolean
 }
 
 export interface RefundResult {
