@@ -1,2 +1,2 @@
-import type { invisiPoolAbi } from "./abis/InvisiPool"
-export type InvisiPoolAbi = typeof invisiPoolAbi
+import type { invisiProtocolAbi } from "./abis/InvisiProtocol"
+export type InvisiProtocolAbi = typeof invisiProtocolAbi

@@ -1,11 +1,11 @@
-export const invisiPoolAbi = [
+export const invisiProtocolAbi = [
   // ── Write functions ──────────────────────────────────────────────────────
   {
     type: "function",
-    name: "payPublic",
+    name: "payOpen",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "receiverCommitment", type: "bytes32" },
+      { name: "identityCommitment", type: "bytes32" },
       {
         name: "asset",
         type: "tuple",
@@ -22,7 +22,7 @@ export const invisiPoolAbi = [
   },
   {
     type: "function",
-    name: "payShielded",
+    name: "payBlind",
     stateMutability: "nonpayable",
     inputs: [
       { name: "proof", type: "bytes" },
@@ -54,10 +54,10 @@ export const invisiPoolAbi = [
   // ── Meta-transaction (WithSig) ────────────────────────────────────────
   {
     type: "function",
-    name: "payPublicWithSig",
+    name: "payOpenWithSig",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "receiverCommitment", type: "bytes32" },
+      { name: "identityCommitment", type: "bytes32" },
       {
         name: "asset",
         type: "tuple",
@@ -88,7 +88,7 @@ export const invisiPoolAbi = [
   },
   {
     type: "function",
-    name: "payShieldedWithSig",
+    name: "payBlindWithSig",
     stateMutability: "nonpayable",
     inputs: [
       { name: "proof", type: "bytes" },
@@ -126,7 +126,7 @@ export const invisiPoolAbi = [
     name: "depositCreditWithSig",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "receiverCommitment", type: "bytes32" },
+      { name: "identityCommitment", type: "bytes32" },
       { name: "payerCommitment", type: "bytes32" },
       {
         name: "asset",
@@ -325,7 +325,7 @@ export const invisiPoolAbi = [
     type: "function",
     name: "depositCredit",
     inputs: [
-      { name: "receiverCommitment", type: "bytes32" },
+      { name: "identityCommitment", type: "bytes32" },
       { name: "payerCommitment", type: "bytes32" },
       {
         name: "asset",
@@ -393,7 +393,7 @@ export const invisiPoolAbi = [
   // ── Events ───────────────────────────────────────────────────────────────
   {
     type: "event",
-    name: "PayPublic",
+    name: "PayOpen",
     inputs: [
       { name: "paymentCommitment", type: "bytes32", indexed: true },
       { name: "payer", type: "address", indexed: true },
@@ -401,14 +401,14 @@ export const invisiPoolAbi = [
       { name: "leafIndex", type: "uint32", indexed: false },
       { name: "tokenAddress", type: "address", indexed: false },
       { name: "amount", type: "uint256", indexed: false },
-      { name: "receiverCommitment", type: "bytes32", indexed: false },
+      { name: "identityCommitment", type: "bytes32", indexed: false },
       { name: "nonce", type: "bytes32", indexed: false },
       { name: "refundLink", type: "bytes32", indexed: false },
     ],
   },
   {
     type: "event",
-    name: "PayShielded",
+    name: "PayBlind",
     inputs: [
       { name: "paymentCommitment", type: "bytes32", indexed: true },
       { name: "payer", type: "address", indexed: true },
@@ -477,7 +477,7 @@ export const invisiPoolAbi = [
       { name: "depositor", type: "address", indexed: true },
       { name: "treeId", type: "uint256", indexed: true },
       { name: "leafIndex", type: "uint32", indexed: false },
-      { name: "receiverCommitment", type: "bytes32", indexed: false },
+      { name: "identityCommitment", type: "bytes32", indexed: false },
       { name: "payerCommitment", type: "bytes32", indexed: false },
       { name: "tokenAddress", type: "address", indexed: false },
       { name: "amount", type: "uint256", indexed: false },

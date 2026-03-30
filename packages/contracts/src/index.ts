@@ -1,2 +1,2 @@
-export { invisiPoolAbi } from "./abis/InvisiPool"
-export type { InvisiPoolAbi } from "./types"
+export { invisiProtocolAbi } from "./abis/InvisiProtocol"
+export type { InvisiProtocolAbi } from "./types"
