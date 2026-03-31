@@ -101,9 +101,10 @@ describe("invisiProtocolAbi", () => {
       (x) => x.type === "function" && x.name === "getTokenConfig"
     )
     expect(fn).toBeDefined()
-    const outputs = (fn as unknown as { outputs: Array<{ type: string; components: Array<{ name: string }> }> }).outputs
-    expect(outputs[0].type).toBe("tuple")
-    const componentNames = outputs[0].components.map((c) => c.name)
+    const outputs = (fn as unknown as { outputs: Array<{ type: string; components: Array<{ name: string }> }> })?.outputs
+    const first = outputs?.[0]
+    expect(first?.type).toBe("tuple")
+    const componentNames = first?.components.map((c) => c.name) ?? []
     expect(componentNames).toContain("registered")
     expect(componentNames).toContain("enabled")
     expect(componentNames).toContain("maxPerDeposit")
@@ -193,7 +194,7 @@ describe("invisiProtocolAbi", () => {
   })
 
   it("RefundLinked event is removed", () => {
-    const event = invisiProtocolAbi.find(
+    const event = (invisiProtocolAbi as readonly Record<string, unknown>[]).find(
       (x) => x.type === "event" && x.name === "RefundLinked"
     )
     expect(event).toBeUndefined()
@@ -204,7 +205,7 @@ describe("invisiProtocolAbi", () => {
       (x) => x.type === "event" && x.name === "Withdraw"
     )
     expect(event).toBeDefined()
-    const inputs = (event as unknown as { inputs: Array<{ name: string }> }).inputs
-    expect(inputs.some((i) => i.name === "count")).toBe(false)
+    const inputs = (event as unknown as { inputs: Array<{ name: string }> })?.inputs
+    expect(inputs?.some((i) => i.name === "count")).toBe(false)
   })
 })
