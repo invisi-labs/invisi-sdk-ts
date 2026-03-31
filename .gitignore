@@ -9,3 +9,8 @@ coverage/
 
 .idea
 .DS_Store
+.worktrees/
+
+# Examples
+examples/**/node_modules
+examples/**/.env

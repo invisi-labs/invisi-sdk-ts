@@ -1,0 +1,16 @@
+{
+  "name": "@invisi-examples/deposit-credit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx main.ts"
+  },
+  "dependencies": {
+    "@invisi/payer": "file:../../packages/payer",
+    "@invisi/ipp": "file:../../packages/ipp",
+    "@invisi/deployments": "file:../../packages/deployments",
+    "viem": "^2.0.0",
+    "tsx": "^4.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

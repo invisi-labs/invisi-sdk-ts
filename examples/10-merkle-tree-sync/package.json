@@ -1,0 +1,15 @@
+{
+  "name": "@invisi-examples/merkle-tree-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx main.ts"
+  },
+  "dependencies": {
+    "@invisi/tree": "file:../../packages/tree",
+    "@invisi/deployments": "file:../../packages/deployments",
+    "viem": "^2.0.0",
+    "tsx": "^4.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

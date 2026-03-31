@@ -1,0 +1,12 @@
+{
+  "name": "@invisi-examples/proof-generation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx main.ts"
+  },
+  "dependencies": {
+    "@invisi/node": "file:../../packages/node",
+    "tsx": "^4.0.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@invisi-examples/vue-integration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@invisi/vue": "file:../../packages/vue",
+    "@invisi/payer": "file:../../packages/payer",
+    "vue": "^3.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0",
+    "typescript": "^5.4.0"
+  }
+}

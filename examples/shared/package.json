@@ -1,0 +1,10 @@
+{
+  "name": "@invisi-examples/shared",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "viem": "^2.0.0",
+    "@invisi/deployments": "file:../../packages/deployments"
+  }
+}
