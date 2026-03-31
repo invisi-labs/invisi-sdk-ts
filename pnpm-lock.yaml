@@ -21,17 +21,17 @@ importers:
   examples/01-fixed-price-payment:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       '@invisi-labs/receiver':
-        specifier: file:../../packages/receiver
-        version: file:packages/receiver(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/receiver
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -45,17 +45,17 @@ importers:
   examples/02-open-amount-payment:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       '@invisi-labs/receiver':
-        specifier: file:../../packages/receiver
-        version: file:packages/receiver(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/receiver
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -69,20 +69,20 @@ importers:
   examples/03-pay-blind:
     dependencies:
       '@invisi-labs/core':
-        specifier: file:../../packages/core
+        specifier: workspace:*
         version: link:../../packages/core
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/node':
-        specifier: file:../../packages/node
-        version: file:packages/node
+        specifier: workspace:*
+        version: link:../../packages/node
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -96,17 +96,17 @@ importers:
   examples/04-withdraw:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/node':
-        specifier: file:../../packages/node
-        version: file:packages/node
+        specifier: workspace:*
+        version: link:../../packages/node
       '@invisi-labs/receiver':
-        specifier: file:../../packages/receiver
-        version: file:packages/receiver(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/receiver
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -120,14 +120,14 @@ importers:
   examples/05-deposit-credit:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -141,17 +141,17 @@ importers:
   examples/06-credit-draw:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/node':
-        specifier: file:../../packages/node
-        version: file:packages/node
+        specifier: workspace:*
+        version: link:../../packages/node
       '@invisi-labs/receiver':
-        specifier: file:../../packages/receiver
-        version: file:packages/receiver(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/receiver
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -165,17 +165,17 @@ importers:
   examples/07-credit-reclaim:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/node':
-        specifier: file:../../packages/node
-        version: file:packages/node
+        specifier: workspace:*
+        version: link:../../packages/node
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -189,11 +189,11 @@ importers:
   examples/08-refund:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/receiver':
-        specifier: file:../../packages/receiver
-        version: file:packages/receiver(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/receiver
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -207,14 +207,14 @@ importers:
   examples/09-meta-transaction:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/ipp':
-        specifier: file:../../packages/ipp
+        specifier: workspace:*
         version: link:../../packages/ipp
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -228,11 +228,11 @@ importers:
   examples/10-merkle-tree-sync:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       '@invisi-labs/tree':
-        specifier: file:../../packages/tree
-        version: file:packages/tree(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/tree
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
@@ -246,8 +246,8 @@ importers:
   examples/11-proof-generation:
     dependencies:
       '@invisi-labs/node':
-        specifier: file:../../packages/node
-        version: file:packages/node
+        specifier: workspace:*
+        version: link:../../packages/node
       tsx:
         specifier: ^4.0.0
         version: 4.21.0
@@ -255,11 +255,11 @@ importers:
   examples/12-react-integration:
     dependencies:
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       '@invisi-labs/react':
-        specifier: file:../../packages/react
-        version: file:packages/react(react@18.3.1)(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/react
       react:
         specifier: ^18.0.0
         version: 18.3.1
@@ -286,11 +286,11 @@ importers:
   examples/13-vue-integration:
     dependencies:
       '@invisi-labs/payer':
-        specifier: file:../../packages/payer
-        version: file:packages/payer(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/payer
       '@invisi-labs/vue':
-        specifier: file:../../packages/vue
-        version: file:packages/vue(typescript@5.9.3)(vue@3.5.30(typescript@5.9.3))
+        specifier: workspace:*
+        version: link:../../packages/vue
       vue:
         specifier: ^3.0.0
         version: 3.5.30(typescript@5.9.3)
@@ -308,7 +308,7 @@ importers:
   examples/shared:
     dependencies:
       '@invisi-labs/deployments':
-        specifier: file:../../packages/deployments
+        specifier: workspace:*
         version: link:../../packages/deployments
       dotenv:
         specifier: ^16.0.0
@@ -1024,29 +1024,6 @@ packages:
     peerDependenciesMeta:
       '@types/node':
         optional: true
-
-  '@invisi-labs/node@file:packages/node':
-    resolution: {directory: packages/node, type: directory}
-    engines: {node: '>=20.0.0'}
-
-  '@invisi-labs/payer@file:packages/payer':
-    resolution: {directory: packages/payer, type: directory}
-
-  '@invisi-labs/react@file:packages/react':
-    resolution: {directory: packages/react, type: directory}
-    peerDependencies:
-      react: '>=18.0.0'
-
-  '@invisi-labs/receiver@file:packages/receiver':
-    resolution: {directory: packages/receiver, type: directory}
-
-  '@invisi-labs/tree@file:packages/tree':
-    resolution: {directory: packages/tree, type: directory}
-
-  '@invisi-labs/vue@file:packages/vue':
-    resolution: {directory: packages/vue, type: directory}
-    peerDependencies:
-      vue: '>=3.4.0'
 
   '@jest/schemas@29.6.3':
     resolution: {integrity: sha512-mo5j5X+jIZmJQveBKeS/clAueipV7KgiX1vMgCxam1RNYiqE1w62n0/tJJnHtjW8ZHcQco5gY85jA3mi0L+nSA==}
@@ -3038,72 +3015,6 @@ snapshots:
       iconv-lite: 0.7.2
     optionalDependencies:
       '@types/node': 20.19.37
-
-  '@invisi-labs/node@file:packages/node':
-    dependencies:
-      '@invisi-labs/core': link:packages/core
-      '@noir-lang/noir_js': 1.0.0-beta.15
-    optionalDependencies:
-      '@aztec/bb.js': 3.0.0-nightly.20251104
-
-  '@invisi-labs/payer@file:packages/payer(typescript@5.9.3)':
-    dependencies:
-      '@invisi-labs/contracts': link:packages/contracts
-      '@invisi-labs/core': link:packages/core
-      '@invisi-labs/deployments': link:packages/deployments
-      '@invisi-labs/ipp': link:packages/ipp
-      viem: 2.47.5(typescript@5.9.3)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@invisi-labs/react@file:packages/react(react@18.3.1)(typescript@5.9.3)':
-    dependencies:
-      '@invisi-labs/payer': link:packages/payer
-      react: 18.3.1
-      viem: 2.47.5(typescript@5.9.3)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@invisi-labs/receiver@file:packages/receiver(typescript@5.9.3)':
-    dependencies:
-      '@invisi-labs/contracts': link:packages/contracts
-      '@invisi-labs/core': link:packages/core
-      '@invisi-labs/deployments': link:packages/deployments
-      '@invisi-labs/ipp': link:packages/ipp
-      viem: 2.47.5(typescript@5.9.3)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@invisi-labs/tree@file:packages/tree(typescript@5.9.3)':
-    dependencies:
-      '@invisi-labs/contracts': link:packages/contracts
-      '@invisi-labs/core': link:packages/core
-      viem: 2.47.5(typescript@5.9.3)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@invisi-labs/vue@file:packages/vue(typescript@5.9.3)(vue@3.5.30(typescript@5.9.3))':
-    dependencies:
-      '@invisi-labs/payer': link:packages/payer
-      viem: 2.47.5(typescript@5.9.3)
-      vue: 3.5.30(typescript@5.9.3)
-    transitivePeerDependencies:
-      - bufferutil
-      - typescript
-      - utf-8-validate
-      - zod
 
   '@jest/schemas@29.6.3':
     dependencies:

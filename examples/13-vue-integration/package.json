@@ -7,8 +7,8 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@invisi-labs/vue": "file:../../packages/vue",
-    "@invisi-labs/payer": "file:../../packages/payer",
+    "@invisi-labs/vue": "workspace:*",
+    "@invisi-labs/payer": "workspace:*",
     "vue": "^3.0.0"
   },
   "devDependencies": {

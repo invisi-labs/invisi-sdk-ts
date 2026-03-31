@@ -5,6 +5,6 @@
   "dependencies": {
     "dotenv": "^16.0.0",
     "viem": "^2.0.0",
-    "@invisi-labs/deployments": "file:../../packages/deployments"
+    "@invisi-labs/deployments": "workspace:*"
   }
 }

@@ -6,7 +6,7 @@
     "start": "tsx main.ts"
   },
   "dependencies": {
-    "@invisi-labs/node": "file:../../packages/node",
+    "@invisi-labs/node": "workspace:*",
     "tsx": "^4.0.0"
   }
 }

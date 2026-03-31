@@ -6,10 +6,10 @@
     "start": "tsx main.ts"
   },
   "dependencies": {
-    "@invisi-labs/ipp": "file:../../packages/ipp",
-    "@invisi-labs/receiver": "file:../../packages/receiver",
-    "@invisi-labs/node": "file:../../packages/node",
-    "@invisi-labs/deployments": "file:../../packages/deployments",
+    "@invisi-labs/ipp": "workspace:*",
+    "@invisi-labs/receiver": "workspace:*",
+    "@invisi-labs/node": "workspace:*",
+    "@invisi-labs/deployments": "workspace:*",
     "viem": "^2.0.0",
     "tsx": "^4.0.0",
     "dotenv": "^16.0.0"
