@@ -25,3 +25,6 @@ export type {
   SignDepositCreditParams, SignDepositCreditResult,
   EIP712DomainParams, TokenPermit,
 } from "./metaTx"
+
+export { verifyPaymentCommitment } from "./verify"
+export type { VerifyPaymentCommitmentParams } from "./verify"
