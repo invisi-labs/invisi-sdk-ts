@@ -16,6 +16,19 @@ describe("buildPayOpenCalldata", () => {
     expect(result.approveAmount).toBe(100_000_000n)
   })
 
+  it("uses externally provided nonce instead of generating", async () => {
+    const externalNonce = 12345n
+    const result = await buildPayOpenCalldata({
+      chainId: 84532n,
+      identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      amount: 100_000_000n,
+      treeId: 1n,
+      nonce: externalNonce,
+    })
+    expect(result.nonce).toBe("0x" + externalNonce.toString(16).padStart(64, "0"))
+  })
+
   it("generates different nonces on each call", async () => {
     const params = {
       chainId: 1n,

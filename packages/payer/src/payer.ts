@@ -10,7 +10,9 @@ export interface PayOpenParams {
   tokenAddress: `0x${string}`
   amount: bigint
   treeId: bigint
-  refundLink?: bigint
+  refundLink?: bigint | undefined
+  /** 外部提供的 nonce（如 propose 响应）。不传则内部随机生成 */
+  nonce?: bigint | undefined
 }
 
 export interface PayOpenCalldata {
@@ -32,7 +34,7 @@ export async function buildPayOpenCalldata(
   params: PayOpenParams
 ): Promise<PayOpenCalldata> {
   const { poseidonHash, D_PAY } = await import("@invisi/core")
-  const nonce = generateNonce()
+  const nonce = params.nonce ?? generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
   const paymentCommitment = await poseidonHash([

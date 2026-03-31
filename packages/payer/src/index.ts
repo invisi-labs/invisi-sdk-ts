@@ -28,3 +28,6 @@ export type {
 
 export { verifyPaymentCommitment } from "./verify"
 export type { VerifyPaymentCommitmentParams } from "./verify"
+
+export { buildPaymentFromRequest } from "./fromRequest"
+export type { BuildPaymentFromRequestParams, BuildPaymentFromRequestResult } from "./fromRequest"

@@ -22,6 +22,7 @@
   "dependencies": {
     "@invisi/core": "workspace:*",
     "@invisi/contracts": "workspace:*",
+    "@invisi/ipp": "workspace:*",
     "@invisi/deployments": "workspace:*",
     "viem": "^2.0.0"
   },
