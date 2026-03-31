@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/deployments",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Invisi Protocol chain deployment registry",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -1,8 +1,20 @@
 {
-  "$schema": "https://unpkg.com/@changesets/config/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@invisi-labs/core",
+      "@invisi-labs/contracts",
+      "@invisi-labs/deployments",
+      "@invisi-labs/ipp",
+      "@invisi-labs/node",
+      "@invisi-labs/payer",
+      "@invisi-labs/receiver",
+      "@invisi-labs/tree",
+      "@invisi-labs/react",
+      "@invisi-labs/vue"
+    ]
+  ],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
