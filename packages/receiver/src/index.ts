@@ -21,3 +21,6 @@ export type {
   WaitForPayConfirmation,
   SubmitWithdraw,
 } from "./refund"
+
+export { computePaymentCommitmentForPropose } from "./propose"
+export type { ComputePaymentCommitmentForProposeParams, ProposeResult } from "./propose"
