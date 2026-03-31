@@ -10,5 +10,5 @@ console.log("4. Payer discovers the refund via the on-chain PayOpen event's refu
 console.log("")
 console.log("Requirements: a confirmed original paymentCommitment")
 
-// import { refund } from "@invisi/receiver"
+// import { refund } from "@invisi-labs/receiver"
 // const result = await refund({ originalCommitment: "0x...", refundAmount: 50_000_000n, ... })

@@ -4,10 +4,10 @@ Credit reclaim example demonstrating how the payer recovers unused credit after 
 
 ## Packages Used
 
-- `@invisi/ipp` -- IPPClient (creditReclaim API)
-- `@invisi/payer` -- Build creditReclaim calldata
-- `@invisi/node` -- Generate ZK proof
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/ipp` -- IPPClient (creditReclaim API)
+- `@invisi-labs/payer` -- Build creditReclaim calldata
+- `@invisi-labs/node` -- Generate ZK proof
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { buildPaymentFromRequest } from "./fromRequest"
-import { computePaymentCommitment, computeIdentityCommitment, deriveNullifierKey } from "@invisi/core"
-import type { IPPRequest } from "@invisi/ipp"
+import { computePaymentCommitment, computeIdentityCommitment, deriveNullifierKey } from "@invisi-labs/core"
+import type { IPPRequest } from "@invisi-labs/ipp"
 
 describe("buildPaymentFromRequest", () => {
   const CHAIN_ID = 84532n

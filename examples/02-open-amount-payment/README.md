@@ -4,10 +4,10 @@ Open-amount payment example demonstrating tip/donation scenarios where the payer
 
 ## Packages Used
 
-- `@invisi/receiver` -- Create payment requests
-- `@invisi/payer` -- Build payment calldata
-- `@invisi/ipp` -- Encode/decode IPP requests, IPPClient
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/receiver` -- Create payment requests
+- `@invisi-labs/payer` -- Build payment calldata
+- `@invisi-labs/ipp` -- Encode/decode IPP requests, IPPClient
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

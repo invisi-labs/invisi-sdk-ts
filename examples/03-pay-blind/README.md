@@ -4,11 +4,11 @@ Blinded-amount payment example demonstrating the full flow of using a ZK proof t
 
 ## Packages Used
 
-- `@invisi/payer` -- Build payBlind calldata, verify paymentCommitment
-- `@invisi/core` -- Compute changeCommitment
-- `@invisi/node` -- Generate ZK proof
-- `@invisi/ipp` -- IPP request decoding, IPPClient
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/payer` -- Build payBlind calldata, verify paymentCommitment
+- `@invisi-labs/core` -- Compute changeCommitment
+- `@invisi-labs/node` -- Generate ZK proof
+- `@invisi-labs/ipp` -- IPP request decoding, IPPClient
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

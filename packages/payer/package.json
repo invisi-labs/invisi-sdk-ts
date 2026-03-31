@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/payer",
+  "name": "@invisi-labs/payer",
   "version": "0.0.1",
   "description": "Invisi Protocol payer SDK",
   "type": "module",
@@ -20,10 +20,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi/core": "workspace:*",
-    "@invisi/contracts": "workspace:*",
-    "@invisi/ipp": "workspace:*",
-    "@invisi/deployments": "workspace:*",
+    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/contracts": "workspace:*",
+    "@invisi-labs/ipp": "workspace:*",
+    "@invisi-labs/deployments": "workspace:*",
     "viem": "^2.0.0"
   },
   "devDependencies": {

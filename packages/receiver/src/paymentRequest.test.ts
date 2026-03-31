@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { createPaymentRequest } from "./paymentRequest"
-import { computeIdentityCommitment, computePaymentCommitment, deriveNullifierKey } from "@invisi/core"
-import { validateIPPRequest, caip2ToChainId } from "@invisi/ipp"
+import { computeIdentityCommitment, computePaymentCommitment, deriveNullifierKey } from "@invisi-labs/core"
+import { validateIPPRequest, caip2ToChainId } from "@invisi-labs/ipp"
 
 describe("createPaymentRequest", () => {
   const baseParams = {

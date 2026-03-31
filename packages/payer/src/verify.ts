@@ -1,4 +1,4 @@
-import { computePaymentCommitment } from "@invisi/core"
+import { computePaymentCommitment } from "@invisi-labs/core"
 
 export interface VerifyPaymentCommitmentParams {
   identityCommitment: `0x${string}`

@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/deployments",
+  "name": "@invisi-labs/deployments",
   "version": "0.0.1",
   "description": "Invisi Protocol chain deployment registry",
   "type": "module",

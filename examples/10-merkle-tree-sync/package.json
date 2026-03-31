@@ -6,8 +6,8 @@
     "start": "tsx main.ts"
   },
   "dependencies": {
-    "@invisi/tree": "file:../../packages/tree",
-    "@invisi/deployments": "file:../../packages/deployments",
+    "@invisi-labs/tree": "file:../../packages/tree",
+    "@invisi-labs/deployments": "file:../../packages/deployments",
     "viem": "^2.0.0",
     "tsx": "^4.0.0",
     "dotenv": "^16.0.0"

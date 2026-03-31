@@ -4,8 +4,8 @@ React + Vite frontend integration example demonstrating how to use the `usePayOp
 
 ## Packages Used
 
-- `@invisi/react` -- React hooks (usePayOpen)
-- `@invisi/payer` -- Payment calldata construction
+- `@invisi-labs/react` -- React hooks (usePayOpen)
+- `@invisi-labs/payer` -- Payment calldata construction
 
 ## Running
 

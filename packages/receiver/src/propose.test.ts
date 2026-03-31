@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { computePaymentCommitmentForPropose } from "./propose"
-import { computePaymentCommitment } from "@invisi/core"
+import { computePaymentCommitment } from "@invisi-labs/core"
 
 describe("computePaymentCommitmentForPropose", () => {
   const params = {

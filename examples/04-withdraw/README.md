@@ -4,10 +4,10 @@ Batch settlement example demonstrating how the receiver withdraws received payme
 
 ## Packages Used
 
-- `@invisi/ipp` -- IPPClient (withdraw API)
-- `@invisi/receiver` -- Build withdraw calldata
-- `@invisi/node` -- Generate ZK proof
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/ipp` -- IPPClient (withdraw API)
+- `@invisi-labs/receiver` -- Build withdraw calldata
+- `@invisi-labs/node` -- Generate ZK proof
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

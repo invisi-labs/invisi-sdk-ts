@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem"
-import { invisiProtocolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
 // BN254 field modulus
 const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
@@ -33,7 +33,7 @@ function generateNonce(): bigint {
 export async function buildPayOpenCalldata(
   params: PayOpenParams
 ): Promise<PayOpenCalldata> {
-  const { poseidonHash, D_PAY } = await import("@invisi/core")
+  const { poseidonHash, D_PAY } = await import("@invisi-labs/core")
   const nonce = params.nonce ?? generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
@@ -135,7 +135,7 @@ export interface SettleChangeCalldata {
 export async function buildSettleChangeCalldata(
   params: SettleChangeParams
 ): Promise<SettleChangeCalldata> {
-  const { computePaymentNullifier } = await import("@invisi/core")
+  const { computePaymentNullifier } = await import("@invisi-labs/core")
   const nullifier = await computePaymentNullifier(
     params.chainId,
     params.nullifierKey,

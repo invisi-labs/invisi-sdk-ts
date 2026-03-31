@@ -1,6 +1,6 @@
 import { encodeFunctionData } from "viem"
-import { deriveNullifierKey, computeIdentityCommitment } from "@invisi/core"
-import { invisiProtocolAbi } from "@invisi/contracts"
+import { deriveNullifierKey, computeIdentityCommitment } from "@invisi-labs/core"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
 export interface GenerateInvoiceParams { masterKey: bigint; invoiceId: bigint; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint }
 export interface Invoice { invoiceId: bigint; nullifierKey: bigint; identityCommitment: `0x${string}`; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint }

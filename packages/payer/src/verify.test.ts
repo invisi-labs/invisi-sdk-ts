@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { verifyPaymentCommitment } from "./verify"
-import { computePaymentCommitment, computeIdentityCommitment, deriveNullifierKey } from "@invisi/core"
+import { computePaymentCommitment, computeIdentityCommitment, deriveNullifierKey } from "@invisi-labs/core"
 
 describe("verifyPaymentCommitment", () => {
   const CHAIN_ID = 84532n

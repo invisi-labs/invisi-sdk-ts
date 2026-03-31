@@ -51,10 +51,10 @@ All examples reference local packages via `file:../../packages/<name>`, suitable
 
 ```json
 // During development
-"@invisi/payer": "file:../../packages/payer"
+"@invisi-labs/payer": "file:../../packages/payer"
 
 // After publishing
-"@invisi/payer": "^0.1.0"
+"@invisi-labs/payer": "^0.1.0"
 ```
 
 ## Frontend Examples

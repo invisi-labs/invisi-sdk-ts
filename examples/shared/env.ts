@@ -7,7 +7,7 @@ config({ path: resolve(__dirname, "../.env") })
 import { createPublicClient, createWalletClient, http } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { baseSepolia } from "viem/chains"
-import { getDeployment } from "@invisi/deployments"
+import { getDeployment } from "@invisi-labs/deployments"
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`
 const RPC_URL = process.env.RPC_URL ?? "https://sepolia.base.org"

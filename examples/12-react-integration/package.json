@@ -7,8 +7,8 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@invisi/react": "file:../../packages/react",
-    "@invisi/payer": "file:../../packages/payer",
+    "@invisi-labs/react": "file:../../packages/react",
+    "@invisi-labs/payer": "file:../../packages/payer",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },

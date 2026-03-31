@@ -4,9 +4,9 @@ Gasless payment example demonstrating zero-gas payments for users via EIP-712 si
 
 ## Packages Used
 
-- `@invisi/payer` -- Build EIP-712 typed data
-- `@invisi/ipp` -- IPPClient (relay API)
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/payer` -- Build EIP-712 typed data
+- `@invisi-labs/ipp` -- IPPClient (relay API)
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

@@ -1,6 +1,6 @@
-import { deriveNullifierKey, computeIdentityCommitment } from "@invisi/core"
-import { chainIdToCAIP2 } from "@invisi/ipp"
-import type { IPPRequest, PaymentType } from "@invisi/ipp"
+import { deriveNullifierKey, computeIdentityCommitment } from "@invisi-labs/core"
+import { chainIdToCAIP2 } from "@invisi-labs/ipp"
+import type { IPPRequest, PaymentType } from "@invisi-labs/ipp"
 import { computePaymentCommitmentForPropose } from "./propose"
 
 export interface CreatePaymentRequestParams {

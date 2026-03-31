@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/node",
+  "name": "@invisi-labs/node",
   "version": "0.0.1",
   "description": "Invisi Protocol Node.js proof generation",
   "type": "module",
@@ -23,7 +23,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi/core": "workspace:*",
+    "@invisi-labs/core": "workspace:*",
     "@noir-lang/noir_js": "1.0.0-beta.15"
   },
   "devDependencies": {

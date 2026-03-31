@@ -1,4 +1,4 @@
-import { usePayOpen } from "@invisi/react"
+import { usePayOpen } from "@invisi-labs/react"
 
 function PaymentButton() {
   const { status, calldata, error, prepare } = usePayOpen()

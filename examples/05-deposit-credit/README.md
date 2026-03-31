@@ -4,9 +4,9 @@ Credit deposit example demonstrating the flow of a payer granting credit to a re
 
 ## Packages Used
 
-- `@invisi/payer` -- Create credit calldata
-- `@invisi/ipp` -- IPP request decoding, IPPClient (authorize API)
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/payer` -- Create credit calldata
+- `@invisi-labs/ipp` -- IPP request decoding, IPPClient (authorize API)
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

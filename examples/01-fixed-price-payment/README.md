@@ -4,10 +4,10 @@ Fixed-amount payment example demonstrating the single-payer invoice mode with re
 
 ## Packages Used
 
-- `@invisi/receiver` -- Create payment requests
-- `@invisi/payer` -- Build payment calldata, verify paymentCommitment
-- `@invisi/ipp` -- Encode/decode IPP requests
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/receiver` -- Create payment requests
+- `@invisi-labs/payer` -- Build payment calldata, verify paymentCommitment
+- `@invisi-labs/ipp` -- Encode/decode IPP requests
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

@@ -1,4 +1,4 @@
-import { computePaymentCommitment } from "@invisi/core"
+import { computePaymentCommitment } from "@invisi-labs/core"
 
 const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 

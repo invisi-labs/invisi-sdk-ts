@@ -10,7 +10,7 @@ console.log("4. Continuously listen for new events")
 console.log("")
 console.log("Requirements: RPC connection to Base Sepolia")
 
-// import { InvisiTreeManager } from "@invisi/tree"
+// import { InvisiTreeManager } from "@invisi-labs/tree"
 // const manager = new InvisiTreeManager({ client: publicClient, protocolAddress: PROTOCOL_ADDRESS })
 // await manager.start()
 // console.log("Tree count:", manager.getTreeCount())

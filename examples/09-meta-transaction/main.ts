@@ -11,8 +11,8 @@ console.log("5. Relayer submits the transaction (consumes relayer's ETH)")
 console.log("")
 console.log("Requirements: an endpoint that supports relay")
 
-// import { buildSignPayOpenTypedData } from "@invisi/payer"
-// import { decodeIPPRequest, IPPClient } from "@invisi/ipp"
+// import { buildSignPayOpenTypedData } from "@invisi-labs/payer"
+// import { decodeIPPRequest, IPPClient } from "@invisi-labs/ipp"
 // const typedData = buildSignPayOpenTypedData({ chainId: CHAIN_ID, ... })
 // const signature = await walletClient.signTypedData(typedData)
 // const relayResp = await client.relay({ mode: "signature", operation: "pay-open", network: "eip155:84532", signature, ... })

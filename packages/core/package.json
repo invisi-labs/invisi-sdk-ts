@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/core",
+  "name": "@invisi-labs/core",
   "version": "0.0.1",
   "description": "Invisi Protocol core cryptographic primitives",
   "type": "module",

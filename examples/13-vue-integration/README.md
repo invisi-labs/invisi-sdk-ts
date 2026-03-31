@@ -4,8 +4,8 @@ Vue 3 + Vite frontend integration example demonstrating how to use the `usePayOp
 
 ## Packages Used
 
-- `@invisi/vue` -- Vue composables (usePayOpen)
-- `@invisi/payer` -- Payment calldata construction
+- `@invisi-labs/vue` -- Vue composables (usePayOpen)
+- `@invisi-labs/payer` -- Payment calldata construction
 
 ## Running
 

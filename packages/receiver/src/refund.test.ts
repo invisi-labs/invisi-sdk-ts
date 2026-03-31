@@ -3,7 +3,7 @@ import {
   deriveNullifierKey,
   computeIdentityCommitment,
   computeRefundLink,
-} from "@invisi/core"
+} from "@invisi-labs/core"
 import { refund, resumeRefund, stringIdToBigInt } from "./refund"
 import type {
   RefundDependencies,

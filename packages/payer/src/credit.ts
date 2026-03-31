@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem"
-import { invisiProtocolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
 const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
 
@@ -43,7 +43,7 @@ export interface CreateCreditResult {
 }
 
 export async function createCredit(params: CreateCreditParams): Promise<CreateCreditResult> {
-  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash } = await import("@invisi/core")
+  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash } = await import("@invisi-labs/core")
 
   const payerNullifierKey = await deriveNullifierKey(params.payerMasterKey, params.creditId)
   const payerCommitment = await computeIdentityCommitment(payerNullifierKey, params.payerAddress)

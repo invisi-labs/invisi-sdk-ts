@@ -47,7 +47,7 @@ describe("InMemoryMerkleTree", () => {
   })
 
   it("getProof merklePath can reconstruct root", async () => {
-    const { poseidonHash } = await import("@invisi/core")
+    const { poseidonHash } = await import("@invisi-labs/core")
 
     const tree = await InMemoryMerkleTree.create()
     const leaf = 42n
@@ -65,7 +65,7 @@ describe("InMemoryMerkleTree", () => {
   })
 
   it("getProof works for non-zero index", async () => {
-    const { poseidonHash } = await import("@invisi/core")
+    const { poseidonHash } = await import("@invisi-labs/core")
 
     const tree = await InMemoryMerkleTree.create()
     await tree.insert(100n) // index 0

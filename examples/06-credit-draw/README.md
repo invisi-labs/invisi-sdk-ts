@@ -4,10 +4,10 @@ Credit draw example demonstrating how the receiver draws funds on demand from th
 
 ## Packages Used
 
-- `@invisi/ipp` -- IPPClient (creditDraw API)
-- `@invisi/receiver` -- Build creditDraw calldata
-- `@invisi/node` -- Generate ZK proof
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/ipp` -- IPPClient (creditDraw API)
+- `@invisi-labs/receiver` -- Build creditDraw calldata
+- `@invisi-labs/node` -- Generate ZK proof
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { buildPayBlindCalldata, type PayBlindParams, type PayBlindCalldata } from "@invisi/payer"
+import { buildPayBlindCalldata, type PayBlindParams, type PayBlindCalldata } from "@invisi-labs/payer"
 
 type Status = "idle" | "preparing" | "ready" | "error"
 

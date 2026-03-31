@@ -4,8 +4,8 @@ Refund example demonstrating the receiver initiating a full or partial refund. T
 
 ## Packages Used
 
-- `@invisi/receiver` -- Build refund calldata
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/receiver` -- Build refund calldata
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

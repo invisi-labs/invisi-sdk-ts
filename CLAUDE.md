@@ -21,8 +21,8 @@ pnpm lint
 pnpm clean
 
 # Target a specific package
-pnpm turbo run test --filter=@invisi/core
-pnpm turbo run build --filter=@invisi/receiver
+pnpm turbo run test --filter=@invisi-labs/core
+pnpm turbo run build --filter=@invisi-labs/receiver
 
 # Run tests inside a package directly
 cd packages/core && pnpm test
@@ -37,42 +37,42 @@ pnpm release            # Build + publish
 
 ## Architecture
 
-This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SDK. All packages live under `packages/` and are published as `@invisi/*`.
+This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SDK. All packages live under `packages/` and are published as `@invisi-labs/*`.
 
 ### Package Dependency Graph
 
 ```
-@invisi/core          ← Poseidon hash, commitments, nullifiers, key derivation
+@invisi-labs/core          ← Poseidon hash, commitments, nullifiers, key derivation
        ↓                  (uses @aztec/bb.js for Barretenberg cryptography)
-@invisi/ipp           ← IPP data format, encoding, CAIP-2, Interaction Protocol client (uses @msgpack/msgpack)
-@invisi/contracts     ← InvisiProtocol ABI + TypeScript types (no dependencies)
-@invisi/deployments   ← Chain deployment registry (no dependencies)
+@invisi-labs/ipp           ← IPP data format, encoding, CAIP-2, Interaction Protocol client (uses @msgpack/msgpack)
+@invisi-labs/contracts     ← InvisiProtocol ABI + TypeScript types (no dependencies)
+@invisi-labs/deployments   ← Chain deployment registry (no dependencies)
        ↓
-@invisi/payer         ← buildPayOpenCalldata, buildPayBlindCalldata, buildPaymentFromRequest, verifyPaymentCommitment
-                          (uses viem + @invisi/contracts + @invisi/ipp)
-@invisi/receiver      ← generateInvoice, buildWithdrawCalldata, createPaymentRequest, computePaymentCommitmentForPropose
-                          (uses @invisi/core + @invisi/contracts + @invisi/deployments + @invisi/ipp + viem)
+@invisi-labs/payer         ← buildPayOpenCalldata, buildPayBlindCalldata, buildPaymentFromRequest, verifyPaymentCommitment
+                          (uses viem + @invisi-labs/contracts + @invisi-labs/ipp)
+@invisi-labs/receiver      ← generateInvoice, buildWithdrawCalldata, createPaymentRequest, computePaymentCommitmentForPropose
+                          (uses @invisi-labs/core + @invisi-labs/contracts + @invisi-labs/deployments + @invisi-labs/ipp + viem)
        ↓
-@invisi/react         ← usePayOpen() hook, usePayBlind() hook (wraps @invisi/payer)
-@invisi/vue           ← usePayOpen() composable, usePayBlind() composable (wraps @invisi/payer)
+@invisi-labs/react         ← usePayOpen() hook, usePayBlind() hook (wraps @invisi-labs/payer)
+@invisi-labs/vue           ← usePayOpen() composable, usePayBlind() composable (wraps @invisi-labs/payer)
 
-@invisi/node          ← Server-side ZK proof generation via nargo + bb CLI
-                          (uses @invisi/core, requires nargo & bb binaries)
+@invisi-labs/node          ← Server-side ZK proof generation via nargo + bb CLI
+                          (uses @invisi-labs/core, requires nargo & bb binaries)
 ```
 
 ### Key Concepts
 
-- **Claiming key**: Derived per-invoice from a master key (`deriveClaimingKey(masterKey, invoiceId)` in `@invisi/core`). Used to compute commitments and nullifiers.
+- **Claiming key**: Derived per-invoice from a master key (`deriveClaimingKey(masterKey, invoiceId)` in `@invisi-labs/core`). Used to compute commitments and nullifiers.
 - **Payment commitment**: `poseidonHash(identityCommitment, amount)` — stored on-chain when a payer deposits.
 - **Nullifier**: `poseidonHash(claimingKey, amount)` — prevents double-spending during settlement.
-- **Proof circuits**: `single_withdraw`, `batch_withdraw`, `shielded_payment` — generated server-side by `@invisi/node` via two-step process: `nargo execute` (witness) then `bb prove` (proof).
+- **Proof circuits**: `single_withdraw`, `batch_withdraw`, `shielded_payment` — generated server-side by `@invisi-labs/node` via two-step process: `nargo execute` (witness) then `bb prove` (proof).
 - **IPPClient**: `new IPPClient(endpoint)` — HTTP client for IPP Interaction Protocol. Methods: `info`, `propose`, `authorize`, `status`, `notify`, `withdraw`, `creditDraw`, `creditReclaim`, `creditStatus`, `relay`, `relayStatus`.
 - **createPaymentRequest**: Generates an `IPPRequest` from receiver credentials. Automatically computes `identityCommitment` and optionally pre-computes `nonce` + `paymentCommitment` (mode 1a).
 - **buildPaymentFromRequest**: Constructs on-chain calldata from an `IPPRequest` + propose response. Verifies `paymentCommitment` before building.
 
 ### Contracts Sync
 
-ABIs in `@invisi/contracts` and deployment addresses in `@invisi/deployments` are auto-synced from the `invisi-protocol` repo via the `protocol-sync` GitHub Actions workflow (triggered by a `protocol-release` repository dispatch event). Do not manually edit ABI files — they are generated.
+ABIs in `@invisi-labs/contracts` and deployment addresses in `@invisi-labs/deployments` are auto-synced from the `invisi-protocol` repo via the `protocol-sync` GitHub Actions workflow (triggered by a `protocol-release` repository dispatch event). Do not manually edit ABI files — they are generated.
 
 ### Build System
 

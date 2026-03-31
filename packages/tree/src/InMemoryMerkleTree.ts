@@ -1,4 +1,4 @@
-import { poseidonHash } from "@invisi/core"
+import { poseidonHash } from "@invisi-labs/core"
 
 const DEPTH = 16
 

@@ -16,10 +16,10 @@ console.log("- nargo + bb installed (Noir ZK toolchain)")
 console.log("- An existing UTXO (used as input for the blind payment)")
 console.log("")
 
-// import { buildPayBlindCalldata, verifyPaymentCommitment } from "@invisi/payer"
-// import { generateProof } from "@invisi/node"
-// import { computeChangeCommitment } from "@invisi/core"
-// import { decodeIPPRequest, IPPClient } from "@invisi/ipp"
+// import { buildPayBlindCalldata, verifyPaymentCommitment } from "@invisi-labs/payer"
+// import { generateProof } from "@invisi-labs/node"
+// import { computeChangeCommitment } from "@invisi-labs/core"
+// import { decodeIPPRequest, IPPClient } from "@invisi-labs/ipp"
 //
 // const request = decodeIPPRequest(qrData)
 // const client = new IPPClient(request.endpoint!)

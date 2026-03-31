@@ -141,7 +141,7 @@ export interface SignPayOpenParams {
 export async function buildSignPayOpenTypedData(
   params: SignPayOpenParams
 ): Promise<SignPayOpenResult> {
-  const { poseidonHash, D_PAY } = await import("@invisi/core")
+  const { poseidonHash, D_PAY } = await import("@invisi-labs/core")
   const nonce = generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as Hex
 

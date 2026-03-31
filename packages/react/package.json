@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/react",
+  "name": "@invisi-labs/react",
   "version": "0.0.1",
   "description": "Invisi Protocol React hooks",
   "type": "module",
@@ -14,7 +14,7 @@
     }
   },
   "dependencies": {
-    "@invisi/payer": "workspace:*",
+    "@invisi-labs/payer": "workspace:*",
     "viem": "^2.0.0"
   },
   "peerDependencies": {

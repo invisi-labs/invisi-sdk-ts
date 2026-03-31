@@ -67,7 +67,7 @@ jobs:
           fs.writeFileSync('./packages/deployments/src/registry.ts', ts);
           "
 
-      - name: Update bb_version in @invisi/core
+      - name: Update bb_version in @invisi-labs/core
         run: |
           BB_VERSION="${{ github.event.client_payload.bb_version }}"
           cd packages/core

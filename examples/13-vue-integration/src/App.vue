@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { usePayOpen } from "@invisi/vue"
+import { usePayOpen } from "@invisi-labs/vue"
 
 const { status, calldata, error, prepare } = usePayOpen()
 

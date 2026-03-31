@@ -1,8 +1,8 @@
 import {
   USDC_ADDRESS, DEFAULT_TREE_ID, CHAIN_ID,
 } from "../shared/env.ts"
-import { createPaymentRequest } from "@invisi/receiver"
-import { encodeIPPRequest, decodeIPPRequest } from "@invisi/ipp"
+import { createPaymentRequest } from "@invisi-labs/receiver"
+import { encodeIPPRequest, decodeIPPRequest } from "@invisi-labs/ipp"
 
 // === Receiver: Create open-amount request ===
 console.log("=== Mode 2: Open amount (payer determines the price) ===")

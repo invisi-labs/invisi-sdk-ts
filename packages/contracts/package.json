@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/contracts",
+  "name": "@invisi-labs/contracts",
   "version": "0.0.1",
   "description": "Invisi Protocol contract ABIs and types",
   "type": "module",

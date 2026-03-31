@@ -1,4 +1,4 @@
-import { generateProof, checkBBAvailable, CIRCUIT_NAMES } from "@invisi/node"
+import { generateProof, checkBBAvailable, CIRCUIT_NAMES } from "@invisi-labs/node"
 
 console.log("=== ZK Proof Generation ===")
 console.log("")

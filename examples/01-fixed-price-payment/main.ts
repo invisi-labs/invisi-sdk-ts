@@ -2,9 +2,9 @@ import {
   account, walletClient, publicClient,
   PROTOCOL_ADDRESS, USDC_ADDRESS, DEFAULT_TREE_ID, CHAIN_ID,
 } from "../shared/env.ts"
-import { createPaymentRequest } from "@invisi/receiver"
-import { buildPaymentFromRequest, verifyPaymentCommitment } from "@invisi/payer"
-import { encodeIPPRequest, decodeIPPRequest, IPPClient } from "@invisi/ipp"
+import { createPaymentRequest } from "@invisi-labs/receiver"
+import { buildPaymentFromRequest, verifyPaymentCommitment } from "@invisi-labs/payer"
+import { encodeIPPRequest, decodeIPPRequest, IPPClient } from "@invisi-labs/ipp"
 
 // === Mode 1a: Receiver-precomputed nonce (single-payer exact invoice) ===
 console.log("=== Mode 1a: Receiver-precomputed nonce ===")

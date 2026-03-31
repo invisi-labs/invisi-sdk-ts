@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem"
-import { invisiProtocolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
 export interface CreditRecord {
   creditId: string

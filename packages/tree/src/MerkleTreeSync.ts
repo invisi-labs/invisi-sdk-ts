@@ -1,4 +1,4 @@
-import { invisiProtocolAbi } from "@invisi/contracts"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
 import type { InMemoryMerkleTree } from "./InMemoryMerkleTree"
 
 export type TreeType = "payment"

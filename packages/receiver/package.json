@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/receiver",
+  "name": "@invisi-labs/receiver",
   "version": "0.0.1",
   "description": "Invisi Protocol receiver SDK",
   "type": "module",
@@ -20,10 +20,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi/core": "workspace:*",
-    "@invisi/contracts": "workspace:*",
-    "@invisi/deployments": "workspace:*",
-    "@invisi/ipp": "workspace:*",
+    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/contracts": "workspace:*",
+    "@invisi-labs/deployments": "workspace:*",
+    "@invisi-labs/ipp": "workspace:*",
     "viem": "^2.0.0"
   },
   "devDependencies": {

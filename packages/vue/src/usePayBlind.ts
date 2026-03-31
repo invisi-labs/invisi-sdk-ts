@@ -1,5 +1,5 @@
 import { ref } from "vue"
-import { buildPayBlindCalldata, type PayBlindParams, type PayBlindCalldata } from "@invisi/payer"
+import { buildPayBlindCalldata, type PayBlindParams, type PayBlindCalldata } from "@invisi-labs/payer"
 
 export function usePayBlind() {
   const status = ref<"idle" | "preparing" | "ready" | "error">("idle")

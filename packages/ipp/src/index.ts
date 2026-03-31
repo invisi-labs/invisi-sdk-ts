@@ -1,4 +1,4 @@
-// @invisi/ipp — Invisible Payment Protocol data format
+// @invisi-labs/ipp — Invisible Payment Protocol data format
 
 // === 版本 ===
 export const IPP_VERSION = 1

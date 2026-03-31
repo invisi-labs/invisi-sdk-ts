@@ -10,9 +10,9 @@ console.log("2c. Fully delegated to relay (no compute power + no ETH)")
 console.log("")
 console.log("Requirements: a running endpoint + confirmed paymentCommitments")
 
-// import { IPPClient } from "@invisi/ipp"
-// import { buildWithdrawCalldata } from "@invisi/receiver"
-// import { generateProof } from "@invisi/node"
+// import { IPPClient } from "@invisi-labs/ipp"
+// import { buildWithdrawCalldata } from "@invisi-labs/receiver"
+// import { generateProof } from "@invisi-labs/node"
 // const client = new IPPClient("https://pay.example.com")
 // const resp = await client.withdraw({ identityCommitment: "0x...", tokenAddress: USDC_ADDRESS, treeId: "1", paymentCommitments: ["0x..."] })
 // const proof = await generateProof({ circuitName: resp.circuit!, witness: resp.witness })

@@ -4,8 +4,8 @@ Merkle Tree sync example demonstrating how to sync on-chain Merkle Tree state an
 
 ## Packages Used
 
-- `@invisi/tree` -- InvisiTreeManager
-- `@invisi/deployments` -- Contract addresses
+- `@invisi-labs/tree` -- InvisiTreeManager
+- `@invisi-labs/deployments` -- Contract addresses
 
 ## Running
 

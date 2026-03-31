@@ -1,5 +1,5 @@
 {
-  "name": "@invisi/tree",
+  "name": "@invisi-labs/tree",
   "version": "0.0.1",
   "description": "Invisi Protocol Merkle Tree real-time sync",
   "type": "module",
@@ -20,8 +20,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi/core": "workspace:*",
-    "@invisi/contracts": "workspace:*",
+    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/contracts": "workspace:*",
     "viem": "^2.0.0"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
-import { caip2ToChainId } from "@invisi/ipp"
-import type { IPPRequest } from "@invisi/ipp"
+import { caip2ToChainId } from "@invisi-labs/ipp"
+import type { IPPRequest } from "@invisi-labs/ipp"
 import { verifyPaymentCommitment } from "./verify"
 import { buildPayOpenCalldata } from "./payer"
 

@@ -3,8 +3,8 @@ import {
   deriveNullifierKey,
   computeIdentityCommitment,
   computeRefundLink,
-} from "@invisi/core"
-import { invisiProtocolAbi } from "@invisi/contracts"
+} from "@invisi-labs/core"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
 // BN254 field modulus
 const FIELD_MODULUS =

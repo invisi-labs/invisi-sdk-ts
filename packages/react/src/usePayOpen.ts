@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { buildPayOpenCalldata, type PayOpenParams, type PayOpenCalldata } from "@invisi/payer"
+import { buildPayOpenCalldata, type PayOpenParams, type PayOpenCalldata } from "@invisi-labs/payer"
 
 type Status = "idle" | "preparing" | "ready" | "error"
 
