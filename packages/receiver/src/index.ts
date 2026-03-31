@@ -24,3 +24,6 @@ export type {
 
 export { computePaymentCommitmentForPropose } from "./propose"
 export type { ComputePaymentCommitmentForProposeParams, ProposeResult } from "./propose"
+
+export { createPaymentRequest } from "./paymentRequest"
+export type { CreatePaymentRequestParams } from "./paymentRequest"
