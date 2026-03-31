@@ -1,57 +1,61 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect } from "vitest"
+import { generateProof } from "./prover"
+import { checkBBAvailable } from "./backend-bb"
 
-vi.mock("node:child_process", () => ({
-  execFile: vi.fn(),
-}))
-
-vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  readFile: vi.fn().mockResolvedValue(Buffer.from("deadbeef", "hex")),
-  mkdtemp: vi.fn().mockResolvedValue("/tmp/invisi-proof-abc"),
-  rm: vi.fn().mockResolvedValue(undefined),
-}))
-
-import { checkBBAvailable, generateProof } from "./prover"
-import { execFile } from "node:child_process"
-
-const mockExecFile = vi.mocked(execFile)
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  mockExecFile.mockImplementation((...args: any[]) => {
-    const cb = args[args.length - 1]
-    if (typeof cb === "function") {
-      cb(null, "", "")
-    }
-    return {} as any
-  })
-})
-
-describe("checkBBAvailable", () => {
-  it("returns true when bb exits successfully", async () => {
-    const result = await checkBBAvailable("bb")
-    expect(result).toBe(true)
-  })
-
-  it("returns false when bb is not found", async () => {
-    mockExecFile.mockImplementationOnce((...args: any[]) => {
-      const cb = args[args.length - 1]
-      if (typeof cb === "function") {
-        cb(new Error("not found"), "", "")
-      }
-      return {} as any
-    })
-    const result = await checkBBAvailable("bb")
-    expect(result).toBe(false)
-  })
-})
+const TEST_INPUTS = {
+  claiming_keys: ["123"],
+  nonces: ["42"],
+  amounts: ["1000"],
+  leaf_indices: ["0"],
+  merkle_paths: [Array(16).fill("0")],
+  chain_id: "1",
+  merkle_root: "0x2ac880615f616e165e3a8dadca15b45754111108e7e069c9b908d8a938ef5128",
+  nullifiers: ["0x103d706be84d179ec8b61d5c25af329aa8e45c47a03156e2dd5ded2f452caf09"],
+  receiving_address: "456",
+  token_address: "789",
+  total_amount: "1000",
+  actual_count: "1",
+}
 
 describe("generateProof", () => {
-  it("returns a 0x-prefixed hex proof", async () => {
+  it("generates proof with bb backend", async () => {
+    const available = await checkBBAvailable()
+    if (!available) {
+      console.log("Skipping: bb binary not found")
+      return
+    }
+
     const proof = await generateProof({
       circuitName: "batch_settle_1",
-      witness: { claiming_key: "42", amount: "1000000000000000000" },
+      inputs: TEST_INPUTS,
+      backend: "bb",
     })
+
     expect(proof).toMatch(/^0x[0-9a-f]+$/i)
-  })
+  }, 120_000)
+
+  it("generates proof with wasm backend", async () => {
+    const proof = await generateProof({
+      circuitName: "batch_settle_1",
+      inputs: TEST_INPUTS,
+      backend: "wasm",
+    })
+
+    expect(proof).toMatch(/^0x[0-9a-f]+$/i)
+  }, 120_000)
+
+  it("defaults to bb backend", async () => {
+    const available = await checkBBAvailable()
+    if (!available) {
+      console.log("Skipping: bb binary not found")
+      return
+    }
+
+    const proof = await generateProof({
+      circuitName: "batch_settle_1",
+      inputs: TEST_INPUTS,
+    })
+
+    expect(proof).toMatch(/^0x[0-9a-f]+$/i)
+  }, 120_000)
 })

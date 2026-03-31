@@ -1,2 +1,6 @@
-export { generateProof, checkBBAvailable } from "./prover"
-export type { ProveParams } from "./prover"
+export { generateProof } from "./prover"
+export type { ProveParams, Backend } from "./prover"
+export { checkBBAvailable } from "./backend-bb"
+export { loadCircuit, getCircuitPath, CIRCUIT_NAMES } from "./circuits"
+export type { CircuitName, CompiledCircuit } from "./circuits"
+export { generateWitness } from "./witness"

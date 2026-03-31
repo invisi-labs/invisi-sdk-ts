@@ -378,6 +378,13 @@ importers:
       '@invisi/core':
         specifier: workspace:*
         version: link:../core
+      '@noir-lang/noir_js':
+        specifier: 1.0.0-beta.15
+        version: 1.0.0-beta.15
+    optionalDependencies:
+      '@aztec/bb.js':
+        specifier: 3.0.0-nightly.20251104
+        version: 3.0.0-nightly.20251104
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -539,6 +546,10 @@ packages:
 
   '@aztec/bb.js@0.87.9':
     resolution: {integrity: sha512-opLGrEPszWL3YBiWgyGaBZrrN0ZOgPcnkh5G5uduLhvV7WUBGGxhosMhh3aw/Iiyn9gKnKPwpVYWr/+VlTCJ0g==}
+    hasBin: true
+
+  '@aztec/bb.js@3.0.0-nightly.20251104':
+    resolution: {integrity: sha512-gLuPbivmU/yCq/eeMU9srQkyef9f7W4zUy2WJY+FOv3VBqmErz66AAVdVKj8MuKcFmtfXK1Lor1ZHomv8Ak95g==}
     hasBin: true
 
   '@babel/code-frame@7.29.0':
@@ -1120,6 +1131,18 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@noir-lang/acvm_js@1.0.0-beta.15':
+    resolution: {integrity: sha512-WQNMycnVGj0J369BDcsa0N6n0IlISqXEznzDBHiP2yugHgTAoxiDzXizRW10K6u/w0EOVrl+bybLxNxLIPUSYQ==}
+
+  '@noir-lang/noir_js@1.0.0-beta.15':
+    resolution: {integrity: sha512-ffN3rWzcqaO+FmBF6quFqgXhEK1gyJ8TQ9V4V3A+PIKYE94BOB0L84McxofbRqt3TFuSloBymGiFrJ/Gx8Q8eQ==}
+
+  '@noir-lang/noirc_abi@1.0.0-beta.15':
+    resolution: {integrity: sha512-ZJ5pUSKiZ6Nyj6DcXmLkf/+OA12cApYq/XPYePxX7v1Z2mLLl1/Gj8dO/greHUYRD47ziXIgyaZQWryE3+4ifw==}
+
+  '@noir-lang/types@1.0.0-beta.15':
+    resolution: {integrity: sha512-FCydHArW6+oOSCxSIsprOExDaBMmxh0a9+ZhXigxFDZF6j96wzy3WvA0XLgczZzAjWOiBPCr4voTW1bsM0Ca2A==}
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
@@ -2574,6 +2597,17 @@ snapshots:
       pino: 9.14.0
       tslib: 2.8.1
 
+  '@aztec/bb.js@3.0.0-nightly.20251104':
+    dependencies:
+      comlink: 4.4.2
+      commander: 12.1.0
+      idb-keyval: 6.2.2
+      msgpackr: 1.11.9
+      pako: 2.1.0
+      pino: 9.14.0
+      tslib: 2.8.1
+    optional: true
+
   '@babel/code-frame@7.29.0':
     dependencies:
       '@babel/helper-validator-identifier': 7.28.5
@@ -3008,6 +3042,9 @@ snapshots:
   '@invisi/node@file:packages/node':
     dependencies:
       '@invisi/core': link:packages/core
+      '@noir-lang/noir_js': 1.0.0-beta.15
+    optionalDependencies:
+      '@aztec/bb.js': 3.0.0-nightly.20251104
 
   '@invisi/payer@file:packages/payer(typescript@5.9.3)':
     dependencies:
@@ -3146,6 +3183,21 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@noir-lang/acvm_js@1.0.0-beta.15': {}
+
+  '@noir-lang/noir_js@1.0.0-beta.15':
+    dependencies:
+      '@noir-lang/acvm_js': 1.0.0-beta.15
+      '@noir-lang/noirc_abi': 1.0.0-beta.15
+      '@noir-lang/types': 1.0.0-beta.15
+      pako: 2.1.0
+
+  '@noir-lang/noirc_abi@1.0.0-beta.15':
+    dependencies:
+      '@noir-lang/types': 1.0.0-beta.15
+
+  '@noir-lang/types@1.0.0-beta.15': {}
 
   '@pinojs/redact@0.4.0': {}
 
