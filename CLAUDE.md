@@ -44,13 +44,14 @@ This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SD
 ```
 @invisi/core          ← Poseidon hash, commitments, nullifiers, key derivation
        ↓                  (uses @aztec/bb.js for Barretenberg cryptography)
-@invisi/ipp           ← IPP data format, encoding, CAIP-2 (uses @msgpack/msgpack)
+@invisi/ipp           ← IPP data format, encoding, CAIP-2, Interaction Protocol client (uses @msgpack/msgpack)
 @invisi/contracts     ← InvisiProtocol ABI + TypeScript types (no dependencies)
 @invisi/deployments   ← Chain deployment registry (no dependencies)
        ↓
-@invisi/payer         ← buildPayOpenCalldata, buildPayBlindCalldata (uses viem + @invisi/contracts)
-@invisi/receiver      ← generateInvoice, buildWithdrawCalldata
-                          (uses @invisi/core + @invisi/contracts + @invisi/deployments + viem)
+@invisi/payer         ← buildPayOpenCalldata, buildPayBlindCalldata, buildPaymentFromRequest, verifyPaymentCommitment
+                          (uses viem + @invisi/contracts + @invisi/ipp)
+@invisi/receiver      ← generateInvoice, buildWithdrawCalldata, createPaymentRequest, computePaymentCommitmentForPropose
+                          (uses @invisi/core + @invisi/contracts + @invisi/deployments + @invisi/ipp + viem)
        ↓
 @invisi/react         ← usePayOpen() hook, usePayBlind() hook (wraps @invisi/payer)
 @invisi/vue           ← usePayOpen() composable, usePayBlind() composable (wraps @invisi/payer)
@@ -65,6 +66,9 @@ This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SD
 - **Payment commitment**: `poseidonHash(identityCommitment, amount)` — stored on-chain when a payer deposits.
 - **Nullifier**: `poseidonHash(claimingKey, amount)` — prevents double-spending during settlement.
 - **Proof circuits**: `single_withdraw`, `batch_withdraw`, `shielded_payment` — generated server-side by `@invisi/node` via two-step process: `nargo execute` (witness) then `bb prove` (proof).
+- **IPPClient**: `new IPPClient(endpoint)` — HTTP client for IPP Interaction Protocol. Methods: `info`, `propose`, `authorize`, `status`, `notify`, `withdraw`, `creditDraw`, `creditReclaim`, `creditStatus`, `relay`, `relayStatus`.
+- **createPaymentRequest**: Generates an `IPPRequest` from receiver credentials. Automatically computes `identityCommitment` and optionally pre-computes `nonce` + `paymentCommitment` (mode 1a).
+- **buildPaymentFromRequest**: Constructs on-chain calldata from an `IPPRequest` + propose response. Verifies `paymentCommitment` before building.
 
 ### Contracts Sync
 
