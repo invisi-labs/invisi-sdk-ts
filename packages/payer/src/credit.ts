@@ -58,7 +58,7 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
     args: [
       params.identityCommitment,
       payerCommitment,
-      { addr: params.tokenAddress, amount: params.amount },
+      params.amount,
       nonceHex,
       params.expiry,
       nullifierKeyHash,
@@ -89,7 +89,6 @@ export interface BuildReclaimCalldataParams {
   nullifier: `0x${string}`
   amount: bigint
   receivingAddress: `0x${string}`
-  tokenAddress: `0x${string}`
   merkleRoot: `0x${string}`
   proof: `0x${string}`
   treeId: bigint
@@ -111,7 +110,6 @@ export async function buildReclaimCalldata(params: BuildReclaimCalldataParams): 
       params.nullifier,
       params.amount,
       params.receivingAddress,
-      params.tokenAddress,
       params.treeId,
       params.expiry,
     ],

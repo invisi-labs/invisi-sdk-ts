@@ -51,7 +51,7 @@ export async function buildPayOpenCalldata(
     functionName: "payOpen",
     args: [
       params.identityCommitment,
-      { addr: params.tokenAddress, amount: params.amount },
+      params.amount,
       nonceHex,
       params.treeId,
       ("0x" + (params.refundLink ?? 0n).toString(16).padStart(64, "0")) as `0x${string}`,
@@ -71,7 +71,6 @@ export interface PayBlindParams {
   paymentCommitment: `0x${string}`
   changeCommitment: `0x${string}`
   inputAmount: bigint
-  tokenAddress: `0x${string}`
   treeId: bigint
   refundLink?: bigint
 }
@@ -92,7 +91,6 @@ export async function buildPayBlindCalldata(
       params.paymentCommitment,
       params.changeCommitment,
       params.inputAmount,
-      params.tokenAddress,
       params.treeId,
       ("0x" + (params.refundLink ?? 0n).toString(16).padStart(64, "0")) as `0x${string}`,
     ],
@@ -153,7 +151,6 @@ export async function buildSettleChangeCalldata(
       [nullifier as `0x${string}`],
       params.amount,
       params.receivingAddress,
-      params.tokenAddress,
       params.treeId,
     ],
   })
