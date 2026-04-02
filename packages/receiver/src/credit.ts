@@ -33,7 +33,6 @@ export interface BuildCreditDrawCalldataParams {
   nullifiers: `0x${string}`[]
   totalAmount: bigint
   receivingAddress: `0x${string}`
-  tokenAddress: `0x${string}`
   merkleRoot: `0x${string}`
   proof: `0x${string}`
   treeId: bigint
@@ -52,7 +51,6 @@ export async function buildCreditDrawCalldata(params: BuildCreditDrawCalldataPar
         nullifiers: params.nullifiers,
         totalAmount: params.totalAmount,
         receivingAddress: params.receivingAddress,
-        tokenAddress: params.tokenAddress,
         treeId: params.treeId,
         remainderCommitments: params.remainderCommitments,
         expiry: params.expiry,

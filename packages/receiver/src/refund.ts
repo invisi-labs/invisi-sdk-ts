@@ -105,7 +105,7 @@ export type SubmitWithdraw = (params: {
 export interface RefundDependencies {
   masterKey: bigint
   chainId: bigint
-  protocolAddress: Address
+  instanceAddress: Address
   lookupOriginalPayment: LookupOriginalPayment
   sendTransaction: SendTransaction
   waitForPayConfirmation: WaitForPayConfirmation
@@ -143,7 +143,6 @@ function toHex(value: bigint): Hex {
 
 export interface BuildRefundPayOpenCalldataParams {
   identityCommitment: Hex
-  tokenAddress: Address
   refundAmount: bigint
   nonce: bigint
   treeId: bigint
@@ -158,7 +157,7 @@ export async function buildRefundPayOpenCalldata(
     functionName: "payOpen",
     args: [
       params.identityCommitment,
-      { addr: params.tokenAddress, amount: params.refundAmount },
+      params.refundAmount,
       toHex(params.nonce),
       params.treeId,
       params.refundLink,
@@ -218,7 +217,6 @@ export async function refund(
   // 6. Build and send pay tx
   const { data } = await buildRefundPayOpenCalldata({
     identityCommitment,
-    tokenAddress: original.tokenAddress,
     refundAmount: params.refundAmount,
     nonce: refundNonce,
     treeId: original.treeId,
@@ -227,7 +225,7 @@ export async function refund(
 
   const payTxHash = await deps.sendTransaction({
     data,
-    to: deps.protocolAddress,
+    to: deps.instanceAddress,
   })
 
   // 7. Wait for confirmation

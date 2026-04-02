@@ -10,6 +10,7 @@ export interface CreatePaymentRequestParams {
   tokenAddress: `0x${string}`
   chainId: bigint
   treeId: bigint
+  operator: `0x${string}`
   paymentTypes: PaymentType[]
   amount?: bigint | undefined
   endpoint?: string | undefined
@@ -32,6 +33,7 @@ export async function createPaymentRequest(
     network: chainIdToCAIP2(params.chainId),
     identityCommitment,
     tokenAddress: params.tokenAddress,
+    operator: params.operator,
     treeId: params.treeId.toString(),
     paymentTypes: params.paymentTypes,
   }
