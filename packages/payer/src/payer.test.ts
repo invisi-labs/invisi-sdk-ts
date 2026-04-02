@@ -58,6 +58,37 @@ describe("buildPayBlindCalldata", () => {
   })
 })
 
+describe("AUDIT-039: paymentCommitment consistency with core", () => {
+  it("buildPayOpenCalldata produces the same commitment as computePaymentCommitment", async () => {
+    const { computePaymentCommitment } = await import("@invisi-labs/core")
+
+    const chainId = 84532n
+    const identityCommitment = ("0x" + "ab".repeat(32)) as `0x${string}`
+    const tokenAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`
+    const amount = 100_000_000n
+    const nonce = 42n
+
+    const result = await buildPayOpenCalldata({
+      chainId,
+      identityCommitment,
+      tokenAddress,
+      amount,
+      treeId: 1n,
+      nonce,
+    })
+
+    const expected = await computePaymentCommitment(
+      chainId,
+      identityCommitment,
+      BigInt(tokenAddress),
+      amount,
+      nonce,
+    )
+
+    expect(result.paymentCommitment).toBe(expected)
+  })
+})
+
 describe("buildSettleChangeCalldata", () => {
   it("returns nullifier and calldata", async () => {
     const result = await buildSettleChangeCalldata({

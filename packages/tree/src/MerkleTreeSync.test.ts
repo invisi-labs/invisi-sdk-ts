@@ -162,6 +162,44 @@ describe("MerkleTreeSync", () => {
     expect(tree.size).toBe(2) // only treeId=1 events
   })
 
+  it("AUDIT-043: throws when leafIndex is not contiguous", async () => {
+    // Gap: leafIndex jumps from 0 to 2, skipping 1
+    const events = [
+      { args: { paymentCommitment: "0x" + "01".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayOpen" },
+      { args: { paymentCommitment: "0x" + "03".padStart(64, "0"), leafIndex: 2, treeId: 1n }, eventName: "PayOpen" },
+    ]
+    const client = createMockClient(events)
+    const sync = new MerkleTreeSync({
+      tree,
+      client,
+      protocolAddress: "0x0000000000000000000000000000000000000001",
+      fromBlock: 0n,
+      treeType: "payment",
+      treeId: 1n,
+    })
+    await expect(sync.start()).rejects.toThrow(/Merkle tree sync mismatch/)
+  })
+
+  it("AUDIT-043: succeeds when leafIndex is contiguous", async () => {
+    const events = [
+      { args: { paymentCommitment: "0x" + "01".padStart(64, "0"), leafIndex: 0, treeId: 1n }, eventName: "PayOpen" },
+      { args: { paymentCommitment: "0x" + "02".padStart(64, "0"), leafIndex: 1, treeId: 1n }, eventName: "PayOpen" },
+      { args: { paymentCommitment: "0x" + "03".padStart(64, "0"), leafIndex: 2, treeId: 1n }, eventName: "PayOpen" },
+    ]
+    const client = createMockClient(events)
+    const sync = new MerkleTreeSync({
+      tree,
+      client,
+      protocolAddress: "0x0000000000000000000000000000000000000001",
+      fromBlock: 0n,
+      treeType: "payment",
+      treeId: 1n,
+    })
+    await sync.start()
+    expect(tree.size).toBe(3)
+    expect(sync.synced).toBe(true)
+  })
+
   it("filters PayBlind events by treeId", async () => {
     const events = [
       {

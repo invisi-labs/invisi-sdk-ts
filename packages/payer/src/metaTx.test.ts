@@ -77,6 +77,37 @@ describe("buildSignPayOpenTypedData", () => {
   })
 })
 
+describe("AUDIT-039: metaTx paymentCommitment consistency with core", () => {
+  it("buildSignPayOpenTypedData produces the same commitment as computePaymentCommitment", async () => {
+    const { computePaymentCommitment } = await import("@invisi-labs/core")
+
+    const result = await buildSignPayOpenTypedData({
+      chainId: 1n,
+      verifyingContract: MOCK_CONTRACT,
+      identityCommitment: MOCK_COMMITMENT,
+      tokenAddress: MOCK_TOKEN,
+      amount: 100_000_000n,
+      treeId: 1n,
+      sigNonce: 0n,
+      deadline: 9999999999n,
+    })
+
+    // Extract the nonce that was used internally
+    const nonceHex = result.nonce
+    const nonce = BigInt(nonceHex)
+
+    const expected = await computePaymentCommitment(
+      1n,
+      MOCK_COMMITMENT,
+      BigInt(MOCK_TOKEN),
+      100_000_000n,
+      nonce,
+    )
+
+    expect(result.paymentCommitment).toBe(expected)
+  })
+})
+
 describe("buildSignPayBlindTypedData", () => {
   it("returns typed data with correct primary type", () => {
     const result = buildSignPayBlindTypedData({

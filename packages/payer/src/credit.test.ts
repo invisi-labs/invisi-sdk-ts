@@ -46,6 +46,42 @@ describe("createCredit", () => {
   })
 })
 
+describe("AUDIT-040: creditNullifierKey deterministic derivation", () => {
+  const baseParams = {
+    payerMasterKey: 12345n,
+    creditId: 1n,
+    identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+    payerAddress: 0xdeadn,
+    tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+    amount: 100_000_000n,
+    expiry: 9999999999n,
+    treeId: 1n,
+    chainId: 1n,
+  }
+
+  it("same inputs produce the same creditNullifierKey (deterministic)", async () => {
+    const a = await createCredit(baseParams)
+    const b = await createCredit(baseParams)
+    expect(a.authorization.creditNullifierKey).toBe(b.authorization.creditNullifierKey)
+  })
+
+  it("different creditId produces a different creditNullifierKey (uniqueness)", async () => {
+    const a = await createCredit(baseParams)
+    const b = await createCredit({ ...baseParams, creditId: 2n })
+    expect(a.authorization.creditNullifierKey).not.toBe(b.authorization.creditNullifierKey)
+  })
+
+  it("creditNullifierKey matches manual Poseidon2(D_DERIVE, payerNullifierKey, creditId)", async () => {
+    const { poseidonHash, D_DERIVE, deriveNullifierKey } = await import("@invisi-labs/core")
+    const payerNullifierKey = await deriveNullifierKey(baseParams.payerMasterKey, baseParams.creditId)
+    const expectedHash = await poseidonHash([D_DERIVE, payerNullifierKey, baseParams.creditId])
+    const expected = BigInt(expectedHash)
+
+    const result = await createCredit(baseParams)
+    expect(result.authorization.creditNullifierKey).toBe(expected)
+  })
+})
+
 describe("buildReclaimCalldata", () => {
   it("returns encoded calldata", async () => {
     const result = await buildReclaimCalldata({

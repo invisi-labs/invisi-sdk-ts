@@ -18,4 +18,17 @@ describe("poseidonHash", () => {
     const b = await poseidonHash([2n])
     expect(a).not.toBe(b)
   })
+
+  it("AUDIT-041: concurrent calls all return the same result (singleton Promise cache)", async () => {
+    const inputs = [100n, 200n, 300n]
+    // Fire 10 concurrent calls with the same inputs
+    const promises = Array.from({ length: 10 }, () => poseidonHash(inputs))
+    const results = await Promise.all(promises)
+
+    // All results must be identical
+    for (const r of results) {
+      expect(r).toBe(results[0])
+    }
+    expect(results[0]).toMatch(/^0x[0-9a-f]{64}$/i)
+  })
 })
