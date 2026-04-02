@@ -20,7 +20,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@aztec/bb.js": "^0.87.0"
+    "@aztec/bb.js": "4.0.0-nightly.20260120"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
