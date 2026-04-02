@@ -35,6 +35,10 @@ export const invisiProtocolAbi = [
             "type": "address"
           }
         ]
+      },
+      {
+        "name": "_screener",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -913,7 +917,8 @@ export const invisiProtocolAbi = [
         "type": "bytes32",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -964,7 +969,8 @@ export const invisiProtocolAbi = [
         "type": "uint256",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1005,7 +1011,8 @@ export const invisiProtocolAbi = [
         "type": "uint256",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1016,12 +1023,14 @@ export const invisiProtocolAbi = [
         "type": "uint256",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
     "name": "EIP712DomainChanged",
-    "inputs": []
+    "inputs": [],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1037,18 +1046,8 @@ export const invisiProtocolAbi = [
         "type": "uint256",
         "indexed": false
       }
-    ]
-  },
-  {
-    "type": "event",
-    "name": "ScreenerUpdated",
-    "inputs": [
-      {
-        "name": "newScreener",
-        "type": "address",
-        "indexed": true
-      }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1059,7 +1058,8 @@ export const invisiProtocolAbi = [
         "type": "address",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1110,7 +1110,8 @@ export const invisiProtocolAbi = [
         "type": "bytes32",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1161,7 +1162,20 @@ export const invisiProtocolAbi = [
         "type": "bytes32",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ScreenerUpdated",
+    "inputs": [
+      {
+        "name": "newScreener",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1172,7 +1186,8 @@ export const invisiProtocolAbi = [
         "type": "uint256",
         "indexed": true
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1183,7 +1198,8 @@ export const invisiProtocolAbi = [
         "type": "address",
         "indexed": false
       }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1219,17 +1235,8 @@ export const invisiProtocolAbi = [
         "type": "uint256",
         "indexed": false
       }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "AddressScreeningFailed",
-    "inputs": [
-      {
-        "name": "account",
-        "type": "address"
-      }
-    ]
+    ],
+    "anonymous": false
   },
   {
     "type": "error",
@@ -1250,6 +1257,21 @@ export const invisiProtocolAbi = [
         "type": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "AddressScreeningFailed",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ChainIdMismatch",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1327,6 +1349,11 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidCommitment",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidIdentityCommitment",
     "inputs": []
   },
@@ -1358,6 +1385,11 @@ export const invisiProtocolAbi = [
   {
     "type": "error",
     "name": "InvalidProof",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidReceivingAddress",
     "inputs": []
   },
   {
@@ -1492,6 +1524,11 @@ export const invisiProtocolAbi = [
         "type": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "TreeNotInitialized",
+    "inputs": []
   },
   {
     "type": "error",
