@@ -44,24 +44,16 @@ export const EMPTY_PERMIT: TokenPermit = {
 
 // ─── EIP-712 Types ───────────────────────────────────────────────────
 
-const assetType = {
-  Asset: [
-    { name: "addr", type: "address" },
-    { name: "amount", type: "uint256" },
-  ],
-} as const
-
 export const payOpenWithSigTypes = {
   PayOpenWithSig: [
     { name: "identityCommitment", type: "bytes32" },
-    { name: "asset", type: "Asset" },
+    { name: "amount", type: "uint256" },
     { name: "nonce", type: "bytes32" },
     { name: "treeId", type: "uint256" },
     { name: "refundLink", type: "bytes32" },
     { name: "sigNonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
-  ...assetType,
 } as const
 
 export const payBlindWithSigTypes = {
@@ -70,7 +62,6 @@ export const payBlindWithSigTypes = {
     { name: "paymentCommitment", type: "bytes32" },
     { name: "changeCommitment", type: "bytes32" },
     { name: "inputAmount", type: "uint256" },
-    { name: "tokenAddress", type: "address" },
     { name: "treeId", type: "uint256" },
     { name: "refundLink", type: "bytes32" },
     { name: "sigNonce", type: "uint256" },
@@ -82,7 +73,7 @@ export const depositCreditWithSigTypes = {
   DepositCreditWithSig: [
     { name: "identityCommitment", type: "bytes32" },
     { name: "payerCommitment", type: "bytes32" },
-    { name: "asset", type: "Asset" },
+    { name: "amount", type: "uint256" },
     { name: "nonce", type: "bytes32" },
     { name: "expiry", type: "uint256" },
     { name: "nullifierKeyHash", type: "bytes32" },
@@ -90,7 +81,6 @@ export const depositCreditWithSigTypes = {
     { name: "sigNonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
-  ...assetType,
 } as const
 
 // ─── Sign method return types ──────────────────────────────────────────────
@@ -170,7 +160,7 @@ export async function buildSignPayOpenTypedData(
       primaryType: "PayOpenWithSig",
       message: {
         identityCommitment: params.identityCommitment,
-        asset: { addr: params.tokenAddress, amount: params.amount },
+        amount: params.amount,
         nonce: nonceHex,
         treeId: params.treeId,
         refundLink,
@@ -190,7 +180,6 @@ export interface SignPayBlindParams {
   paymentCommitment: Hex
   changeCommitment: Hex
   inputAmount: bigint
-  tokenAddress: Address
   treeId: bigint
   refundLink?: Hex
   sigNonce: bigint
@@ -217,7 +206,6 @@ export function buildSignPayBlindTypedData(
         paymentCommitment: params.paymentCommitment,
         changeCommitment: params.changeCommitment,
         inputAmount: params.inputAmount,
-        tokenAddress: params.tokenAddress,
         treeId: params.treeId,
         refundLink,
         sigNonce: params.sigNonce,
@@ -234,7 +222,6 @@ export interface SignDepositCreditParams {
   verifyingContract: Address
   identityCommitment: Hex
   payerCommitment: Hex
-  tokenAddress: Address
   amount: bigint
   nonce: Hex
   expiry: bigint
@@ -260,7 +247,7 @@ export function buildSignDepositCreditTypedData(
       message: {
         identityCommitment: params.identityCommitment,
         payerCommitment: params.payerCommitment,
-        asset: { addr: params.tokenAddress, amount: params.amount },
+        amount: params.amount,
         nonce: params.nonce,
         expiry: params.expiry,
         nullifierKeyHash: params.nullifierKeyHash,
