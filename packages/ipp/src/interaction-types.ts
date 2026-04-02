@@ -1,5 +1,15 @@
 // === 支付方交互 ===
 
+/** Paymaster service configuration for EIP-4337 gasless payments */
+export interface PaymasterConfig {
+  /** Paymaster service RPC URL */
+  url: string
+  /** Sponsorship policy ID (required by some providers) */
+  policyId?: string
+  /** Extension fields (required by some providers) */
+  context?: Record<string, unknown>
+}
+
 export interface InfoRequest {
   identityCommitment: string
 }
@@ -10,6 +20,8 @@ export interface InfoResponse {
   amount?: string | undefined
   currency?: string | undefined
   expiresAt?: string | undefined
+  /** Merchant's gas sponsorship config for EIP-4337 (optional) */
+  paymaster?: PaymasterConfig | undefined
 }
 
 export interface ProposeRequest {

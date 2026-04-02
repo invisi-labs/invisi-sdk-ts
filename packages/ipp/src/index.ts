@@ -21,6 +21,7 @@ export type { NetworkInfo } from "./caip2"
 
 // === 交互接口类型 ===
 export type {
+  PaymasterConfig,
   InfoRequest, InfoResponse,
   ProposeRequest, ProposeResponse,
   AuthorizeRequest, AuthorizeResponse,
