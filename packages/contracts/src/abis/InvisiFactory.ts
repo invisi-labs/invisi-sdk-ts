@@ -109,10 +109,30 @@ export const invisiFactoryAbi = [
   },
   {
     "type": "function",
-    "name": "emergencyPauseAll",
-    "inputs": [],
+    "name": "emergencyPauseRange",
+    "inputs": [
+      {
+        "name": "start",
+        "type": "uint256"
+      },
+      {
+        "name": "end",
+        "type": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "instanceCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -202,10 +222,15 @@ export const invisiFactoryAbi = [
   },
   {
     "type": "event",
-    "name": "EmergencyPauseAll",
+    "name": "EmergencyPauseRange",
     "inputs": [
       {
-        "name": "instanceCount",
+        "name": "start",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "end",
         "type": "uint256",
         "indexed": false
       }
