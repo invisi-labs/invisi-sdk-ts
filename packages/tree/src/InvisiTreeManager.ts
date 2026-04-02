@@ -41,9 +41,9 @@ export class InvisiTreeManager {
       functionName: "getTreeCount",
     })
 
-    // treeId starts at 1, _treeCount includes the reserved index 0
+    // treeId starts at 1, _treeCount is the count of actual trees (excluding sentinel at index 0)
     const startups: Promise<void>[] = []
-    for (let id = 1n; id < this._treeCount; id++) {
+    for (let id = 1n; id <= this._treeCount; id++) {
       startups.push(this._initTree(id))
     }
     await Promise.all(startups)
