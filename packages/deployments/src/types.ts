@@ -9,7 +9,8 @@ export interface ChainDeployment {
   network: string
   env: "mainnet" | "testnet"
   deployedAt: string
-  InvisiProtocol: ContractDeployment
+  InvisiFactory: ContractDeployment
+  VerifierRouter: ContractDeployment
   SingleSettleVerifier: ContractDeployment
   BatchSettleVerifier: ContractDeployment
   ShieldedPaymentVerifier: ContractDeployment

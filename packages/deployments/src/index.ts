@@ -1,2 +1,2 @@
-export { getDeployment, getSupportedChainIds } from "./registry"
+export { getDeployment, getSupportedChainIds, resolveInstanceAddress } from "./registry"
 export type { ChainDeployment, ContractDeployment } from "./types"
