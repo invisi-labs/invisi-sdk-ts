@@ -1,5 +1,7 @@
 import type { Address, Hex } from "viem"
-import { buildPayOpenCalldata } from "./payer"
+import { encodeFunctionData } from "viem"
+import { invisiProtocolAbi } from "@invisi-labs/contracts"
+import { buildPayOpenCalldata, buildPayBlindCalldata } from "./payer"
 import { GAS_ESTIMATES } from "./gasEstimates"
 import type { BaseUserOp, PaymasterConfig } from "./gasEstimates"
 
@@ -55,4 +57,99 @@ export async function buildPayOpenUserOp(
     nonce: calldataResult.nonce,
     ...(params.paymaster ? { paymaster: params.paymaster } : {}),
   }
+}
+
+export interface PayBlindUserOpParams {
+  /** ZK proof bytes */
+  proof: Hex
+  /** Payment commitment (pre-computed by caller) */
+  paymentCommitment: Hex
+  /** Change commitment (pre-computed by caller) */
+  changeCommitment: Hex
+  /** Total input amount (shielded note value) */
+  inputAmount: bigint
+  /** Merkle tree ID */
+  treeId: bigint
+  /** Refund link (0 = normal payment) */
+  refundLink?: bigint
+  /** InvisiProtocol instance address */
+  protocolAddress: Address
+  /** Smart Account address */
+  sender: Address
+  /** Chain ID */
+  chainId: bigint
+  /** Paymaster config (optional, from IPP InfoResponse) */
+  paymaster?: PaymasterConfig
+}
+
+export async function buildPayBlindUserOp(
+  params: PayBlindUserOpParams,
+): Promise<BaseUserOp> {
+  const calldataResult = await buildPayBlindCalldata({
+    proof: params.proof,
+    paymentCommitment: params.paymentCommitment,
+    changeCommitment: params.changeCommitment,
+    inputAmount: params.inputAmount,
+    treeId: params.treeId,
+    refundLink: params.refundLink,
+  })
+
+  return {
+    to: params.protocolAddress,
+    sender: params.sender,
+    callData: calldataResult.data,
+    ...GAS_ESTIMATES.payBlind,
+    ...(params.paymaster ? { paymaster: params.paymaster } : {}),
+  }
+}
+
+export interface DepositCreditUserOpParams {
+  /** Receiver identity commitment */
+  identityCommitment: Hex
+  /** Payer commitment */
+  payerCommitment: Hex
+  /** Credit amount */
+  amount: bigint
+  /** Nonce (bytes32 hex) */
+  nonce: Hex
+  /** Credit expiry timestamp */
+  expiry: bigint
+  /** Nullifier key hash */
+  nullifierKeyHash: Hex
+  /** Merkle tree ID */
+  treeId: bigint
+  /** InvisiProtocol instance address */
+  protocolAddress: Address
+  /** Smart Account address */
+  sender: Address
+  /** Chain ID */
+  chainId: bigint
+  /** Paymaster config (optional, from IPP InfoResponse) */
+  paymaster?: PaymasterConfig
+}
+
+export function buildDepositCreditUserOp(
+  params: DepositCreditUserOpParams,
+): Promise<BaseUserOp> {
+  const callData = encodeFunctionData({
+    abi: invisiProtocolAbi,
+    functionName: "depositCredit",
+    args: [
+      params.identityCommitment,
+      params.payerCommitment,
+      params.amount,
+      params.nonce,
+      params.expiry,
+      params.nullifierKeyHash,
+      params.treeId,
+    ],
+  })
+
+  return Promise.resolve({
+    to: params.protocolAddress,
+    sender: params.sender,
+    callData,
+    ...GAS_ESTIMATES.depositCredit,
+    ...(params.paymaster ? { paymaster: params.paymaster } : {}),
+  })
 }
