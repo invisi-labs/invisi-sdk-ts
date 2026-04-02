@@ -6,7 +6,7 @@ export type TreeType = "payment"
 export interface MerkleTreeSyncOptions {
   tree: InMemoryMerkleTree
   client: any
-  protocolAddress: string
+  instanceAddress: string
   fromBlock: bigint
   treeType: TreeType
   treeId: bigint
@@ -24,7 +24,7 @@ interface LeafEntry {
 export class MerkleTreeSync {
   private readonly tree: InMemoryMerkleTree
   private readonly client: any
-  private readonly protocolAddress: string
+  private readonly instanceAddress: string
   private readonly fromBlock: bigint
   private readonly treeType: TreeType
   private readonly treeId: bigint
@@ -36,7 +36,7 @@ export class MerkleTreeSync {
   constructor(opts: MerkleTreeSyncOptions) {
     this.tree = opts.tree
     this.client = opts.client
-    this.protocolAddress = opts.protocolAddress
+    this.instanceAddress = opts.instanceAddress
     this.fromBlock = opts.fromBlock
     this.treeType = opts.treeType
     this.treeId = opts.treeId
@@ -68,7 +68,7 @@ export class MerkleTreeSync {
 
     const events = await this.client.getContractEvents({
       abi: invisiProtocolAbi,
-      address: this.protocolAddress,
+      address: this.instanceAddress,
       fromBlock: this.fromBlock,
       toBlock: latestBlock,
       args: { treeId: this.treeId },
@@ -81,7 +81,7 @@ export class MerkleTreeSync {
   private _subscribe(): void {
     this._unwatch = this.client.watchContractEvent({
       abi: invisiProtocolAbi,
-      address: this.protocolAddress,
+      address: this.instanceAddress,
       args: { treeId: this.treeId },
       onLogs: async (logs: any[]) => {
         await this._applyEvents(logs)

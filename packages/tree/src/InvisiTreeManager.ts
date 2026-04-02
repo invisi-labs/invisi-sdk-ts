@@ -4,7 +4,7 @@ import { MerkleTreeSync } from "./MerkleTreeSync"
 
 export interface InvisiTreeManagerOptions {
   client: any
-  protocolAddress: string
+  instanceAddress: string
   fromBlock: bigint
 }
 
@@ -19,14 +19,14 @@ interface TreeEntry {
  */
 export class InvisiTreeManager {
   private readonly client: any
-  private readonly protocolAddress: string
+  private readonly instanceAddress: string
   private readonly fromBlock: bigint
   private readonly _trees = new Map<bigint, TreeEntry>()
   private _treeCount = 0n
 
   constructor(opts: InvisiTreeManagerOptions) {
     this.client = opts.client
-    this.protocolAddress = opts.protocolAddress
+    this.instanceAddress = opts.instanceAddress
     this.fromBlock = opts.fromBlock
   }
 
@@ -37,7 +37,7 @@ export class InvisiTreeManager {
   async start(): Promise<void> {
     this._treeCount = await this.client.readContract({
       abi: invisiProtocolAbi,
-      address: this.protocolAddress,
+      address: this.instanceAddress,
       functionName: "getTreeCount",
     })
 
@@ -72,7 +72,7 @@ export class InvisiTreeManager {
     const sync = new MerkleTreeSync({
       tree,
       client: this.client,
-      protocolAddress: this.protocolAddress,
+      instanceAddress: this.instanceAddress,
       fromBlock: this.fromBlock,
       treeType: "payment",
       treeId,
