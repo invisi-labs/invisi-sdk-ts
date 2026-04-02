@@ -22,6 +22,10 @@ export function validateIPPRequest(request: IPPRequest): void {
     throw new Error("Invalid IPPRequest: tokenAddress is required")
   }
 
+  if (typeof request.operator !== "string" || !request.operator) {
+    throw new Error("Invalid IPPRequest: operator is required")
+  }
+
   if (typeof request.treeId !== "string" || !request.treeId) {
     throw new Error("Invalid IPPRequest: treeId is required")
   }

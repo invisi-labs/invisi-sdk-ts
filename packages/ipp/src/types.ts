@@ -11,6 +11,8 @@ export interface IPPRequest {
   identityCommitment: string
   /** ERC20 代币合约地址 (0x-prefixed hex) */
   tokenAddress: string
+  /** 运营方地址 (0x-prefixed hex)，用于定位 per-token 合约实例 */
+  operator: string
   /** Merkle Tree ID (bigint as string) */
   treeId: string
   /** 收款方接受的支付类型 */
