@@ -31,3 +31,16 @@ export type { VerifyPaymentCommitmentParams } from "./verify"
 
 export { buildPaymentFromRequest } from "./fromRequest"
 export type { BuildPaymentFromRequestParams, BuildPaymentFromRequestResult } from "./fromRequest"
+
+export { buildPayOpenUserOp, buildPayBlindUserOp, buildDepositCreditUserOp } from "./userOp"
+export type {
+  PayOpenUserOpParams, PayOpenUserOp,
+  PayBlindUserOpParams,
+  DepositCreditUserOpParams,
+} from "./userOp"
+
+export { buildApproveCalldata } from "./approve"
+export type { ApproveCalldataParams, ApproveCalldata } from "./approve"
+
+export { GAS_ESTIMATES, INVISI_DEFAULT_PAYMASTER } from "./gasEstimates"
+export type { PaymasterConfig, BaseUserOp } from "./gasEstimates"

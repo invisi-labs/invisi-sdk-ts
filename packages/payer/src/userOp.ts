@@ -91,7 +91,7 @@ export async function buildPayBlindUserOp(
     changeCommitment: params.changeCommitment,
     inputAmount: params.inputAmount,
     treeId: params.treeId,
-    refundLink: params.refundLink,
+    ...(params.refundLink !== undefined ? { refundLink: params.refundLink } : {}),
   })
 
   return {
