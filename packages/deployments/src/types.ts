@@ -14,4 +14,7 @@ export interface ChainDeployment {
   SingleSettleVerifier: ContractDeployment
   BatchSettleVerifier: ContractDeployment
   ShieldedPaymentVerifier: ContractDeployment
+  ProofLib: ContractDeployment
+  creationCode: `0x${string}` | ""
+  creationCodeHash: `0x${string}` | ""
 }

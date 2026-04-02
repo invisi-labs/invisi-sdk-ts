@@ -9,6 +9,10 @@ export const invisiFactoryAbi = [
       {
         "name": "verifierRouter_",
         "type": "address"
+      },
+      {
+        "name": "creationCodeHash_",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "nonpayable"
@@ -30,6 +34,10 @@ export const invisiFactoryAbi = [
     "name": "computeInstanceAddress",
     "inputs": [
       {
+        "name": "creationCode",
+        "type": "bytes"
+      },
+      {
         "name": "operator",
         "type": "address"
       },
@@ -38,38 +46,16 @@ export const invisiFactoryAbi = [
         "type": "address"
       },
       {
-        "name": "params",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "factory",
-            "type": "address"
-          },
-          {
-            "name": "token",
-            "type": "address"
-          },
-          {
-            "name": "globalEmergency",
-            "type": "address"
-          },
-          {
-            "name": "emergencyAdmin",
-            "type": "address"
-          },
-          {
-            "name": "timelockAdmin",
-            "type": "address"
-          },
-          {
-            "name": "maxPerDeposit",
-            "type": "uint256"
-          },
-          {
-            "name": "verifierRouter",
-            "type": "address"
-          }
-        ]
+        "name": "emergencyAdmin",
+        "type": "address"
+      },
+      {
+        "name": "timelockAdmin",
+        "type": "address"
+      },
+      {
+        "name": "maxPerDeposit",
+        "type": "uint256"
       },
       {
         "name": "screener",
@@ -88,6 +74,10 @@ export const invisiFactoryAbi = [
     "type": "function",
     "name": "deploy",
     "inputs": [
+      {
+        "name": "creationCode",
+        "type": "bytes"
+      },
       {
         "name": "token",
         "type": "address"
@@ -199,6 +189,18 @@ export const invisiFactoryAbi = [
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "creationCodeHash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "EmergencyPauseAll",
     "inputs": [
@@ -268,6 +270,11 @@ export const invisiFactoryAbi = [
   {
     "type": "error",
     "name": "NotGlobalEmergency",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCreationCode",
     "inputs": []
   }
 ] as const
