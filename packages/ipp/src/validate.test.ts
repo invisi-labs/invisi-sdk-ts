@@ -5,6 +5,7 @@ import type { IPPRequest } from "./types"
 // 模式 1a：有 nonce + paymentCommitment，endpoint 可选
 const MODE_1A_REQUEST: IPPRequest = {
   v: 1,
+  operator: "0x1234567890123456789012345678901234567890",
   network: "eip155:84532",
   identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -18,6 +19,7 @@ const MODE_1A_REQUEST: IPPRequest = {
 // 模式 1b：有 amount，无 nonce，需要 endpoint
 const MODE_1B_REQUEST: IPPRequest = {
   v: 1,
+  operator: "0x1234567890123456789012345678901234567890",
   network: "eip155:84532",
   identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",

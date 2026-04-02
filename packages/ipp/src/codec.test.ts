@@ -4,6 +4,7 @@ import type { IPPRequest } from "./types"
 
 const SAMPLE_REQUEST: IPPRequest = {
   v: 1,
+  operator: "0x1234567890123456789012345678901234567890",
   network: "eip155:84532",
   identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
   tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -19,6 +20,7 @@ const SAMPLE_REQUEST: IPPRequest = {
 
 const MINIMAL_REQUEST: IPPRequest = {
   v: 1,
+  operator: "0x1234567890123456789012345678901234567890",
   network: "eip155:84532",
   identityCommitment: "0xabc",
   tokenAddress: "0xdef",
