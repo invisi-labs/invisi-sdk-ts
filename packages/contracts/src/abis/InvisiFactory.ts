@@ -70,6 +70,10 @@ export const invisiFactoryAbi = [
             "type": "address"
           }
         ]
+      },
+      {
+        "name": "screener",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -99,6 +103,10 @@ export const invisiFactoryAbi = [
       {
         "name": "maxPerDeposit",
         "type": "uint256"
+      },
+      {
+        "name": "screener",
+        "type": "address"
       }
     ],
     "outputs": [

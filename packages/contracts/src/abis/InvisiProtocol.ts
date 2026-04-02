@@ -745,11 +745,35 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "function",
+    "name": "screener",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "setDepositLimit",
     "inputs": [
       {
         "name": "newMaxPerDeposit",
         "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setScreener",
+    "inputs": [
+      {
+        "name": "newScreener",
+        "type": "address"
       }
     ],
     "outputs": [],
@@ -1017,11 +1041,11 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "event",
-    "name": "NonceInvalidated",
+    "name": "ScreenerUpdated",
     "inputs": [
       {
-        "name": "nonce",
-        "type": "bytes32",
+        "name": "newScreener",
+        "type": "address",
         "indexed": true
       }
     ]
@@ -1194,6 +1218,16 @@ export const invisiProtocolAbi = [
         "name": "totalAmount",
         "type": "uint256",
         "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AddressScreeningFailed",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
       }
     ]
   },
