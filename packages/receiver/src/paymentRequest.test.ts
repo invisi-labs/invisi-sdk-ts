@@ -11,6 +11,7 @@ describe("createPaymentRequest", () => {
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`,
     chainId: 84532n,
     treeId: 1n,
+    operator: "0x1234567890123456789012345678901234567890" as `0x${string}`,
     paymentTypes: ["open", "blind"] as ("open" | "blind" | "credit")[],
   }
 

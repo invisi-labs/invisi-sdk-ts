@@ -20,7 +20,7 @@ const REFUND_ID = "refund-001"
 const ORIGINAL_INVOICE_ID = "inv-001"
 const PAYER_ADDRESS = "0x1234567890abcdef1234567890abcdef12345678" as Address
 const TOKEN_ADDRESS = "0xaabbccddee11223344556677889900aabbccddee" as Address
-const PROTOCOL_ADDRESS = "0x0000000000000000000000000000000000000001" as Address
+const INSTANCE_ADDRESS = "0x0000000000000000000000000000000000000001" as Address
 const CHAIN_ID = 1n
 const TREE_ID = 0n
 const ORIGINAL_COMMITMENT = 999n
@@ -43,7 +43,7 @@ function makeDeps(overrides?: Partial<RefundDependencies>): RefundDependencies {
   return {
     masterKey: MASTER_KEY,
     chainId: CHAIN_ID,
-    protocolAddress: PROTOCOL_ADDRESS,
+    instanceAddress: INSTANCE_ADDRESS,
     lookupOriginalPayment: vi.fn().mockResolvedValue(makeOriginalPayment()),
     sendTransaction: vi.fn().mockResolvedValue(MOCK_TX_HASH),
     waitForPayConfirmation: vi.fn().mockResolvedValue({ leafIndex: 42 }),
@@ -181,7 +181,7 @@ describe("refund", () => {
       // sendTransaction was called with pool address
       expect(deps.sendTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: PROTOCOL_ADDRESS,
+          to: INSTANCE_ADDRESS,
         })
       )
 
