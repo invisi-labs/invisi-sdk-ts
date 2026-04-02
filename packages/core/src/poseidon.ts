@@ -1,12 +1,12 @@
 import { Barretenberg, BackendType } from "@aztec/bb.js"
 
-let bb: Barretenberg | null = null
+let bbPromise: Promise<Barretenberg> | null = null
 
-async function getBB(): Promise<Barretenberg> {
-  if (!bb) {
-    bb = await Barretenberg.new({ threads: 1, backend: BackendType.Wasm })
+function getBB(): Promise<Barretenberg> {
+  if (!bbPromise) {
+    bbPromise = Barretenberg.new({ threads: 1, backend: BackendType.Wasm })
   }
-  return bb
+  return bbPromise
 }
 
 function bigintToBytes32(n: bigint): Uint8Array {

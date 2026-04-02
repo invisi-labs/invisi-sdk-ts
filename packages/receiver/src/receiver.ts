@@ -3,7 +3,7 @@ import { deriveNullifierKey, computeIdentityCommitment } from "@invisi-labs/core
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
 export interface GenerateInvoiceParams { masterKey: bigint; invoiceId: bigint; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint; operator: `0x${string}` }
-export interface Invoice { invoiceId: bigint; nullifierKey: bigint; identityCommitment: `0x${string}`; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint; operator: `0x${string}` }
+export interface Invoice { invoiceId: bigint; /** @sensitive — do not serialize to logs, API responses, or unencrypted storage */ nullifierKey: bigint; identityCommitment: `0x${string}`; receivingAddress: bigint; tokenAddress: `0x${string}`; amount: bigint; treeId: bigint; operator: `0x${string}` }
 
 export interface BatchCircuitInfo {
   name: string

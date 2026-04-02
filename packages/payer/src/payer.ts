@@ -1,8 +1,6 @@
 import { encodeFunctionData } from "viem"
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
-
-// BN254 field modulus
-const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
+import { computePaymentCommitment, generateNonce } from "@invisi-labs/core"
 
 export interface PayOpenParams {
   chainId: bigint
@@ -23,28 +21,19 @@ export interface PayOpenCalldata {
   value?: bigint
 }
 
-function generateNonce(): bigint {
-  const buf = new Uint8Array(32)
-  crypto.getRandomValues(buf)
-  const raw = BigInt("0x" + Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join(""))
-  return raw % FIELD_MODULUS
-}
-
 export async function buildPayOpenCalldata(
   params: PayOpenParams
 ): Promise<PayOpenCalldata> {
-  const { poseidonHash, D_PAY } = await import("@invisi-labs/core")
   const nonce = params.nonce ?? generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
-  const paymentCommitment = await poseidonHash([
-    D_PAY,
+  const paymentCommitment = await computePaymentCommitment(
     params.chainId,
-    BigInt(params.identityCommitment) % FIELD_MODULUS,
-    BigInt(params.tokenAddress) % FIELD_MODULUS,
-    params.amount % FIELD_MODULUS,
-    nonce % FIELD_MODULUS,
-  ])
+    params.identityCommitment,
+    BigInt(params.tokenAddress),
+    params.amount,
+    nonce,
+  )
 
   const data = encodeFunctionData({
     abi: invisiProtocolAbi,

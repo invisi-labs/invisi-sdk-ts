@@ -95,7 +95,10 @@ export class MerkleTreeSync {
     // Insert all leaves (known leaf indices) in order
     leaves.sort((a, b) => a.leafIndex - b.leafIndex)
     for (const leaf of leaves) {
-      await this.tree.insert(leaf.commitment)
+      const insertedIndex = await this.tree.insert(leaf.commitment)
+      if (insertedIndex !== leaf.leafIndex) {
+        throw new Error(`Merkle tree sync mismatch: expected leafIndex ${leaf.leafIndex}, got ${insertedIndex}`)
+      }
     }
   }
 

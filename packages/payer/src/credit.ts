@@ -1,14 +1,6 @@
 import { encodeFunctionData } from "viem"
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
-
-const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
-
-function generateNonce(): bigint {
-  const buf = new Uint8Array(32)
-  crypto.getRandomValues(buf)
-  const raw = BigInt("0x" + Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join(""))
-  return raw % FIELD_MODULUS
-}
+import { poseidonHash, D_DERIVE, generateNonce } from "@invisi-labs/core"
 
 export interface CreditAuthorization {
   creditId: bigint
@@ -47,7 +39,9 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
 
   const payerNullifierKey = await deriveNullifierKey(params.payerMasterKey, params.creditId)
   const payerCommitment = await computeIdentityCommitment(payerNullifierKey, params.payerAddress)
-  const creditNullifierKey = generateNonce()
+  // Deterministic derivation: creditNullifierKey = Poseidon2(D_DERIVE, payerNullifierKey, creditId)
+  const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, params.creditId])
+  const creditNullifierKey = BigInt(creditNullifierKeyHash)
   const nullifierKeyHash = await computeNullifierKeyHash(creditNullifierKey)
   const nonce = generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`

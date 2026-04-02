@@ -1,14 +1,5 @@
 import type { Hex, Address } from "viem"
-
-// BN254 field modulus (same as payer.ts)
-const FIELD_MODULUS = 21888242871839275222246405745257275088548364400416034343698204186575808495617n
-
-function generateNonce(): bigint {
-  const buf = new Uint8Array(32)
-  crypto.getRandomValues(buf)
-  const raw = BigInt("0x" + Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join(""))
-  return raw % FIELD_MODULUS
-}
+import { computePaymentCommitment, generateNonce } from "@invisi-labs/core"
 
 // ─── EIP-712 Domain ──────────────────────────────────────────────────
 
@@ -131,18 +122,16 @@ export interface SignPayOpenParams {
 export async function buildSignPayOpenTypedData(
   params: SignPayOpenParams
 ): Promise<SignPayOpenResult> {
-  const { poseidonHash, D_PAY } = await import("@invisi-labs/core")
   const nonce = generateNonce()
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as Hex
 
-  const paymentCommitment = await poseidonHash([
-    D_PAY,
+  const paymentCommitment = await computePaymentCommitment(
     params.chainId,
-    BigInt(params.identityCommitment) % FIELD_MODULUS,
-    BigInt(params.tokenAddress) % FIELD_MODULUS,
-    params.amount % FIELD_MODULUS,
-    nonce % FIELD_MODULUS,
-  ])
+    params.identityCommitment,
+    BigInt(params.tokenAddress),
+    params.amount,
+    nonce,
+  )
 
   const domain = getEIP712Domain({
     chainId: params.chainId,

@@ -13,3 +13,4 @@ export {
   deriveRemainderNullifierKey,
 } from "./creditCommitment"
 export { computeRefundLink } from "./refundLink"
+export { FIELD_MODULUS, generateNonce } from "./random"
