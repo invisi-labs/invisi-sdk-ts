@@ -38,17 +38,27 @@ describe("invisiProtocolAbi", () => {
     expect(functionNames).toContain("timelockAdmin")
   })
 
-  it("contains new token management functions", () => {
-    expect(functionNames).toContain("addToken")
-    expect(functionNames).toContain("removeToken")
-    expect(functionNames).toContain("pauseToken")
-    expect(functionNames).toContain("unpauseToken")
-    expect(functionNames).toContain("setTokenLimit")
-    expect(functionNames).toContain("getTokenConfig")
-    expect(functionNames).toContain("isTokenEnabled")
+  it("contains per-token instance functions (no token management)", () => {
+    expect(functionNames).toContain("token")
+    expect(functionNames).toContain("factory")
+    expect(functionNames).toContain("globalEmergency")
+    expect(functionNames).toContain("maxPerDeposit")
+    expect(functionNames).toContain("verifierRouter")
+    expect(functionNames).toContain("globalPause")
+    expect(functionNames).toContain("setDepositLimit")
   })
 
-  it("contains global pause functions", () => {
+  it("does not contain removed token management functions", () => {
+    expect(functionNames).not.toContain("addToken")
+    expect(functionNames).not.toContain("removeToken")
+    expect(functionNames).not.toContain("pauseToken")
+    expect(functionNames).not.toContain("unpauseToken")
+    expect(functionNames).not.toContain("setTokenLimit")
+    expect(functionNames).not.toContain("getTokenConfig")
+    expect(functionNames).not.toContain("isTokenEnabled")
+  })
+
+  it("contains pause/unpause functions", () => {
     expect(functionNames).toContain("pause")
     expect(functionNames).toContain("unpause")
   })
@@ -62,12 +72,13 @@ describe("invisiProtocolAbi", () => {
     expect(functionNames).not.toContain("settleBatch")
   })
 
-  it("contains new token events", () => {
-    expect(eventNames).toContain("TokenAdded")
-    expect(eventNames).toContain("TokenRemoved")
-    expect(eventNames).toContain("TokenPaused")
-    expect(eventNames).toContain("TokenUnpaused")
-    expect(eventNames).toContain("TokenLimitUpdated")
+  it("contains DepositLimitUpdated event (replaces token events)", () => {
+    expect(eventNames).toContain("DepositLimitUpdated")
+    expect(eventNames).not.toContain("TokenAdded")
+    expect(eventNames).not.toContain("TokenRemoved")
+    expect(eventNames).not.toContain("TokenPaused")
+    expect(eventNames).not.toContain("TokenUnpaused")
+    expect(eventNames).not.toContain("TokenLimitUpdated")
   })
 
   it("contains PayOpen and PayBlind events", () => {
@@ -81,33 +92,26 @@ describe("invisiProtocolAbi", () => {
     expect(eventNames).not.toContain("VerifierUpdated")
   })
 
-  it("TokenAdded event has maxPerDeposit parameter", () => {
-    const tokenAdded = invisiProtocolAbi.find(
-      (x) => x.type === "event" && x.name === "TokenAdded"
-    )
-    expect(tokenAdded).toBeDefined()
-    const inputs = (tokenAdded as unknown as { inputs: Array<{ name: string }> }).inputs
-    expect(inputs.some((i) => i.name === "maxPerDeposit")).toBe(true)
-  })
-
   it("contains new error definitions", () => {
-    expect(errorNames).toContain("TokenNotRegistered")
-    expect(errorNames).toContain("TokenNotEnabled")
     expect(errorNames).toContain("ExceedsDepositLimit")
+    expect(errorNames).toContain("NotEmergencyAdmin")
+    expect(errorNames).toContain("NotGlobalEmergency")
+    expect(errorNames).toContain("InvalidProof")
+    expect(errorNames).toContain("CommitmentAlreadyPaid")
+    expect(errorNames).not.toContain("TokenNotRegistered")
+    expect(errorNames).not.toContain("TokenNotEnabled")
   })
 
-  it("getTokenConfig returns TokenConfig tuple", () => {
-    const fn = invisiProtocolAbi.find(
-      (x) => x.type === "function" && x.name === "getTokenConfig"
+  it("payOpen takes amount directly (no Asset tuple)", () => {
+    const payOpen = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "payOpen"
     )
-    expect(fn).toBeDefined()
-    const outputs = (fn as unknown as { outputs: Array<{ type: string; components: Array<{ name: string }> }> })?.outputs
-    const first = outputs?.[0]
-    expect(first?.type).toBe("tuple")
-    const componentNames = first?.components.map((c) => c.name) ?? []
-    expect(componentNames).toContain("registered")
-    expect(componentNames).toContain("enabled")
-    expect(componentNames).toContain("maxPerDeposit")
+    expect(payOpen).toBeDefined()
+    const inputs = (payOpen as unknown as { inputs: Array<{ name: string; type: string }> }).inputs
+    const amount = inputs.find((i) => i.name === "amount")
+    expect(amount).toBeDefined()
+    expect(amount!.type).toBe("uint256")
+    expect(inputs.some((i) => i.name === "asset")).toBe(false)
   })
 
   it("payOpen has nonce parameter", () => {
@@ -130,6 +134,57 @@ describe("invisiProtocolAbi", () => {
     const ic = inputs.find((i) => i.name === "identityCommitment")
     expect(ic).toBeDefined()
     expect(ic!.type).toBe("bytes32")
+  })
+
+  it("payBlind does not have tokenAddress parameter", () => {
+    const payBlind = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "payBlind"
+    )
+    expect(payBlind).toBeDefined()
+    const inputs = (payBlind as unknown as { inputs: Array<{ name: string }> }).inputs
+    expect(inputs.some((i) => i.name === "tokenAddress")).toBe(false)
+  })
+
+  it("withdraw does not have tokenAddress parameter", () => {
+    const withdraw = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "withdraw"
+    )
+    expect(withdraw).toBeDefined()
+    const inputs = (withdraw as unknown as { inputs: Array<{ name: string }> }).inputs
+    expect(inputs.some((i) => i.name === "tokenAddress")).toBe(false)
+  })
+
+  it("reclaim does not have tokenAddress parameter", () => {
+    const reclaim = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "reclaim"
+    )
+    expect(reclaim).toBeDefined()
+    const inputs = (reclaim as unknown as { inputs: Array<{ name: string }> }).inputs
+    expect(inputs.some((i) => i.name === "tokenAddress")).toBe(false)
+  })
+
+  it("creditDraw CreditDrawParams does not have tokenAddress", () => {
+    const fn = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "creditDraw"
+    )
+    expect(fn).toBeDefined()
+    const inputs = (fn as unknown as { inputs: Array<{ name: string; type: string; components?: Array<{ name: string }> }> }).inputs
+    const params = inputs.find((i) => i.name === "params")
+    expect(params).toBeDefined()
+    expect(params!.type).toBe("tuple")
+    expect(params!.components!.some((c) => c.name === "tokenAddress")).toBe(false)
+  })
+
+  it("depositCredit takes amount directly (no Asset tuple)", () => {
+    const fn = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "depositCredit"
+    )
+    expect(fn).toBeDefined()
+    const inputs = (fn as unknown as { inputs: Array<{ name: string; type: string }> }).inputs
+    const amount = inputs.find((i) => i.name === "amount")
+    expect(amount).toBeDefined()
+    expect(amount!.type).toBe("uint256")
+    expect(inputs.some((i) => i.name === "asset")).toBe(false)
   })
 
   it("PayOpen event has treeId indexed and new fields", () => {
@@ -207,5 +262,23 @@ describe("invisiProtocolAbi", () => {
     expect(event).toBeDefined()
     const inputs = (event as unknown as { inputs: Array<{ name: string }> })?.inputs
     expect(inputs?.some((i) => i.name === "count")).toBe(false)
+  })
+
+  it("MetaTxParams uses new structure (no nested permit in top level)", () => {
+    const fn = invisiProtocolAbi.find(
+      (x) => x.type === "function" && x.name === "payOpenWithSig"
+    )
+    expect(fn).toBeDefined()
+    const inputs = (fn as unknown as { inputs: Array<{ name: string; type: string; components?: Array<{ name: string }> }> }).inputs
+    const meta = inputs.find((i) => i.name === "meta")
+    expect(meta).toBeDefined()
+    expect(meta!.type).toBe("tuple")
+    const fieldNames = meta!.components!.map((c) => c.name)
+    expect(fieldNames).toContain("signer")
+    expect(fieldNames).toContain("sigNonce")
+    expect(fieldNames).toContain("deadline")
+    expect(fieldNames).toContain("signature")
+    expect(fieldNames).toContain("permitToken")
+    expect(fieldNames).toContain("permit")
   })
 })

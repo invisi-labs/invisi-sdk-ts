@@ -1,547 +1,1481 @@
 export const invisiProtocolAbi = [
-  // ── Write functions ──────────────────────────────────────────────────────
   {
-    type: "function",
-    name: "payOpen",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "identityCommitment", type: "bytes32" },
+    "type": "constructor",
+    "inputs": [
       {
-        name: "asset",
-        type: "tuple",
-        components: [
-          { name: "addr", type: "address" },
-          { name: "amount", type: "uint256" },
-        ],
-      },
-      { name: "nonce", type: "bytes32" },
-      { name: "treeId", type: "uint256" },
-      { name: "refundLink", type: "bytes32" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "payBlind",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "proof", type: "bytes" },
-      { name: "paymentCommitment", type: "bytes32" },
-      { name: "changeCommitment", type: "bytes32" },
-      { name: "inputAmount", type: "uint256" },
-      { name: "tokenAddress", type: "address" },
-      { name: "treeId", type: "uint256" },
-      { name: "refundLink", type: "bytes32" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "withdraw",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "proof", type: "bytes" },
-      { name: "merkleRoot", type: "bytes32" },
-      { name: "nullifiers", type: "bytes32[]" },
-      { name: "totalAmount", type: "uint256" },
-      { name: "receivingAddress", type: "address" },
-      { name: "tokenAddress", type: "address" },
-      { name: "treeId", type: "uint256" },
-    ],
-    outputs: [],
-  },
-
-  // ── Meta-transaction (WithSig) ────────────────────────────────────────
-  {
-    type: "function",
-    name: "payOpenWithSig",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "identityCommitment", type: "bytes32" },
-      {
-        name: "asset",
-        type: "tuple",
-        components: [
-          { name: "addr", type: "address" },
-          { name: "amount", type: "uint256" },
-        ],
-      },
-      { name: "nonce", type: "bytes32" },
-      { name: "treeId", type: "uint256" },
-      { name: "refundLink", type: "bytes32" },
-      {
-        name: "permit",
-        type: "tuple",
-        components: [
-          { name: "deadline", type: "uint256" },
-          { name: "v", type: "uint8" },
-          { name: "r", type: "bytes32" },
-          { name: "s", type: "bytes32" },
-        ],
-      },
-      { name: "signer", type: "address" },
-      { name: "sigNonce", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-      { name: "signature", type: "bytes" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "payBlindWithSig",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "proof", type: "bytes" },
-      { name: "paymentCommitment", type: "bytes32" },
-      { name: "changeCommitment", type: "bytes32" },
-      { name: "inputAmount", type: "uint256" },
-      { name: "tokenAddress", type: "address" },
-      { name: "treeId", type: "uint256" },
-      { name: "refundLink", type: "bytes32" },
-      {
-        name: "meta",
-        type: "tuple",
-        components: [
+        "name": "params",
+        "type": "tuple",
+        "components": [
           {
-            name: "permit",
-            type: "tuple",
-            components: [
-              { name: "deadline", type: "uint256" },
-              { name: "v", type: "uint8" },
-              { name: "r", type: "bytes32" },
-              { name: "s", type: "bytes32" },
-            ],
+            "name": "factory",
+            "type": "address"
           },
-          { name: "signer", type: "address" },
-          { name: "sigNonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-          { name: "signature", type: "bytes" },
-        ],
-      },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "depositCreditWithSig",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "identityCommitment", type: "bytes32" },
-      { name: "payerCommitment", type: "bytes32" },
-      {
-        name: "asset",
-        type: "tuple",
-        components: [
-          { name: "addr", type: "address" },
-          { name: "amount", type: "uint256" },
-        ],
-      },
-      { name: "nonce", type: "bytes32" },
-      { name: "expiry", type: "uint256" },
-      { name: "nullifierKeyHash", type: "bytes32" },
-      { name: "treeId", type: "uint256" },
-      {
-        name: "meta",
-        type: "tuple",
-        components: [
           {
-            name: "permit",
-            type: "tuple",
-            components: [
-              { name: "deadline", type: "uint256" },
-              { name: "v", type: "uint8" },
-              { name: "r", type: "bytes32" },
-              { name: "s", type: "bytes32" },
-            ],
+            "name": "token",
+            "type": "address"
           },
-          { name: "signer", type: "address" },
-          { name: "sigNonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-          { name: "signature", type: "bytes" },
-        ],
-      },
+          {
+            "name": "globalEmergency",
+            "type": "address"
+          },
+          {
+            "name": "emergencyAdmin",
+            "type": "address"
+          },
+          {
+            "name": "timelockAdmin",
+            "type": "address"
+          },
+          {
+            "name": "maxPerDeposit",
+            "type": "uint256"
+          },
+          {
+            "name": "verifierRouter",
+            "type": "address"
+          }
+        ]
+      }
     ],
-    outputs: [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: "function",
-    name: "invalidateNonce",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-
-  // ── View functions ───────────────────────────────────────────────────────
-  {
-    type: "function",
-    name: "getTreeCount",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "count", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "getPaymentTreeRoot",
-    stateMutability: "view",
-    inputs: [{ name: "treeId", type: "uint256" }],
-    outputs: [{ name: "", type: "bytes32" }],
-  },
-  {
-    type: "function",
-    name: "isTreeFull",
-    stateMutability: "view",
-    inputs: [{ name: "treeId", type: "uint256" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "isNullifierSpent",
-    stateMutability: "view",
-    inputs: [{ name: "nullifier", type: "bytes32" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "nonces",
-    stateMutability: "view",
-    inputs: [{ name: "signer", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "isCommitmentPaid",
-    stateMutability: "view",
-    inputs: [{ name: "paymentCommitment", type: "bytes32" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "VERSION",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "emergencyAdmin",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
-    name: "timelockAdmin",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
-    name: "getTokenConfig",
-    stateMutability: "view",
-    inputs: [{ name: "token", type: "address" }],
-    outputs: [
+    "type": "function",
+    "name": "CHAIN_ID",
+    "inputs": [],
+    "outputs": [
       {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "registered", type: "bool" },
-          { name: "enabled", type: "bool" },
-          { name: "maxPerDeposit", type: "uint256" },
-        ],
-      },
+        "name": "",
+        "type": "uint256"
+      }
     ],
+    "stateMutability": "view"
   },
   {
-    type: "function",
-    name: "isTokenEnabled",
-    stateMutability: "view",
-    inputs: [{ name: "token", type: "address" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
-
-  // ── Admin functions ──────────────────────────────────────────────────────
-  // emergencyAdmin (instant)
-  {
-    type: "function",
-    name: "pause",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "unpause",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "pauseToken",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "token", type: "address" }],
-    outputs: [],
-  },
-
-  // timelockAdmin (delayed)
-  {
-    type: "function",
-    name: "addToken",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "maxPerDeposit", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "removeToken",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "token", type: "address" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "setTokenLimit",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "maxPerDeposit", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "unpauseToken",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "token", type: "address" }],
-    outputs: [],
-  },
-
-  // ── Credit functions ────────────────────────────────────────────────────
-  {
-    type: "function",
-    name: "depositCredit",
-    inputs: [
-      { name: "identityCommitment", type: "bytes32" },
-      { name: "payerCommitment", type: "bytes32" },
+    "type": "function",
+    "name": "COOLDOWN_PERIOD",
+    "inputs": [],
+    "outputs": [
       {
-        name: "asset",
-        type: "tuple",
-        components: [
-          { name: "addr", type: "address" },
-          { name: "amount", type: "uint256" },
-        ],
-      },
-      { name: "nonce", type: "bytes32" },
-      { name: "expiry", type: "uint256" },
-      { name: "nullifierKeyHash", type: "bytes32" },
-      { name: "treeId", type: "uint256" },
+        "name": "",
+        "type": "uint256"
+      }
     ],
-    outputs: [],
-    stateMutability: "nonpayable",
+    "stateMutability": "view"
   },
   {
-    type: "function",
-    name: "creditDraw",
-    inputs: [
-      { name: "proof", type: "bytes" },
+    "type": "function",
+    "name": "DEPOSIT_CREDIT_TYPEHASH",
+    "inputs": [],
+    "outputs": [
       {
-        name: "params",
-        type: "tuple",
-        components: [
-          { name: "merkleRoot", type: "bytes32" },
-          { name: "nullifiers", type: "bytes32[]" },
-          { name: "totalAmount", type: "uint256" },
-          { name: "receivingAddress", type: "address" },
-          { name: "tokenAddress", type: "address" },
-          { name: "treeId", type: "uint256" },
-          { name: "remainderCommitments", type: "bytes32[]" },
-          { name: "expiry", type: "uint256" },
-        ],
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PAY_BLIND_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PAY_OPEN_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VERSION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDraw",
+    "inputs": [
+      {
+        "name": "proof",
+        "type": "bytes"
       },
+      {
+        "name": "params",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "merkleRoot",
+            "type": "bytes32"
+          },
+          {
+            "name": "nullifiers",
+            "type": "bytes32[]"
+          },
+          {
+            "name": "totalAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "receivingAddress",
+            "type": "address"
+          },
+          {
+            "name": "treeId",
+            "type": "uint256"
+          },
+          {
+            "name": "remainderCommitments",
+            "type": "bytes32[]"
+          },
+          {
+            "name": "expiry",
+            "type": "uint256"
+          }
+        ]
+      }
     ],
-    outputs: [],
-    stateMutability: "nonpayable",
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: "function",
-    name: "reclaim",
-    inputs: [
-      { name: "proof", type: "bytes" },
-      { name: "merkleRoot", type: "bytes32" },
-      { name: "nullifier", type: "bytes32" },
-      { name: "amount", type: "uint256" },
-      { name: "receivingAddress", type: "address" },
-      { name: "tokenAddress", type: "address" },
-      { name: "treeId", type: "uint256" },
-      { name: "expiry", type: "uint256" },
+    "type": "function",
+    "name": "depositCredit",
+    "inputs": [
+      {
+        "name": "identityCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "payerCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "name": "expiry",
+        "type": "uint256"
+      },
+      {
+        "name": "nullifierKeyHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      }
     ],
-    outputs: [],
-    stateMutability: "nonpayable",
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: "function",
-    name: "COOLDOWN_PERIOD",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-  },
-
-  // ── Events ───────────────────────────────────────────────────────────────
-  {
-    type: "event",
-    name: "PayOpen",
-    inputs: [
-      { name: "paymentCommitment", type: "bytes32", indexed: true },
-      { name: "payer", type: "address", indexed: true },
-      { name: "treeId", type: "uint256", indexed: true },
-      { name: "leafIndex", type: "uint32", indexed: false },
-      { name: "tokenAddress", type: "address", indexed: false },
-      { name: "amount", type: "uint256", indexed: false },
-      { name: "identityCommitment", type: "bytes32", indexed: false },
-      { name: "nonce", type: "bytes32", indexed: false },
-      { name: "refundLink", type: "bytes32", indexed: false },
+    "type": "function",
+    "name": "depositCreditWithSig",
+    "inputs": [
+      {
+        "name": "identityCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "payerCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "name": "expiry",
+        "type": "uint256"
+      },
+      {
+        "name": "nullifierKeyHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      },
+      {
+        "name": "meta",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "signer",
+            "type": "address"
+          },
+          {
+            "name": "sigNonce",
+            "type": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "permitToken",
+            "type": "address"
+          },
+          {
+            "name": "permit",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "name": "v",
+                "type": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
     ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: "event",
-    name: "PayBlind",
-    inputs: [
-      { name: "paymentCommitment", type: "bytes32", indexed: true },
-      { name: "payer", type: "address", indexed: true },
-      { name: "treeId", type: "uint256", indexed: true },
-      { name: "changeCommitment", type: "bytes32", indexed: false },
-      { name: "paymentLeafIndex", type: "uint32", indexed: false },
-      { name: "changeLeafIndex", type: "uint32", indexed: false },
-      { name: "tokenAddress", type: "address", indexed: false },
-      { name: "inputAmount", type: "uint256", indexed: false },
-      { name: "refundLink", type: "bytes32", indexed: false },
+    "type": "function",
+    "name": "eip712Domain",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "fields",
+        "type": "bytes1"
+      },
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32"
+      },
+      {
+        "name": "extensions",
+        "type": "uint256[]"
+      }
     ],
+    "stateMutability": "view"
   },
   {
-    type: "event",
-    name: "Withdraw",
-    inputs: [
-      { name: "receivingAddress", type: "address", indexed: true },
-      { name: "tokenAddress", type: "address", indexed: true },
-      { name: "treeId", type: "uint256", indexed: true },
-      { name: "merkleRoot", type: "bytes32", indexed: false },
-      { name: "nullifiers", type: "bytes32[]", indexed: false },
-      { name: "totalAmount", type: "uint256", indexed: false },
+    "type": "function",
+    "name": "emergencyAdmin",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
     ],
+    "stateMutability": "view"
   },
   {
-    type: "event",
-    name: "TreeCreated",
-    inputs: [{ name: "treeId", type: "uint256", indexed: true }],
-  },
-  {
-    type: "event",
-    name: "TokenAdded",
-    inputs: [
-      { name: "token", type: "address", indexed: true },
-      { name: "maxPerDeposit", type: "uint256", indexed: false },
+    "type": "function",
+    "name": "factory",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
     ],
+    "stateMutability": "view"
   },
   {
-    type: "event",
-    name: "TokenRemoved",
-    inputs: [{ name: "token", type: "address", indexed: true }],
-  },
-  {
-    type: "event",
-    name: "TokenPaused",
-    inputs: [{ name: "token", type: "address", indexed: true }],
-  },
-  {
-    type: "event",
-    name: "TokenUnpaused",
-    inputs: [{ name: "token", type: "address", indexed: true }],
-  },
-  {
-    type: "event",
-    name: "TokenLimitUpdated",
-    inputs: [
-      { name: "token", type: "address", indexed: true },
-      { name: "maxPerDeposit", type: "uint256", indexed: false },
+    "type": "function",
+    "name": "getPaymentTreeRoot",
+    "inputs": [
+      {
+        "name": "treeId",
+        "type": "uint256"
+      }
     ],
-  },
-  {
-    type: "event",
-    name: "CreditDeposit",
-    inputs: [
-      { name: "commitment", type: "bytes32", indexed: true },
-      { name: "depositor", type: "address", indexed: true },
-      { name: "treeId", type: "uint256", indexed: true },
-      { name: "leafIndex", type: "uint32", indexed: false },
-      { name: "identityCommitment", type: "bytes32", indexed: false },
-      { name: "payerCommitment", type: "bytes32", indexed: false },
-      { name: "tokenAddress", type: "address", indexed: false },
-      { name: "amount", type: "uint256", indexed: false },
-      { name: "nonce", type: "bytes32", indexed: false },
-      { name: "expiry", type: "uint256", indexed: false },
-      { name: "nullifierKeyHash", type: "bytes32", indexed: false },
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
     ],
+    "stateMutability": "view"
   },
   {
-    type: "event",
-    name: "CreditDraw",
-    inputs: [
-      { name: "receivingAddress", type: "address", indexed: true },
-      { name: "tokenAddress", type: "address", indexed: true },
-      { name: "treeId", type: "uint256", indexed: true },
-      { name: "merkleRoot", type: "bytes32", indexed: false },
-      { name: "nullifiers", type: "bytes32[]", indexed: false },
-      { name: "totalAmount", type: "uint256", indexed: false },
-      { name: "remainderCommitments", type: "bytes32[]", indexed: false },
-      { name: "remainderLeafIndices", type: "uint32[]", indexed: false },
-      { name: "expiry", type: "uint256", indexed: false },
+    "type": "function",
+    "name": "getTreeCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "count",
+        "type": "uint256"
+      }
     ],
+    "stateMutability": "view"
   },
   {
-    type: "event",
-    name: "CreditReclaim",
-    inputs: [
-      { name: "receivingAddress", type: "address", indexed: true },
-      { name: "treeId", type: "uint256", indexed: true },
-      { name: "nullifier", type: "bytes32", indexed: true },
-      { name: "merkleRoot", type: "bytes32", indexed: false },
-      { name: "tokenAddress", type: "address", indexed: false },
-      { name: "amount", type: "uint256", indexed: false },
-      { name: "expiry", type: "uint256", indexed: false },
+    "type": "function",
+    "name": "globalEmergency",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
     ],
+    "stateMutability": "view"
   },
-
-  // ── Meta-transaction events ───────────────────────────────────────────
   {
-    type: "event",
-    name: "NonceInvalidated",
-    inputs: [
-      { name: "signer", type: "address", indexed: true },
-      { name: "newNonce", type: "uint256", indexed: false },
+    "type": "function",
+    "name": "globalPause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "invalidateNonce",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isCommitmentPaid",
+    "inputs": [
+      {
+        "name": "paymentCommitment",
+        "type": "bytes32"
+      }
     ],
-  },
-  // ── Errors ─────────────────────────────────────────────────────────────
-  {
-    type: "error",
-    name: "TokenNotRegistered",
-    inputs: [{ name: "token", type: "address" }],
-  },
-  {
-    type: "error",
-    name: "TokenNotEnabled",
-    inputs: [{ name: "token", type: "address" }],
-  },
-  {
-    type: "error",
-    name: "ExceedsDepositLimit",
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "maxPerDeposit", type: "uint256" },
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
     ],
+    "stateMutability": "view"
   },
+  {
+    "type": "function",
+    "name": "isNullifierSpent",
+    "inputs": [
+      {
+        "name": "nullifier",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isTreeFull",
+    "inputs": [
+      {
+        "name": "treeId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "maxPerDeposit",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nonces",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "paused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "payBlind",
+    "inputs": [
+      {
+        "name": "proof",
+        "type": "bytes"
+      },
+      {
+        "name": "paymentCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "changeCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "inputAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      },
+      {
+        "name": "refundLink",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "payBlindWithSig",
+    "inputs": [
+      {
+        "name": "proof",
+        "type": "bytes"
+      },
+      {
+        "name": "paymentCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "changeCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "inputAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      },
+      {
+        "name": "refundLink",
+        "type": "bytes32"
+      },
+      {
+        "name": "meta",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "signer",
+            "type": "address"
+          },
+          {
+            "name": "sigNonce",
+            "type": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "permitToken",
+            "type": "address"
+          },
+          {
+            "name": "permit",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "name": "v",
+                "type": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "payOpen",
+    "inputs": [
+      {
+        "name": "identityCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      },
+      {
+        "name": "refundLink",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "payOpenWithSig",
+    "inputs": [
+      {
+        "name": "identityCommitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      },
+      {
+        "name": "refundLink",
+        "type": "bytes32"
+      },
+      {
+        "name": "meta",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "signer",
+            "type": "address"
+          },
+          {
+            "name": "sigNonce",
+            "type": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256"
+          },
+          {
+            "name": "signature",
+            "type": "bytes"
+          },
+          {
+            "name": "permitToken",
+            "type": "address"
+          },
+          {
+            "name": "permit",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "name": "v",
+                "type": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "reclaim",
+    "inputs": [
+      {
+        "name": "proof",
+        "type": "bytes"
+      },
+      {
+        "name": "merkleRoot",
+        "type": "bytes32"
+      },
+      {
+        "name": "nullifier",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "receivingAddress",
+        "type": "address"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      },
+      {
+        "name": "expiry",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDepositLimit",
+    "inputs": [
+      {
+        "name": "newMaxPerDeposit",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "timelockAdmin",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "token",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "verifierRouter",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "proof",
+        "type": "bytes"
+      },
+      {
+        "name": "merkleRoot",
+        "type": "bytes32"
+      },
+      {
+        "name": "nullifiers",
+        "type": "bytes32[]"
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "receivingAddress",
+        "type": "address"
+      },
+      {
+        "name": "treeId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "CreditDeposit",
+    "inputs": [
+      {
+        "name": "commitment",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "depositor",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "leafIndex",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "identityCommitment",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "payerCommitment",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "expiry",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "nullifierKeyHash",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "CreditDraw",
+    "inputs": [
+      {
+        "name": "receivingAddress",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "merkleRoot",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "nullifiers",
+        "type": "bytes32[]",
+        "indexed": false
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "remainderCommitments",
+        "type": "bytes32[]",
+        "indexed": false
+      },
+      {
+        "name": "remainderLeafIndices",
+        "type": "uint32[]",
+        "indexed": false
+      },
+      {
+        "name": "expiry",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "CreditReclaim",
+    "inputs": [
+      {
+        "name": "receivingAddress",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "nullifier",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "merkleRoot",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "expiry",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "DepositLimitUpdated",
+    "inputs": [
+      {
+        "name": "maxPerDeposit",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "EIP712DomainChanged",
+    "inputs": []
+  },
+  {
+    "type": "event",
+    "name": "NonceInvalidated",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newNonce",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "NonceInvalidated",
+    "inputs": [
+      {
+        "name": "nonce",
+        "type": "bytes32",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Paused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "PayBlind",
+    "inputs": [
+      {
+        "name": "paymentCommitment",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "changeCommitment",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "paymentLeafIndex",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "changeLeafIndex",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "inputAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "refundLink",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "PayOpen",
+    "inputs": [
+      {
+        "name": "paymentCommitment",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "leafIndex",
+        "type": "uint32",
+        "indexed": false
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "identityCommitment",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "refundLink",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "TreeCreated",
+    "inputs": [
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Unpaused",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "Withdraw",
+    "inputs": [
+      {
+        "name": "receivingAddress",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "treeId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "merkleRoot",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "nullifiers",
+        "type": "bytes32[]",
+        "indexed": false
+      },
+      {
+        "name": "totalAmount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AddressInsufficientBalance",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "CommitmentAlreadyPaid",
+    "inputs": [
+      {
+        "name": "commitment",
+        "type": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "CooldownNotPassed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CreditDrawWindowClosed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DoubleSpend",
+    "inputs": [
+      {
+        "name": "nullifier",
+        "type": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "EnforcedPause",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExceedsDepositLimit",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "maxPerDeposit",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ExpectedPause",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExpiryInPast",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailedInnerCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidBatchSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidIdentityCommitment",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidMerkleRoot",
+    "inputs": [
+      {
+        "name": "root",
+        "type": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidNonce",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNullifierKeyHash",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPayerCommitment",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidProof",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidShortString",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSignature",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTree",
+    "inputs": [
+      {
+        "name": "treeId",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "LengthMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MerkleTreeFull",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotAdmin",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEmergencyAdmin",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotGlobalEmergency",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NullifierAlreadySpent",
+    "inputs": [
+      {
+        "name": "nullifier",
+        "type": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NullifiersEmpty",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SignatureExpired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "StaleRoot",
+    "inputs": [
+      {
+        "name": "root",
+        "type": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "StringTooLong",
+    "inputs": [
+      {
+        "name": "str",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TransferFailed",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TreeAlreadyInitialized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TreeFull",
+    "inputs": [
+      {
+        "name": "treeId",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "WrongPermitToken",
+    "inputs": [
+      {
+        "name": "provided",
+        "type": "address"
+      },
+      {
+        "name": "expected",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ZeroNullifier",
+    "inputs": []
+  }
 ] as const

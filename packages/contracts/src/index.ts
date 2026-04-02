@@ -1,2 +1,4 @@
 export { invisiProtocolAbi } from "./abis/InvisiProtocol"
-export type { InvisiProtocolAbi } from "./types"
+export { invisiFactoryAbi } from "./abis/InvisiFactory"
+export { verifierRouterAbi } from "./abis/VerifierRouter"
+export type { InvisiProtocolAbi, InvisiFactoryAbi, VerifierRouterAbi } from "./types"
