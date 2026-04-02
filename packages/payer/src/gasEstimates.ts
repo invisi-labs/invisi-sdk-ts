@@ -1,6 +1,10 @@
 import type { Address, Hex } from "viem"
 
-/** Paymaster service configuration, obtained from IPP InfoResponse or manually specified */
+/**
+ * Paymaster service configuration, obtained from IPP InfoResponse or manually specified.
+ * NOTE: Identical type exists in @invisi-labs/ipp (interaction-types.ts).
+ * Duplicated to avoid circular dependency (payer does not depend on ipp).
+ */
 export interface PaymasterConfig {
   /** Paymaster service RPC URL */
   url: string

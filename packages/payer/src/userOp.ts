@@ -82,9 +82,11 @@ export interface PayBlindUserOpParams {
   paymaster?: PaymasterConfig
 }
 
+export type PayBlindUserOp = BaseUserOp
+
 export async function buildPayBlindUserOp(
   params: PayBlindUserOpParams,
-): Promise<BaseUserOp> {
+): Promise<PayBlindUserOp> {
   const calldataResult = await buildPayBlindCalldata({
     proof: params.proof,
     paymentCommitment: params.paymentCommitment,
@@ -128,9 +130,16 @@ export interface DepositCreditUserOpParams {
   paymaster?: PaymasterConfig
 }
 
+export type DepositCreditUserOp = BaseUserOp
+
+/**
+ * Build UserOp for depositCredit.
+ * Returns Promise for API consistency with buildPayOpenUserOp/buildPayBlindUserOp,
+ * though this function does no async work.
+ */
 export function buildDepositCreditUserOp(
   params: DepositCreditUserOpParams,
-): Promise<BaseUserOp> {
+): Promise<DepositCreditUserOp> {
   const callData = encodeFunctionData({
     abi: invisiProtocolAbi,
     functionName: "depositCredit",

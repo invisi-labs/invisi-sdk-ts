@@ -1,6 +1,10 @@
 // === 支付方交互 ===
 
-/** Paymaster service configuration for EIP-4337 gasless payments */
+/**
+ * Paymaster service configuration for EIP-4337 gasless payments.
+ * NOTE: Identical type exists in @invisi-labs/payer (gasEstimates.ts).
+ * Duplicated to avoid circular dependency.
+ */
 export interface PaymasterConfig {
   /** Paymaster service RPC URL */
   url: string

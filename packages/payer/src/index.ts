@@ -35,8 +35,8 @@ export type { BuildPaymentFromRequestParams, BuildPaymentFromRequestResult } fro
 export { buildPayOpenUserOp, buildPayBlindUserOp, buildDepositCreditUserOp } from "./userOp"
 export type {
   PayOpenUserOpParams, PayOpenUserOp,
-  PayBlindUserOpParams,
-  DepositCreditUserOpParams,
+  PayBlindUserOpParams, PayBlindUserOp,
+  DepositCreditUserOpParams, DepositCreditUserOp,
 } from "./userOp"
 
 export { buildApproveCalldata } from "./approve"
