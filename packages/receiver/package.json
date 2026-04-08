@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/receiver",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Invisi Protocol receiver SDK",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -31,5 +31,7 @@
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ]
 }
