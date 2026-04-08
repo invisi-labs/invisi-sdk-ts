@@ -1,6 +1,6 @@
-import { poseidonHash } from "@invisi-labs/core"
+import { poseidonHash, TREE_DEPTH } from "@invisi-labs/core"
 
-const DEPTH = 16
+const DEPTH = TREE_DEPTH
 
 async function hash2(a: bigint, b: bigint): Promise<bigint> {
   const h = await poseidonHash([a, b])
