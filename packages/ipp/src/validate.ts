@@ -14,27 +14,33 @@ export function validateIPPRequest(request: IPPRequest): void {
     )
   }
 
-  if (typeof request.identityCommitment !== "string" || !request.identityCommitment) {
+  if (!request.payload || typeof request.payload !== "object") {
+    throw new Error("Invalid IPPRequest: payload is required")
+  }
+
+  const p = request.payload
+
+  if (typeof p.identityCommitment !== "string" || !p.identityCommitment) {
     throw new Error("Invalid IPPRequest: identityCommitment is required")
   }
 
-  if (typeof request.tokenAddress !== "string" || !request.tokenAddress) {
+  if (typeof p.tokenAddress !== "string" || !p.tokenAddress) {
     throw new Error("Invalid IPPRequest: tokenAddress is required")
   }
 
-  if (typeof request.operator !== "string" || !request.operator) {
+  if (typeof p.operator !== "string" || !p.operator) {
     throw new Error("Invalid IPPRequest: operator is required")
   }
 
-  if (typeof request.treeId !== "string" || !request.treeId) {
+  if (typeof p.treeId !== "string" || !p.treeId) {
     throw new Error("Invalid IPPRequest: treeId is required")
   }
 
-  if (!Array.isArray(request.paymentTypes) || request.paymentTypes.length === 0) {
+  if (!Array.isArray(p.paymentTypes) || p.paymentTypes.length === 0) {
     throw new Error("Invalid IPPRequest: paymentTypes must be a non-empty array")
   }
 
-  for (const pt of request.paymentTypes) {
+  for (const pt of p.paymentTypes) {
     if (!VALID_PAYMENT_TYPES.includes(pt)) {
       throw new Error(
         `Invalid IPPRequest: paymentTypes contains invalid type "${pt}"`,
@@ -42,15 +48,15 @@ export function validateIPPRequest(request: IPPRequest): void {
     }
   }
 
-  const hasNonce = request.nonce !== undefined
-  const hasPC = request.paymentCommitment !== undefined
+  const hasNonce = p.nonce !== undefined
+  const hasPC = p.paymentCommitment !== undefined
   if (hasNonce !== hasPC) {
     throw new Error(
       "Invalid IPPRequest: nonce and paymentCommitment must both be present or both absent",
     )
   }
 
-  if (!hasNonce && !request.endpoint) {
+  if (!hasNonce && !p.endpoint) {
     throw new Error(
       "Invalid IPPRequest: endpoint is required when nonce is not provided (mode 1b/2 requires propose)",
     )

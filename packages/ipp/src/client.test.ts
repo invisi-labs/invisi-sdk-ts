@@ -79,10 +79,20 @@ describe("IPPClient", () => {
   })
 
   it("notify: POST /ipp/v1/notify", async () => {
-    const resp: NotifyResponse = { received: true }
+    const resp: NotifyResponse = { status: "received" }
     mockJsonResponse(resp)
-    const result = await client.notify({ paymentCommitment: "0xp", txHash: "0xtx", network: "eip155:84532" })
-    expect(result.received).toBe(true)
+    const result = await client.notify({ commitment: "0xabc", action: "submitted" as const, txHash: "0xtx", network: "eip155:84532" })
+    expect(result.status).toBe("received")
+  })
+
+  it("sends cancel notify", async () => {
+    const resp: NotifyResponse = { status: "received" }
+    mockJsonResponse(resp)
+    const result = await client.notify({
+      commitment: "0xabc",
+      action: "cancelled",
+    })
+    expect(result.status).toBe("received")
   })
 
   it("withdraw: POST /ipp/v1/withdraw", async () => {

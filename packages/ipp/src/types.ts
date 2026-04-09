@@ -1,12 +1,8 @@
 /** 支付类型 */
 export type PaymentType = "open" | "blind" | "credit"
 
-/** IPP 支付请求 */
-export interface IPPRequest {
-  /** IPP 协议版本，对应 InvisiProtocol 合约版本。当前固定为 1 */
-  v: number
-  /** CAIP-2 网络标识，如 "eip155:84532" */
-  network: string
+/** V1 Payload — 版本特定字段 */
+export interface IPPPayloadV1 {
   /** 收款方身份承诺 (0x-prefixed hex) */
   identityCommitment: string
   /** ERC20 代币合约地址 (0x-prefixed hex) */
@@ -25,8 +21,18 @@ export interface IPPRequest {
   paymentCommitment?: string | undefined
   /** 收款方服务地址，实现 IPP Interaction Protocol */
   endpoint?: string | undefined
-  /** 业务扩展字段 */
+}
+
+/** IPP 支付请求 — 版本化结构 */
+export interface IPPRequest {
+  /** IPP 协议版本，对应 InvisiProtocol 合约版本 */
+  v: number
+  /** CAIP-2 网络标识，如 "eip155:84532" */
+  network: string
+  /** 业务扩展字段，跨版本稳定 */
   meta?: Record<string, string> | undefined
+  /** 版本特定数据（v=1 时为 IPPPayloadV1） */
+  payload: IPPPayloadV1
 }
 
 /** 编码格式 */

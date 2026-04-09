@@ -55,19 +55,20 @@ export interface AuthorizeResponse {
 }
 
 export interface StatusResponse {
-  status: "unknown" | "accepted" | "submitted" | "confirmed" | "settled"
+  status: "unknown" | "accepted" | "cancelled" | "submitted" | "confirmed" | "settled"
   txHash?: string | undefined
   amount?: string | undefined
 }
 
 export interface NotifyRequest {
-  paymentCommitment: string
-  txHash: string
-  network: string
+  commitment: string
+  action: "submitted" | "cancelled"
+  txHash?: string | undefined
+  network?: string | undefined
 }
 
 export interface NotifyResponse {
-  received: boolean
+  status: "received" | "not_found" | "already_onchain"
 }
 
 // === 收款方操作 ===

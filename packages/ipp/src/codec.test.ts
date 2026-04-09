@@ -4,30 +4,31 @@ import type { IPPRequest } from "./types"
 
 const SAMPLE_REQUEST: IPPRequest = {
   v: 1,
-  operator: "0x1234567890123456789012345678901234567890",
   network: "eip155:84532",
-  identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-  tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  treeId: "1",
-  paymentTypes: ["open", "blind"],
-  amount: "100000000",
-  endpoint: "https://pay.merchant.com",
-  meta: {
-    merchantName: "Coffee Shop",
-    orderId: "ORD-001",
+  meta: { merchantName: "Coffee Shop", orderId: "ORD-001" },
+  payload: {
+    identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    operator: "0x1234567890123456789012345678901234567890",
+    treeId: "1",
+    paymentTypes: ["open", "blind"],
+    amount: "100000000",
+    endpoint: "https://pay.merchant.com",
   },
 }
 
 const MINIMAL_REQUEST: IPPRequest = {
   v: 1,
-  operator: "0x1234567890123456789012345678901234567890",
   network: "eip155:84532",
-  identityCommitment: "0xabc",
-  tokenAddress: "0xdef",
-  treeId: "1",
-  paymentTypes: ["open"],
-  nonce: "42",
-  paymentCommitment: "0x9999",
+  payload: {
+    identityCommitment: "0xabc",
+    tokenAddress: "0xdef",
+    operator: "0x1234567890123456789012345678901234567890",
+    treeId: "1",
+    paymentTypes: ["open"],
+    nonce: "42",
+    paymentCommitment: "0x9999",
+  },
 }
 
 describe("JSON encoding", () => {
@@ -36,14 +37,14 @@ describe("JSON encoding", () => {
     const parsed = JSON.parse(encoded)
     expect(parsed.v).toBe(1)
     expect(parsed.network).toBe("eip155:84532")
-    expect(parsed.paymentTypes).toEqual(["open", "blind"])
+    expect(parsed.payload.paymentTypes).toEqual(["open", "blind"])
   })
 
   it("omits undefined optional fields", () => {
     const encoded = encodeIPPRequest(MINIMAL_REQUEST, "json")
     const parsed = JSON.parse(encoded)
-    expect(parsed.amount).toBeUndefined()
-    expect(parsed.endpoint).toBeUndefined()
+    expect(parsed.payload.amount).toBeUndefined()
+    expect(parsed.payload.endpoint).toBeUndefined()
     expect(parsed.meta).toBeUndefined()
   })
 

@@ -56,7 +56,16 @@ export function decodeIPPRequest(encoded: string): IPPRequest {
 function stripUndefined(obj: IPPRequest): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
+    if (value === undefined) continue
+    if (key === "payload" && typeof value === "object" && value !== null) {
+      const cleanPayload: Record<string, unknown> = {}
+      for (const [pk, pv] of Object.entries(value as Record<string, unknown>)) {
+        if (pv !== undefined) {
+          cleanPayload[pk] = pv
+        }
+      }
+      result[key] = cleanPayload
+    } else {
       result[key] = value
     }
   }

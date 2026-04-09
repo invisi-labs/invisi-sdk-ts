@@ -1,10 +1,10 @@
 // @invisi-labs/ipp — Invisible Payment Protocol data format
 
 // === 版本 ===
-export const IPP_VERSION = 1
+export const IPP_CURRENT_VERSION = 1
 
 // === 协议类型 ===
-export type { IPPRequest, PaymentType, IPPFormat } from "./types"
+export type { IPPRequest, IPPPayloadV1, PaymentType, IPPFormat } from "./types"
 
 // === 编解码 ===
 export { encodeIPPRequest, decodeIPPRequest } from "./codec"
