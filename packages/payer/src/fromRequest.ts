@@ -19,10 +19,11 @@ export async function buildPaymentFromRequest(
   params: BuildPaymentFromRequestParams,
 ): Promise<BuildPaymentFromRequestResult> {
   const chainId = caip2ToChainId(params.request.network)
+  const p = params.request.payload
 
   const valid = await verifyPaymentCommitment({
-    identityCommitment: params.request.identityCommitment as `0x${string}`,
-    tokenAddress: params.request.tokenAddress as `0x${string}`,
+    identityCommitment: p.identityCommitment as `0x${string}`,
+    tokenAddress: p.tokenAddress as `0x${string}`,
     amount: params.amount,
     nonce: params.nonce,
     paymentCommitment: params.paymentCommitment,
@@ -35,13 +36,12 @@ export async function buildPaymentFromRequest(
     )
   }
 
-  // 传入外部 nonce，确保 calldata 使用 propose 分配的 nonce
   const result = await buildPayOpenCalldata({
     chainId,
-    identityCommitment: params.request.identityCommitment as `0x${string}`,
-    tokenAddress: params.request.tokenAddress as `0x${string}`,
+    identityCommitment: p.identityCommitment as `0x${string}`,
+    tokenAddress: p.tokenAddress as `0x${string}`,
     amount: params.amount,
-    treeId: BigInt(params.request.treeId),
+    treeId: BigInt(p.treeId),
     nonce: BigInt(params.nonce),
   })
 
