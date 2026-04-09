@@ -13,6 +13,6 @@ console.log("Requirements: a running endpoint (implementing the authorize API)")
 // import { createCredit } from "@invisi-labs/payer"
 // import { decodeIPPRequest, IPPClient } from "@invisi-labs/ipp"
 // const request = decodeIPPRequest(qrData)
-// const client = new IPPClient(request.endpoint!)
-// const resp = await client.authorize({ identityCommitment: request.identityCommitment, amount: "500000000", expiry: ... })
+// const client = new IPPClient(request.payload.endpoint!)
+// const resp = await client.authorize({ identityCommitment: request.payload.identityCommitment, amount: "500000000", expiry: ... })
 // const result = await createCredit({ ... })

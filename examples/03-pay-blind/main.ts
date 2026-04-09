@@ -22,8 +22,8 @@ console.log("")
 // import { decodeIPPRequest, IPPClient } from "@invisi-labs/ipp"
 //
 // const request = decodeIPPRequest(qrData)
-// const client = new IPPClient(request.endpoint!)
-// const resp = await client.propose({ identityCommitment: request.identityCommitment, amount: request.amount! })
+// const client = new IPPClient(request.payload.endpoint!)
+// const resp = await client.propose({ identityCommitment: request.payload.identityCommitment, amount: request.payload.amount! })
 // await verifyPaymentCommitment({ ... })
 // const changeCommitment = await computeChangeCommitment({ ... })
 // const proof = await generateProof({ circuitName: "blind_payment", witness: { ... } })

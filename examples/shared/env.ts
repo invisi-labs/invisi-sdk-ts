@@ -34,6 +34,7 @@ export const walletClient = createWalletClient({
 const deployment = getDeployment(chain.id)
 export const PROTOCOL_ADDRESS = deployment.InvisiProtocol.address
 export const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as `0x${string}`
+export const OPERATOR_ADDRESS = deployment.InvisiProtocol.address as `0x${string}`
 
 export const DEFAULT_TREE_ID = 1n
 export const CHAIN_ID = BigInt(chain.id)
