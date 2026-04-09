@@ -31,19 +31,21 @@ export async function createPaymentRequest(
   const request: IPPRequest = {
     v: 1,
     network: chainIdToCAIP2(params.chainId),
-    identityCommitment,
-    tokenAddress: params.tokenAddress,
-    operator: params.operator,
-    treeId: params.treeId.toString(),
-    paymentTypes: params.paymentTypes,
+    payload: {
+      identityCommitment,
+      tokenAddress: params.tokenAddress,
+      operator: params.operator,
+      treeId: params.treeId.toString(),
+      paymentTypes: params.paymentTypes,
+    },
   }
 
   if (params.amount !== undefined) {
-    request.amount = params.amount.toString()
+    request.payload.amount = params.amount.toString()
   }
 
   if (params.endpoint !== undefined) {
-    request.endpoint = params.endpoint
+    request.payload.endpoint = params.endpoint
   }
 
   if (params.meta !== undefined) {
@@ -58,8 +60,8 @@ export async function createPaymentRequest(
       amount: params.amount,
       chainId: params.chainId,
     })
-    request.nonce = nonce
-    request.paymentCommitment = paymentCommitment
+    request.payload.nonce = nonce
+    request.payload.paymentCommitment = paymentCommitment
   }
 
   return request

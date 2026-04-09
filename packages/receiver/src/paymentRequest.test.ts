@@ -26,7 +26,7 @@ describe("createPaymentRequest", () => {
 
     const nk = await deriveNullifierKey(baseParams.masterKey, baseParams.invoiceId)
     const expectedIC = await computeIdentityCommitment(nk, baseParams.receivingAddress)
-    expect(request.identityCommitment).toBe(expectedIC)
+    expect(request.payload.identityCommitment).toBe(expectedIC)
   })
 
   it("converts chainId to CAIP-2 network", async () => {
@@ -44,9 +44,9 @@ describe("createPaymentRequest", () => {
       ...baseParams,
       amount: 100_000_000n,
     })
-    expect(request.nonce).toBeDefined()
-    expect(request.paymentCommitment).toBeDefined()
-    expect(request.amount).toBe("100000000")
+    expect(request.payload.nonce).toBeDefined()
+    expect(request.payload.paymentCommitment).toBeDefined()
+    expect(request.payload.amount).toBe("100000000")
   })
 
   it("mode 1a: paymentCommitment matches core computation", async () => {
@@ -56,12 +56,12 @@ describe("createPaymentRequest", () => {
     })
     const expected = await computePaymentCommitment(
       baseParams.chainId,
-      request.identityCommitment as `0x${string}`,
+      request.payload.identityCommitment as `0x${string}`,
       BigInt(baseParams.tokenAddress),
       100_000_000n,
-      BigInt(request.nonce!),
+      BigInt(request.payload.nonce!),
     )
-    expect(request.paymentCommitment).toBe(expected)
+    expect(request.payload.paymentCommitment).toBe(expected)
   })
 
   it("mode 1b: no nonce when multiPayer is true", async () => {
@@ -71,10 +71,10 @@ describe("createPaymentRequest", () => {
       endpoint: "https://pay.example.com",
       multiPayer: true,
     })
-    expect(request.nonce).toBeUndefined()
-    expect(request.paymentCommitment).toBeUndefined()
-    expect(request.amount).toBe("100000000")
-    expect(request.endpoint).toBe("https://pay.example.com")
+    expect(request.payload.nonce).toBeUndefined()
+    expect(request.payload.paymentCommitment).toBeUndefined()
+    expect(request.payload.amount).toBe("100000000")
+    expect(request.payload.endpoint).toBe("https://pay.example.com")
   })
 
   it("mode 2: no amount, no nonce, endpoint required", async () => {
@@ -82,9 +82,9 @@ describe("createPaymentRequest", () => {
       ...baseParams,
       endpoint: "https://pay.example.com",
     })
-    expect(request.amount).toBeUndefined()
-    expect(request.nonce).toBeUndefined()
-    expect(request.endpoint).toBe("https://pay.example.com")
+    expect(request.payload.amount).toBeUndefined()
+    expect(request.payload.nonce).toBeUndefined()
+    expect(request.payload.endpoint).toBe("https://pay.example.com")
   })
 
   it("includes meta fields", async () => {
@@ -102,6 +102,6 @@ describe("createPaymentRequest", () => {
       amount: 100_000_000n,
       paymentTypes: ["open"],
     })
-    expect(request.paymentTypes).toEqual(["open"])
+    expect(request.payload.paymentTypes).toEqual(["open"])
   })
 })
