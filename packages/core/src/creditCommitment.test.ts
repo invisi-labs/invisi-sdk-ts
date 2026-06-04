@@ -57,4 +57,34 @@ describe("creditCommitment", () => {
     const rnk = await deriveRemainderNullifierKey(500n, 777n)
     expect(rn).not.toBe(rnk)
   })
+
+  // Cross-language vectors for Go interop (pkg/kms). D_DERIVE=8, field=BN254.
+  // Formula: Poseidon2([D_DERIVE, 0, nonce, newNonce]) for nonce,
+  //          Poseidon2([D_DERIVE, 1, nullifierKey, newNonce]) for nullifierKey.
+  it.each([
+    {
+      nonce: 0x1n,
+      newNonce: 0x2n,
+      remainderNonce: 0x173a72fb74a48e7f2dd3472a6e5f38e65d3c9712d981529409001abc4db90e65n,
+      remainderNullifierKey: 0x3027a8a3331d8c83f07557d19b3eec1c25abdb95c0d554ee678d330dc2881236n,
+    },
+    {
+      nonce: 0x1f4n,
+      newNonce: 0x309n,
+      remainderNonce: 0x23d3c1e0359484dd7602569da181e465c9f88363e623c3123443f6424dd03ec8n,
+      remainderNullifierKey: 0x03ea1df3f50d17a7d8b1ff5e6b73585cfba71864cf79f8d4eeb749dd8fb1246en,
+    },
+    {
+      nonce: 0xdeadbeefn,
+      newNonce: 0xcafebaben,
+      remainderNonce: 0x05dc4545a59627275572aadeae34267e8b1c4998a41671aaab3a98df9bf7c5d0n,
+      remainderNullifierKey: 0x1a7223234da2edfc73e0ee2dea04d1cf46e55e4c0148952d08ffc2e8034db785n,
+    },
+  ])(
+    "cross-language vector nonce=$nonce newNonce=$newNonce",
+    async ({ nonce, newNonce, remainderNonce, remainderNullifierKey }) => {
+      expect(await deriveRemainderNonce(nonce, newNonce)).toBe(remainderNonce)
+      expect(await deriveRemainderNullifierKey(nonce, newNonce)).toBe(remainderNullifierKey)
+    }
+  )
 })
