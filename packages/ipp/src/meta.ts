@@ -7,4 +7,6 @@ export const IPP_META_KEYS = Object.freeze({
   DESCRIPTION: "description",
   /** 过期时间，ISO 8601 格式 */
   EXPIRES_AT: "expiresAt",
+  /** 订阅 ID */
+  SUBSCRIPTION_ID: "invisi.subscriptionId",
 } as const)
