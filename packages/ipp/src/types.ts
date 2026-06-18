@@ -1,6 +1,9 @@
 /** 支付类型 */
 export type PaymentType = "open" | "blind" | "credit"
 
+/** IPP message type discriminator */
+export type IPPMessageType = "request" | "voucher"
+
 /** V1 Payload — 版本特定字段 */
 export interface IPPPayloadV1 {
   /** 收款方身份承诺 (0x-prefixed hex) */
@@ -23,17 +26,47 @@ export interface IPPPayloadV1 {
   endpoint?: string | undefined
 }
 
-/** IPP 支付请求 — 版本化结构 */
-export interface IPPRequest {
-  /** IPP 协议版本，对应 InvisiProtocol 合约版本 */
-  v: number
-  /** CAIP-2 网络标识，如 "eip155:84532" */
-  network: string
-  /** 业务扩展字段，跨版本稳定 */
-  meta?: Record<string, string> | undefined
-  /** 版本特定数据（v=1 时为 IPPPayloadV1） */
-  payload: IPPPayloadV1
+/** V1 Voucher Payload — mode 3 address transfer (payer → receiver) */
+export interface IPPVoucherV1 {
+  /** Receiver's identity commitment: Poseidon2(D_IDENT, nullifierKey, receivingAddress) */
+  identityCommitment: string
+  /** On-chain leaf: used for location and self-verification */
+  paymentCommitment: string
+  /** ERC20 token contract address (0x-prefixed hex) */
+  tokenAddress: string
+  /** Operator address (0x-prefixed hex); routes to per-token instance */
+  operator: string
+  /** Payment amount in atomic units (bigint as string) */
+  amount: string
+  /** Payment nonce (0x-prefixed hex) */
+  nonce: string
+  /** Settlement key — only withdrawable to the bound receiving address */
+  nullifierKey: string
+  /** Merkle Tree ID (bigint as string) */
+  treeId: string
+  /** Optional leaf index; if absent, locate by scanning PayOpen events */
+  leafIndex?: string | undefined
 }
+
+/** Base IPP message envelope */
+export interface IPPMessage {
+  /** IPP protocol version */
+  v: number
+  /** CAIP-2 network identifier, e.g. "eip155:84532" */
+  network: string
+  /** Message type discriminator */
+  type: IPPMessageType
+  /** Extension fields, stable across versions */
+  meta?: Record<string, string> | undefined
+  /** Version-specific data */
+  payload: IPPPayloadV1 | IPPVoucherV1
+}
+
+/** IPP payment request (receiver → payer) */
+export type IPPRequest = IPPMessage & { type: "request"; payload: IPPPayloadV1 }
+
+/** IPP payment voucher (payer → receiver, mode 3 address transfer) */
+export type IPPVoucher = IPPMessage & { type: "voucher"; payload: IPPVoucherV1 }
 
 /** 编码格式 */
 export type IPPFormat = "json" | "compact"

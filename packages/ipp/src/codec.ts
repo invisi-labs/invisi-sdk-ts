@@ -1,29 +1,31 @@
 import { encode, decode } from "@msgpack/msgpack"
 import { validateIPPRequest } from "./validate"
-import type { IPPRequest, IPPFormat } from "./types"
+import type { IPPMessage, IPPRequest, IPPVoucher, IPPFormat } from "./types"
 
 const IPP_PREFIX = "ipp"
 
-export function encodeIPPRequest(request: IPPRequest, format: IPPFormat): string {
-  validateIPPRequest(request)
+// ---------------------------------------------------------------------------
+// Internal shared envelope encode / decode helpers
+// ---------------------------------------------------------------------------
 
-  const clean = stripUndefined(request)
+function encodeMessage(msg: IPPMessage, format: IPPFormat): string {
+  const clean = stripUndefined(msg)
 
   if (format === "json") {
     return JSON.stringify(clean)
   }
 
-  // compact: MessagePack + Base64URL
+  // compact: MessagePack + Base64URL with ipp{v}: prefix
   const packed = encode(clean)
   const base64 = base64UrlEncode(packed)
-  return `${IPP_PREFIX}${request.v}:${base64}`
+  return `${IPP_PREFIX}${msg.v}:${base64}`
 }
 
-export function decodeIPPRequest(encoded: string): IPPRequest {
-  let request: IPPRequest
+function decodeMessage(encoded: string): IPPMessage {
+  let msg: IPPMessage
 
   if (encoded.startsWith("{")) {
-    request = JSON.parse(encoded) as IPPRequest
+    msg = JSON.parse(encoded) as IPPMessage
   } else if (encoded.startsWith(IPP_PREFIX)) {
     const colonIdx = encoded.indexOf(":")
     if (colonIdx === -1) {
@@ -37,10 +39,10 @@ export function decodeIPPRequest(encoded: string): IPPRequest {
     }
     const payload = encoded.slice(colonIdx + 1)
     const bytes = base64UrlDecode(payload)
-    request = decode(bytes) as IPPRequest
-    if (request.v !== prefixVersion) {
+    msg = decode(bytes) as IPPMessage
+    if (msg.v !== prefixVersion) {
       throw new Error(
-        `IPP version mismatch: prefix says v${prefixVersion} but payload has v=${request.v}`,
+        `IPP version mismatch: prefix says v${prefixVersion} but payload has v=${msg.v}`,
       )
     }
   } else {
@@ -49,11 +51,48 @@ export function decodeIPPRequest(encoded: string): IPPRequest {
     )
   }
 
-  validateIPPRequest(request)
-  return request
+  return msg
 }
 
-function stripUndefined(obj: IPPRequest): Record<string, unknown> {
+// ---------------------------------------------------------------------------
+// Public encode functions
+// ---------------------------------------------------------------------------
+
+export function encodeIPPRequest(request: IPPRequest, format: IPPFormat): string {
+  validateIPPRequest(request)
+  return encodeMessage(request, format)
+}
+
+export function encodeIPPVoucher(voucher: IPPVoucher, format: IPPFormat): string {
+  return encodeMessage(voucher, format)
+}
+
+// ---------------------------------------------------------------------------
+// Public decode functions
+// ---------------------------------------------------------------------------
+
+export function decodeIPPMessage(encoded: string): IPPMessage {
+  return decodeMessage(encoded)
+}
+
+export function decodeIPPRequest(encoded: string): IPPRequest {
+  const m = decodeMessage(encoded)
+  if (m.type !== "request") throw new Error(`expected type "request", got "${m.type}"`)
+  validateIPPRequest(m as IPPRequest)
+  return m as IPPRequest
+}
+
+export function decodeIPPVoucher(encoded: string): IPPVoucher {
+  const m = decodeMessage(encoded)
+  if (m.type !== "voucher") throw new Error(`expected type "voucher", got "${m.type}"`)
+  return m as IPPVoucher
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stripUndefined(obj: IPPMessage): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(obj)) {
     if (value === undefined) continue

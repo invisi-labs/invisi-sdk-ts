@@ -4,10 +4,10 @@
 export const IPP_CURRENT_VERSION = 1
 
 // === 协议类型 ===
-export type { IPPRequest, IPPPayloadV1, PaymentType, IPPFormat } from "./types"
+export type { IPPMessage, IPPMessageType, IPPRequest, IPPVoucher, IPPPayloadV1, IPPVoucherV1, PaymentType, IPPFormat } from "./types"
 
 // === 编解码 ===
-export { encodeIPPRequest, decodeIPPRequest } from "./codec"
+export { encodeIPPRequest, decodeIPPRequest, encodeIPPVoucher, decodeIPPVoucher, decodeIPPMessage } from "./codec"
 
 // === 校验 ===
 export { validateIPPRequest } from "./validate"
