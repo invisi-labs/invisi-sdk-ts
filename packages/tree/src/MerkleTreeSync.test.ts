@@ -30,7 +30,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -49,7 +49,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -63,7 +63,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -79,7 +79,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -106,7 +106,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -134,7 +134,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -153,7 +153,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -172,7 +172,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -190,7 +190,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,
@@ -227,7 +227,7 @@ describe("MerkleTreeSync", () => {
     const sync = new MerkleTreeSync({
       tree,
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
       treeType: "payment",
       treeId: 1n,

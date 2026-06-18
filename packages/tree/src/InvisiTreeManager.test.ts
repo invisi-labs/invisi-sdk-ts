@@ -23,7 +23,7 @@ describe("InvisiTreeManager", () => {
     const client = createMockClient([], 3n)
     const manager = new InvisiTreeManager({
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -38,7 +38,7 @@ describe("InvisiTreeManager", () => {
     const client = createMockClient(events, 3n)
     const manager = new InvisiTreeManager({
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -57,7 +57,7 @@ describe("InvisiTreeManager", () => {
     const client = createMockClient(events, 2n)
     const manager = new InvisiTreeManager({
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -69,7 +69,7 @@ describe("InvisiTreeManager", () => {
     const client = createMockClient([], 2n)
     const manager = new InvisiTreeManager({
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
@@ -82,7 +82,7 @@ describe("InvisiTreeManager", () => {
     client.watchContractEvent = vi.fn().mockReturnValue(unwatch)
     const manager = new InvisiTreeManager({
       client,
-      protocolAddress: "0x0000000000000000000000000000000000000001",
+      instanceAddress: "0x0000000000000000000000000000000000000001",
       fromBlock: 0n,
     })
     await manager.start()
