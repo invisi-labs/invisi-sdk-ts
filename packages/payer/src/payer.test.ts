@@ -50,7 +50,6 @@ describe("buildPayBlindCalldata", () => {
       paymentCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       changeCommitment: ("0x" + "cd".repeat(32)) as `0x${string}`,
       inputAmount: 200_000_000n,
-      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       treeId: 1n,
     })
     expect(result.data).toMatch(/^0x/)

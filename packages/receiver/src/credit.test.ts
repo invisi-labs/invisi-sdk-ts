@@ -37,7 +37,6 @@ describe("buildCreditDrawCalldata", () => {
       nullifiers: [("0x" + "ab".repeat(32)) as `0x${string}`],
       totalAmount: 100_000_000n,
       receivingAddress: "0x000000000000000000000000000000000000dead",
-      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       merkleRoot: ("0x" + "bb".repeat(32)) as `0x${string}`,
       proof: "0xdeadbeef" as `0x${string}`,
       treeId: 1n,

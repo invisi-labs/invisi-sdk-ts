@@ -100,8 +100,8 @@ describe("buildPayBlindUserOp", () => {
 
   it("does NOT expose paymentCommitment or nonce on result", async () => {
     const result = await buildPayBlindUserOp(baseParams)
-    expect((result as Record<string, unknown>).paymentCommitment).toBeUndefined()
-    expect((result as Record<string, unknown>).nonce).toBeUndefined()
+    expect((result as unknown as Record<string, unknown>).paymentCommitment).toBeUndefined()
+    expect((result as unknown as Record<string, unknown>).nonce).toBeUndefined()
   })
 
   it("uses payBlind gas estimates", async () => {

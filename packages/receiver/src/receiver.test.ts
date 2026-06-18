@@ -10,6 +10,7 @@ describe("generateInvoice", () => {
       tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
       treeId: 1n,
+      operator: ("0x" + "cc".repeat(20)) as `0x${string}`,
     })
     expect(inv.nullifierKey).toBeTypeOf("bigint")
     expect(inv.identityCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
@@ -17,8 +18,8 @@ describe("generateInvoice", () => {
   })
 
   it("different addresses produce different commitments", async () => {
-    const a = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
-    const b = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xbeefn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n })
+    const a = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xdeadn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n, operator: ("0x" + "cc".repeat(20)) as `0x${string}` })
+    const b = await generateInvoice({ masterKey: 1n, invoiceId: 1n, receivingAddress: 0xbeefn, tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`, amount: 100_000_000n, treeId: 1n, operator: ("0x" + "cc".repeat(20)) as `0x${string}` })
     expect(a.nullifierKey).toBe(b.nullifierKey)
     expect(a.identityCommitment).not.toBe(b.identityCommitment)
   })
@@ -31,6 +32,7 @@ describe("generateInvoice", () => {
       tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
       treeId: 3n,
+      operator: ("0x" + "cc".repeat(20)) as `0x${string}`,
     })
     expect(inv.treeId).toBe(3n)
     expect(inv.tokenAddress).toBe(("0x" + "aa".repeat(20)) as `0x${string}`)
@@ -74,7 +76,6 @@ describe("buildWithdrawCalldata", () => {
       nullifiers: [("0x" + "ab".repeat(32)) as `0x${string}`],
       totalAmount: 100_000_000n,
       receivingAddress: "0x000000000000000000000000000000000000dead",
-      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       merkleRoot: ("0x" + "bb".repeat(32)) as `0x${string}`,
       proof: "0xdeadbeef" as `0x${string}`,
       treeId: 1n,
