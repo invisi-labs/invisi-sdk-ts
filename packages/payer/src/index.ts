@@ -44,3 +44,6 @@ export type { ApproveCalldataParams, ApproveCalldata } from "./approve"
 
 export { GAS_ESTIMATES, INVISI_DEFAULT_PAYMASTER } from "./gasEstimates"
 export type { PaymasterConfig, BaseUserOp } from "./gasEstimates"
+
+export { buildVoucher } from "./buildVoucher"
+export type { BuildVoucherParams } from "./buildVoucher"
