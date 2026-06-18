@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/receiver",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Invisi Protocol receiver SDK",
   "type": "module",
   "main": "./dist/index.cjs",
