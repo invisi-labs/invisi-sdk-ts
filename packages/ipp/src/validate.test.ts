@@ -6,6 +6,7 @@ import type { IPPRequest } from "./types"
 const MODE_1A_REQUEST: IPPRequest = {
   v: 1,
   network: "eip155:84532",
+  type: "request",
   payload: {
     operator: "0x1234567890123456789012345678901234567890",
     identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
@@ -22,6 +23,7 @@ const MODE_1A_REQUEST: IPPRequest = {
 const MODE_1B_REQUEST: IPPRequest = {
   v: 1,
   network: "eip155:84532",
+  type: "request",
   payload: {
     operator: "0x1234567890123456789012345678901234567890",
     identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",

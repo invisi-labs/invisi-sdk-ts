@@ -1,6 +1,6 @@
 import { deriveNullifierKey, computeIdentityCommitment } from "@invisi-labs/core"
 import { chainIdToCAIP2 } from "@invisi-labs/ipp"
-import type { IPPRequest, PaymentType } from "@invisi-labs/ipp"
+import type { IPPRequest, IPPPayloadV1, PaymentType } from "@invisi-labs/ipp"
 import { computePaymentCommitmentForPropose } from "./propose"
 
 export interface CreatePaymentRequestParams {
@@ -28,16 +28,19 @@ export async function createPaymentRequest(
     params.receivingAddress,
   )
 
+  const payload: IPPPayloadV1 = {
+    identityCommitment,
+    tokenAddress: params.tokenAddress,
+    operator: params.operator,
+    treeId: params.treeId.toString(),
+    paymentTypes: params.paymentTypes,
+  }
+
   const request: IPPRequest = {
     v: 1,
     network: chainIdToCAIP2(params.chainId),
-    payload: {
-      identityCommitment,
-      tokenAddress: params.tokenAddress,
-      operator: params.operator,
-      treeId: params.treeId.toString(),
-      paymentTypes: params.paymentTypes,
-    },
+    type: "request",
+    payload,
   }
 
   if (params.amount !== undefined) {

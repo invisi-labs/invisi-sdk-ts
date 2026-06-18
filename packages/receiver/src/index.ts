@@ -27,3 +27,6 @@ export type { ComputePaymentCommitmentForProposeParams, ProposeResult } from "./
 
 export { createPaymentRequest } from "./paymentRequest"
 export type { CreatePaymentRequestParams } from "./paymentRequest"
+
+export { verifyVoucher, voucherToWithdrawRequest } from "./voucher"
+export type { VerifyVoucherParams } from "./voucher"

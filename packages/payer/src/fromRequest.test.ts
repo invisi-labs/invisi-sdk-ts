@@ -19,7 +19,7 @@ describe("buildPaymentFromRequest", () => {
     const ic = await computeIdentityCommitment(nullifierKey, 0xdeadn)
     const pc = await computePaymentCommitment(CHAIN_ID, ic, BigInt(TOKEN_ADDRESS), AMOUNT, NONCE)
     const request: IPPRequest = {
-      v: 1, network: "eip155:84532",
+      v: 1, network: "eip155:84532", type: "request",
       payload: {
         identityCommitment: ic, tokenAddress: TOKEN_ADDRESS, operator: "0x0000000000000000000000000000000000000000",
         treeId: "1", paymentTypes: ["open"], amount: AMOUNT.toString(),
