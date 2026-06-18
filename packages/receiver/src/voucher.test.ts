@@ -49,3 +49,20 @@ it("maps to a WithdrawRequest without leaking nullifierKey", async () => {
   })
   expect(JSON.stringify(req)).not.toContain(v.payload.nullifierKey)
 })
+
+it("rejects a tampered nonce", async () => {
+  const v = await makeVoucher()
+  v.payload.nonce = "0x999"
+  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS, chainId: CHAIN_ID })).toBe(false)
+})
+
+it("rejects a tampered paymentCommitment", async () => {
+  const v = await makeVoucher()
+  v.payload.paymentCommitment = "0xdeadbeef"
+  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS, chainId: CHAIN_ID })).toBe(false)
+})
+
+it("falls back to chainId parsed from voucher.network when chainId is omitted", async () => {
+  const v = await makeVoucher() // network is "eip155:84532" which maps to chainId 84532n
+  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS })).toBe(true)
+})
