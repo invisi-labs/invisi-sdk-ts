@@ -1,6 +1,6 @@
 import { encodeFunctionData } from "viem"
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
-import { poseidonHash, D_DERIVE, generateNonce } from "@invisi-labs/core"
+import { poseidonHash, D_DERIVE } from "@invisi-labs/core"
 
 export interface CreditAuthorization {
   creditId: bigint
@@ -23,6 +23,8 @@ export interface CreateCreditParams {
   payerAddress: bigint
   tokenAddress: `0x${string}`
   amount: bigint
+  /** Server-assigned nonce from the IPP `authorize` response. */
+  nonce: bigint
   expiry: bigint
   treeId: bigint
   chainId: bigint
@@ -43,7 +45,7 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
   const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, params.creditId])
   const creditNullifierKey = BigInt(creditNullifierKeyHash)
   const nullifierKeyHash = await computeNullifierKeyHash(creditNullifierKey)
-  const nonce = generateNonce()
+  const nonce = params.nonce
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
   const data = encodeFunctionData({

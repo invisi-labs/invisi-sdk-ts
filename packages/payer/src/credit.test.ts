@@ -10,6 +10,7 @@ describe("createCredit", () => {
       payerAddress: 0xdeadn,
       tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
+      nonce: 555n,
       expiry: 9999999999n,
       treeId: 1n,
       chainId: 1n,
@@ -22,13 +23,13 @@ describe("createCredit", () => {
     expect(result.authorization.payerCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(result.authorization.nullifierKeyHash).toMatch(/^0x[0-9a-f]{64}$/i)
     expect(result.authorization.creditNullifierKey).toBeTypeOf("bigint")
-    expect(result.authorization.nonce).toBeTypeOf("bigint")
+    expect(result.authorization.nonce).toBe(555n)
     expect(result.authorization.amount).toBe(100_000_000n)
     expect(result.authorization.treeId).toBe(1n)
     expect(result.authorization.chainId).toBe(1n)
   })
 
-  it("generates different nonces on each call", async () => {
+  it("uses the supplied nonce (from authorize response) instead of generating one", async () => {
     const params = {
       payerMasterKey: 99n,
       creditId: 2n,
@@ -36,13 +37,34 @@ describe("createCredit", () => {
       payerAddress: 0xbeefn,
       tokenAddress: ("0x" + "bb".repeat(20)) as `0x${string}`,
       amount: 50_000_000n,
+      nonce: 7777n,
       expiry: 9999999999n,
       treeId: 1n,
       chainId: 1n,
     }
     const a = await createCredit(params)
     const b = await createCredit(params)
-    expect(a.authorization.nonce).not.toBe(b.authorization.nonce)
+    // Same supplied nonce -> identical authorization.nonce (no randomness)
+    expect(a.authorization.nonce).toBe(7777n)
+    expect(b.authorization.nonce).toBe(7777n)
+    expect(a.data).toBe(b.data)
+  })
+
+  // @ts-expect-error nonce is required; omitting it must be a compile error
+  it("rejects calls without nonce at type level", async () => {
+    // Runtime guard: this call will throw because nonce is undefined at runtime;
+    // the @ts-expect-error above ensures tsc also rejects this as a type error.
+    await expect(createCredit({
+      payerMasterKey: 1n,
+      creditId: 1n,
+      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      payerAddress: 0xdeadn,
+      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+      amount: 1n,
+      expiry: 9999999999n,
+      treeId: 1n,
+      chainId: 1n,
+    })).rejects.toThrow()
   })
 })
 
@@ -54,6 +76,7 @@ describe("AUDIT-040: creditNullifierKey deterministic derivation", () => {
     payerAddress: 0xdeadn,
     tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
     amount: 100_000_000n,
+    nonce: 1n,
     expiry: 9999999999n,
     treeId: 1n,
     chainId: 1n,
