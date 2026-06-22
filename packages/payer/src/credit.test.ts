@@ -50,21 +50,23 @@ describe("createCredit", () => {
     expect(a.data).toBe(b.data)
   })
 
-  // @ts-expect-error nonce is required; omitting it must be a compile error
   it("rejects calls without nonce at type level", async () => {
     // Runtime guard: this call will throw because nonce is undefined at runtime;
-    // the @ts-expect-error above ensures tsc also rejects this as a type error.
-    await expect(createCredit({
-      payerMasterKey: 1n,
-      creditId: 1n,
-      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
-      payerAddress: 0xdeadn,
-      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
-      amount: 1n,
-      expiry: 9999999999n,
-      treeId: 1n,
-      chainId: 1n,
-    })).rejects.toThrow()
+    // The @ts-expect-error below ensures tsc also rejects this as a type error.
+    await expect(
+      // @ts-expect-error nonce is required; omitting it must be a compile error
+      createCredit({
+        payerMasterKey: 1n,
+        creditId: 1n,
+        identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+        payerAddress: 0xdeadn,
+        tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+        amount: 1n,
+        expiry: 9999999999n,
+        treeId: 1n,
+        chainId: 1n,
+      })
+    ).rejects.toThrow()
   })
 })
 

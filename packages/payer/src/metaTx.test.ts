@@ -80,20 +80,22 @@ describe("buildSignPayOpenTypedData", () => {
     expect(result.typedData.message.refundLink).toBe(refundLink)
   })
 
-  // @ts-expect-error nonce is required; omitting it must be a compile error
   it("rejects calls without nonce at type level", async () => {
     // Runtime guard: this call will throw because nonce is undefined at runtime;
-    // the @ts-expect-error above ensures tsc also rejects this as a type error.
-    await expect(buildSignPayOpenTypedData({
-      chainId: 1n,
-      verifyingContract: MOCK_CONTRACT,
-      identityCommitment: MOCK_COMMITMENT,
-      tokenAddress: MOCK_TOKEN,
-      amount: 100_000_000n,
-      treeId: 1n,
-      sigNonce: 0n,
-      deadline: 9999999999n,
-    })).rejects.toThrow()
+    // The @ts-expect-error below ensures tsc also rejects this as a type error.
+    await expect(
+      // @ts-expect-error nonce is required; omitting it must be a compile error
+      buildSignPayOpenTypedData({
+        chainId: 1n,
+        verifyingContract: MOCK_CONTRACT,
+        identityCommitment: MOCK_COMMITMENT,
+        tokenAddress: MOCK_TOKEN,
+        amount: 100_000_000n,
+        treeId: 1n,
+        sigNonce: 0n,
+        deadline: 9999999999n,
+      })
+    ).rejects.toThrow()
   })
 })
 

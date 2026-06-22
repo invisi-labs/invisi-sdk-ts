@@ -45,17 +45,19 @@ describe("buildPayOpenCalldata", () => {
     expect(a.paymentCommitment).toBe(b.paymentCommitment)
   })
 
-  // @ts-expect-error nonce is required; omitting it must be a compile error
   it("rejects calls without nonce at type level", async () => {
     // Runtime guard: this call will throw because nonce is undefined at runtime;
-    // the @ts-expect-error above ensures tsc also rejects this as a type error.
-    await expect(buildPayOpenCalldata({
-      chainId: 1n,
-      treeId: 1n,
-      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
-      tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
-      amount: 100_000_000n,
-    })).rejects.toThrow()
+    // The @ts-expect-error below ensures tsc also rejects this as a type error.
+    await expect(
+      // @ts-expect-error nonce is required; omitting it must be a compile error
+      buildPayOpenCalldata({
+        chainId: 1n,
+        treeId: 1n,
+        identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+        tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
+        amount: 100_000_000n,
+      })
+    ).rejects.toThrow()
   })
 })
 

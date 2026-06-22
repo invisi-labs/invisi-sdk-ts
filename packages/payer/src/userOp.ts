@@ -16,8 +16,8 @@ export interface PayOpenUserOpParams {
   treeId: bigint
   /** Refund link (0 = normal payment) */
   refundLink?: bigint
-  /** External nonce from propose response. Auto-generated if not provided */
-  nonce?: bigint
+  /** Payment nonce supplied by the caller per the payment mode (mode 1a/1b/2: server/receiver-assigned; mode 3: locally generated). */
+  nonce: bigint
   /** InvisiProtocol instance address */
   protocolAddress: Address
   /** Smart Account address */
