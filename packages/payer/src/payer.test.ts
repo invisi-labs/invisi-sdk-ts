@@ -9,6 +9,7 @@ describe("buildPayOpenCalldata", () => {
       identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
+      nonce: 7n,
     })
     expect(result.data).toMatch(/^0x/)
     expect(result.paymentCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
@@ -29,17 +30,30 @@ describe("buildPayOpenCalldata", () => {
     expect(result.nonce).toBe("0x" + externalNonce.toString(16).padStart(64, "0"))
   })
 
-  it("generates different nonces on each call", async () => {
+  it("produces a deterministic commitment for a fixed nonce", async () => {
     const params = {
       chainId: 1n,
       treeId: 1n,
       identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
+      nonce: 99n,
     }
     const a = await buildPayOpenCalldata(params)
     const b = await buildPayOpenCalldata(params)
-    expect(a.nonce).not.toBe(b.nonce)
+    expect(a.nonce).toBe(b.nonce)
+    expect(a.paymentCommitment).toBe(b.paymentCommitment)
+  })
+
+  // @ts-expect-error nonce is required; omitting it must be a compile error
+  it("rejects calls without nonce at type level", async () => {
+    await buildPayOpenCalldata({
+      chainId: 1n,
+      treeId: 1n,
+      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
+      amount: 100_000_000n,
+    })
   })
 })
 
