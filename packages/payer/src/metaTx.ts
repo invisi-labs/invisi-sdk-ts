@@ -1,5 +1,5 @@
 import type { Hex, Address } from "viem"
-import { computePaymentCommitment, generateNonce } from "@invisi-labs/core"
+import { computePaymentCommitment } from "@invisi-labs/core"
 
 // ─── EIP-712 Domain ──────────────────────────────────────────────────
 
@@ -115,6 +115,8 @@ export interface SignPayOpenParams {
   amount: bigint
   treeId: bigint
   refundLink?: Hex
+  /** Payment nonce. Required — supplied by the caller per the payment mode. */
+  nonce: bigint
   sigNonce: bigint
   deadline: bigint
 }
@@ -122,7 +124,7 @@ export interface SignPayOpenParams {
 export async function buildSignPayOpenTypedData(
   params: SignPayOpenParams
 ): Promise<SignPayOpenResult> {
-  const nonce = generateNonce()
+  const nonce = params.nonce
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as Hex
 
   const paymentCommitment = await computePaymentCommitment(
