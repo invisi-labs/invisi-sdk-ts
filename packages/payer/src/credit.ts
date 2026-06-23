@@ -81,6 +81,29 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
   }
 }
 
+/**
+ * Derives the two nonce-independent payer-side values (payerCommitment,
+ * nullifierKeyHash) needed to populate an IPP credit authorize request.
+ * Both depend only on payerMasterKey, creditId, payerAddress — never nonce.
+ * Mirrors the derivation chain in createCredit (incl. the D_DERIVE step), so
+ * its output matches createCredit's authorization byte-for-byte.
+ */
+export async function deriveCreditAuthorizeFields(
+  payerMasterKey: bigint,
+  creditId: bigint,
+  payerAddress: bigint,
+): Promise<{ payerCommitment: `0x${string}`; nullifierKeyHash: `0x${string}` }> {
+  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash } = await import("@invisi-labs/core")
+
+  const payerNullifierKey = await deriveNullifierKey(payerMasterKey, creditId)
+  const payerCommitment = await computeIdentityCommitment(payerNullifierKey, payerAddress)
+  // Deterministic derivation: creditNullifierKey = Poseidon2(D_DERIVE, payerNullifierKey, creditId)
+  const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, creditId])
+  const nullifierKeyHash = await computeNullifierKeyHash(BigInt(creditNullifierKeyHash))
+
+  return { payerCommitment, nullifierKeyHash }
+}
+
 export interface BuildReclaimCalldataParams {
   nullifier: `0x${string}`
   amount: bigint

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { createCredit, buildReclaimCalldata } from "./credit"
+import { createCredit, buildReclaimCalldata, deriveCreditAuthorizeFields } from "./credit"
 
 describe("createCredit", () => {
   it("returns all expected fields", async () => {
@@ -104,6 +104,53 @@ describe("AUDIT-040: creditNullifierKey deterministic derivation", () => {
 
     const result = await createCredit(baseParams)
     expect(result.authorization.creditNullifierKey).toBe(expected)
+  })
+})
+
+describe("deriveCreditAuthorizeFields", () => {
+  // Same fixture inputs as the createCredit "returns all expected fields" test,
+  // so the helper output must match createCredit's authorization byte-for-byte.
+  const PAYER_MASTER_KEY = 12345n
+  const CREDIT_ID = 1n
+  const PAYER_ADDRESS = 0xdeadn
+
+  it("derives payerCommitment/nullifierKeyHash matching createCredit", async () => {
+    const fields = await deriveCreditAuthorizeFields(PAYER_MASTER_KEY, CREDIT_ID, PAYER_ADDRESS)
+
+    const fromCreate = await createCredit({
+      payerMasterKey: PAYER_MASTER_KEY,
+      creditId: CREDIT_ID,
+      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      payerAddress: PAYER_ADDRESS,
+      tokenAddress: ("0x" + "aa".repeat(20)) as `0x${string}`,
+      amount: 100_000_000n,
+      nonce: 555n,
+      expiry: 9999999999n,
+      treeId: 1n,
+      chainId: 1n,
+    })
+
+    // Both fields are nonce-independent, so they must equal createCredit's output.
+    expect(fields.payerCommitment).toBe(fromCreate.authorization.payerCommitment)
+    expect(fields.nullifierKeyHash).toBe(fromCreate.authorization.nullifierKeyHash)
+  })
+
+  it("returns bytes32 hex strings", async () => {
+    const fields = await deriveCreditAuthorizeFields(PAYER_MASTER_KEY, CREDIT_ID, PAYER_ADDRESS)
+    expect(fields.payerCommitment).toMatch(/^0x[0-9a-f]{64}$/i)
+    expect(fields.nullifierKeyHash).toMatch(/^0x[0-9a-f]{64}$/i)
+  })
+
+  it("is deterministic for the same inputs", async () => {
+    const a = await deriveCreditAuthorizeFields(PAYER_MASTER_KEY, CREDIT_ID, PAYER_ADDRESS)
+    const b = await deriveCreditAuthorizeFields(PAYER_MASTER_KEY, CREDIT_ID, PAYER_ADDRESS)
+    expect(a).toEqual(b)
+  })
+
+  it("produces a different nullifierKeyHash for a different creditId", async () => {
+    const a = await deriveCreditAuthorizeFields(PAYER_MASTER_KEY, 1n, PAYER_ADDRESS)
+    const b = await deriveCreditAuthorizeFields(PAYER_MASTER_KEY, 2n, PAYER_ADDRESS)
+    expect(a.nullifierKeyHash).not.toBe(b.nullifierKeyHash)
   })
 })
 
