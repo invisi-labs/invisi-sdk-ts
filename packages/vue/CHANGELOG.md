@@ -1,5 +1,11 @@
 # @invisi-labs/vue
 
+## 2.0.1
+
+### Patch Changes
+
+- @invisi-labs/payer@2.0.1
+
 ## 2.0.0
 
 ### Patch Changes
