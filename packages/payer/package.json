@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/payer",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Invisi Protocol payer SDK",
   "type": "module",
   "main": "./dist/index.cjs",
