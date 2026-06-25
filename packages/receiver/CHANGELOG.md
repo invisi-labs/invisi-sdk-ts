@@ -1,5 +1,15 @@
 # @invisi-labs/receiver
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [1b73ab6]
+  - @invisi-labs/core@2.0.0
+  - @invisi-labs/ipp@2.0.0
+  - @invisi-labs/contracts@2.0.0
+  - @invisi-labs/deployments@2.0.0
+
 ## 1.0.2
 
 ### Patch Changes
