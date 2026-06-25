@@ -5,7 +5,7 @@ export type {
   ChangeRecord, SettleChangeParams, SettleChangeCalldata,
 } from "./payer"
 
-export { createCredit, buildReclaimCalldata } from "./credit"
+export { createCredit, buildReclaimCalldata, deriveCreditAuthorizeFields } from "./credit"
 export type {
   CreditAuthorization,
   CreateCreditParams, CreateCreditResult,
@@ -26,8 +26,8 @@ export type {
   EIP712DomainParams, TokenPermit,
 } from "./metaTx"
 
-export { verifyPaymentCommitment } from "./verify"
-export type { VerifyPaymentCommitmentParams } from "./verify"
+export { verifyPaymentCommitment, verifyCreditCommitment } from "./verify"
+export type { VerifyPaymentCommitmentParams, VerifyCreditCommitmentParams } from "./verify"
 
 export { buildPaymentFromRequest } from "./fromRequest"
 export type { BuildPaymentFromRequestParams, BuildPaymentFromRequestResult } from "./fromRequest"

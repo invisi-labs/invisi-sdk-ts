@@ -9,7 +9,10 @@ const IPP_PREFIX = "ipp"
 // ---------------------------------------------------------------------------
 
 function encodeMessage(msg: IPPMessage, format: IPPFormat): string {
-  const clean = stripUndefined(msg)
+  // Wire is snake_case; TS keeps camelCase property names and
+  // converts only at this serialization boundary, so the same wire contract
+  // round-trips with the Go SDK.
+  const clean = keysToSnake(stripUndefined(msg))
 
   if (format === "json") {
     return JSON.stringify(clean)
@@ -25,7 +28,9 @@ function decodeMessage(encoded: string): IPPMessage {
   let msg: IPPMessage
 
   if (encoded.startsWith("{")) {
-    msg = JSON.parse(encoded) as IPPMessage
+    // Wire is snake_case; convert back to camelCase property names
+    // that the rest of the SDK accesses.
+    msg = keysToCamel(JSON.parse(encoded)) as IPPMessage
   } else if (encoded.startsWith(IPP_PREFIX)) {
     const colonIdx = encoded.indexOf(":")
     if (colonIdx === -1) {
@@ -39,7 +44,7 @@ function decodeMessage(encoded: string): IPPMessage {
     }
     const payload = encoded.slice(colonIdx + 1)
     const bytes = base64UrlDecode(payload)
-    msg = decode(bytes) as IPPMessage
+    msg = keysToCamel(decode(bytes)) as IPPMessage
     if (msg.v !== prefixVersion) {
       throw new Error(
         `IPP version mismatch: prefix says v${prefixVersion} but payload has v=${msg.v}`,
@@ -86,6 +91,52 @@ export function decodeIPPVoucher(encoded: string): IPPVoucher {
   const m = decodeMessage(encoded)
   if (m.type !== "voucher") throw new Error(`expected type "voucher", got "${m.type}"`)
   return m as IPPVoucher
+}
+
+// ---------------------------------------------------------------------------
+// camelCase ↔ snake_case key conversion (wire boundary)
+// ---------------------------------------------------------------------------
+//
+// Only object KEYS are converted, never values. The `meta` field is a
+// Record<string,string> of business-convention keys (merchantName, orderId,
+// expiresAt, invisi.subscriptionId — see meta.ts IPP_META_KEYS); its inner keys
+// are exempt and passed through verbatim (the field name "meta" itself is a
+// single word, unchanged either direction). Conversion is fully recursive
+// across nested objects and arrays of objects (e.g. witness.merkleProofs).
+
+const META_KEY = "meta"
+
+function camelToSnake(key: string): string {
+  return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
+}
+
+function snakeToCamel(key: string): string {
+  return key.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase())
+}
+
+function convertKeys(value: unknown, convert: (key: string) => string): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => convertKeys(item, convert))
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      // `meta` value is a plain string map of business keys — recurse no
+      // further and keep its inner keys verbatim (namespaced keys like
+      // "invisi.subscriptionId" must survive untouched).
+      out[convert(k)] = k === META_KEY ? v : convertKeys(v, convert)
+    }
+    return out
+  }
+  return value
+}
+
+function keysToSnake(value: unknown): unknown {
+  return convertKeys(value, camelToSnake)
+}
+
+function keysToCamel(value: unknown): unknown {
+  return convertKeys(value, snakeToCamel)
 }
 
 // ---------------------------------------------------------------------------

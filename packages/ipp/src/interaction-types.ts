@@ -41,9 +41,12 @@ export interface ProposeResponse {
 }
 
 export interface AuthorizeRequest {
-  identityCommitment: string
+  identityCommitment: string   // receiver
   amount: string
   expiry: string
+  /** Required in credit mode; payer-derived locally (nonce-independent, non-custodial). Omitted in plain 6.2 usage. */
+  payerCommitment?: string | undefined
+  nullifierKeyHash?: string | undefined
 }
 
 export interface AuthorizeResponse {

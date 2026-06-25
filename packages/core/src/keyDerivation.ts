@@ -5,6 +5,3 @@ export async function deriveNullifierKey(masterKey: bigint, invoiceId: bigint): 
   const hash = await poseidonHash([D_NKEY, masterKey, invoiceId])
   return BigInt(hash)
 }
-
-/** @deprecated Use deriveNullifierKey */
-export const deriveClaimingKey = deriveNullifierKey

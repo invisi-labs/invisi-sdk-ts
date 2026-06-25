@@ -17,6 +17,7 @@ describe("buildPayOpenUserOp", () => {
     tokenAddress: MOCK_TOKEN,
     amount: 100_000_000n,
     treeId: 1n,
+    nonce: 123n,
     protocolAddress: MOCK_PROTOCOL,
     sender: MOCK_SENDER,
     chainId: 8453n,

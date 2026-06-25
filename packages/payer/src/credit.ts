@@ -1,6 +1,6 @@
 import { encodeFunctionData } from "viem"
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
-import { poseidonHash, D_DERIVE, generateNonce } from "@invisi-labs/core"
+import { poseidonHash, D_DERIVE } from "@invisi-labs/core"
 
 export interface CreditAuthorization {
   creditId: bigint
@@ -23,6 +23,8 @@ export interface CreateCreditParams {
   payerAddress: bigint
   tokenAddress: `0x${string}`
   amount: bigint
+  /** Server-assigned nonce from the IPP `authorize` response. */
+  nonce: bigint
   expiry: bigint
   treeId: bigint
   chainId: bigint
@@ -43,7 +45,7 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
   const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, params.creditId])
   const creditNullifierKey = BigInt(creditNullifierKeyHash)
   const nullifierKeyHash = await computeNullifierKeyHash(creditNullifierKey)
-  const nonce = generateNonce()
+  const nonce = params.nonce
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
   const data = encodeFunctionData({
@@ -77,6 +79,29 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
     data,
     approveAmount: params.amount,
   }
+}
+
+/**
+ * Derives the two nonce-independent payer-side values (payerCommitment,
+ * nullifierKeyHash) needed to populate an IPP credit authorize request.
+ * Both depend only on payerMasterKey, creditId, payerAddress — never nonce.
+ * Mirrors the derivation chain in createCredit (incl. the D_DERIVE step), so
+ * its output matches createCredit's authorization byte-for-byte.
+ */
+export async function deriveCreditAuthorizeFields(
+  payerMasterKey: bigint,
+  creditId: bigint,
+  payerAddress: bigint,
+): Promise<{ payerCommitment: `0x${string}`; nullifierKeyHash: `0x${string}` }> {
+  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash } = await import("@invisi-labs/core")
+
+  const payerNullifierKey = await deriveNullifierKey(payerMasterKey, creditId)
+  const payerCommitment = await computeIdentityCommitment(payerNullifierKey, payerAddress)
+  // Deterministic derivation: creditNullifierKey = Poseidon2(D_DERIVE, payerNullifierKey, creditId)
+  const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, creditId])
+  const nullifierKeyHash = await computeNullifierKeyHash(BigInt(creditNullifierKeyHash))
+
+  return { payerCommitment, nullifierKeyHash }
 }
 
 export interface BuildReclaimCalldataParams {

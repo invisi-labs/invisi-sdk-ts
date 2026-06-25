@@ -19,3 +19,10 @@ describe("deriveNullifierKey", () => {
     expect(a).not.toBe(b)
   })
 })
+
+describe("SPEC-026: deprecated alias removed", () => {
+  it("does not export deriveClaimingKey from the core entrypoint", async () => {
+    const mod = await import("./index")
+    expect("deriveClaimingKey" in mod).toBe(false)
+  })
+})
