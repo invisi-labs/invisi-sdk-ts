@@ -12,6 +12,7 @@ import type {
   RelayStatusResponse,
   ErrorResponse,
 } from "./interaction-types"
+import { keysToSnake, keysToCamel } from "./codec"
 
 export class IPPClient {
   private readonly baseUrl: string
@@ -69,7 +70,8 @@ export class IPPClient {
     const res = await fetch(`${this.baseUrl}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      // Wire is snake_case; TS request types are camelCase — convert at the boundary.
+      body: JSON.stringify(keysToSnake(body)),
     })
     return this.handleResponse<T>(res)
   }
@@ -85,9 +87,11 @@ export class IPPClient {
   private async handleResponse<T>(res: Response): Promise<T> {
     const data = await res.json()
     if (!res.ok) {
+      // Error envelope is already snake_case and a distinct contract —
+      // read it verbatim, do not snake→camel transcode.
       const err = data as ErrorResponse
       throw new Error(err.error ?? `HTTP ${res.status}`, { cause: err })
     }
-    return data as T
+    return keysToCamel(data) as T
   }
 }

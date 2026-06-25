@@ -131,11 +131,14 @@ function convertKeys(value: unknown, convert: (key: string) => string): unknown 
   return value
 }
 
-function keysToSnake(value: unknown): unknown {
+// Exported so the IPP HTTP client (client.ts) converts at the same wire
+// boundary as the QR/msgpack envelope path — one snake_case wire contract,
+// shared key-conversion semantics (meta exempt, fully recursive).
+export function keysToSnake(value: unknown): unknown {
   return convertKeys(value, camelToSnake)
 }
 
-function keysToCamel(value: unknown): unknown {
+export function keysToCamel(value: unknown): unknown {
   return convertKeys(value, snakeToCamel)
 }
 
