@@ -10,9 +10,9 @@ import type {
   CreditStatusResponse,
   RelayRequest, RelayResponse, RelayProveResponse,
   RelayStatusResponse,
-  ErrorResponse,
 } from "./interaction-types"
 import { keysToSnake, keysToCamel } from "./codec"
+import { ConnectionError, ippErrorFromEnvelope } from "./errors"
 
 export class IPPClient {
   private readonly baseUrl: string
@@ -67,7 +67,7 @@ export class IPPClient {
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}/${path}`, {
+    const res = await this.doFetch(`${this.baseUrl}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Wire is snake_case; TS request types are camelCase — convert at the boundary.
@@ -77,21 +77,62 @@ export class IPPClient {
   }
 
   private async get<T>(path: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}/${path}`, {
+    const res = await this.doFetch(`${this.baseUrl}/${path}`, {
       method: "GET",
       headers: { Accept: "application/json" },
     })
     return this.handleResponse<T>(res)
   }
 
-  private async handleResponse<T>(res: Response): Promise<T> {
-    const data = await res.json()
-    if (!res.ok) {
-      // Error envelope is already snake_case and a distinct contract —
-      // read it verbatim, do not snake→camel transcode.
-      const err = data as ErrorResponse
-      throw new Error(err.error ?? `HTTP ${res.status}`, { cause: err })
+  // Wrap transport-level failures (network down, DNS, timeout/abort) as
+  // ConnectionError so callers see one error model, never a bare fetch reject.
+  private async doFetch(url: string, init: RequestInit): Promise<Response> {
+    try {
+      return await fetch(url, init)
+    } catch (cause) {
+      throw new ConnectionError(
+        cause instanceof Error ? cause.message : "network request failed",
+        { cause },
+      )
     }
+  }
+
+  private async handleResponse<T>(res: Response): Promise<T> {
+    // Decide success vs error FIRST. Parsing the body before this check turned
+    // a non-JSON 4xx/5xx into an opaque SyntaxError; now both paths parse only
+    // after the branch and any parse failure becomes a ConnectionError.
+    if (!res.ok) {
+      // The error envelope is already snake_case and a distinct contract —
+      // read it verbatim, do not snake→camel transcode.
+      let body: unknown
+      try {
+        body = await res.json()
+      } catch (cause) {
+        // Non-JSON / empty / unparseable error body → no envelope to type.
+        throw new ConnectionError(
+          `IPP error response body was not valid JSON (HTTP ${res.status})`,
+          { statusCode: res.status, cause },
+        )
+      }
+      const err = ippErrorFromEnvelope(body, res.status)
+      if (err === null) {
+        // Body parsed but lacks the nested {error:{...}} shape — also opaque.
+        throw new ConnectionError(
+          `IPP error response did not contain a nested error envelope (HTTP ${res.status})`,
+          { statusCode: res.status },
+        )
+      }
+      throw err
+    }
+
+    let data: unknown
+    try {
+      data = await res.json()
+    } catch (cause) {
+      throw new ConnectionError("IPP response body was not valid JSON", { cause })
+    }
+    // Success bodies (incl. Channel ② {status:"rejected", reject_code}) go
+    // through snake→camel so `reject_code` surfaces as `rejectCode`.
     return keysToCamel(data) as T
   }
 }

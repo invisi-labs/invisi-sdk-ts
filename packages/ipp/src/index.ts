@@ -34,9 +34,25 @@ export type {
   RelayRequest, RelaySignatureRequest, RelayCalldataRequest,
   RelayWitnessRequest, RelayProveRequest,
   RelayResponse, RelayProveResponse, RelayStatusResponse,
-  RelayErrorCode, RelayOperation, RelayWitnessOperation,
-  ErrorResponse,
+  RelayOperation, RelayWitnessOperation,
 } from "./interaction-types"
+
+// === IPP wire 机器码（三通道：reject_code / relay error_code，开放字符串 + 便利常量）===
+export { REJECT_CODES, RELAY_ERROR_CODES } from "./codes"
+export type { RejectCode, RelayErrorCode } from "./codes"
+
+// === IPP 类型化错误（通道① Stripe 嵌套信封）===
+export {
+  IppError,
+  InvalidRequestError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  ApiError,
+  ConnectionError,
+  ippErrorFromEnvelope,
+} from "./errors"
+export type { ErrorEnvelope, ErrorResponse, IppErrorFields } from "./errors"
 
 // === IPP 客户端 ===
 export { IPPClient } from "./client"

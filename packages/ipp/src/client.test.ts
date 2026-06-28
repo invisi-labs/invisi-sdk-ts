@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { IPPClient } from "./client"
+import {
+  InvalidRequestError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  ApiError,
+  ConnectionError,
+} from "./errors"
+import type { ErrorEnvelope } from "./errors"
 
 const ENDPOINT = "https://pay.example.com"
 const BASE_URL = `${ENDPOINT}/ipp/v1`
@@ -17,11 +26,32 @@ function mockJsonResponse(data: unknown) {
   })
 }
 
-function mockErrorResponse(status: number, data: { error: string; message?: string }) {
+// The gateway wraps every 4xx/5xx in a Stripe-style NESTED envelope
+// `{error:{type,code,message,param,request_id,details}}` — already snake_case,
+// read verbatim into the typed error (no snake→camel transcode).
+function mockEnvelopeError(status: number, error: ErrorEnvelope) {
   mockFetch.mockResolvedValueOnce({
     ok: false,
     status,
-    json: () => Promise.resolve(data),
+    json: () => Promise.resolve({ error }),
+  })
+}
+
+// Error response whose body is not JSON (json() rejects) — no envelope to type.
+function mockNonJsonError(status: number) {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status,
+    json: () => Promise.reject(new SyntaxError("Unexpected token < in JSON")),
+  })
+}
+
+// Error response whose body parses but lacks the nested {error:{...}} shape.
+function mockShapelessError(status: number, body: unknown) {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status,
+    json: () => Promise.resolve(body),
   })
 }
 
@@ -169,9 +199,134 @@ describe("IPPClient", () => {
     expect(mockFetch).toHaveBeenCalledWith(`${BASE_URL}/relay/relay-123`, expect.objectContaining({ method: "GET" }))
   })
 
-  it("throws on HTTP error — error envelope stays snake, not transcoded", async () => {
-    mockErrorResponse(400, { error: "invalid_commitment", message: "Bad commitment" })
-    await expect(client.info({ identityCommitment: "0xbad" })).rejects.toThrow("invalid_commitment")
+  // === Channel ① — typed envelope errors (4xx/5xx) ===
+
+  it("400 nested envelope → InvalidRequestError with verbatim snake fields", async () => {
+    mockEnvelopeError(400, {
+      type: "invalid_request_error",
+      code: "invalid_argument",
+      message: "payer_commitment must be bytes32",
+      param: "payer_commitment",
+      request_id: "req_123",
+      details: { hint: "0x-prefixed 32 bytes" },
+    })
+    const err = await client.info({ identityCommitment: "0xbad" }).catch((e) => e)
+    expect(err).toBeInstanceOf(InvalidRequestError)
+    expect(err.message).toBe("payer_commitment must be bytes32")
+    expect(err.type).toBe("invalid_request_error")
+    expect(err.code).toBe("invalid_argument")
+    expect(err.param).toBe("payer_commitment")
+    expect(err.requestId).toBe("req_123") // request_id → requestId, read verbatim from envelope
+    expect(err.statusCode).toBe(400)
+    expect(err.details).toEqual({ hint: "0x-prefixed 32 bytes" })
+    expect(err.raw.request_id).toBe("req_123") // raw keeps snake_case envelope
+  })
+
+  it("404 nested envelope → NotFoundError", async () => {
+    mockEnvelopeError(404, { type: "not_found_error", code: "payment_request_not_found", message: "not found" })
+    const err = await client.status("0xnope").catch((e) => e)
+    expect(err).toBeInstanceOf(NotFoundError)
+    expect(err.code).toBe("payment_request_not_found")
+    expect(err.statusCode).toBe(404)
+  })
+
+  it("409 nested envelope → ConflictError", async () => {
+    mockEnvelopeError(409, { type: "conflict_error", code: "conflict", message: "conflict" })
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(ConflictError)
+    expect(err.statusCode).toBe(409)
+  })
+
+  it("429 nested envelope → RateLimitError", async () => {
+    mockEnvelopeError(429, { type: "rate_limit_error", code: "rate_limited", message: "slow down" })
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(RateLimitError)
+    expect(err.statusCode).toBe(429)
+  })
+
+  it("5xx nested envelope → ApiError (catch-all)", async () => {
+    mockEnvelopeError(500, { type: "api_error", code: "api_error", message: "internal error" })
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.statusCode).toBe(500)
+  })
+
+  it("falls back to status when envelope type is missing/unknown (412 → InvalidRequestError)", async () => {
+    mockEnvelopeError(412, { code: "failed_precondition", message: "request expired" })
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(InvalidRequestError)
+    expect(err.code).toBe("failed_precondition")
+    expect(err.statusCode).toBe(412)
+  })
+
+  // === ConnectionError — no envelope to type against (regression bug fixes) ===
+
+  it("non-JSON error body → ConnectionError (not opaque SyntaxError)", async () => {
+    mockNonJsonError(502)
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(ConnectionError)
+    expect(err).not.toBeInstanceOf(SyntaxError)
+    expect(err.statusCode).toBe(502)
+    // Must carry a readable message, never the "[object Object]" string coercion.
+    expect(err.message).not.toContain("[object Object]")
+  })
+
+  it("error body without nested {error:{...}} shape → ConnectionError (not [object Object])", async () => {
+    // The OLD flat-envelope shape `{error,message}` no longer types — it has no
+    // nested object, so it cannot be coerced to a typed error nor to a string.
+    mockShapelessError(400, { error: "invalid_commitment", message: "Bad commitment" })
+    const err = await client.info({ identityCommitment: "0xbad" }).catch((e) => e)
+    expect(err).toBeInstanceOf(ConnectionError)
+    expect(err.message).not.toContain("[object Object]")
+  })
+
+  it("empty error body → ConnectionError", async () => {
+    // res.json() on an empty body rejects; treat as unparseable.
+    mockNonJsonError(500)
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(ConnectionError)
+    expect(err.statusCode).toBe(500)
+  })
+
+  it("fetch rejection (network down) → ConnectionError", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"))
+    const err = await client.info({ identityCommitment: "0xabc" }).catch((e) => e)
+    expect(err).toBeInstanceOf(ConnectionError)
+    expect(err.statusCode).toBeUndefined() // no HTTP status on a transport failure
+  })
+
+  // === Channel ② — business rejection (HTTP 200, does NOT throw) ===
+
+  it("200 {status:rejected, reject_code} → resolves with rejectCode, does NOT throw", async () => {
+    mockJsonResponse({
+      status: "rejected",
+      reject_code: "insufficient_credit_balance",
+      reason: "draw amount exceeds remainder",
+    })
+    const result = await client.creditDraw({
+      identityCommitment: "0xabc", tokenAddress: "0xtoken", treeId: "1",
+      creditCommitments: ["0xc1"], amounts: ["50000000"],
+    })
+    expect(result.status).toBe("rejected")
+    // reject_code → rejectCode via the success-path snake→camel codec.
+    expect(result.rejectCode).toBe("insufficient_credit_balance")
+    expect(result.reason).toBe("draw amount exceeds remainder")
+  })
+
+  it("authorize 200 rejected surfaces rejectCode", async () => {
+    mockJsonResponse({ status: "rejected", reject_code: "no_preallocated_credential", reason: "no credential" })
+    const result = await client.authorize({ identityCommitment: "0xabc", amount: "1000000", expiry: "1711900000" })
+    expect(result.status).toBe("rejected")
+    expect(result.rejectCode).toBe("no_preallocated_credential")
+  })
+
+  // === Channel ③ — relay async failure (HTTP 200, read errorCode from status poll) ===
+
+  it("relayStatus 200 {status:failed, error_code} → reads errorCode, does NOT throw", async () => {
+    mockJsonResponse({ status: "failed", error_code: "relay_bad_calldata", reason: "calldata not 0x-hex" })
+    const result = await client.relayStatus("relay-123")
+    expect(result.status).toBe("failed")
+    expect(result.errorCode).toBe("relay_bad_calldata")
   })
 
   it("strips trailing slash from endpoint", () => {

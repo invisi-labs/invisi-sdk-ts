@@ -1,3 +1,7 @@
+import type { RejectCode, RelayErrorCode } from "./codes"
+
+export type { RelayErrorCode } from "./codes"
+
 // === 支付方交互 ===
 
 /**
@@ -37,6 +41,8 @@ export interface ProposeResponse {
   status: "accepted" | "rejected"
   nonce?: string | undefined
   paymentCommitment?: string | undefined
+  /** Set when status="rejected" (Channel ② — true business rejection). Wire `reject_code`. */
+  rejectCode?: RejectCode | undefined
   reason?: string | undefined
 }
 
@@ -54,6 +60,8 @@ export interface AuthorizeResponse {
   nonce?: string | undefined
   creditCommitment?: string | undefined
   nullifierKeyHash?: string | undefined
+  /** Set when status="rejected" (Channel ② — true business rejection). Wire `reject_code`. */
+  rejectCode?: RejectCode | undefined
   reason?: string | undefined
 }
 
@@ -116,6 +124,8 @@ export interface CreditDrawResponse {
     merkleProofs: unknown[]
   } | undefined
   circuit?: string | undefined
+  /** Set when status="rejected" (Channel ② — true business rejection). Wire `reject_code`. */
+  rejectCode?: RejectCode | undefined
   reason?: string | undefined
 }
 
@@ -136,6 +146,8 @@ export interface CreditReclaimResponse {
     merkleProof: unknown
   } | undefined
   circuit?: string | undefined
+  /** Set when status="rejected" (Channel ② — true business rejection). Wire `reject_code`. */
+  rejectCode?: RejectCode | undefined
   reason?: string | undefined
 }
 
@@ -205,11 +217,13 @@ export interface RelayProveRequest {
   circuit: string
 }
 
+// Synchronous Relay() response. Per the protocol contract a sync failure goes
+// through the Stripe envelope (Channel ①), so the async `errorCode` is NOT
+// carried here — it lives on RelayStatusResponse (Channel ③). Field omitted.
 export interface RelayResponse {
   status: "queued" | "submitted" | "rejected"
   relayId?: string | undefined
   txHash?: string | undefined
-  errorCode?: RelayErrorCode | undefined
   reason?: string | undefined
 }
 
@@ -218,21 +232,12 @@ export interface RelayProveResponse {
   relayId?: string | undefined
   proof?: string | undefined
   calldata?: string | undefined
-  errorCode?: RelayErrorCode | undefined
   reason?: string | undefined
 }
 
-export type RelayErrorCode =
-  | "invalid_signature"
-  | "invalid_calldata"
-  | "invalid_witness"
-  | "unsupported_circuit"
-  | "unsupported_operation"
-  | "insufficient_gas"
-  | "queue_full"
-  | "rate_limited"
-  | "internal"
-
+// Channel ③ — async relay result. `errorCode` is read here (status="failed");
+// the open-string RelayErrorCode (see codes.ts §E3) lets unknown server codes
+// flow through without breaking the SDK.
 export interface RelayStatusResponse {
   status: "queued" | "proving" | "completed" | "submitted" | "confirmed" | "failed"
   proof?: string | undefined
@@ -240,11 +245,4 @@ export interface RelayStatusResponse {
   txHash?: string | undefined
   errorCode?: RelayErrorCode | undefined
   reason?: string | undefined
-}
-
-// === 错误 ===
-
-export interface ErrorResponse {
-  error: string
-  message?: string | undefined
 }
