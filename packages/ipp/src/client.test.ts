@@ -92,8 +92,22 @@ describe("IPPClient", () => {
 
   it("authorize: POST /ipp/v1/authorize", async () => {
     mockJsonResponse({ status: "accepted", nonce: "0x42", credit_commitment: "0xccc", nullifier_key_hash: "0xnkh" })
-    const result = await client.authorize({ identityCommitment: "0xabc", amount: "1000000", expiry: "1711900000" })
-    expect(sentBody()).toEqual({ identity_commitment: "0xabc", amount: "1000000", expiry: "1711900000" })
+    // credit_nullifier_key + subscription_id ride the generic camelCase→snake_case
+    // wire conversion (no bespoke codec entry), so assert their round-trip here.
+    const result = await client.authorize({
+      identityCommitment: "0xabc",
+      amount: "1000000",
+      expiry: "1711900000",
+      creditNullifierKey: "0xcnk",
+      subscriptionId: "sub_1",
+    })
+    expect(sentBody()).toEqual({
+      identity_commitment: "0xabc",
+      amount: "1000000",
+      expiry: "1711900000",
+      credit_nullifier_key: "0xcnk",
+      subscription_id: "sub_1",
+    })
     expect(result.status).toBe("accepted")
     expect(result.creditCommitment).toBe("0xccc")
     expect(result.nullifierKeyHash).toBe("0xnkh")

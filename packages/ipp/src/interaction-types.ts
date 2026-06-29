@@ -53,6 +53,10 @@ export interface AuthorizeRequest {
   /** Required in credit mode; payer-derived locally (nonce-independent, non-custodial). Omitted in plain 6.2 usage. */
   payerCommitment?: string | undefined
   nullifierKeyHash?: string | undefined
+  /** Links this authorization to a subscription; the server persists it and forwards it to the subscription side on deposit-confirmed. Omitted for a standalone authorization. */
+  subscriptionId?: string | undefined
+  /** Payer-derived shared secret (0x bytes32 hex) the server stores so it can later fill the credit-draw witness on the payer's behalf. Required by the off-session credit-draw flow; omitted otherwise. */
+  creditNullifierKey?: string | undefined
 }
 
 export interface AuthorizeResponse {
