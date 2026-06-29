@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/vue",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Invisi Protocol Vue composables",
   "type": "module",
   "main": "./dist/index.cjs",
