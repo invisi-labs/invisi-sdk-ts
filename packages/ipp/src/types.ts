@@ -28,8 +28,8 @@ export interface IPPPayloadV1 {
 
 /** V1 Voucher Payload — mode 3 address transfer (payer → receiver) */
 export interface IPPVoucherV1 {
-  /** Receiver's identity commitment: Poseidon2(D_IDENT, nullifierKey, receivingAddress) */
-  identityCommitment: string
+  /** Receiver's address; with nullifierKey it recomputes identityCommitment / paymentCommitment, and is the settle circuit's receiving_address public input (one-way hash — identityCommitment is not reversible to this) */
+  receivingAddress: string
   /** On-chain leaf: used for location and self-verification */
   paymentCommitment: string
   /** ERC20 token contract address (0x-prefixed hex) */

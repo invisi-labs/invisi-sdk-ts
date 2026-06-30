@@ -16,7 +16,7 @@ async function makeVoucher(): Promise<IPPVoucher> {
   return {
     v: 1, network: "eip155:84532", type: "voucher",
     payload: {
-      identityCommitment: ic, paymentCommitment: pc, tokenAddress: TOKEN,
+      receivingAddress: "0x" + RECEIVING_ADDRESS.toString(16), paymentCommitment: pc, tokenAddress: TOKEN,
       operator: "0x1234567890123456789012345678901234567890",
       amount: amount.toString(), nonce: "0x" + nonce.toString(16),
       nullifierKey: "0x" + nk.toString(16), treeId: "1",
@@ -42,7 +42,6 @@ it("maps to a WithdrawRequest without leaking nullifierKey", async () => {
   const v = await makeVoucher()
   const req = voucherToWithdrawRequest(v)
   expect(req).toEqual({
-    identityCommitment: v.payload.identityCommitment,
     tokenAddress: v.payload.tokenAddress,
     treeId: v.payload.treeId,
     paymentCommitments: [v.payload.paymentCommitment],

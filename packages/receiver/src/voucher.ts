@@ -11,19 +11,24 @@ export interface VerifyVoucherParams {
 /**
  * Receiver-side check before withdraw: confirm the voucher binds funds to the
  * receiver's own address and is internally consistent. MUST pass before withdraw.
+ * The voucher carries receivingAddress directly; identityCommitment is recomputed
+ * locally from receivingAddress + nullifierKey (one-way hash — not reversible).
  */
 export async function verifyVoucher(params: VerifyVoucherParams): Promise<boolean> {
   const p = params.voucher.payload
   const chainId = params.chainId ?? caip2ToChainId(params.voucher.network)
 
-  // Check 1: identityCommitment must bind the nullifierKey to this receiver's address
-  const ic = await computeIdentityCommitment(BigInt(p.nullifierKey), params.receivingAddress)
-  if (ic.toLowerCase() !== p.identityCommitment.toLowerCase()) return false
+  // Check 1: the voucher's receivingAddress must be this receiver's own address —
+  // the settle circuit sends funds there, so a mismatch means funds go elsewhere.
+  if (BigInt(p.receivingAddress) !== params.receivingAddress) return false
+
+  // Recompute identityCommitment locally (the voucher no longer carries it).
+  const ic = await computeIdentityCommitment(BigInt(p.nullifierKey), BigInt(p.receivingAddress))
 
   // Check 2: paymentCommitment must be internally consistent
   const pc = await computePaymentCommitment(
     chainId,
-    p.identityCommitment as `0x${string}`,
+    ic,
     BigInt(p.tokenAddress),
     BigInt(p.amount),
     BigInt(p.nonce),
@@ -32,13 +37,13 @@ export async function verifyVoucher(params: VerifyVoucherParams): Promise<boolea
 }
 
 /**
- * Build the withdraw request body from a voucher. nullifierKey stays client-side
- * (used for local proof generation), never sent to the endpoint.
+ * Build the withdraw request body from a voucher. identityCommitment is omitted
+ * (server-advisory — the server locates leaves by paymentCommitments). receivingAddress
+ * and nullifierKey stay client-side for local proof generation, never sent to the endpoint.
  */
 export function voucherToWithdrawRequest(voucher: IPPVoucher): WithdrawRequest {
   const p = voucher.payload
   return {
-    identityCommitment: p.identityCommitment,
     tokenAddress: p.tokenAddress,
     treeId: p.treeId,
     paymentCommitments: [p.paymentCommitment],

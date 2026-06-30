@@ -5,7 +5,7 @@ import { buildVoucher } from "./buildVoucher"
 it("assembles a type:voucher IPPVoucher and roundtrips", () => {
   const voucher = buildVoucher({
     network: "eip155:84532",
-    identityCommitment: "0xabc",
+    receivingAddress: "0xabc",
     paymentCommitment: "0xdef",
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     operator: "0x1234567890123456789012345678901234567890",
@@ -20,10 +20,10 @@ it("assembles a type:voucher IPPVoucher and roundtrips", () => {
   expect(decodeIPPVoucher(encodeIPPVoucher(voucher, "compact"))).toEqual(voucher)
 })
 
-it("sets leafIndex and meta when provided, and sets operator and identityCommitment correctly", () => {
+it("sets leafIndex and meta when provided, and sets operator and receivingAddress correctly", () => {
   const voucher = buildVoucher({
     network: "eip155:84532",
-    identityCommitment: "0xabc",
+    receivingAddress: "0xabc",
     paymentCommitment: "0xdef",
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     operator: "0x1234567890123456789012345678901234567890",
@@ -37,5 +37,5 @@ it("sets leafIndex and meta when provided, and sets operator and identityCommitm
   expect(voucher.payload.leafIndex).toBe("42")
   expect(voucher.meta).toEqual({ source: "test", version: "1" })
   expect(voucher.payload.operator).toBe("0x1234567890123456789012345678901234567890")
-  expect(voucher.payload.identityCommitment).toBe("0xabc")
+  expect(voucher.payload.receivingAddress).toBe("0xabc")
 })

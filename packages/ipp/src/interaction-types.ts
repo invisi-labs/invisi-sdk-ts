@@ -89,7 +89,8 @@ export interface NotifyResponse {
 // === 收款方操作 ===
 
 export interface WithdrawRequest {
-  identityCommitment: string
+  /** advisory: server locates leaves by paymentCommitments and ignores this; mode-3 vouchers omit it */
+  identityCommitment?: string | undefined
   tokenAddress: string
   treeId: string
   paymentCommitments: string[]
@@ -97,12 +98,11 @@ export interface WithdrawRequest {
 
 export interface WithdrawResponse {
   status: "accepted" | "rejected"
+  /** server-authoritative merkle data only; withdraw is non-custodial (server has no nullifierKey). nullifiers + receivingAddress are client-supplied circuit inputs, not returned here */
   witness?: {
     merkleRoot: string
-    nullifiers: string[]
-    totalAmount: string
-    receivingAddress: string
     merkleProofs: unknown[]
+    totalAmount: string
   } | undefined
   circuit?: string | undefined
   reason?: string | undefined

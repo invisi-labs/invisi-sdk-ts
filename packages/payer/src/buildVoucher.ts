@@ -2,7 +2,7 @@ import type { IPPVoucher } from "@invisi-labs/ipp"
 
 export interface BuildVoucherParams {
   network: string
-  identityCommitment: string
+  receivingAddress: string
   paymentCommitment: string
   tokenAddress: string
   operator: string
@@ -25,7 +25,7 @@ export function buildVoucher(params: BuildVoucherParams): IPPVoucher {
     type: "voucher",
     ...(params.meta ? { meta: params.meta } : {}),
     payload: {
-      identityCommitment: params.identityCommitment,
+      receivingAddress: params.receivingAddress,
       paymentCommitment: params.paymentCommitment,
       tokenAddress: params.tokenAddress,
       operator: params.operator,

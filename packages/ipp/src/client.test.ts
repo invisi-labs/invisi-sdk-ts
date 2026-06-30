@@ -141,7 +141,7 @@ describe("IPPClient", () => {
   it("withdraw: POST /ipp/v1/withdraw — recursive snake/camel across witness", async () => {
     mockJsonResponse({
       status: "accepted",
-      witness: { merkle_root: "0xroot", nullifiers: ["0xn1"], total_amount: "100000000", receiving_address: "0xaddr", merkle_proofs: [] },
+      witness: { merkle_root: "0xroot", total_amount: "100000000", merkle_proofs: [{ leaf_index: "3", merkle_path: ["0xa", "0xb"] }] },
       circuit: "batch_settle_1",
     })
     const result = await client.withdraw({ identityCommitment: "0xabc", tokenAddress: "0xtoken", treeId: "1", paymentCommitments: ["0xp1"] })
@@ -150,8 +150,8 @@ describe("IPPClient", () => {
     expect(result.circuit).toBe("batch_settle_1")
     expect(result.witness?.merkleRoot).toBe("0xroot")
     expect(result.witness?.totalAmount).toBe("100000000")
-    expect(result.witness?.receivingAddress).toBe("0xaddr")
-    expect(result.witness?.merkleProofs).toEqual([])
+    // server-authoritative merkle data only; nullifiers + receivingAddress are client-supplied, not returned
+    expect(result.witness?.merkleProofs).toEqual([{ leafIndex: "3", merklePath: ["0xa", "0xb"] }])
   })
 
   it("creditDraw: POST /ipp/v1/credit-draw", async () => {

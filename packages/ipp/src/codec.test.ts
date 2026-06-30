@@ -38,7 +38,7 @@ const SAMPLE_VOUCHER: IPPVoucher = {
   network: "eip155:84532",
   type: "voucher",
   payload: {
-    identityCommitment: "0xabc",
+    receivingAddress: "0xabc",
     paymentCommitment: "0xdef",
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     operator: "0x1234567890123456789012345678901234567890",
