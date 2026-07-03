@@ -9,7 +9,9 @@ import {
 
 const MOCK_CONTRACT = "0x1234567890123456789012345678901234567890" as const
 const MOCK_TOKEN = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const
-const MOCK_COMMITMENT = ("0x" + "ab".repeat(32)) as `0x${string}`
+// In-field BN254 placeholder: identity commitments feed poseidonHash, which
+// rejects values >= the field modulus (keep the top byte below 0x30).
+const MOCK_COMMITMENT = ("0x" + "2a".repeat(32)) as `0x${string}`
 
 describe("getEIP712Domain", () => {
   it("returns correct domain", () => {

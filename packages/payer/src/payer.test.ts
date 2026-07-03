@@ -6,7 +6,7 @@ describe("buildPayOpenCalldata", () => {
     const result = await buildPayOpenCalldata({
       chainId: 1n,
       treeId: 1n,
-      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      identityCommitment: ("0x" + "2a".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
       nonce: 7n,
@@ -34,7 +34,7 @@ describe("buildPayOpenCalldata", () => {
     const params = {
       chainId: 1n,
       treeId: 1n,
-      identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+      identityCommitment: ("0x" + "2a".repeat(32)) as `0x${string}`,
       tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
       amount: 100_000_000n,
       nonce: 99n,
@@ -53,7 +53,7 @@ describe("buildPayOpenCalldata", () => {
       buildPayOpenCalldata({
         chainId: 1n,
         treeId: 1n,
-        identityCommitment: ("0x" + "ab".repeat(32)) as `0x${string}`,
+        identityCommitment: ("0x" + "2a".repeat(32)) as `0x${string}`,
         tokenAddress: ("0x" + "00".repeat(20)) as `0x${string}`,
         amount: 100_000_000n,
       })
@@ -80,7 +80,7 @@ describe("AUDIT-039: paymentCommitment consistency with core", () => {
     const { computePaymentCommitment } = await import("@invisi-labs/core")
 
     const chainId = 84532n
-    const identityCommitment = ("0x" + "ab".repeat(32)) as `0x${string}`
+    const identityCommitment = ("0x" + "2a".repeat(32)) as `0x${string}`
     const tokenAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`
     const amount = 100_000_000n
     const nonce = 42n

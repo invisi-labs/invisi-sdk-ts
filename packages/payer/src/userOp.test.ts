@@ -5,7 +5,9 @@ import { GAS_ESTIMATES } from "./gasEstimates"
 const MOCK_PROTOCOL = "0x1111111111111111111111111111111111111111" as const
 const MOCK_SENDER = "0x3333333333333333333333333333333333333333" as const
 const MOCK_TOKEN = "0x2222222222222222222222222222222222222222" as const
-const MOCK_IDENTITY = ("0x" + "ab".repeat(32)) as `0x${string}`
+// In-field BN254 placeholder: identity commitments feed poseidonHash, which
+// rejects values >= the field modulus (keep the top byte below 0x30).
+const MOCK_IDENTITY = ("0x" + "2a".repeat(32)) as `0x${string}`
 const ZERO_BYTES32 = ("0x" + "00".repeat(32)) as `0x${string}`
 const MOCK_PROOF = ("0x" + "cc".repeat(64)) as `0x${string}`
 const MOCK_COMMITMENT = ("0x" + "dd".repeat(32)) as `0x${string}`
