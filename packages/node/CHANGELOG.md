@@ -1,5 +1,12 @@
 # @invisi-labs/node
 
+## 2.2.0
+
+### Patch Changes
+
+- Updated dependencies [e410783]
+  - @invisi-labs/core@2.2.0
+
 ## 2.1.0
 
 ### Patch Changes

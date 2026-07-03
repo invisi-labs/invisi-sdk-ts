@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/ipp",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Invisible Payment Protocol — data format, encoding, CAIP-2 utilities",
   "type": "module",
   "main": "./dist/index.cjs",

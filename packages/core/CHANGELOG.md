@@ -1,5 +1,13 @@
 # @invisi-labs/core
 
+## 2.2.0
+
+### Patch Changes
+
+- e410783: feat(ipp): AuthorizeRequest now carries `subscriptionId` and `creditNullifierKey`; voucher payload carries `receiving_address` instead of `identity_commitment` (breaking wire-format change for voucher consumers).
+
+  fix(core): `poseidonHash` now rejects inputs outside the BN254 scalar field range instead of silently reducing them.
+
 ## 2.1.0
 
 ## 2.0.1
