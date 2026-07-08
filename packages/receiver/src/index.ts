@@ -1,3 +1,6 @@
+// The receiver derives creditNullifierKey on demand from masterKey + creditId
+// rather than persisting it; the server derives it independently with the same formula.
+export { deriveCreditNullifierKey } from "@invisi-labs/core"
 export { generateInvoice, selectBatchCircuit, buildWithdrawCalldata } from "./receiver"
 export type { GenerateInvoiceParams, Invoice, BatchCircuitInfo, WithdrawParams, WithdrawCalldata } from "./receiver"
 

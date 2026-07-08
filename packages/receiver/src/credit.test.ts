@@ -48,3 +48,20 @@ describe("buildCreditDrawCalldata", () => {
     expect(result.totalAmount).toBe(100_000_000n)
   })
 })
+
+describe("deriveCreditNullifierKey (re-exported from core)", () => {
+  it("is re-exported from the receiver package entrypoint", async () => {
+    const mod = await import("./index")
+    expect(typeof mod.deriveCreditNullifierKey).toBe("function")
+  })
+
+  it("delegates to core: Poseidon2(D_CREDIT_NKEY, masterKey, creditId)", async () => {
+    const { deriveCreditNullifierKey } = await import("./index")
+    const core = await import("@invisi-labs/core")
+    const masterKey = 999n
+    const creditId = 7n
+    expect(await deriveCreditNullifierKey(masterKey, creditId)).toBe(
+      await core.deriveCreditNullifierKey(masterKey, creditId),
+    )
+  })
+})

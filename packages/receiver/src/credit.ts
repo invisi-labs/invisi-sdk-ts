@@ -1,11 +1,14 @@
 import { encodeFunctionData } from "viem"
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
 
+// creditNullifierKey is not stored — the receiver derives it on demand via
+// deriveCreditNullifierKey(masterKey, creditId). Other fields come from the
+// server authorize record (payerCommitment / nonce / amount / expiry) and the
+// CreditDeposit event (leafIndex / treeId); no payer-sent witness.
 export interface CreditRecord {
   creditId: string
   commitment: `0x${string}`
   payerCommitment: `0x${string}`
-  creditNullifierKey: bigint
   tokenAddress: `0x${string}`
   amount: bigint
   nonce: bigint
