@@ -8,6 +8,7 @@ export const D_CNULL  = 6n
 export const D_NKHASH = 7n
 export const D_DERIVE = 8n
 export const D_REFLINK = 9n
+export const D_CREDIT_NKEY = 10n
 
 /** Protocol constants */
 export const TREE_DEPTH = 16
