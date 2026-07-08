@@ -1,6 +1,5 @@
 import { encodeFunctionData } from "viem"
 import { invisiProtocolAbi } from "@invisi-labs/contracts"
-import { poseidonHash, D_DERIVE } from "@invisi-labs/core"
 
 export interface CreditAuthorization {
   creditId: bigint
@@ -28,6 +27,12 @@ export interface CreateCreditParams {
   expiry: bigint
   treeId: bigint
   chainId: bigint
+  /** Downlinked in the authorize response; server-derived from receiverMasterKey. */
+  creditNullifierKey: bigint
+  /** Returned by the server; verified against the local recompute (step 1). */
+  nullifierKeyHash: `0x${string}`
+  /** Returned by the server; verified against the local recompute (step 2). */
+  creditCommitment: `0x${string}`
 }
 
 export interface CreateCreditResult {
@@ -37,14 +42,42 @@ export interface CreateCreditResult {
 }
 
 export async function createCredit(params: CreateCreditParams): Promise<CreateCreditResult> {
-  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash } = await import("@invisi-labs/core")
+  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash, computeCreditCommitment } =
+    await import("@invisi-labs/core")
 
   const payerNullifierKey = await deriveNullifierKey(params.payerMasterKey, params.creditId)
   const payerCommitment = await computeIdentityCommitment(payerNullifierKey, params.payerAddress)
-  // Deterministic derivation: creditNullifierKey = Poseidon2(D_DERIVE, payerNullifierKey, creditId)
-  const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, params.creditId])
-  const creditNullifierKey = BigInt(creditNullifierKeyHash)
-  const nullifierKeyHash = await computeNullifierKeyHash(creditNullifierKey)
+
+  // creditNullifierKey is server-derived (Poseidon2(D_CREDIT_NKEY,
+  // receiverMasterKey, creditId)) and downlinked in the authorize response. The
+  // payer recomputes the hash locally; depositCredit binds THIS value so the
+  // reclaim safety anchor never trusts the server's returned hash.
+  const nullifierKeyHash = await computeNullifierKeyHash(params.creditNullifierKey)
+
+  // Client two-step verification. Either failure MUST abort — no depositCredit.
+  // Step 1: the returned key/hash pair is mutually consistent.
+  if (params.nullifierKeyHash.toLowerCase() !== nullifierKeyHash.toLowerCase()) {
+    throw new Error(
+      "createCredit: authorize nullifierKeyHash does not match Poseidon2(D_NKHASH, creditNullifierKey)",
+    )
+  }
+  // Step 2: the server folded the correct nonce into the commitment (recompute with the LOCAL hash).
+  const recomputedCommitment = await computeCreditCommitment(
+    params.chainId,
+    params.identityCommitment,
+    payerCommitment,
+    BigInt(params.tokenAddress),
+    params.amount,
+    params.nonce,
+    params.expiry,
+    nullifierKeyHash,
+  )
+  if (recomputedCommitment.toLowerCase() !== params.creditCommitment.toLowerCase()) {
+    throw new Error(
+      "createCredit: recomputed creditCommitment does not match the authorize response",
+    )
+  }
+
   const nonce = params.nonce
   const nonceHex = ("0x" + nonce.toString(16).padStart(64, "0")) as `0x${string}`
 
@@ -57,7 +90,7 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
       params.amount,
       nonceHex,
       params.expiry,
-      nullifierKeyHash,
+      nullifierKeyHash, // local recompute — reclaim safety anchor
       params.treeId,
     ],
   })
@@ -67,7 +100,7 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
       creditId: params.creditId,
       identityCommitment: params.identityCommitment,
       payerCommitment,
-      creditNullifierKey,
+      creditNullifierKey: params.creditNullifierKey,
       nullifierKeyHash,
       tokenAddress: params.tokenAddress,
       amount: params.amount,
@@ -82,26 +115,23 @@ export async function createCredit(params: CreateCreditParams): Promise<CreateCr
 }
 
 /**
- * Derives the two nonce-independent payer-side values (payerCommitment,
- * nullifierKeyHash) needed to populate an IPP credit authorize request.
- * Both depend only on payerMasterKey, creditId, payerAddress — never nonce.
- * Mirrors the derivation chain in createCredit (incl. the D_DERIVE step), so
- * its output matches createCredit's authorization byte-for-byte.
+ * Derives the single nonce-independent payer-side value (payerCommitment) needed
+ * to populate an IPP credit authorize request. Depends only on payerMasterKey,
+ * creditId, payerAddress. The payer does not know creditNullifierKey before
+ * authorize — the server derives it and downlinks it in the response, which
+ * createCredit consumes verbatim, recomputing only the hash locally.
  */
 export async function deriveCreditAuthorizeFields(
   payerMasterKey: bigint,
   creditId: bigint,
   payerAddress: bigint,
-): Promise<{ payerCommitment: `0x${string}`; nullifierKeyHash: `0x${string}` }> {
-  const { deriveNullifierKey, computeIdentityCommitment, computeNullifierKeyHash } = await import("@invisi-labs/core")
+): Promise<{ payerCommitment: `0x${string}` }> {
+  const { deriveNullifierKey, computeIdentityCommitment } = await import("@invisi-labs/core")
 
   const payerNullifierKey = await deriveNullifierKey(payerMasterKey, creditId)
   const payerCommitment = await computeIdentityCommitment(payerNullifierKey, payerAddress)
-  // Deterministic derivation: creditNullifierKey = Poseidon2(D_DERIVE, payerNullifierKey, creditId)
-  const creditNullifierKeyHash = await poseidonHash([D_DERIVE, payerNullifierKey, creditId])
-  const nullifierKeyHash = await computeNullifierKeyHash(BigInt(creditNullifierKeyHash))
 
-  return { payerCommitment, nullifierKeyHash }
+  return { payerCommitment }
 }
 
 export interface BuildReclaimCalldataParams {
