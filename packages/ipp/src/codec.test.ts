@@ -267,3 +267,25 @@ describe("wire snake_case round-trip", () => {
     expect(json).not.toContain("subscription_id")
   })
 })
+
+describe("credit_id field", () => {
+  it("round-trips IPPPayloadV1.creditId as wire credit_id", () => {
+    const req: IPPRequest = {
+      v: 1,
+      network: "eip155:84532",
+      type: "request",
+      payload: {
+        identityCommitment: "0xabc",
+        tokenAddress: "0xdef",
+        operator: "0x1234567890123456789012345678901234567890",
+        treeId: "1",
+        paymentTypes: ["credit"],
+        endpoint: "https://pay.merchant.com",
+        creditId: "credit_abc123",
+      },
+    }
+    const parsed = JSON.parse(encodeIPPRequest(req, "json"))
+    expect(parsed.payload.credit_id).toBe("credit_abc123")
+    expect(decodeIPPRequest(encodeIPPRequest(req, "json")).payload.creditId).toBe("credit_abc123")
+  })
+})

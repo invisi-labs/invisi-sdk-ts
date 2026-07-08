@@ -52,18 +52,18 @@ export interface AuthorizeRequest {
   expiry: string
   /** Required in credit mode; payer-derived locally (nonce-independent, non-custodial). Omitted in plain 6.2 usage. */
   payerCommitment?: string | undefined
-  nullifierKeyHash?: string | undefined
   /** Links this authorization to a subscription; the server persists it and forwards it to the subscription side on deposit-confirmed. Omitted for a standalone authorization. */
   subscriptionId?: string | undefined
-  /** Payer-derived shared secret (0x bytes32 hex) the server stores so it can later fill the credit-draw witness on the payer's behalf. Required by the off-session credit-draw flow; omitted otherwise. */
-  creditNullifierKey?: string | undefined
 }
 
 export interface AuthorizeResponse {
   status: "accepted" | "rejected"
   nonce?: string | undefined
   creditCommitment?: string | undefined
+  /** Server-folded hash, echoed for cross-checking / debugging. Wire `nullifier_key_hash`. */
   nullifierKeyHash?: string | undefined
+  /** Server-derived shared secret (0x bytes32 hex), downlinked over TLS. Returned when status="accepted"; the caller MUST verify it via two-step check before use. Wire `credit_nullifier_key`. */
+  creditNullifierKey?: string | undefined
   /** Set when status="rejected" (Channel ② — true business rejection). Wire `reject_code`. */
   rejectCode?: RejectCode | undefined
   reason?: string | undefined

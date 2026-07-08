@@ -24,6 +24,8 @@ export interface IPPPayloadV1 {
   paymentCommitment?: string | undefined
   /** 收款方服务地址，实现 IPP Interaction Protocol */
   endpoint?: string | undefined
+  /** Credit authorization ID (wire `credit_id`); required when paymentTypes includes 'credit', single-use. */
+  creditId?: string | undefined
 }
 
 /** V1 Voucher Payload — mode 3 address transfer (payer → receiver) */
