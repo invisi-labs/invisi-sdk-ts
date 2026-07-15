@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { deriveNullifierKey, deriveCreditNullifierKey } from "./keyDerivation"
+import { deriveNullifierKey, deriveCreditNullifierKey, deriveChangeNullifierKey } from "./keyDerivation"
 
 describe("deriveNullifierKey", () => {
   it("returns a bigint", async () => {
@@ -70,5 +70,59 @@ describe("deriveCreditNullifierKey", () => {
     const { poseidonHash, D_CREDIT_NKEY } = await import("./index")
     const expected = BigInt(await poseidonHash([D_CREDIT_NKEY, 111n, 222n]))
     expect(await deriveCreditNullifierKey(111n, 222n)).toBe(expected)
+  })
+})
+
+describe("D_CHANGE_NKEY constant (SPEC-029)", () => {
+  it("is 11n", async () => {
+    const { D_CHANGE_NKEY } = await import("./domains")
+    expect(D_CHANGE_NKEY).toBe(11n)
+  })
+
+  it("is exported from the core entrypoint", async () => {
+    const mod = await import("./index")
+    expect(mod.D_CHANGE_NKEY).toBe(11n)
+    expect(typeof mod.deriveChangeNullifierKey).toBe("function")
+  })
+})
+
+describe("deriveChangeNullifierKey (SPEC-029)", () => {
+  // Salt is this payment's paymentCommitment (a Poseidon2 output → canonical field).
+  const PAYER_MASTER_KEY = 12345n
+  const PAYMENT_COMMITMENT = 67890n
+
+  it("returns a bigint", async () => {
+    const result = await deriveChangeNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    expect(typeof result).toBe("bigint")
+  })
+
+  it("is deterministic", async () => {
+    const a = await deriveChangeNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    const b = await deriveChangeNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    expect(a).toBe(b)
+  })
+
+  it("different paymentCommitment (salt) produces a different key (per-payment uniqueness)", async () => {
+    const a = await deriveChangeNullifierKey(PAYER_MASTER_KEY, 1n)
+    const b = await deriveChangeNullifierKey(PAYER_MASTER_KEY, 2n)
+    expect(a).not.toBe(b)
+  })
+
+  it("is domain-separated from deriveNullifierKey (D_CHANGE_NKEY=11 vs D_NKEY=1)", async () => {
+    const change = await deriveChangeNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    const receiver = await deriveNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    expect(change).not.toBe(receiver)
+  })
+
+  it("is domain-separated from deriveCreditNullifierKey (D_CHANGE_NKEY=11 vs D_CREDIT_NKEY=10)", async () => {
+    const change = await deriveChangeNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    const credit = await deriveCreditNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)
+    expect(change).not.toBe(credit)
+  })
+
+  it("matches Poseidon2(D_CHANGE_NKEY, payerMasterKey, paymentCommitment) — formula lock", async () => {
+    const { poseidonHash, D_CHANGE_NKEY } = await import("./index")
+    const expected = BigInt(await poseidonHash([D_CHANGE_NKEY, PAYER_MASTER_KEY, PAYMENT_COMMITMENT]))
+    expect(await deriveChangeNullifierKey(PAYER_MASTER_KEY, PAYMENT_COMMITMENT)).toBe(expected)
   })
 })
