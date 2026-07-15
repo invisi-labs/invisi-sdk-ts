@@ -8,6 +8,8 @@ export interface BuildPaymentFromRequestParams {
   nonce: `0x${string}`
   paymentCommitment: `0x${string}`
   amount: bigint
+  /** SPEC-029: treeId now comes from the propose response, not the request payload. */
+  treeId: bigint
 }
 
 export interface BuildPaymentFromRequestResult {
@@ -41,7 +43,7 @@ export async function buildPaymentFromRequest(
     identityCommitment: p.identityCommitment as `0x${string}`,
     tokenAddress: p.tokenAddress as `0x${string}`,
     amount: params.amount,
-    treeId: BigInt(p.treeId),
+    treeId: params.treeId,
     nonce: BigInt(params.nonce),
   })
 

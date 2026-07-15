@@ -9,6 +9,7 @@ describe("buildPaymentFromRequest", () => {
   const AMOUNT = 100_000_000n
   const NONCE = 42n
   const NONCE_HEX = ("0x" + NONCE.toString(16).padStart(64, "0")) as `0x${string}`
+  const TREE_ID = 1n
 
   async function makeValidRequest(): Promise<{
     request: IPPRequest
@@ -22,8 +23,7 @@ describe("buildPaymentFromRequest", () => {
       v: 1, network: "eip155:84532", type: "request",
       payload: {
         identityCommitment: ic, tokenAddress: TOKEN_ADDRESS, operator: "0x0000000000000000000000000000000000000000",
-        treeId: "1", paymentTypes: ["open"], amount: AMOUNT.toString(),
-        nonce: NONCE_HEX, paymentCommitment: pc,
+        mode: "single", paymentTypes: ["open"], amount: AMOUNT.toString(),
       },
     }
     return { request, nonce: NONCE_HEX, paymentCommitment: pc }
@@ -31,15 +31,15 @@ describe("buildPaymentFromRequest", () => {
 
   it("returns calldata and approveAmount for valid request", async () => {
     const { request, nonce, paymentCommitment } = await makeValidRequest()
-    const result = await buildPaymentFromRequest({ request, nonce, paymentCommitment, amount: AMOUNT })
+    const result = await buildPaymentFromRequest({ request, nonce, paymentCommitment, amount: AMOUNT, treeId: TREE_ID })
     expect(result.calldata).toMatch(/^0x/)
     expect(result.approveAmount).toBe(AMOUNT)
   })
 
   it("calldata uses the provided nonce (deterministic)", async () => {
     const { request, nonce, paymentCommitment } = await makeValidRequest()
-    const r1 = await buildPaymentFromRequest({ request, nonce, paymentCommitment, amount: AMOUNT })
-    const r2 = await buildPaymentFromRequest({ request, nonce, paymentCommitment, amount: AMOUNT })
+    const r1 = await buildPaymentFromRequest({ request, nonce, paymentCommitment, amount: AMOUNT, treeId: TREE_ID })
+    const r2 = await buildPaymentFromRequest({ request, nonce, paymentCommitment, amount: AMOUNT, treeId: TREE_ID })
     expect(r1.calldata).toBe(r2.calldata)
   })
 
@@ -49,13 +49,14 @@ describe("buildPaymentFromRequest", () => {
       request, nonce,
       paymentCommitment: "0x0000000000000000000000000000000000000000000000000000000000000001",
       amount: AMOUNT,
+      treeId: TREE_ID,
     })).rejects.toThrow("paymentCommitment verification failed")
   })
 
   it("throws on wrong amount", async () => {
     const { request, nonce, paymentCommitment } = await makeValidRequest()
     await expect(buildPaymentFromRequest({
-      request, nonce, paymentCommitment, amount: 999n,
+      request, nonce, paymentCommitment, amount: 999n, treeId: TREE_ID,
     })).rejects.toThrow("paymentCommitment verification failed")
   })
 })

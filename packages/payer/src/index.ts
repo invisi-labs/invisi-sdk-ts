@@ -32,6 +32,9 @@ export type { VerifyPaymentCommitmentParams, VerifyCreditCommitmentParams } from
 export { buildPaymentFromRequest } from "./fromRequest"
 export type { BuildPaymentFromRequestParams, BuildPaymentFromRequestResult } from "./fromRequest"
 
+export { deriveChange } from "./change"
+export type { DeriveChangeParams, ChangeDerivation } from "./change"
+
 export { buildPayOpenUserOp, buildPayBlindUserOp, buildDepositCreditUserOp } from "./userOp"
 export type {
   PayOpenUserOpParams, PayOpenUserOp,
