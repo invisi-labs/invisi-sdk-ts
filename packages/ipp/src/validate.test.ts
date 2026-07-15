@@ -80,9 +80,8 @@ describe("validateIPPRequest — SPEC-029 mode ⇒ endpoint baseline", () => {
   })
 
   it("modeless credit request passes even without endpoint (rule fires only for explicit single/multi)", () => {
-    // SPEC-029 §5 'modeless credit 码' vector: defensive behaviour on runtime data whose
-    // mode is absent. Authoritative 6.1/§1 have credit codes carry mode='single'; this
-    // asserts the validator does not force endpoint when mode is not an explicit single/multi.
+    // Defensive behavior for runtime data whose mode is absent: the validator must
+    // not force endpoint when mode is not an explicit single/multi.
     const req: IPPRequest = {
       v: 1,
       network: "eip155:84532",

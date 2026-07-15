@@ -42,11 +42,10 @@ export function validateIPPRequest(request: IPPRequest): void {
     }
   }
 
-  // SPEC-029 baseline: scan-distributed requests carry mode ∈ {single,multi} and
-  // deliver payment materials via propose, so they MUST carry an endpoint. The rule
-  // fires only for an explicit single/multi (a credit code's one-time semantics ride
-  // credit_id, not mode; amount-per-mode / credit⇒creditId are encoding-tightening
-  // rules the encoder guarantees, not SDK baseline).
+  // A single/multi request delivers its payment materials via propose, so it must
+  // carry an endpoint. The rule fires only for an explicit single/multi — a credit
+  // code's one-time semantics ride on credit_id, not mode. Amount-per-mode and
+  // credit⇒creditId are the encoder's tightening rules, not the SDK baseline.
   if (p.mode === "single" || p.mode === "multi") {
     if (typeof p.endpoint !== "string" || !p.endpoint) {
       throw new Error(

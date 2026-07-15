@@ -28,8 +28,8 @@ console.log("QR code data:", qrData1a)
 
 const decoded1a = decodeIPPRequest(qrData1a)
 
-// SPEC-029: payment materials (nonce / paymentCommitment / treeId) are delivered
-// by the receiver's propose endpoint, not embedded in the scanned request.
+// Payment materials (nonce, paymentCommitment, treeId) are obtained by calling the
+// receiver's propose endpoint after scanning the request.
 const client = new IPPClient(decoded1a.payload.endpoint!)
 const resp = await client.propose({
   identityCommitment: decoded1a.payload.identityCommitment,

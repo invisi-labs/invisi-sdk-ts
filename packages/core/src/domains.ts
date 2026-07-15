@@ -9,7 +9,7 @@ export const D_NKHASH = 7n
 export const D_DERIVE = 8n
 export const D_REFLINK = 9n
 export const D_CREDIT_NKEY = 10n
-export const D_CHANGE_NKEY = 11n  // changeNullifierKey derivation (SPEC-029); salt = this payment's paymentCommitment
+export const D_CHANGE_NKEY = 11n  // derivation salt is this payment's paymentCommitment
 
 /** Protocol constants */
 export const TREE_DEPTH = 16

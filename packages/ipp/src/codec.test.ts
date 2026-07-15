@@ -61,8 +61,8 @@ describe("JSON encoding", () => {
   it("omits undefined optional fields", () => {
     const encoded = encodeIPPRequest(MINIMAL_REQUEST, "json")
     const parsed = JSON.parse(encoded)
-    // SPEC-029: mode ⇒ endpoint baseline — MINIMAL_REQUEST is mode "multi" so it
-    // must carry endpoint; `amount` remains the truly-optional field under test.
+    // MINIMAL_REQUEST is mode "multi", which requires endpoint per the baseline rule;
+    // `amount` is the only truly optional field under test here.
     expect(parsed.payload.amount).toBeUndefined()
     expect(parsed.meta).toBeUndefined()
   })

@@ -1,7 +1,7 @@
 import { deriveChangeNullifierKey, computeChangeCommitment } from "@invisi-labs/core"
 
 export interface DeriveChangeParams {
-  /** REQUIRED — payBlind's necessary config; no random fallback (SPEC-029 §5). */
+  /** REQUIRED — payBlind's necessary config; no random fallback. */
   payerMasterKey: bigint
   /** This payment's paymentCommitment (0x bytes32 hex) — the derivation salt. */
   paymentCommitment: `0x${string}`
@@ -10,7 +10,7 @@ export interface DeriveChangeParams {
   tokenAddress: `0x${string}`
   /** inputAmount - paymentAmount. */
   changeAmount: bigint
-  /** The payment nonce — reused verbatim as changeNonce (SPEC-029 §2). */
+  /** The payment nonce — reused verbatim as changeNonce. */
   nonce: bigint
   chainId: bigint
 }
@@ -21,7 +21,7 @@ export interface ChangeDerivation {
 }
 
 /**
- * Deterministically derives a shielded payment's change (SPEC-029 §2). Produces the
+ * Deterministically derives a shielded payment's change. Produces the
  * changeCommitment fed into the ZK proof and buildPayBlindCalldata, plus the
  * changeNullifierKey the caller stores in its local ChangeRecord for later withdraw.
  *
@@ -33,8 +33,8 @@ export interface ChangeDerivation {
  *
  * treeId / leafIndex are NOT produced here — they are known only from the propose
  * response (treeId) and the on-chain PayBlind event (leafIndex); the caller assembles
- * the full ChangeRecord post-tx from { treeId, leafIndex, changeNullifierKey,
- * changeReceivingAddress, tokenAddress, changeAmount, nonce }.
+ * the full ChangeRecord after the transaction confirms, from { treeId, leafIndex,
+ * changeNullifierKey, changeReceivingAddress, tokenAddress, changeAmount, nonce }.
  */
 export async function deriveChange(params: DeriveChangeParams): Promise<ChangeDerivation> {
   if (params.payerMasterKey === undefined || params.payerMasterKey === null || params.payerMasterKey === 0n) {

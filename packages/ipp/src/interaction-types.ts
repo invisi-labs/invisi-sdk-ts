@@ -41,7 +41,7 @@ export interface ProposeResponse {
   status: "accepted" | "rejected"
   nonce?: string | undefined
   paymentCommitment?: string | undefined
-  /** SPEC-029: target Payment Tree id (wire `tree_id`). Returned when status="accepted"; lifecycle see 6.1. */
+  /** Target Payment Tree id (wire `tree_id`); set when accepted. */
   treeId?: string | undefined
   /** Set when status="rejected" (Channel ② — true business rejection). Wire `reject_code`. */
   rejectCode?: RejectCode | undefined
@@ -61,7 +61,7 @@ export interface AuthorizeRequest {
 export interface AuthorizeResponse {
   status: "accepted" | "rejected"
   nonce?: string | undefined
-  /** SPEC-029: target Payment Tree id (wire `tree_id`). Returned when status="accepted"; lifecycle see 6.1. */
+  /** Target Payment Tree id (wire `tree_id`); set when accepted. */
   treeId?: string | undefined
   creditCommitment?: string | undefined
   /** Server-folded hash, echoed for cross-checking / debugging. Wire `nullifier_key_hash`. */

@@ -14,16 +14,14 @@ export interface IPPPayloadV1 {
   operator: string
   /** 收款方接受的支付类型 */
   paymentTypes: PaymentType[]
-  /** 收款单模式 (wire `mode`)：'single' = 金额固定、单次有效 (1a)；'multi' = 多人多次 (1b/2)。SPEC-029 §1 */
+  /** Payment request mode (wire `mode`): 'single' = fixed amount, single-use; 'multi' = many payers. */
   mode: "single" | "multi"
-  /** 支付金额，原子单位 (bigint as string)。不填 = 开放金额 (仅 multi) */
+  /** Payment amount, atomic units (bigint as string); omitted = open amount (multi mode only). */
   amount?: string | undefined
-  /** 收款方服务地址，实现 IPP Interaction Protocol；扫码分发的请求必填 (协议基线) */
+  /** Receiver service address implementing the IPP Interaction Protocol; required for scan-distributed requests. */
   endpoint?: string | undefined
   /** Credit authorization ID (wire `credit_id`); required when paymentTypes includes 'credit', single-use. */
   creditId?: string | undefined
-  // SPEC-029: 支付材料 nonce / paymentCommitment / treeId 不再入 payload——统一经 propose 下发
-  // (nonce/paymentCommitment 见 ProposeResponse, treeId 见 ProposeResponse/AuthorizeResponse)。
 }
 
 /** V1 Voucher Payload — mode 3 address transfer (payer → receiver) */

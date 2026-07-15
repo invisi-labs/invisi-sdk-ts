@@ -10,7 +10,7 @@ export interface CreatePaymentRequestParams {
   chainId: bigint
   operator: `0x${string}`
   paymentTypes: PaymentType[]
-  /** 收款单模式：'single' = 金额固定、单次有效 (1a)；'multi' = 多人多次 (1b/2)。SPEC-029 §1 */
+  /** Payment request mode: 'single' = fixed amount, single-use; 'multi' = many payers. */
   mode: "single" | "multi"
   amount?: bigint | undefined
   endpoint?: string | undefined
@@ -26,8 +26,6 @@ export async function createPaymentRequest(
     params.receivingAddress,
   )
 
-  // SPEC-029: payload carries no payment materials (nonce / paymentCommitment / treeId).
-  // All materials are delivered via propose; the scan request only declares mode.
   const payload: IPPPayloadV1 = {
     identityCommitment,
     tokenAddress: params.tokenAddress,

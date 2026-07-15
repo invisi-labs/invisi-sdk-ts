@@ -8,7 +8,7 @@ export interface BuildPaymentFromRequestParams {
   nonce: `0x${string}`
   paymentCommitment: `0x${string}`
   amount: bigint
-  /** SPEC-029: treeId now comes from the propose response, not the request payload. */
+  /** Sourced from the propose response's treeId. */
   treeId: bigint
 }
 
