@@ -1,5 +1,5 @@
 import {
-  USDC_ADDRESS, OPERATOR_ADDRESS, DEFAULT_TREE_ID, CHAIN_ID,
+  USDC_ADDRESS, OPERATOR_ADDRESS, CHAIN_ID,
 } from "../shared/env.ts"
 import { createPaymentRequest } from "@invisi-labs/receiver"
 import { encodeIPPRequest, decodeIPPRequest } from "@invisi-labs/ipp"
@@ -13,9 +13,9 @@ const request = await createPaymentRequest({
   receivingAddress: 0xDEADn,
   tokenAddress: USDC_ADDRESS,
   chainId: CHAIN_ID,
-  treeId: DEFAULT_TREE_ID,
   operator: OPERATOR_ADDRESS,
   paymentTypes: ["open", "blind"],
+  mode: "multi",
   endpoint: "https://pay.example.com",
   meta: { description: "Thanks for your support" },
 })
