@@ -1,7 +1,6 @@
 import { deriveNullifierKey, computeIdentityCommitment } from "@invisi-labs/core"
 import { chainIdToCAIP2 } from "@invisi-labs/ipp"
 import type { IPPRequest, IPPPayloadV1, PaymentType } from "@invisi-labs/ipp"
-import { computePaymentCommitmentForPropose } from "./propose"
 
 export interface CreatePaymentRequestParams {
   masterKey: bigint
@@ -9,14 +8,13 @@ export interface CreatePaymentRequestParams {
   receivingAddress: bigint
   tokenAddress: `0x${string}`
   chainId: bigint
-  treeId: bigint
   operator: `0x${string}`
   paymentTypes: PaymentType[]
+  /** 收款单模式：'single' = 金额固定、单次有效 (1a)；'multi' = 多人多次 (1b/2)。SPEC-029 §1 */
+  mode: "single" | "multi"
   amount?: bigint | undefined
   endpoint?: string | undefined
   meta?: Record<string, string> | undefined
-  /** true = 多人扫码模式（不生成 nonce，由 propose 分配） */
-  multiPayer?: boolean | undefined
 }
 
 export async function createPaymentRequest(
@@ -28,12 +26,14 @@ export async function createPaymentRequest(
     params.receivingAddress,
   )
 
+  // SPEC-029: payload carries no payment materials (nonce / paymentCommitment / treeId).
+  // All materials are delivered via propose; the scan request only declares mode.
   const payload: IPPPayloadV1 = {
     identityCommitment,
     tokenAddress: params.tokenAddress,
     operator: params.operator,
-    treeId: params.treeId.toString(),
     paymentTypes: params.paymentTypes,
+    mode: params.mode,
   }
 
   const request: IPPRequest = {
@@ -53,18 +53,6 @@ export async function createPaymentRequest(
 
   if (params.meta !== undefined) {
     request.meta = params.meta
-  }
-
-  // 模式 1a：有 amount、无 multiPayer → 预算 nonce + paymentCommitment
-  if (params.amount !== undefined && !params.multiPayer) {
-    const { nonce, paymentCommitment } = await computePaymentCommitmentForPropose({
-      identityCommitment,
-      tokenAddress: params.tokenAddress,
-      amount: params.amount,
-      chainId: params.chainId,
-    })
-    request.payload.nonce = nonce
-    request.payload.paymentCommitment = paymentCommitment
   }
 
   return request

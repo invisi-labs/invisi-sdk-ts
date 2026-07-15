@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { createPaymentRequest } from "./paymentRequest"
-import { computeIdentityCommitment, computePaymentCommitment, deriveNullifierKey } from "@invisi-labs/core"
+import { computeIdentityCommitment, deriveNullifierKey } from "@invisi-labs/core"
 import { validateIPPRequest, caip2ToChainId } from "@invisi-labs/ipp"
 
 describe("createPaymentRequest", () => {
@@ -10,7 +10,6 @@ describe("createPaymentRequest", () => {
     receivingAddress: 0xdeadn,
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`,
     chainId: 84532n,
-    treeId: 1n,
     operator: "0x1234567890123456789012345678901234567890" as `0x${string}`,
     paymentTypes: ["open", "blind"] as ("open" | "blind" | "credit")[],
   }
@@ -18,6 +17,7 @@ describe("createPaymentRequest", () => {
   it("creates a valid IPPRequest with correct identityCommitment", async () => {
     const request = await createPaymentRequest({
       ...baseParams,
+      mode: "single",
       amount: 100_000_000n,
       endpoint: "https://pay.example.com",
     })
@@ -32,6 +32,7 @@ describe("createPaymentRequest", () => {
   it("converts chainId to CAIP-2 network", async () => {
     const request = await createPaymentRequest({
       ...baseParams,
+      mode: "single",
       amount: 100_000_000n,
       endpoint: "https://pay.example.com",
     })
@@ -39,57 +40,47 @@ describe("createPaymentRequest", () => {
     expect(caip2ToChainId(request.network)).toBe(84532n)
   })
 
-  it("mode 1a: includes nonce + paymentCommitment when amount is set and multiPayer is false", async () => {
-    const request = await createPaymentRequest({
-      ...baseParams,
+  it("single mode: payload carries mode='single', no prefilled materials", async () => {
+    const req = await createPaymentRequest({
+      masterKey: 999n,
+      invoiceId: 1n,
+      receivingAddress: 0xdeadn,
+      tokenAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      chainId: 84532n,
+      operator: "0x1234567890123456789012345678901234567890",
+      paymentTypes: ["open", "blind"],
+      mode: "single",
+      endpoint: "https://pay.merchant.com",
       amount: 100_000_000n,
     })
-    expect(request.payload.nonce).toBeDefined()
-    expect(request.payload.paymentCommitment).toBeDefined()
-    expect(request.payload.amount).toBe("100000000")
+    expect(req.payload.mode).toBe("single")
+    expect(req.payload.amount).toBe("100000000")
+    expect(req.payload.endpoint).toBe("https://pay.merchant.com")
+    expect("nonce" in req.payload).toBe(false)
+    expect("paymentCommitment" in req.payload).toBe(false)
+    expect("treeId" in req.payload).toBe(false)
   })
 
-  it("mode 1a: paymentCommitment matches core computation", async () => {
-    const request = await createPaymentRequest({
-      ...baseParams,
-      amount: 100_000_000n,
+  it("multi mode: open amount, mode='multi'", async () => {
+    const req = await createPaymentRequest({
+      masterKey: 999n,
+      invoiceId: 2n,
+      receivingAddress: 0xdeadn,
+      tokenAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      chainId: 84532n,
+      operator: "0x1234567890123456789012345678901234567890",
+      paymentTypes: ["open"],
+      mode: "multi",
+      endpoint: "https://pay.merchant.com",
     })
-    const expected = await computePaymentCommitment(
-      baseParams.chainId,
-      request.payload.identityCommitment as `0x${string}`,
-      BigInt(baseParams.tokenAddress),
-      100_000_000n,
-      BigInt(request.payload.nonce!),
-    )
-    expect(request.payload.paymentCommitment).toBe(expected)
-  })
-
-  it("mode 1b: no nonce when multiPayer is true", async () => {
-    const request = await createPaymentRequest({
-      ...baseParams,
-      amount: 100_000_000n,
-      endpoint: "https://pay.example.com",
-      multiPayer: true,
-    })
-    expect(request.payload.nonce).toBeUndefined()
-    expect(request.payload.paymentCommitment).toBeUndefined()
-    expect(request.payload.amount).toBe("100000000")
-    expect(request.payload.endpoint).toBe("https://pay.example.com")
-  })
-
-  it("mode 2: no amount, no nonce, endpoint required", async () => {
-    const request = await createPaymentRequest({
-      ...baseParams,
-      endpoint: "https://pay.example.com",
-    })
-    expect(request.payload.amount).toBeUndefined()
-    expect(request.payload.nonce).toBeUndefined()
-    expect(request.payload.endpoint).toBe("https://pay.example.com")
+    expect(req.payload.mode).toBe("multi")
+    expect("amount" in req.payload).toBe(false)
   })
 
   it("includes meta fields", async () => {
     const request = await createPaymentRequest({
       ...baseParams,
+      mode: "single",
       amount: 100_000_000n,
       meta: { merchantName: "Coffee Shop", orderId: "ORD-001" },
     })
@@ -99,6 +90,7 @@ describe("createPaymentRequest", () => {
   it("sets paymentTypes from params", async () => {
     const request = await createPaymentRequest({
       ...baseParams,
+      mode: "single",
       amount: 100_000_000n,
       paymentTypes: ["open"],
     })
