@@ -82,12 +82,13 @@ describe("IPPClient", () => {
   })
 
   it("propose: POST /ipp/v1/propose", async () => {
-    mockJsonResponse({ status: "accepted", nonce: "0x42", payment_commitment: "0xdef" })
+    mockJsonResponse({ status: "accepted", nonce: "0x42", payment_commitment: "0xdef", tree_id: "1" })
     const result = await client.propose({ identityCommitment: "0xabc", amount: "100000000" })
     expect(sentBody()).toEqual({ identity_commitment: "0xabc", amount: "100000000" })
     expect(result.status).toBe("accepted")
     expect(result.nonce).toBe("0x42")
     expect(result.paymentCommitment).toBe("0xdef")
+    expect(result.treeId).toBe("1")
   })
 
   it("authorize: POST /ipp/v1/authorize", async () => {
@@ -96,6 +97,7 @@ describe("IPPClient", () => {
     mockJsonResponse({
       status: "accepted",
       nonce: "0x42",
+      tree_id: "1",
       credit_commitment: "0xccc",
       nullifier_key_hash: "0xnkh",
       credit_nullifier_key: "0xcnk",
@@ -118,6 +120,7 @@ describe("IPPClient", () => {
     expect(result.creditCommitment).toBe("0xccc")
     expect(result.nullifierKeyHash).toBe("0xnkh")
     expect(result.creditNullifierKey).toBe("0xcnk")
+    expect(result.treeId).toBe("1")
   })
 
   it("status: GET /ipp/v1/status/{paymentCommitment}", async () => {

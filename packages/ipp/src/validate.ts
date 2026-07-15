@@ -32,33 +32,26 @@ export function validateIPPRequest(request: IPPRequest): void {
     throw new Error("Invalid IPPRequest: operator is required")
   }
 
-  if (typeof p.treeId !== "string" || !p.treeId) {
-    throw new Error("Invalid IPPRequest: treeId is required")
-  }
-
   if (!Array.isArray(p.paymentTypes) || p.paymentTypes.length === 0) {
     throw new Error("Invalid IPPRequest: paymentTypes must be a non-empty array")
   }
 
   for (const pt of p.paymentTypes) {
     if (!VALID_PAYMENT_TYPES.includes(pt)) {
-      throw new Error(
-        `Invalid IPPRequest: paymentTypes contains invalid type "${pt}"`,
-      )
+      throw new Error(`Invalid IPPRequest: paymentTypes contains invalid type "${pt}"`)
     }
   }
 
-  const hasNonce = p.nonce !== undefined
-  const hasPC = p.paymentCommitment !== undefined
-  if (hasNonce !== hasPC) {
-    throw new Error(
-      "Invalid IPPRequest: nonce and paymentCommitment must both be present or both absent",
-    )
-  }
-
-  if (!hasNonce && !p.endpoint) {
-    throw new Error(
-      "Invalid IPPRequest: endpoint is required when nonce is not provided (mode 1b/2 requires propose)",
-    )
+  // SPEC-029 baseline: scan-distributed requests carry mode ∈ {single,multi} and
+  // deliver payment materials via propose, so they MUST carry an endpoint. The rule
+  // fires only for an explicit single/multi (a credit code's one-time semantics ride
+  // credit_id, not mode; amount-per-mode / credit⇒creditId are encoding-tightening
+  // rules the encoder guarantees, not SDK baseline).
+  if (p.mode === "single" || p.mode === "multi") {
+    if (typeof p.endpoint !== "string" || !p.endpoint) {
+      throw new Error(
+        "Invalid IPPRequest: endpoint is required when mode is 'single' or 'multi' (payment materials are delivered via propose)",
+      )
+    }
   }
 }

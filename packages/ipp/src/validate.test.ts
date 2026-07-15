@@ -1,148 +1,101 @@
 import { describe, it, expect } from "vitest"
 import { validateIPPRequest } from "./validate"
-import type { IPPRequest } from "./types"
+import type { IPPRequest, IPPPayloadV1 } from "./types"
 
-// 模式 1a：有 nonce + paymentCommitment，endpoint 可选
-const MODE_1A_REQUEST: IPPRequest = {
-  v: 1,
-  network: "eip155:84532",
-  type: "request",
-  payload: {
-    operator: "0x1234567890123456789012345678901234567890",
-    identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-    tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    treeId: "1",
-    paymentTypes: ["open", "blind"],
-    amount: "100000000",
-    nonce: "42",
-    paymentCommitment: "0xabcdef",
-  },
+function makeRequest(payload: Partial<IPPPayloadV1> & Pick<IPPPayloadV1, "mode">): IPPRequest {
+  return {
+    v: 1,
+    network: "eip155:84532",
+    type: "request",
+    payload: {
+      identityCommitment: "0xabc",
+      tokenAddress: "0xdef",
+      operator: "0x1234567890123456789012345678901234567890",
+      paymentTypes: ["open", "blind"],
+      endpoint: "https://pay.merchant.com",
+      ...payload,
+    },
+  }
 }
 
-// 模式 1b：有 amount，无 nonce，需要 endpoint
-const MODE_1B_REQUEST: IPPRequest = {
-  v: 1,
-  network: "eip155:84532",
-  type: "request",
-  payload: {
-    operator: "0x1234567890123456789012345678901234567890",
-    identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-    tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    treeId: "1",
-    paymentTypes: ["open", "blind"],
-    amount: "100000000",
-    endpoint: "https://pay.merchant.com",
-  },
-}
-
-describe("validateIPPRequest", () => {
-  it("accepts mode 1a request (nonce + paymentCommitment, no endpoint)", () => {
-    expect(() => validateIPPRequest(MODE_1A_REQUEST)).not.toThrow()
+describe("validateIPPRequest — envelope & required fields", () => {
+  it("passes a well-formed single request", () => {
+    expect(() => validateIPPRequest(makeRequest({ mode: "single", amount: "100" }))).not.toThrow()
   })
 
-  it("accepts mode 1a with optional endpoint", () => {
+  it("throws when v < 1", () => {
+    const req = makeRequest({ mode: "single", amount: "100" })
+    req.v = 0
+    expect(() => validateIPPRequest(req)).toThrow(/v must be/i)
+  })
+
+  it("throws on non-CAIP-2 network", () => {
+    const req = makeRequest({ mode: "single", amount: "100" })
+    req.network = "mainnet"
+    expect(() => validateIPPRequest(req)).toThrow(/CAIP-2/i)
+  })
+
+  it("throws when identityCommitment missing", () => {
+    const req = makeRequest({ mode: "single", amount: "100" })
+    // @ts-expect-error deliberately drop a required field to exercise the runtime guard
+    delete req.payload.identityCommitment
+    expect(() => validateIPPRequest(req)).toThrow(/identityCommitment/i)
+  })
+
+  it("throws when paymentTypes empty", () => {
+    expect(() => validateIPPRequest(makeRequest({ mode: "single", amount: "100", paymentTypes: [] }))).toThrow(
+      /paymentTypes/i,
+    )
+  })
+
+  it("throws on invalid payment type", () => {
     expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: {
-          ...MODE_1A_REQUEST.payload,
-          endpoint: "https://pay.example.com",
-        },
-      }),
-    ).not.toThrow()
+      // @ts-expect-error invalid payment type value
+      validateIPPRequest(makeRequest({ mode: "single", amount: "100", paymentTypes: ["bogus"] })),
+    ).toThrow(/invalid type/i)
+  })
+})
+
+describe("validateIPPRequest — SPEC-029 mode ⇒ endpoint baseline", () => {
+  it("multi without endpoint throws", () => {
+    const req = makeRequest({ mode: "multi" })
+    delete req.payload.endpoint
+    expect(() => validateIPPRequest(req)).toThrow(/endpoint/i)
   })
 
-  it("accepts mode 1b (amount + endpoint, no nonce)", () => {
-    expect(() => validateIPPRequest(MODE_1B_REQUEST)).not.toThrow()
+  it("single without endpoint throws", () => {
+    const req = makeRequest({ mode: "single", amount: "100" })
+    delete req.payload.endpoint
+    expect(() => validateIPPRequest(req)).toThrow(/endpoint/i)
   })
 
-  it("accepts mode 2 (no amount, with endpoint)", () => {
-    const { amount: _a, nonce: _n, paymentCommitment: _p, ...basePayload } = MODE_1A_REQUEST.payload
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: {
-          ...basePayload,
-          endpoint: "https://pay.example.com",
-        },
-      } as IPPRequest),
-    ).not.toThrow()
+  it("single WITHOUT amount still passes baseline (amount-per-mode is an encoding-tightening rule, not baseline)", () => {
+    const req = makeRequest({ mode: "single" })
+    delete req.payload.amount
+    expect(() => validateIPPRequest(req)).not.toThrow()
   })
 
-  it("rejects if v is missing", () => {
-    const { v: _, ...rest } = MODE_1A_REQUEST
-    expect(() => validateIPPRequest(rest as IPPRequest)).toThrow("v")
+  it("multi with endpoint passes (open amount)", () => {
+    expect(() => validateIPPRequest(makeRequest({ mode: "multi" }))).not.toThrow()
   })
 
-  it("rejects if network is not CAIP-2 format", () => {
-    expect(() =>
-      validateIPPRequest({ ...MODE_1A_REQUEST, network: "ethereum" }),
-    ).toThrow("network")
-  })
-
-  it("rejects if payload is missing", () => {
-    const { payload: _, ...rest } = MODE_1A_REQUEST
-    expect(() => validateIPPRequest(rest as IPPRequest)).toThrow("payload")
-  })
-
-  it("rejects if paymentTypes is empty", () => {
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: { ...MODE_1A_REQUEST.payload, paymentTypes: [] },
-      }),
-    ).toThrow("paymentTypes")
-  })
-
-  it("rejects if paymentTypes contains invalid type", () => {
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: {
-          ...MODE_1A_REQUEST.payload,
-          paymentTypes: ["open", "invalid" as any],
-        },
-      }),
-    ).toThrow("paymentTypes")
-  })
-
-  it("rejects nonce without paymentCommitment", () => {
-    const { paymentCommitment: _, ...noPC } = MODE_1A_REQUEST.payload
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: { ...noPC, endpoint: "https://x.com" },
-      } as IPPRequest),
-    ).toThrow("nonce")
-  })
-
-  it("rejects paymentCommitment without nonce", () => {
-    const { nonce: _, ...noNonce } = MODE_1A_REQUEST.payload
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: { ...noNonce, endpoint: "https://x.com" },
-      } as IPPRequest),
-    ).toThrow("nonce")
-  })
-
-  it("rejects mode 1b without endpoint (amount set, no nonce)", () => {
-    const { endpoint: _, ...noEndpoint } = MODE_1B_REQUEST.payload
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1B_REQUEST,
-        payload: noEndpoint,
-      } as IPPRequest),
-    ).toThrow("endpoint")
-  })
-
-  it("rejects mode 2 without endpoint (no amount, no nonce)", () => {
-    const { amount: _a, nonce: _n, paymentCommitment: _p, ...basePayload } = MODE_1A_REQUEST.payload
-    expect(() =>
-      validateIPPRequest({
-        ...MODE_1A_REQUEST,
-        payload: basePayload,
-      } as IPPRequest),
-    ).toThrow("endpoint")
+  it("modeless credit request passes even without endpoint (rule fires only for explicit single/multi)", () => {
+    // SPEC-029 §5 'modeless credit 码' vector: defensive behaviour on runtime data whose
+    // mode is absent. Authoritative 6.1/§1 have credit codes carry mode='single'; this
+    // asserts the validator does not force endpoint when mode is not an explicit single/multi.
+    const req: IPPRequest = {
+      v: 1,
+      network: "eip155:84532",
+      type: "request",
+      payload: {
+        identityCommitment: "0xabc",
+        tokenAddress: "0xdef",
+        operator: "0x1234567890123456789012345678901234567890",
+        paymentTypes: ["credit"],
+        creditId: "credit_abc123",
+        // mode intentionally omitted (runtime-untrusted shape)
+      } as unknown as IPPPayloadV1,
+    }
+    expect(() => validateIPPRequest(req)).not.toThrow()
   })
 })

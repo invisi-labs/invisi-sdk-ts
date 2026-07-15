@@ -11,8 +11,8 @@ const SAMPLE_REQUEST: IPPRequest = {
     identityCommitment: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     operator: "0x1234567890123456789012345678901234567890",
-    treeId: "1",
     paymentTypes: ["open", "blind"],
+    mode: "single",
     amount: "100000000",
     endpoint: "https://pay.merchant.com",
   },
@@ -26,10 +26,9 @@ const MINIMAL_REQUEST: IPPRequest = {
     identityCommitment: "0xabc",
     tokenAddress: "0xdef",
     operator: "0x1234567890123456789012345678901234567890",
-    treeId: "1",
     paymentTypes: ["open"],
-    nonce: "42",
-    paymentCommitment: "0x9999",
+    mode: "multi",
+    endpoint: "https://pay.merchant.com",
   },
 }
 
@@ -62,9 +61,16 @@ describe("JSON encoding", () => {
   it("omits undefined optional fields", () => {
     const encoded = encodeIPPRequest(MINIMAL_REQUEST, "json")
     const parsed = JSON.parse(encoded)
+    // SPEC-029: mode ⇒ endpoint baseline — MINIMAL_REQUEST is mode "multi" so it
+    // must carry endpoint; `amount` remains the truly-optional field under test.
     expect(parsed.payload.amount).toBeUndefined()
-    expect(parsed.payload.endpoint).toBeUndefined()
     expect(parsed.meta).toBeUndefined()
+  })
+
+  it("round-trips IPPPayloadV1.mode as wire mode", () => {
+    const parsed = JSON.parse(encodeIPPRequest(MINIMAL_REQUEST, "json"))
+    expect(parsed.payload.mode).toBe("multi")
+    expect(decodeIPPRequest(encodeIPPRequest(MINIMAL_REQUEST, "json")).payload.mode).toBe("multi")
   })
 
   it("roundtrips correctly", () => {
@@ -278,8 +284,8 @@ describe("credit_id field", () => {
         identityCommitment: "0xabc",
         tokenAddress: "0xdef",
         operator: "0x1234567890123456789012345678901234567890",
-        treeId: "1",
         paymentTypes: ["credit"],
+        mode: "single",
         endpoint: "https://pay.merchant.com",
         creditId: "credit_abc123",
       },

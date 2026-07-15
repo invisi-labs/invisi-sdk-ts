@@ -12,20 +12,18 @@ export interface IPPPayloadV1 {
   tokenAddress: string
   /** 运营方地址 (0x-prefixed hex)，用于定位 per-token 合约实例 */
   operator: string
-  /** Merkle Tree ID (bigint as string) */
-  treeId: string
   /** 收款方接受的支付类型 */
   paymentTypes: PaymentType[]
-  /** 支付金额，原子单位 (bigint as string)。不填 = 开放金额 */
+  /** 收款单模式 (wire `mode`)：'single' = 金额固定、单次有效 (1a)；'multi' = 多人多次 (1b/2)。SPEC-029 §1 */
+  mode: "single" | "multi"
+  /** 支付金额，原子单位 (bigint as string)。不填 = 开放金额 (仅 multi) */
   amount?: string | undefined
-  /** 收款方预算的 nonce (模式 1a) */
-  nonce?: string | undefined
-  /** 收款方预算的 paymentCommitment (模式 1a) */
-  paymentCommitment?: string | undefined
-  /** 收款方服务地址，实现 IPP Interaction Protocol */
+  /** 收款方服务地址，实现 IPP Interaction Protocol；扫码分发的请求必填 (协议基线) */
   endpoint?: string | undefined
   /** Credit authorization ID (wire `credit_id`); required when paymentTypes includes 'credit', single-use. */
   creditId?: string | undefined
+  // SPEC-029: 支付材料 nonce / paymentCommitment / treeId 不再入 payload——统一经 propose 下发
+  // (nonce/paymentCommitment 见 ProposeResponse, treeId 见 ProposeResponse/AuthorizeResponse)。
 }
 
 /** V1 Voucher Payload — mode 3 address transfer (payer → receiver) */
