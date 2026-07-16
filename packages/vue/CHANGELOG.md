@@ -1,5 +1,12 @@
 # @invisi-labs/vue
 
+## 2.3.0
+
+### Patch Changes
+
+- Updated dependencies [53ddc9c]
+  - @invisi-labs/payer@2.3.0
+
 ## 2.2.0
 
 ### Patch Changes
