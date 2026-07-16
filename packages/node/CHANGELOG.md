@@ -1,5 +1,12 @@
 # @invisi-labs/node
 
+## 2.3.0
+
+### Patch Changes
+
+- Updated dependencies [53ddc9c]
+  - @invisi-labs/core@2.3.0
+
 ## 2.2.0
 
 ### Patch Changes
