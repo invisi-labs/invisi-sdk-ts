@@ -53,3 +53,6 @@ export type { BuildVoucherParams } from "./buildVoucher"
 
 export { buildPermitTypedData, permitTypes } from "./permit"
 export type { PermitTypedDataParams, PermitTypedDataResult } from "./permit"
+
+export { buildPayBlindWithSigCalldata, buildPayOpenWithSigCalldata } from "./withSigCalldata"
+export type { MetaTxInput, PayBlindWithSigParams, PayOpenWithSigParams } from "./withSigCalldata"
