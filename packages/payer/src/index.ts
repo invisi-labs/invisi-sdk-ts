@@ -50,3 +50,6 @@ export type { PaymasterConfig, BaseUserOp } from "./gasEstimates"
 
 export { buildVoucher } from "./buildVoucher"
 export type { BuildVoucherParams } from "./buildVoucher"
+
+export { buildPermitTypedData, permitTypes } from "./permit"
+export type { PermitTypedDataParams, PermitTypedDataResult } from "./permit"
