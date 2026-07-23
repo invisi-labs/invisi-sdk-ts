@@ -1,5 +1,14 @@
 # @invisi-labs/receiver
 
+## 2.4.0
+
+### Patch Changes
+
+- @invisi-labs/core@2.4.0
+- @invisi-labs/contracts@2.4.0
+- @invisi-labs/deployments@2.4.0
+- @invisi-labs/ipp@2.4.0
+
 ## 2.3.0
 
 ### Minor Changes

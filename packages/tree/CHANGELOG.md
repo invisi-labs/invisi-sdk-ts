@@ -1,5 +1,12 @@
 # @invisi-labs/tree
 
+## 2.4.0
+
+### Patch Changes
+
+- @invisi-labs/core@2.4.0
+- @invisi-labs/contracts@2.4.0
+
 ## 2.3.0
 
 ### Patch Changes

@@ -1,5 +1,19 @@
 # @invisi-labs/payer
 
+## 2.4.0
+
+### Minor Changes
+
+- 4e54020: Add EIP-2612 permit typed-data builder and payBlindWithSig/payOpenWithSig
+  calldata encoders for single-transaction (approve-less) privacy payments.
+
+### Patch Changes
+
+- @invisi-labs/core@2.4.0
+- @invisi-labs/contracts@2.4.0
+- @invisi-labs/deployments@2.4.0
+- @invisi-labs/ipp@2.4.0
+
 ## 2.3.0
 
 ### Minor Changes
