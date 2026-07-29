@@ -1,4 +1,10 @@
-import type { CompiledCircuit } from "./circuits"
+import type { CompiledCircuit } from "./circuit-types"
+
+function toHex(bytes: Uint8Array): string {
+  let hex = ""
+  for (const byte of bytes) hex += byte.toString(16).padStart(2, "0")
+  return hex
+}
 
 export async function proveWithWasm(params: {
   circuit: CompiledCircuit
@@ -10,8 +16,7 @@ export async function proveWithWasm(params: {
   try {
     const backend = new UltraHonkBackend(params.circuit.bytecode, api)
     const proofData = await backend.generateProof(params.witness)
-    const proofHex = Buffer.from(proofData.proof).toString("hex")
-    return `0x${proofHex}` as `0x${string}`
+    return `0x${toHex(proofData.proof)}` as `0x${string}`
   } finally {
     await api.destroy()
   }

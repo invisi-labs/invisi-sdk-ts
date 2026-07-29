@@ -1,5 +1,5 @@
 import { Noir } from "@noir-lang/noir_js"
-import type { CompiledCircuit } from "./circuits"
+import type { CompiledCircuit } from "./circuit-types"
 
 export async function generateWitness(
   circuit: CompiledCircuit,
