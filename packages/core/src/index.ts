@@ -14,3 +14,4 @@ export {
 } from "./creditCommitment"
 export { computeRefundLink } from "./refundLink"
 export { FIELD_MODULUS, generateNonce } from "./random"
+export { bytesToField } from "./field"
