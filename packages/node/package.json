@@ -37,7 +37,7 @@
     "vitest": "^1.6.0"
   },
   "optionalDependencies": {
-    "@aztec/bb.js": "4.0.0-nightly.20260120"
+    "@aztec/bb.js": "4.2.0"
   },
   "files": [
     "dist",
