@@ -1,5 +1,11 @@
 # @invisi-labs/react
 
+## 2.5.1
+
+### Patch Changes
+
+- @invisi-labs/payer@2.5.1
+
 ## 2.5.0
 
 ### Patch Changes
