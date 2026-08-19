@@ -1,5 +1,14 @@
 # @invisi-labs/payer
 
+## 2.5.1
+
+### Patch Changes
+
+- @invisi-labs/core@2.5.1
+- @invisi-labs/contracts@2.5.1
+- @invisi-labs/deployments@2.5.1
+- @invisi-labs/ipp@2.5.1
+
 ## 2.5.0
 
 ### Patch Changes
