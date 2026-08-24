@@ -20,6 +20,7 @@ async function makeVoucher(): Promise<IPPVoucher> {
       operator: "0x1234567890123456789012345678901234567890",
       amount: amount.toString(), nonce: "0x" + nonce.toString(16),
       nullifierKey: "0x" + nk.toString(16), treeId: "1",
+      endpoint: "https://pay.merchant.com",
     },
   }
 }
@@ -42,6 +43,8 @@ it("maps to a WithdrawRequest without leaking nullifierKey", async () => {
   const v = await makeVoucher()
   const req = voucherToWithdrawRequest(v)
   expect(req).toEqual({
+    network: v.network,
+    operator: v.payload.operator,
     tokenAddress: v.payload.tokenAddress,
     treeId: v.payload.treeId,
     paymentCommitments: [v.payload.paymentCommitment],

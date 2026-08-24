@@ -95,6 +95,10 @@ export interface NotifyResponse {
 export interface WithdrawRequest {
   /** advisory: server locates leaves by paymentCommitments and ignores this; mode-3 vouchers omit it */
   identityCommitment?: string | undefined
+  /** CAIP-2 network identifier, e.g. "eip155:84532"; together with operator + tokenAddress, uniquely identifies the contract instance */
+  network: string
+  /** Operator address (0x-prefixed hex); together with network + tokenAddress, uniquely identifies the contract instance */
+  operator: string
   tokenAddress: string
   treeId: string
   paymentCommitments: string[]

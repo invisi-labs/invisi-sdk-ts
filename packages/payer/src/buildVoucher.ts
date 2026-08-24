@@ -12,6 +12,8 @@ export interface BuildVoucherParams {
   treeId: string
   leafIndex?: string | undefined
   meta?: Record<string, string> | undefined
+  /** Service endpoint that settles this voucher; the receiver calls it to initiate withdraw */
+  endpoint: string
 }
 
 /**
@@ -34,6 +36,7 @@ export function buildVoucher(params: BuildVoucherParams): IPPVoucher {
       nullifierKey: params.nullifierKey,
       treeId: params.treeId,
       ...(params.leafIndex ? { leafIndex: params.leafIndex } : {}),
+      endpoint: params.endpoint,
     },
   }
 }

@@ -45,6 +45,7 @@ const SAMPLE_VOUCHER: IPPVoucher = {
     nonce: "0x123",
     nullifierKey: "0x456",
     treeId: "1",
+    endpoint: "https://pay.merchant.com",
   },
 }
 

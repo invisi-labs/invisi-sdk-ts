@@ -13,6 +13,7 @@ it("assembles a type:voucher IPPVoucher and roundtrips", () => {
     nonce: "0x123",
     nullifierKey: "0x456",
     treeId: "1",
+    endpoint: "https://pay.merchant.com",
   })
   expect(voucher.type).toBe("voucher")
   expect(voucher.payload.amount).toBe("100000000")
@@ -33,6 +34,7 @@ it("sets leafIndex and meta when provided, and sets operator and receivingAddres
     treeId: "1",
     leafIndex: "42",
     meta: { source: "test", version: "1" },
+    endpoint: "https://pay.merchant.com",
   })
   expect(voucher.payload.leafIndex).toBe("42")
   expect(voucher.meta).toEqual({ source: "test", version: "1" })

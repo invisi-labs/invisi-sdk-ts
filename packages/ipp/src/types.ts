@@ -44,6 +44,8 @@ export interface IPPVoucherV1 {
   treeId: string
   /** Optional leaf index; if absent, locate by scanning PayOpen events */
   leafIndex?: string | undefined
+  /** Service endpoint that settles this voucher; the receiver calls it to initiate withdraw */
+  endpoint: string
 }
 
 /** Base IPP message envelope */

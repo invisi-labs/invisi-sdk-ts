@@ -154,8 +154,22 @@ describe("IPPClient", () => {
       witness: { merkle_root: "0xroot", total_amount: "100000000", merkle_proofs: [{ leaf_index: "3", merkle_path: ["0xa", "0xb"] }] },
       circuit: "batch_settle_1",
     })
-    const result = await client.withdraw({ identityCommitment: "0xabc", tokenAddress: "0xtoken", treeId: "1", paymentCommitments: ["0xp1"] })
-    expect(sentBody()).toEqual({ identity_commitment: "0xabc", token_address: "0xtoken", tree_id: "1", payment_commitments: ["0xp1"] })
+    const result = await client.withdraw({
+      identityCommitment: "0xabc",
+      network: "eip155:84532",
+      operator: "0x1234567890123456789012345678901234567890",
+      tokenAddress: "0xtoken",
+      treeId: "1",
+      paymentCommitments: ["0xp1"],
+    })
+    expect(sentBody()).toEqual({
+      identity_commitment: "0xabc",
+      network: "eip155:84532",
+      operator: "0x1234567890123456789012345678901234567890",
+      token_address: "0xtoken",
+      tree_id: "1",
+      payment_commitments: ["0xp1"],
+    })
     expect(result.status).toBe("accepted")
     expect(result.circuit).toBe("batch_settle_1")
     expect(result.witness?.merkleRoot).toBe("0xroot")

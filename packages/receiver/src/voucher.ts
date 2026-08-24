@@ -40,10 +40,14 @@ export async function verifyVoucher(params: VerifyVoucherParams): Promise<boolea
  * Build the withdraw request body from a voucher. identityCommitment is omitted
  * (server-advisory — the server locates leaves by paymentCommitments). receivingAddress
  * and nullifierKey stay client-side for local proof generation, never sent to the endpoint.
+ * network comes from the voucher envelope; operator comes from the payload — together
+ * with tokenAddress they let the server resolve the correct contract instance.
  */
 export function voucherToWithdrawRequest(voucher: IPPVoucher): WithdrawRequest {
   const p = voucher.payload
   return {
+    network: voucher.network,
+    operator: p.operator,
     tokenAddress: p.tokenAddress,
     treeId: p.treeId,
     paymentCommitments: [p.paymentCommitment],
