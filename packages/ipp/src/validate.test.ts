@@ -148,6 +148,13 @@ describe("validateIPPVoucher — envelope & required fields", () => {
     expect(() => validateIPPVoucher(voucher)).toThrow(/CAIP-2/i)
   })
 
+  it("throws when type is not \"voucher\"", () => {
+    const voucher = makeVoucher()
+    // @ts-expect-error deliberately set an invalid discriminator to exercise the runtime guard
+    voucher.type = "request"
+    expect(() => validateIPPVoucher(voucher)).toThrow(/type must be/i)
+  })
+
   it.each(REQUIRED_VOUCHER_PAYLOAD_FIELDS)("throws when %s missing, naming the field", (field) => {
     const voucher = makeVoucher()
     delete voucher.payload[field]
