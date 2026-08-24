@@ -10,7 +10,7 @@ export type { IPPMessage, IPPMessageType, IPPRequest, IPPVoucher, IPPPayloadV1, 
 export { encodeIPPRequest, decodeIPPRequest, encodeIPPVoucher, decodeIPPVoucher, decodeIPPMessage } from "./codec"
 
 // === 校验 ===
-export { validateIPPRequest } from "./validate"
+export { validateIPPRequest, validateIPPVoucher } from "./validate"
 
 // === Meta 常量 ===
 export { IPP_META_KEYS } from "./meta"
