@@ -178,6 +178,37 @@ describe("IPPClient", () => {
     expect(result.witness?.merkleProofs).toEqual([{ leafIndex: "3", merklePath: ["0xa", "0xb"] }])
   })
 
+  it("withdraw: instance-triple only (no identityCommitment) — wire body has exactly the 5 snake_case keys", async () => {
+    // Mirrors voucherToWithdrawRequest's actual output (mode 3 / SPEC-031 §6):
+    // identityCommitment is omitted entirely (server locates leaves by
+    // paymentCommitments), and receivingAddress/nullifierKey are never part of
+    // WithdrawRequest at all — this is the non-custodial invariant, asserted
+    // here at the real wire boundary, not just on the TS object.
+    mockJsonResponse({ status: "accepted" })
+    await client.withdraw({
+      network: "eip155:1",
+      operator: "0x1234567890123456789012345678901234567890",
+      tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      treeId: "42",
+      paymentCommitments: ["0xpaymentcommitment"],
+    })
+    const body = sentBody()
+    expect(Object.keys(body).sort()).toEqual(
+      ["network", "operator", "payment_commitments", "token_address", "tree_id"].sort(),
+    )
+    expect(body).toEqual({
+      network: "eip155:1",
+      operator: "0x1234567890123456789012345678901234567890",
+      token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      tree_id: "42",
+      payment_commitments: ["0xpaymentcommitment"],
+    })
+    const raw = JSON.stringify(body)
+    expect(raw).not.toContain("identity_commitment")
+    expect(raw).not.toContain("receiving_address")
+    expect(raw).not.toContain("nullifier_key")
+  })
+
   it("creditDraw: POST /ipp/v1/credit-draw", async () => {
     mockJsonResponse({ status: "accepted", circuit: "credit_draw_1" })
     const result = await client.creditDraw({ identityCommitment: "0xabc", tokenAddress: "0xtoken", treeId: "1", creditCommitments: ["0xc1"], amounts: ["50000000"] })
