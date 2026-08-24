@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest"
+import { encode as msgpackEncode } from "@msgpack/msgpack"
 import { encodeIPPRequest, decodeIPPRequest, encodeIPPVoucher, decodeIPPVoucher, decodeIPPMessage } from "./codec"
 import type { IPPMessage, IPPRequest, IPPVoucher } from "./types"
 
@@ -162,6 +163,129 @@ describe("voucher codec", () => {
     expect(decodeIPPMessage(encodeIPPVoucher(SAMPLE_VOUCHER, "json")).type).toBe("voucher")
     expect(decodeIPPMessage(encodeIPPRequest(SAMPLE_REQUEST, "json")).type).toBe("request")
   })
+
+  it("encodeIPPVoucher rejects a voucher missing endpoint", () => {
+    const invalid = {
+      v: 1,
+      network: "eip155:84532",
+      type: "voucher",
+      payload: {
+        receivingAddress: "0xabc",
+        paymentCommitment: "0xdef",
+        tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        operator: "0x1234567890123456789012345678901234567890",
+        amount: "100000000",
+        nonce: "0x123",
+        nullifierKey: "0x456",
+        treeId: "1",
+        // endpoint intentionally omitted
+      },
+    } as unknown as IPPVoucher
+    expect(() => encodeIPPVoucher(invalid, "json")).toThrow(/endpoint/i)
+  })
+
+  it("decodeIPPVoucher rejects a JSON string missing endpoint", () => {
+    const json = JSON.stringify({
+      v: 1,
+      network: "eip155:84532",
+      type: "voucher",
+      payload: {
+        receiving_address: "0xabc",
+        payment_commitment: "0xdef",
+        token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        operator: "0x1234567890123456789012345678901234567890",
+        amount: "100000000",
+        nonce: "0x123",
+        nullifier_key: "0x456",
+        tree_id: "1",
+        // endpoint intentionally omitted
+      },
+    })
+    expect(() => decodeIPPVoucher(json)).toThrow(/endpoint/i)
+  })
+
+  it("decodeIPPVoucher rejects a compact string missing endpoint", () => {
+    // Hand-assembled wire message (msgpack + base64url + ipp1: prefix), bypassing
+    // encodeIPPVoucher's own validation so the invalid wire form can reach decode.
+    const wireMsg = {
+      v: 1,
+      network: "eip155:84532",
+      type: "voucher",
+      payload: {
+        receiving_address: "0xabc",
+        payment_commitment: "0xdef",
+        token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        operator: "0x1234567890123456789012345678901234567890",
+        amount: "100000000",
+        nonce: "0x123",
+        nullifier_key: "0x456",
+        tree_id: "1",
+        // endpoint intentionally omitted
+      },
+    }
+    const packed = msgpackEncode(wireMsg)
+    const compact = `ipp1:${Buffer.from(packed).toString("base64url")}`
+    expect(() => decodeIPPVoucher(compact)).toThrow(/endpoint/i)
+  })
+
+  it("decodeIPPVoucher accepts a hand-rolled compact string that has endpoint", () => {
+    // Sanity companion to the rejection case above: a well-formed compact voucher
+    // (with endpoint) still decodes successfully via the same hand-rolled wire path.
+    const wireMsg = {
+      v: 1,
+      network: "eip155:84532",
+      type: "voucher",
+      payload: {
+        receiving_address: "0xabc",
+        payment_commitment: "0xdef",
+        token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        operator: "0x1234567890123456789012345678901234567890",
+        amount: "100000000",
+        nonce: "0x123",
+        nullifier_key: "0x456",
+        tree_id: "1",
+        endpoint: "https://pay.merchant.com",
+      },
+    }
+    const packed = msgpackEncode(wireMsg)
+    const compact = `ipp1:${Buffer.from(packed).toString("base64url")}`
+    expect(() => decodeIPPVoucher(compact)).not.toThrow()
+  })
+
+  it("decodeIPPMessage does not validate — accepts a voucher-shaped message missing endpoint", () => {
+    const json = JSON.stringify({
+      v: 1,
+      network: "eip155:84532",
+      type: "voucher",
+      payload: {
+        receiving_address: "0xabc",
+        payment_commitment: "0xdef",
+        token_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        operator: "0x1234567890123456789012345678901234567890",
+        amount: "100000000",
+        nonce: "0x123",
+        nullifier_key: "0x456",
+        tree_id: "1",
+        // endpoint intentionally omitted — decodeIPPMessage must not validate
+      },
+    })
+    expect(() => decodeIPPMessage(json)).not.toThrow()
+  })
+
+  it("wire JSON payload keys are snake_case and include endpoint", () => {
+    const json = encodeIPPVoucher(SAMPLE_VOUCHER, "json")
+    const parsed = JSON.parse(json)
+    expect(parsed.payload.endpoint).toBe("https://pay.merchant.com")
+    expect(json).toContain("receiving_address")
+    expect(json).toContain("payment_commitment")
+    expect(json).toContain("token_address")
+    expect(json).toContain("nullifier_key")
+    expect(json).toContain("tree_id")
+    expect(json).not.toContain("receivingAddress")
+    expect(json).not.toContain("paymentCommitment")
+    expect(json).not.toContain("nullifierKey")
+    expect(json).not.toContain("treeId")
+  })
 })
 
 // wire is snake_case, TS property names stay camelCase. The codec
@@ -184,6 +308,7 @@ describe("wire snake_case round-trip", () => {
     },
     payload: {
       identityCommitment: "0xabc",
+      receivingAddress: "0xtop",
       paymentCommitment: "0xdef",
       tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       operator: "0x1234567890123456789012345678901234567890",
@@ -191,6 +316,7 @@ describe("wire snake_case round-trip", () => {
       nonce: "0x123",
       nullifierKey: "0x456",
       treeId: "1",
+      endpoint: "https://pay.merchant.com",
       witness: {
         merkleRoot: "0xroot",
         totalAmount: "200000000",

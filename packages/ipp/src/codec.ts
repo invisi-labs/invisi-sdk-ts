@@ -1,5 +1,5 @@
 import { encode, decode } from "@msgpack/msgpack"
-import { validateIPPRequest } from "./validate"
+import { validateIPPRequest, validateIPPVoucher } from "./validate"
 import type { IPPMessage, IPPRequest, IPPVoucher, IPPFormat } from "./types"
 
 const IPP_PREFIX = "ipp"
@@ -69,6 +69,7 @@ export function encodeIPPRequest(request: IPPRequest, format: IPPFormat): string
 }
 
 export function encodeIPPVoucher(voucher: IPPVoucher, format: IPPFormat): string {
+  validateIPPVoucher(voucher)
   return encodeMessage(voucher, format)
 }
 
@@ -90,6 +91,7 @@ export function decodeIPPRequest(encoded: string): IPPRequest {
 export function decodeIPPVoucher(encoded: string): IPPVoucher {
   const m = decodeMessage(encoded)
   if (m.type !== "voucher") throw new Error(`expected type "voucher", got "${m.type}"`)
+  validateIPPVoucher(m as IPPVoucher)
   return m as IPPVoucher
 }
 
