@@ -5,7 +5,6 @@ import type { IPPVoucher, WithdrawRequest } from "@invisi-labs/ipp"
 export interface VerifyVoucherParams {
   voucher: IPPVoucher
   receivingAddress: bigint   // the receiver's own address
-  chainId?: bigint | undefined  // defaults to parsed from voucher.network
 }
 
 /**
@@ -13,10 +12,17 @@ export interface VerifyVoucherParams {
  * receiver's own address and is internally consistent. MUST pass before withdraw.
  * The voucher carries receivingAddress directly; identityCommitment is recomputed
  * locally from receivingAddress + nullifierKey (one-way hash — not reversible).
+ *
+ * chainId is always taken from voucher.network (CAIP-2) — never caller-supplied.
+ * This makes the paymentCommitment consistency check (Check 2 below) double as an
+ * integrity check on the envelope's network: if network were tampered with after
+ * the payment was made, the recomputed commitment would no longer match and
+ * verification would fail. A caller-supplied override would bypass that and let
+ * such tampering through undetected.
  */
 export async function verifyVoucher(params: VerifyVoucherParams): Promise<boolean> {
   const p = params.voucher.payload
-  const chainId = params.chainId ?? caip2ToChainId(params.voucher.network)
+  const chainId = caip2ToChainId(params.voucher.network)
 
   // Check 1: the voucher's receivingAddress must be this receiver's own address —
   // the settle circuit sends funds there, so a mismatch means funds go elsewhere.

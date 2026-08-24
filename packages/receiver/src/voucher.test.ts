@@ -26,17 +26,17 @@ async function makeVoucher(): Promise<IPPVoucher> {
 }
 
 it("verifies a well-formed voucher against the receiving address", async () => {
-  expect(await verifyVoucher({ voucher: await makeVoucher(), receivingAddress: RECEIVING_ADDRESS, chainId: CHAIN_ID })).toBe(true)
+  expect(await verifyVoucher({ voucher: await makeVoucher(), receivingAddress: RECEIVING_ADDRESS })).toBe(true)
 })
 
 it("rejects when receivingAddress does not match the bound address", async () => {
-  expect(await verifyVoucher({ voucher: await makeVoucher(), receivingAddress: 0xBEEFn, chainId: CHAIN_ID })).toBe(false)
+  expect(await verifyVoucher({ voucher: await makeVoucher(), receivingAddress: 0xBEEFn })).toBe(false)
 })
 
 it("rejects a tampered amount", async () => {
   const v = await makeVoucher()
   v.payload.amount = "999"
-  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS, chainId: CHAIN_ID })).toBe(false)
+  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS })).toBe(false)
 })
 
 it("maps to a WithdrawRequest without leaking nullifierKey or receivingAddress", async () => {
@@ -92,16 +92,48 @@ it("takes network from the voucher envelope, not the payload", () => {
 it("rejects a tampered nonce", async () => {
   const v = await makeVoucher()
   v.payload.nonce = "0x999"
-  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS, chainId: CHAIN_ID })).toBe(false)
+  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS })).toBe(false)
 })
 
 it("rejects a tampered paymentCommitment", async () => {
   const v = await makeVoucher()
   v.payload.paymentCommitment = "0xdeadbeef"
-  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS, chainId: CHAIN_ID })).toBe(false)
+  expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS })).toBe(false)
 })
 
-it("falls back to chainId parsed from voucher.network when chainId is omitted", async () => {
+it("derives chainId from voucher.network (there is no caller override)", async () => {
   const v = await makeVoucher() // network is "eip155:84532" which maps to chainId 84532n
   expect(await verifyVoucher({ voucher: v, receivingAddress: RECEIVING_ADDRESS })).toBe(true)
+})
+
+it("verifyVoucher rejects a voucher whose envelope network was tampered with", async () => {
+  // Guards the security property that motivated removing the chainId override:
+  // chainId is read only from voucher.network, so paymentCommitment consistency
+  // (Check 2 in verifyVoucher) doubles as an integrity check on the envelope's
+  // network. Here the commitment was computed for chainId 84532 (Base Sepolia),
+  // but the envelope network is tampered to claim "eip155:1" (Ethereum mainnet).
+  // Recomputing the commitment with the chainId derived from the tampered
+  // network (1n) must no longer match, so verification must fail.
+  const nk = await deriveNullifierKey(999n /*payer masterKey*/, 7n /*random invoiceId*/)
+  const ic = await computeIdentityCommitment(nk, RECEIVING_ADDRESS)
+  const nonce = 12345n
+  const amount = 100_000_000n
+  const pc = await computePaymentCommitment(CHAIN_ID /* 84532 */, ic, BigInt(TOKEN), amount, nonce)
+  const voucher: IPPVoucher = {
+    v: 1,
+    network: "eip155:1", // tampered: commitment above was computed for chainId 84532, not 1
+    type: "voucher",
+    payload: {
+      receivingAddress: "0x" + RECEIVING_ADDRESS.toString(16),
+      paymentCommitment: pc,
+      tokenAddress: TOKEN,
+      operator: "0x1234567890123456789012345678901234567890",
+      amount: amount.toString(),
+      nonce: "0x" + nonce.toString(16),
+      nullifierKey: "0x" + nk.toString(16),
+      treeId: "1",
+      endpoint: "https://pay.merchant.com",
+    },
+  }
+  expect(await verifyVoucher({ voucher, receivingAddress: RECEIVING_ADDRESS })).toBe(false)
 })
