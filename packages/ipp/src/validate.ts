@@ -112,9 +112,18 @@ export function validateIPPVoucher(voucher: IPPVoucher): void {
     throw new Error("Invalid IPPVoucher: endpoint is required")
   }
 
+  // The SDK only checks that endpoint parses as a URL with a scheme and host;
+  // it does not enforce a specific scheme (e.g. https). Aligned with the Go SDK's
+  // ValidateIPPVoucher, which rejects url.Parse successes with an empty Scheme or
+  // Host (e.g. "mailto:", "file:", "urn:") since those can never serve as an
+  // IPPClient HTTP base URL.
+  let url: URL
   try {
-    new URL(p.endpoint)
+    url = new URL(p.endpoint)
   } catch {
+    throw new Error(`Invalid IPPVoucher: endpoint must be a valid URL, got "${p.endpoint}"`)
+  }
+  if (!url.protocol || !url.host) {
     throw new Error(`Invalid IPPVoucher: endpoint must be a valid URL, got "${p.endpoint}"`)
   }
 }

@@ -170,6 +170,24 @@ describe("validateIPPVoucher — envelope & required fields", () => {
     expect(() => validateIPPVoucher(makeVoucher({ endpoint: "http://localhost:3000" }))).not.toThrow()
   })
 
+  it("throws when endpoint is a mailto: URL (no host, cross-SDK parity with Go)", () => {
+    expect(() =>
+      validateIPPVoucher(makeVoucher({ endpoint: "mailto:test@example.com" })),
+    ).toThrow(/endpoint/i)
+  })
+
+  it("throws when endpoint is a file: URL (no host, cross-SDK parity with Go)", () => {
+    expect(() =>
+      validateIPPVoucher(makeVoucher({ endpoint: "file:///path/to/file" })),
+    ).toThrow(/endpoint/i)
+  })
+
+  it("throws when endpoint is a urn: URL (no host, cross-SDK parity with Go)", () => {
+    expect(() =>
+      validateIPPVoucher(makeVoucher({ endpoint: "urn:isbn:0451450523" })),
+    ).toThrow(/endpoint/i)
+  })
+
   it("passes when leafIndex is absent (optional field)", () => {
     const voucher = makeVoucher()
     delete voucher.payload.leafIndex
