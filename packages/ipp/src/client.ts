@@ -116,9 +116,9 @@ export class IPPClient {
       }
       const err = ippErrorFromEnvelope(body, res.status)
       if (err === null) {
-        // Body parsed but lacks the nested {error:{...}} shape — also opaque.
+        // Body parsed but matches neither accepted envelope shape — also opaque.
         throw new ConnectionError(
-          `IPP error response did not contain a nested error envelope (HTTP ${res.status})`,
+          `IPP error response did not contain an error envelope (HTTP ${res.status})`,
           { statusCode: res.status },
         )
       }

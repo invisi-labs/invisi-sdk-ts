@@ -1,12 +1,28 @@
-// === IPP typed errors (Channel ① — HTTP 4xx/5xx Stripe nested envelope) ===
+// === IPP typed errors (Channel ① — HTTP 4xx/5xx error envelope) ===
 //
-// The gateway wraps every REST 4xx/5xx in a nested envelope:
+// TWO envelope shapes are accepted, and both must stay accepted.
+//
+// The gateway emits a Stripe-style NESTED envelope (SPEC-057, every /ipp/v1/*
+// route):
 //   {"error":{"type","code","message","param","request_id","details"}}
-// (SPEC-057). The SDK parses that envelope and THROWS one of the typed classes
-// below, chosen by `type`/`status`. Callers branch with `instanceof` (mirrors
-// the Go SDK's `errors.As`). The envelope is already snake_case and is read
-// verbatim into the typed error — it is NOT run through the snake→camel codec
-// that success bodies use.
+// while 06-ipp/6.2 documents a FLAT one, which is what a third party
+// implementing an IPP endpoint from the prose will emit:
+//   {"code","message","param"}
+//
+// Accepting only the nested shape threw away the machine code of every flat
+// answer, and 06-ipp/6.6 requires an unknown code to be propagated to the caller
+// rather than dropped — so a payer wallet silently lost the one field that told
+// it WHY a third-party receiver refused. Narrowing this back to one shape
+// reintroduces that.
+//
+// Only the SHAPE is negotiated here. `code` itself stays an open string: an
+// unrecognised value is surfaced verbatim, never mapped or rejected.
+//
+// The SDK parses the envelope and THROWS one of the typed classes below, chosen
+// by `type`/`status`. Callers branch with `instanceof` (mirrors the Go SDK's
+// `errors.As`). The envelope is already snake_case and is read verbatim into the
+// typed error — it is NOT run through the snake→camel codec that success bodies
+// use.
 
 /** Raw nested envelope as it arrives on the wire (snake_case, read verbatim). */
 export interface ErrorEnvelope {
@@ -77,7 +93,7 @@ export class ApiError extends IppError {}
 
 /**
  * Transport-level failure: fetch rejection, timeout, or an error response whose
- * body is non-JSON / unparseable / missing the nested `{error:{...}}` shape.
+ * body is non-JSON / unparseable / matching neither accepted envelope shape.
  * Distinct from IppError because there is no envelope to type against. This is
  * what replaces the previous opaque `SyntaxError` (non-JSON body) and the
  * `[object Object]` string coercion (object thrown as Error message).
@@ -106,15 +122,50 @@ function isErrorResponse(body: unknown): body is ErrorResponse {
   )
 }
 
+/** A field that is present and a non-empty string. */
+function str(obj: Record<string, unknown>, key: string): string {
+  const v = obj[key]
+  return typeof v === "string" ? v : ""
+}
+
 /**
- * Build a typed IppError from a parsed nested-envelope body + HTTP status.
- * Picks the subclass by envelope `type` first, then falls back to `status`.
- * Returns `null` if the body is not a nested envelope (caller throws
- * ConnectionError instead).
+ * The envelope out of a body in either accepted shape, or null.
+ *
+ * Nested wins when present: the gateway's shape is the one in production, and a
+ * body carrying both is its shape with stray siblings, not a flat envelope. A
+ * FLAT body is recognised by a non-empty `code` and nothing else -- 6.2 makes
+ * `code` the required field, and requiring it is what keeps the old
+ * `{"error":"some_string","message":"..."}` shape out. That one has no `code`,
+ * so it stays a ConnectionError; typing it would put the string "some_string"
+ * nowhere and hand the caller an error with no machine code anyway.
+ *
+ * A document carrying none of the fields (`{}`, an unrelated object) is not the
+ * contract in either shape: null, so the caller reports a non-envelope body
+ * rather than fabricating an empty typed error.
+ */
+function parseErrorEnvelope(body: unknown): ErrorEnvelope | null {
+  if (isErrorResponse(body)) {
+    const env = body.error as Record<string, unknown>
+    if (str(env, "type") !== "" || str(env, "code") !== "" || str(env, "message") !== "") {
+      return body.error
+    }
+  }
+  if (body !== null && typeof body === "object" && !Array.isArray(body)) {
+    const flat = body as Record<string, unknown>
+    if (str(flat, "code") !== "") return flat as ErrorEnvelope
+  }
+  return null
+}
+
+/**
+ * Build a typed IppError from a parsed error body + HTTP status. Accepts either
+ * accepted envelope shape (see the file header). Picks the subclass by envelope
+ * `type` first, then falls back to `status`. Returns `null` if the body matches
+ * neither shape (caller throws ConnectionError instead).
  */
 export function ippErrorFromEnvelope(body: unknown, statusCode: number): IppError | null {
-  if (!isErrorResponse(body)) return null
-  const env = body.error
+  const env = parseErrorEnvelope(body)
+  if (env === null) return null
   const fields: IppErrorFields = {
     type: env.type ?? "",
     code: env.code ?? "",

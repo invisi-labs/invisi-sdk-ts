@@ -56,3 +56,7 @@ export type { ErrorEnvelope, ErrorResponse, IppErrorFields } from "./errors"
 
 // === IPP 客户端 ===
 export { IPPClient } from "./client"
+
+// === IPP 短链解析（传输层绑定）===
+export { resolveIPPLink, resolveIPPLinkUnsafe } from "./link"
+export type { ResolveIPPLinkOptions, ResolvedIPPLink } from "./link"
