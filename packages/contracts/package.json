@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/contracts",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "description": "Invisi Protocol contract ABIs and types",
   "type": "module",
   "main": "./dist/index.cjs",

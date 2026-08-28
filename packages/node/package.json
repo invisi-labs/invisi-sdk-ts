@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/node",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "description": "Invisi Protocol Node.js proof generation",
   "type": "module",
   "main": "./dist/index.cjs",
