@@ -1,5 +1,11 @@
 # @invisi-labs/node
 
+## 2.6.1
+
+### Patch Changes
+
+- @invisi-labs/core@2.6.1
+
 ## 2.6.0
 
 ### Patch Changes

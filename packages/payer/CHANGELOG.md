@@ -1,5 +1,15 @@
 # @invisi-labs/payer
 
+## 2.6.1
+
+### Patch Changes
+
+- Updated dependencies [3b53049]
+  - @invisi-labs/ipp@2.6.1
+  - @invisi-labs/core@2.6.1
+  - @invisi-labs/contracts@2.6.1
+  - @invisi-labs/deployments@2.6.1
+
 ## 2.6.0
 
 ### Patch Changes

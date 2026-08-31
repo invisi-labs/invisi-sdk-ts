@@ -1,5 +1,11 @@
 # @invisi-labs/deployments
 
+## 2.6.1
+
+### Patch Changes
+
+- @invisi-labs/contracts@2.6.1
+
 ## 2.6.0
 
 ### Patch Changes
