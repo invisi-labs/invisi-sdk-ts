@@ -24,8 +24,33 @@ export interface ResolveIPPLinkOptions {
   timeoutMs?: number
   /** Hard cap on the response body in bytes. Default 65536. */
   maxBytes?: number
+  /**
+   * Accept `http` and targets on loopback / private / link-local addresses.
+   * For local deployments and dev builds only; defaults to false.
+   *
+   * Named for what it gives up so a reviewer or a grep can see it at the call
+   * site, the way `InsecureSkipVerify` and `rejectUnauthorized` do. A caller
+   * that wants this banned in release builds can lint the property name.
+   */
+  allowInsecureTransport?: boolean
+  /**
+   * Resolves a hostname to its addresses, so rule 4 can judge the target by
+   * where the name points rather than by how it is spelled.
+   *
+   * Omitted, the check degrades to "literal addresses plus a set of local
+   * names", which does NOT stop a public name whose record points inside the
+   * network. Runtimes that have name resolution should pass one:
+   * `@invisi-labs/ipp/node` exports `nodeHostResolver` for Node.
+   *
+   * It is a parameter rather than something this module detects, because
+   * detection means naming a Node builtin here, and a specifier this module
+   * mentions is a specifier every consumer's bundler must resolve.
+   */
+  hostResolver?: HostResolver
 }
 
+/** Resolves a hostname to the addresses it points at. See `hostResolver`. */
+export type HostResolver = (hostname: string) => Promise<string[]>
 export interface ResolvedIPPLink {
   /** The resolved payment request -- same schema and same parser as `ipp1:`. */
   request: IPPRequest
@@ -114,7 +139,7 @@ const PATH_PREFIX_RE = /^(\/[^/]+)+$/
 
 /**
  * Names that can only mean the local machine or the local network. Used ONLY on
- * runtimes with no DNS API (browsers) -- see `assertPublicTarget`. On Node the
+ * callers that pass no `hostResolver` -- see `assertPublicTarget`. With one, the
  * decision is made on resolved addresses instead, which subsumes this list.
  */
 const LOCAL_NAME_RE = /^(localhost|.+\.localhost|.+\.local|.+\.internal|.+\.localdomain|.+\.home\.arpa)$/
@@ -127,6 +152,11 @@ const LOCAL_NAME_RE = /^(localhost|.+\.localhost|.+\.local|.+\.internal|.+\.loca
  * redirect following, size + time caps, `validateIPPRequest`, and finally the
  * endpoint cross-check.
  *
+ * `opts.allowInsecureTransport` drops the first and the third of those, for
+ * local deployments. `opts.hostResolver` decides how strong the third one is:
+ * without it the target is judged by how the host is spelled, which does not
+ * stop a public name pointing inside the network.
+ *
  * @throws Error for any rule violation, {@link ConnectionError} for transport
  * failures, and the typed {@link IppError} subclasses for a server error envelope.
  */
@@ -134,24 +164,7 @@ export async function resolveIPPLink(
   linkUrl: string,
   opts?: ResolveIPPLinkOptions,
 ): Promise<ResolvedIPPLink> {
-  return resolve(linkUrl, opts, false)
-}
-
-/**
- * Same as {@link resolveIPPLink} but also accepts `http` and targets on
- * loopback / private / link-local addresses. For local deployments and dev
- * builds only.
- *
- * This is a separate export rather than a flag because "do not pass true in
- * release" is unenforceable, while an import name is greppable and can be
- * banned outright -- `invisi-pay-web` / `invisi-pay-app` do exactly that with
- * ESLint `no-restricted-imports`. Renaming it silently disarms that guard.
- */
-export async function resolveIPPLinkUnsafe(
-  linkUrl: string,
-  opts?: ResolveIPPLinkOptions,
-): Promise<ResolvedIPPLink> {
-  return resolve(linkUrl, opts, true)
+  return resolve(linkUrl, opts, opts?.allowInsecureTransport === true)
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +181,7 @@ async function resolve(
   const { host, endpoint } = parseLinkUrl(linkUrl, allowInsecure)
 
   // Rule 4 -- decided on resolved addresses, not on the literal host.
-  if (!allowInsecure) await assertPublicTarget(host)
+  if (!allowInsecure) await assertPublicTarget(host, opts?.hostResolver)
 
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const maxBytes = opts?.maxBytes ?? DEFAULT_MAX_BYTES
@@ -275,7 +288,7 @@ async function resolve(
   // something internal by the time undici connected. Re-checking here cannot
   // un-send the request, but it does stop an internal response from being
   // handed to the caller as a payment request.
-  if (!allowInsecure) await assertPublicTarget(host)
+  if (!allowInsecure) await assertPublicTarget(host, opts?.hostResolver)
 
   // Rule 9 -- the nail that welds the short link to the protocol. A malformed
   // payload.endpoint throws from normalizeEndpoint with its own reason; only a
@@ -924,11 +937,8 @@ function normalizeEndpoint(endpoint: string | undefined, allowInsecure: boolean)
 
 // --- Rule 4: loopback / private / link-local, judged on resolved addresses ---
 
-type HostResolver = (hostname: string) => Promise<string[]>
 
-let resolverPromise: Promise<HostResolver | null> | undefined
-
-async function assertPublicTarget(host: string): Promise<void> {
+async function assertPublicTarget(host: string, lookup: HostResolver | undefined): Promise<void> {
   // The host arrives as written and lowercased. The spelling rules already
   // refused every obfuscated form of an address literal -- hex, octal, one big
   // integer, a three-segment dotted form -- so what reaches here is either the
@@ -942,13 +952,14 @@ async function assertPublicTarget(host: string): Promise<void> {
   }
   if (asIp === "public") return
 
-  const lookup = await getResolver()
-  if (lookup === null) {
-    // Browsers expose no name resolution, so the resolved-address rule cannot
-    // be enforced there -- a public name whose A record points at 127.0.0.1
-    // still gets through. What does hold in a browser is that the response is
-    // unreadable without permissive CORS, which internal services rarely send.
-    // This name check only catches the honest local-dev cases.
+  if (lookup === undefined) {
+    // No resolver was passed, so the resolved-address rule cannot be enforced
+    // -- a public name whose A record points at 127.0.0.1 still gets through.
+    // Browsers are permanently here (no name resolution to pass); what holds
+    // for them instead is that the response is unreadable without permissive
+    // CORS, which internal services rarely send. Node callers reach the strong
+    // form by passing `nodeHostResolver` from the "./node" subpath. This name
+    // check only catches the honest local-dev cases.
     if (LOCAL_NAME_RE.test(host)) {
       throw new Error(
         `Refusing to resolve IPP link: host "${host}" names the local machine or local network`,
@@ -981,60 +992,6 @@ async function assertPublicTarget(host: string): Promise<void> {
         `Refusing to resolve IPP link: host "${host}" resolves to a non-public address (${address})`,
       )
     }
-  }
-}
-
-function isNodeRuntime(): boolean {
-  const proc = (globalThis as { process?: { versions?: { node?: string } } }).process
-  return typeof proc?.versions?.node === "string"
-}
-
-async function getResolver(): Promise<HostResolver | null> {
-  if (resolverPromise === undefined) resolverPromise = loadNodeResolver()
-  return resolverPromise
-}
-
-/**
- * The Node resolver, or null when this is not Node.
- *
- * Null is reserved for "this runtime has no name resolution at all" -- the only
- * case allowed to fall back to the name heuristic. On Node the resolved-address
- * rule IS enforceable, so failing to load `node:dns` must throw rather than
- * return null: a stubbed specifier, a permission-restricted module, or an
- * Electron main-process bundle would otherwise silently downgrade the strictest
- * runtime to the weakest check, with nothing surfaced to the caller.
- */
-async function loadNodeResolver(): Promise<HostResolver | null> {
-  if (!isNodeRuntime()) return null
-  let lookup: unknown
-  try {
-    // Assembled at runtime, and deliberately in a form no minifier folds back
-    // into a literal: web bundlers that see a literal "node:dns" specifier try
-    // to resolve a Node builtin and fail the build for the browser consumers
-    // that are the majority of this package's users. The ignore comments cover
-    // the bundlers that read them; the join covers the ones that do not.
-    const specifier = ["node", "dns"].join(":")
-    const dns = await import(/* @vite-ignore */ /* webpackIgnore: true */ specifier)
-    lookup = dns?.promises?.lookup ?? dns?.default?.promises?.lookup
-  } catch (cause) {
-    throw new Error(
-      "Refusing to resolve IPP link: this is Node, where the private-network rule is " +
-        `enforceable, but "node:dns" could not be loaded (${cause instanceof Error ? cause.message : "import failed"})`,
-    )
-  }
-  if (typeof lookup !== "function") {
-    throw new Error(
-      'Refusing to resolve IPP link: this is Node, where the private-network rule is ' +
-        'enforceable, but "node:dns" exposed no promises.lookup',
-    )
-  }
-  const fn = lookup as (
-    hostname: string,
-    opts: { all: true; verbatim: true },
-  ) => Promise<Array<{ address: string }>>
-  return async (hostname: string) => {
-    const records = await fn(hostname, { all: true, verbatim: true })
-    return records.map((r) => r.address)
   }
 }
 

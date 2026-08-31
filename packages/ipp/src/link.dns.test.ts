@@ -1,18 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { encodeIPPRequest } from "./codec"
+import { resolveIPPLink } from "./link"
+import { ConnectionError } from "./errors"
+import type { HostResolver } from "./link"
 import type { IPPRequest } from "./types"
 
 // Rule 4 cases that need control over what a NAME resolves to. link.test.ts
-// deliberately never mocks the resolver -- its rule-4 cases use address literals
-// so they exercise the real code path. Here `node:dns` is replaced instead, which
-// is the only way to reach three things: the fail-closed branch when the module
-// cannot be loaded, the re-check that runs AFTER the response, and the attack
-// rule 4 exists for (a public name whose A record points somewhere internal).
-//
-// Every test re-imports ./link through a fresh module graph, because the module
-// memoizes its resolver. That also means the error classes must come from the
-// SAME fresh graph -- a statically imported ConnectionError would be a different
-// class object and `toBeInstanceOf` would fail for the wrong reason.
+// deliberately never passes a resolver -- its rule-4 cases use address literals
+// so they exercise the spelling path. Here a resolver is injected instead, which
+// is the only way to reach two things: the re-check that runs AFTER the response,
+// and the attack rule 4 exists for (a public name whose A record points inside).
 
 const HOST = "pay.example.com"
 const TOKEN = "AbCdEfGhIjKlMnOpQrStUv"
@@ -48,76 +45,25 @@ function response(body: string): Response {
   } as unknown as Response
 }
 
-type LookupResult = Array<{ address: string; family: number }>
-
-/** Load ./link and ./errors through a fresh graph with `node:dns` replaced. */
-async function loadWithDns(factory: () => unknown) {
-  vi.resetModules()
-  vi.doMock("node:dns", factory)
-  const link = await import("./link")
-  const errors = await import("./errors")
-  return { link, errors }
-}
-
-/** A `node:dns` stand-in whose promises.lookup is the given spy. */
-function dnsModule(lookup: (...args: unknown[]) => Promise<LookupResult>) {
-  return () => ({ promises: { lookup }, default: { promises: { lookup } } })
-}
-
 let mockFetch: ReturnType<typeof vi.fn<Parameters<typeof fetch>, Promise<Response>>>
 
 beforeEach(() => {
   mockFetch = vi.fn<Parameters<typeof fetch>, Promise<Response>>()
 })
 
-afterEach(() => {
-  vi.doUnmock("node:dns")
-  vi.resetModules()
-})
-
-describe("rule 4 -- fail closed on Node", () => {
-  it("throws instead of downgrading when node:dns cannot be imported", async () => {
-    // A Node-targeted bundle that stubbed the runtime-assembled specifier, a
-    // permission-restricted module, an Electron main-process build. Returning
-    // null here would silently drop the strictest runtime to the weakest check.
-    const { link } = await loadWithDns(() => {
-      throw new Error("module blocked")
-    })
-    await expect(link.resolveIPPLink(LINK, { fetch: mockFetch })).rejects.toThrow(
-      /"node:dns" could not be loaded/,
-    )
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it("throws when node:dns exposes no promises.lookup", async () => {
-    // Both shapes present but empty: vitest's mock namespace throws on a missing
-    // `default`, which would land in the import-failed branch and hide this one.
-    const { link } = await loadWithDns(() => ({ promises: {}, default: { promises: {} } }))
-    await expect(link.resolveIPPLink(LINK, { fetch: mockFetch })).rejects.toThrow(
-      /exposed no promises\.lookup/,
-    )
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-})
-
 describe("rule 4 -- the attack the rule exists for", () => {
   it("rejects a public name whose A record points at cloud metadata", async () => {
-    const lookup = vi.fn(async () => [{ address: "169.254.169.254", family: 4 }])
-    const { link } = await loadWithDns(dnsModule(lookup))
-    await expect(link.resolveIPPLink(LINK, { fetch: mockFetch })).rejects.toThrow(
+    const hostResolver = vi.fn<[string], Promise<string[]>>(async () => ["169.254.169.254"])
+    await expect(resolveIPPLink(LINK, { fetch: mockFetch, hostResolver })).rejects.toThrow(
       /resolves to a non-public address \(169\.254\.169\.254\)/,
     )
     expect(mockFetch).not.toHaveBeenCalled()
-    expect(lookup).toHaveBeenCalledWith(HOST, { all: true, verbatim: true })
+    expect(hostResolver).toHaveBeenCalledWith(HOST)
   })
 
   it("rejects when only one of several answers is internal", async () => {
-    const lookup = vi.fn(async () => [
-      { address: "93.184.216.34", family: 4 },
-      { address: "10.0.0.5", family: 4 },
-    ])
-    const { link } = await loadWithDns(dnsModule(lookup))
-    await expect(link.resolveIPPLink(LINK, { fetch: mockFetch })).rejects.toThrow(
+    const hostResolver: HostResolver = async () => ["93.184.216.34", "10.0.0.5"]
+    await expect(resolveIPPLink(LINK, { fetch: mockFetch, hostResolver })).rejects.toThrow(
       /resolves to a non-public address \(10\.0\.0\.5\)/,
     )
     expect(mockFetch).not.toHaveBeenCalled()
@@ -127,23 +73,39 @@ describe("rule 4 -- the attack the rule exists for", () => {
     // 64:ff9b::a00:1 is 10.0.0.1 behind NAT64. A hostile resolver answering
     // AAAA is the realistic way to reach this wrapper, which is why the
     // embedded-IPv4 unwrapping has to run on resolved addresses too.
-    const lookup = vi.fn(async () => [{ address: "64:ff9b::a00:1", family: 6 }])
-    const { link } = await loadWithDns(dnsModule(lookup))
-    await expect(link.resolveIPPLink(LINK, { fetch: mockFetch })).rejects.toThrow(
+    const hostResolver: HostResolver = async () => ["64:ff9b::a00:1"]
+    await expect(resolveIPPLink(LINK, { fetch: mockFetch, hostResolver })).rejects.toThrow(
       /resolves to a non-public address/,
     )
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
   it("allows a name that resolves entirely to public addresses", async () => {
-    const lookup = vi.fn(async () => [
-      { address: "93.184.216.34", family: 4 },
-      { address: "2606:2800:220:1::1", family: 6 },
-    ])
-    const { link } = await loadWithDns(dnsModule(lookup))
+    const hostResolver: HostResolver = async () => ["93.184.216.34", "2606:2800:220:1::1"]
     mockFetch.mockResolvedValue(response(encodeIPPRequest(makeRequest(ENDPOINT), "json")))
-    const { endpoint } = await link.resolveIPPLink(LINK, { fetch: mockFetch })
+    const { endpoint } = await resolveIPPLink(LINK, { fetch: mockFetch, hostResolver })
     expect(endpoint).toBe(ENDPOINT)
+  })
+})
+
+describe("rule 4 -- without a resolver the check is only as strong as the spelling", () => {
+  it("lets a public name through without asking where it points", async () => {
+    // The documented cost of not passing `hostResolver`: browsers have no name
+    // resolution to pass, so this is the browser's permanent state, and a Node
+    // caller that skips `nodeHostResolver` opts into the same weaker check.
+    // Deleting the resolver plumbing must NOT be able to keep the suite green:
+    // the cases above are what notice, which is why they inject one.
+    mockFetch.mockResolvedValue(response(encodeIPPRequest(makeRequest(ENDPOINT), "json")))
+    const { endpoint } = await resolveIPPLink(LINK, { fetch: mockFetch })
+    expect(endpoint).toBe(ENDPOINT)
+  })
+
+  it("still refuses a name that says out loud it is local", async () => {
+    const local = "http://box.local/ipp/v1/link/" + TOKEN
+    await expect(resolveIPPLink(local.replace("http:", "https:"), { fetch: mockFetch })).rejects.toThrow(
+      /names the local machine or local network/,
+    )
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 })
 
@@ -153,26 +115,26 @@ describe("rule 4 -- re-check after the response", () => {
     // so a name can rebind between the check and the connect. This second check
     // cannot un-send the request; it stops the response being handed to the
     // caller as a payment request. Deleting it must make this test go red.
-    const lookup = vi
-      .fn<unknown[], Promise<LookupResult>>()
-      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
-      .mockResolvedValueOnce([{ address: "10.0.0.5", family: 4 }])
-    const { link } = await loadWithDns(dnsModule(lookup))
+    const hostResolver = vi
+      .fn<[string], Promise<string[]>>()
+      .mockResolvedValueOnce(["93.184.216.34"])
+      .mockResolvedValueOnce(["10.0.0.5"])
     mockFetch.mockResolvedValue(response(encodeIPPRequest(makeRequest(ENDPOINT), "json")))
 
-    await expect(link.resolveIPPLink(LINK, { fetch: mockFetch })).rejects.toThrow(
+    await expect(resolveIPPLink(LINK, { fetch: mockFetch, hostResolver })).rejects.toThrow(
       /resolves to a non-public address \(10\.0\.0\.5\)/,
     )
     expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(lookup).toHaveBeenCalledTimes(2)
+    expect(hostResolver).toHaveBeenCalledTimes(2)
   })
 
-  it("does not re-check for resolveIPPLinkUnsafe", async () => {
-    const lookup = vi.fn(async () => [{ address: "10.0.0.5", family: 4 }])
-    const { link } = await loadWithDns(dnsModule(lookup))
+  it("does not re-check when allowInsecureTransport is set", async () => {
+    const hostResolver = vi.fn<[string], Promise<string[]>>(async () => ["10.0.0.5"])
     mockFetch.mockResolvedValue(response(encodeIPPRequest(makeRequest(ENDPOINT), "json")))
-    await expect(link.resolveIPPLinkUnsafe(LINK, { fetch: mockFetch })).resolves.toBeDefined()
-    expect(lookup).not.toHaveBeenCalled()
+    await expect(
+      resolveIPPLink(LINK, { fetch: mockFetch, hostResolver, allowInsecureTransport: true }),
+    ).resolves.toBeDefined()
+    expect(hostResolver).not.toHaveBeenCalled()
   })
 })
 
@@ -181,20 +143,22 @@ describe("rule 4 -- a lookup failure is a transport failure", () => {
     // Being offline is not a verdict about this host. Reporting it as one has
     // the wallet tell the user "refused to resolve", which reads as "this code
     // is dangerous" rather than "you have no network".
-    const lookup = vi.fn(async () => {
+    const hostResolver: HostResolver = async () => {
       throw Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" })
-    })
-    const { link, errors } = await loadWithDns(dnsModule(lookup as never))
-    const err = await link.resolveIPPLink(LINK, { fetch: mockFetch }).catch((e: unknown) => e)
-    expect(err).toBeInstanceOf(errors.ConnectionError)
+    }
+    const err = await resolveIPPLink(LINK, { fetch: mockFetch, hostResolver }).catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(ConnectionError)
     expect((err as Error).message).not.toMatch(/Refusing/)
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
   it("reports an empty answer as ConnectionError too", async () => {
-    const lookup = vi.fn(async () => [] as LookupResult)
-    const { link, errors } = await loadWithDns(dnsModule(lookup))
-    const err = await link.resolveIPPLink(LINK, { fetch: mockFetch }).catch((e: unknown) => e)
-    expect(err).toBeInstanceOf(errors.ConnectionError)
+    const hostResolver: HostResolver = async () => []
+    const err = await resolveIPPLink(LINK, { fetch: mockFetch, hostResolver }).catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(ConnectionError)
   })
 })

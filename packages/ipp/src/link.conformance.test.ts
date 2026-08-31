@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach } from "vitest"
 import { readFileSync } from "node:fs"
 import { encodeIPPRequest, decodeIPPRequest } from "./codec"
+import * as link from "./link"
+import * as errorsMod from "./errors"
+import type { HostResolver } from "./link"
 import type { IPPRequest } from "./types"
 
 // Conformance run against the shared 06-ipp/6.6 fixture.
@@ -126,27 +129,13 @@ function assertNoUnhandledKeys(id: string, obj: Record<string, unknown>, consume
  */
 let currentAnswers: string[] = [PUBLIC_STUB_ADDRESS]
 
-type LinkModule = typeof import("./link")
-type ErrorsModule = typeof import("./errors")
-let link: LinkModule
-// From the SAME fresh graph as ./link. A statically imported IppError would be a
-// different class object and `instanceof` would answer no for the wrong reason.
-let errorsMod: ErrorsModule
-
-beforeAll(async () => {
-  // node:dns is replaced so no case in this file touches the network, and so
-  // the fixture's `resolves_to` answers can be delivered verbatim. The module
-  // memoizes its resolver on first use, which is why the lookup is a stable
-  // dispatcher over `currentAnswers` rather than a per-test spy.
-  vi.resetModules()
-  vi.doMock("node:dns", () => {
-    const lookup = async (): Promise<Array<{ address: string; family: number }>> =>
-      currentAnswers.map((address) => ({ address, family: address.includes(":") ? 6 : 4 }))
-    return { promises: { lookup }, default: { promises: { lookup } } }
-  })
-  link = await import("./link")
-  errorsMod = await import("./errors")
-})
+/**
+ * Delivers the fixture's `resolves_to` answers verbatim, so no case in this
+ * file touches the network. It reads `currentAnswers` on each call rather than
+ * closing over a per-case list: a reject case is resolved twice (once before
+ * the fetch, once after) and both reads must see the value the case set.
+ */
+const hostResolver: HostResolver = async () => currentAnswers
 
 beforeEach(() => {
   currentAnswers = [PUBLIC_STUB_ADDRESS]
@@ -323,7 +312,7 @@ describe("link_urls.accept", () => {
         { "Content-Type": "application/json" },
         jsonBytes(encodeIPPRequest(requestWithEndpoint(c.endpoint), "json")),
       )
-      const { endpoint } = await link.resolveIPPLink(c.url, { fetch: stub.fetch })
+      const { endpoint } = await link.resolveIPPLink(c.url, { fetch: stub.fetch, hostResolver })
       expect(endpoint).toBe(c.endpoint)
       expect(stub.calls).toBe(1)
       // The URL goes out AS SCANNED, byte for byte. Only the derived endpoint is
@@ -385,7 +374,7 @@ describe("link_urls.reject", () => {
       currentAnswers = answersFor(c)
       const stub = noFetch()
       const outcome = await link
-        .resolveIPPLink(rejectInput(c), { fetch: stub.fetch })
+        .resolveIPPLink(rejectInput(c), { fetch: stub.fetch, hostResolver })
         .then(() => "accepted" as const)
         .catch((err: unknown) =>
           String(err).includes(REACHED_THE_NETWORK) ? ("accepted" as const) : ("rejected" as const),
@@ -432,7 +421,7 @@ describe("host_policy.public_addresses", () => {
       )
       const { endpoint } = await link.resolveIPPLink(
         `${expected}/ipp/v1/link/${token ?? ""}`,
-        { fetch: stub.fetch },
+        { fetch: stub.fetch, hostResolver },
       )
       expect({ address: pub.address, endpoint }).toEqual({ address: pub.address, endpoint: expected })
     })
@@ -548,7 +537,7 @@ describe("resolve", () => {
       let endpoint: string | null = null
       let err: unknown = null
       try {
-        const out = await link.resolveIPPLink(c.url, { fetch: stub.fetch })
+        const out = await link.resolveIPPLink(c.url, { fetch: stub.fetch, hostResolver })
         request = out.request
         endpoint = out.endpoint
       } catch (caught) {
@@ -687,7 +676,7 @@ describe("envelope.error_envelope_shape_pairs", () => {
     if (c === undefined) throw new Error(`pair names case "${id}", which is not in the fixture`)
     const stub = stubFetch(c.response.status, c.response.headers ?? {}, resolveBody(c))
     const err = await link
-      .resolveIPPLink(c.url, { fetch: stub.fetch })
+      .resolveIPPLink(c.url, { fetch: stub.fetch, hostResolver })
       .then(() => null)
       .catch((caught: unknown) => caught)
     if (err === null) throw new Error(`case ${id} was accepted; an error envelope must be refused`)

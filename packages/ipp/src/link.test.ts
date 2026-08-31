@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { resolveIPPLink, resolveIPPLinkUnsafe } from "./link"
+import { resolveIPPLink } from "./link"
+import type { ResolveIPPLinkOptions } from "./link"
 import { encodeIPPRequest, decodeIPPRequest } from "./codec"
 import { NotFoundError, InvalidRequestError, ConnectionError } from "./errors"
 import type { IPPRequest } from "./types"
@@ -109,6 +110,16 @@ function ok(endpoint = ENDPOINT) {
 // ---------------------------------------------------------------------------
 // Rule 1 -- shape match, and no request is issued when it fails
 // ---------------------------------------------------------------------------
+
+/**
+ * The relaxed call, spelled once. Every case below that needs `http` or a
+ * private target goes through here, so the cases stay about the rule they
+ * cover; the flag itself is exercised literally in the `allowInsecureTransport`
+ * block, which is where a change to its name or meaning should show up.
+ */
+const resolveInsecure = (linkUrl: string, opts: ResolveIPPLinkOptions = {}) =>
+  resolveIPPLink(linkUrl, { ...opts, allowInsecureTransport: true })
+
 
 describe("resolveIPPLink -- rule 1: shape match happens before any request", () => {
   const rejected: Array<[string, string]> = [
@@ -231,7 +242,7 @@ describe("resolveIPPLink -- rule 1: shape match happens before any request", () 
     // Unsafe variant keeps this off a resolver; the URL parsing it exercises is
     // shared with resolveIPPLink. "api-test.<domain>" is the deployed shape.
     mockFetch.mockResolvedValueOnce(response(jsonBody("https://api-test.invisipay.fi")))
-    const { endpoint } = await resolveIPPLinkUnsafe(
+    const { endpoint } = await resolveInsecure(
       `https://api-test.invisipay.fi/ipp/v1/link/${TOKEN}`,
       { fetch: mockFetch },
     )
@@ -315,7 +326,7 @@ describe("resolveIPPLink -- rule 2: URL normalization", () => {
     // payload.endpoint may legitimately arrive uppercased. Scheme case is not;
     // see the pair of cases below.
     mockFetch.mockResolvedValueOnce(response(jsonBody("http://LocalHost:3000")))
-    const { endpoint } = await resolveIPPLinkUnsafe(
+    const { endpoint } = await resolveInsecure(
       `http://LOCALHOST:3000/ipp/v1/link/${TOKEN}`,
       { fetch: mockFetch },
     )
@@ -334,7 +345,7 @@ describe("resolveIPPLink -- rule 2: URL normalization", () => {
       ).rejects.toThrow(/scheme must be the lowercase literal/)
     }
     await expect(
-      resolveIPPLinkUnsafe(`HTTP://${PUBLIC_HOST}/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
+      resolveInsecure(`HTTP://${PUBLIC_HOST}/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
     ).rejects.toThrow(/scheme must be the lowercase literal/)
     expect(mockFetch).not.toHaveBeenCalled()
   })
@@ -386,11 +397,16 @@ describe("resolveIPPLink -- rule 4: private network targets", () => {
   }
 
   it("judges a name by the address it resolves to, not by the name itself", async () => {
-    // "localhost" is not an address literal, so reaching a verdict here requires
-    // the resolver to have run -- the error names the address it came back with.
+    // A name is not an address literal, so reaching a verdict here requires the
+    // injected resolver to have run -- the error names the address it came back
+    // with. Note the name itself is unremarkable: the spelling rule would let
+    // it through, and only the answer condemns it.
     await expect(
-      resolveIPPLink(`https://localhost/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
-    ).rejects.toThrow(/resolves to a non-public address \((127\.0\.0\.1|::1)\)/)
+      resolveIPPLink(`https://pay.example.com/ipp/v1/link/${TOKEN}`, {
+        fetch: mockFetch,
+        hostResolver: async () => ["127.0.0.1"],
+      }),
+    ).rejects.toThrow(/resolves to a non-public address \(127\.0\.0\.1\)/)
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
@@ -527,30 +543,30 @@ describe("resolveIPPLink -- rule 9: endpoint cross-check", () => {
 })
 
 // ---------------------------------------------------------------------------
-// Unsafe variant -- the only door to http and private targets
+// allowInsecureTransport -- the only door to http and private targets
 // ---------------------------------------------------------------------------
 
-describe("resolveIPPLinkUnsafe", () => {
+describe("allowInsecureTransport", () => {
   const localLink = `http://127.0.0.1:8080/ipp/v1/link/${TOKEN}`
   const localEndpoint = "http://127.0.0.1:8080"
 
   it("resolves an http link on loopback", async () => {
     mockFetch.mockResolvedValueOnce(response(jsonBody(localEndpoint)))
-    const { endpoint } = await resolveIPPLinkUnsafe(localLink, { fetch: mockFetch })
+    const { endpoint } = await resolveInsecure(localLink, { fetch: mockFetch })
     expect(endpoint).toBe(localEndpoint)
   })
 
   it("resolves an https link on a CGNAT address", async () => {
     mockFetch.mockResolvedValueOnce(response(jsonBody("https://100.64.0.1")))
     await expect(
-      resolveIPPLinkUnsafe(`https://100.64.0.1/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
+      resolveInsecure(`https://100.64.0.1/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
     ).resolves.toBeDefined()
   })
 
   it("resolves an https link on a private address", async () => {
     mockFetch.mockResolvedValueOnce(response(jsonBody("https://192.168.1.9")))
     await expect(
-      resolveIPPLinkUnsafe(`https://192.168.1.9/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
+      resolveInsecure(`https://192.168.1.9/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
     ).resolves.toBeDefined()
   })
 
@@ -566,15 +582,15 @@ describe("resolveIPPLinkUnsafe", () => {
 
   it("still enforces shape, normalization and the cross-check", async () => {
     await expect(
-      resolveIPPLinkUnsafe(`http://good.com@127.0.0.1/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
+      resolveInsecure(`http://good.com@127.0.0.1/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
     ).rejects.toThrow(/must not contain userinfo/)
     await expect(
-      resolveIPPLinkUnsafe(`http://127.0.0.1/ipp/v1/link/short`, { fetch: mockFetch }),
+      resolveInsecure(`http://127.0.0.1/ipp/v1/link/short`, { fetch: mockFetch }),
     ).rejects.toThrow(/Invalid IPP link/)
     expect(mockFetch).not.toHaveBeenCalled()
 
     mockFetch.mockResolvedValueOnce(response(jsonBody("http://127.0.0.1:9999")))
-    await expect(resolveIPPLinkUnsafe(localLink, { fetch: mockFetch })).rejects.toThrow(
+    await expect(resolveInsecure(localLink, { fetch: mockFetch })).rejects.toThrow(
       /endpoint mismatch/,
     )
   })
@@ -995,7 +1011,7 @@ describe("resolveIPPLink -- W1: authority spelling", () => {
     // Unsafe variant so a name needs no resolver; the URL parsing is shared.
     const puny = "xn--py-via.example.com"
     mockFetch.mockResolvedValueOnce(response(jsonBody(`https://${puny}`)))
-    const { endpoint } = await resolveIPPLinkUnsafe(`https://${puny}/ipp/v1/link/${TOKEN}`, {
+    const { endpoint } = await resolveInsecure(`https://${puny}/ipp/v1/link/${TOKEN}`, {
       fetch: mockFetch,
     })
     expect(endpoint).toBe(`https://${puny}`)
@@ -1115,7 +1131,7 @@ describe("resolveIPPLink -- W1: the host has exactly one legal spelling", () => 
       const derived = `https://${host.toLowerCase()}`
       mockFetch.mockResolvedValueOnce(response(jsonBody(derived)))
       // Unsafe entry so a name needs no resolver; the spelling rules are shared.
-      const { endpoint } = await resolveIPPLinkUnsafe(
+      const { endpoint } = await resolveInsecure(
         `https://${host}/ipp/v1/link/${TOKEN}`,
         { fetch: mockFetch },
       )
@@ -1176,7 +1192,7 @@ describe("resolveIPPLink -- W1: 'ends in a number' matches the URL Standard", ()
       const host = `a.${label}`
       const link = `https://${host}/ipp/v1/link/${TOKEN}`
       if (expected) {
-        await expect(resolveIPPLinkUnsafe(link, { fetch: mockFetch })).rejects.toThrow(
+        await expect(resolveInsecure(link, { fetch: mockFetch })).rejects.toThrow(
           /must not end in a label that reads as a number/,
         )
         expect(mockFetch).not.toHaveBeenCalled()
@@ -1186,7 +1202,7 @@ describe("resolveIPPLink -- W1: 'ends in a number' matches the URL Standard", ()
       // not name resolution.
       const derived = `https://${host.toLowerCase()}`
       mockFetch.mockResolvedValueOnce(response(jsonBody(derived)))
-      const { endpoint } = await resolveIPPLinkUnsafe(link, { fetch: mockFetch })
+      const { endpoint } = await resolveInsecure(link, { fetch: mockFetch })
       expect(endpoint).toBe(derived)
     })
   }
@@ -1206,7 +1222,7 @@ describe("resolveIPPLink -- W1: 'ends in a number' matches the URL Standard", ()
       const derived = `https://a.${label}`
       mockFetch.mockResolvedValueOnce(response(jsonBody(derived)))
       await expect(
-        resolveIPPLinkUnsafe(`https://a.${label}/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
+        resolveInsecure(`https://a.${label}/ipp/v1/link/${TOKEN}`, { fetch: mockFetch }),
       ).resolves.toBeDefined()
     }
   })
@@ -1238,7 +1254,7 @@ describe("resolveIPPLink -- the endpoint is the written string", () => {
       mockFetch.mockResolvedValueOnce(response(jsonBody(expected)))
       // Unsafe entry for the names, so none of this touches a resolver; the
       // derivation is shared with resolveIPPLink.
-      const { endpoint } = await resolveIPPLinkUnsafe(
+      const { endpoint } = await resolveInsecure(
         `https://${host}/ipp/v1/link/${TOKEN}`,
         { fetch: mockFetch },
       )
@@ -1255,7 +1271,7 @@ describe("resolveIPPLink -- the endpoint is the written string", () => {
   it("requests the URL as scanned, not a re-rendering of it", async () => {
     const written = `https://API-Test.Invisipay.FI/ipp/v1/link/${TOKEN}`
     mockFetch.mockResolvedValueOnce(response(jsonBody("https://api-test.invisipay.fi")))
-    await resolveIPPLinkUnsafe(written, { fetch: mockFetch })
+    await resolveInsecure(written, { fetch: mockFetch })
     expect(mockFetch.mock.calls[0]?.[0]).toBe(written)
   })
 })
@@ -1588,7 +1604,7 @@ describe("the accepted set is defined entirely by explicit rules", () => {
       }
     }
     for (const url of sweep) {
-      const message = await resolveIPPLinkUnsafe(url, { fetch: reachedNetwork as never }).then(
+      const message = await resolveInsecure(url, { fetch: reachedNetwork as never }).then(
         () => SENTINEL,
         (e: unknown) => (e instanceof Error ? e.message : String(e)),
       )
