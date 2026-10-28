@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -37,9 +37,10 @@ jobs:
 
       - name: Run all tests with real native and WASM proofs
         run: |
-          SDK_BB_BIN="$PWD/packages/prover/node_modules/@aztec/bb.js/build/amd64-linux/bb"
+          SDK_BB_BIN="$PWD/packages/prover/node_modules/@aztec-foundation/bb.js/build/amd64-linux/bb"
           test -x "$SDK_BB_BIN"
-          INVISI_BB_BIN="$SDK_BB_BIN" INVISI_TEST_WASM=1 pnpm test
+          "$SDK_BB_BIN" --version
+          BB_BINARY_PATH="$SDK_BB_BIN" INVISI_TEST_WASM=1 pnpm test
 
       - name: Type check
         run: pnpm lint
