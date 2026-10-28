@@ -54,5 +54,10 @@
   "files": [
     "dist",
     "circuits"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
+    "directory": "packages/prover"
+  }
 }
