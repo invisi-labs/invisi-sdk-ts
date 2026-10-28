@@ -25,12 +25,12 @@ it("rejects stale releases and cancellation before executing a backend", async (
         await expect(prover.prove(statement(), { signal: controller.signal })).rejects.toThrow();
     }
 });
-const real = process.env.INVISI_BB_BIN ? it : it.skip;
+const real = process.env.BB_BINARY_PATH ? it : it.skip;
 real(
     "runs explicit native and WASM services with independent verification and frozen statements",
     async () => {
         const request = statement(),
-            native = new NativeProver({ bbBin: process.env.INVISI_BB_BIN!, threads: 4 });
+            native = new NativeProver({ bbBin: process.env.BB_BINARY_PATH!, threads: 4 });
         const phases: string[] = [],
             proof = await native.prove(request, { onProgress: (p) => phases.push(p.phase) });
         expect(phases).toEqual(["witness", "proving", "verifying", "complete"]);

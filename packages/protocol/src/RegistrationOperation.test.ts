@@ -36,7 +36,7 @@ async function fixture() {
                 formatVersion: 1 as const,
                 circuitName: request.circuitName,
                 target: request.target,
-                bbVersion: "5.2.1" as const,
+                bbVersion: "6.0.0" as const,
                 artifactSha256: request.artifactSha256,
                 vkSha256: request.vkSha256,
                 proofHex,

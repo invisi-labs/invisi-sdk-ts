@@ -42,7 +42,7 @@ it("builds ready sweep calldata through the public-wallet operation without auth
             target: request.target,
             artifactSha256: request.artifactSha256,
             vkSha256: request.vkSha256,
-            bbVersion: "5.2.1" as const,
+            bbVersion: "6.0.0" as const,
             proofHex,
             proofSha256: Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join(""),
             publicInputs: [...request.expectedPublicInputs],

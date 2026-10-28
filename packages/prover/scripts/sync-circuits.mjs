@@ -42,7 +42,7 @@ try {
     const entries = [];
     for (const manifest of manifests) {
         assert.equal(manifest.complete, true);
-        assert.equal(manifest.bbVersion, "5.2.1");
+        assert.equal(manifest.bbVersion, "6.0.0");
         for (const [path, hash] of Object.entries(manifest.dependencies))
             assert.equal(digest(readFileSync(join(root, path))), hash, `stale source ${path}`);
         for (const entry of [...(manifest.entries ?? [manifest]), ...(manifest.aggregates ?? [])]) {
@@ -67,7 +67,7 @@ try {
                 const vkJsonBytes = readFileSync(join(root, key.vkJson));
                 assert.equal(digest(vkJsonBytes), key.vkJsonSha256, `stale VK JSON ${entry.name}`);
                 const vkJson = JSON.parse(vkJsonBytes);
-                assert.equal(vkJson.bb_version, "5.2.1");
+                assert.equal(vkJson.bb_version, "6.0.0");
                 assert.equal(vkJson.scheme, "ultra_honk");
                 let recursiveMetadata = {};
                 if (key.target === "noir-recursive") {
@@ -83,7 +83,7 @@ try {
                         Buffer.from(vkFields.map((v) => v.slice(2)).join(""), "hex"),
                         "recursive binary/JSON VK mismatch"
                     );
-                    const { Barretenberg, BackendType } = await import("@aztec/bb.js");
+                    const { Barretenberg, BackendType } = await import("@aztec-foundation/bb.js");
                     recursiveHasher ??= await Barretenberg.new({
                         threads: 1,
                         backend: BackendType.Wasm,
@@ -139,8 +139,8 @@ try {
             "aggregate inner key commitment mismatch"
         );
     const release = {
-        bbVersion: "5.2.1",
-        noirVersion: "1.0.0-rc.4",
+        bbVersion: "6.0.0",
+        noirVersion: "1.0.0-rc.6",
         manifests: manifests.map((m, i) => ({
             name: ["transact-user", "credit", "wallet-registration"][i],
             sha256: digest(readFileSync(join(root, manifestPaths[i]))),

@@ -3,9 +3,9 @@ import { checkBBAvailable } from "./backend-bb";
 import { generateProofBundle, verifyProofBundle } from "./prover";
 import { CANCEL_FIXTURE, USER_FIXTURE, TOP_UP_FIXTURE, SWEEP_FIXTURE } from "./test-fixtures";
 import { createRegistrationFixture } from "./registration-fixture";
-const bbBin = process.env.INVISI_BB_BIN;
+const bbBin = process.env.BB_BINARY_PATH;
 const native = bbBin ? describe : describe.skip;
-native("real BB5.2.1 native proving (set INVISI_BB_BIN)", () => {
+native("real BB6.0.0 native proving (set BB_BINARY_PATH)", () => {
     it("requires the pinned BB version", async () => {
         expect(await checkBBAvailable(bbBin)).toBe(true);
     });

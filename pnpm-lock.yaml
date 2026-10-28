@@ -72,9 +72,9 @@ importers:
 
   packages/core:
     dependencies:
-      '@aztec/bb.js':
-        specifier: 5.2.1
-        version: 5.2.1
+      '@aztec-foundation/bb.js':
+        specifier: 6.0.0
+        version: 6.0.0
       '@noble/curves':
         specifier: 1.9.1
         version: 1.9.1
@@ -126,15 +126,15 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@noir-lang/noir_js':
-        specifier: 1.0.0-rc.3
-        version: 1.0.0-rc.3
+        specifier: 1.0.0-rc.6
+        version: 1.0.0-rc.6
       ethers:
         specifier: ^6.17.0
         version: 6.17.0
     optionalDependencies:
-      '@aztec/bb.js':
-        specifier: 5.2.1
-        version: 5.2.1
+      '@aztec-foundation/bb.js':
+        specifier: 6.0.0
+        version: 6.0.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -266,8 +266,8 @@ packages:
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
 
-  '@aztec/bb.js@5.2.1':
-    resolution: {integrity: sha512-8m7GKOkYbfzrCJWA9D/pwYQt6xGVWlnumXigR3bPUKtuRPagLxxTPgmBiJZDZUUwYBQodlJ6PiHfxrvEoGqn9g==}
+  '@aztec-foundation/bb.js@6.0.0':
+    resolution: {integrity: sha512-w+rlVHbSbb1neDeJGMDSbNZCxuD6TeSrN/1lbnVgqhKcVfqdDXdTt2b6RUToCsk7Q2Dmx4oqU5tfBcFY//LQtg==}
     hasBin: true
 
   '@babel/code-frame@7.29.0':
@@ -761,17 +761,17 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@noir-lang/acvm_js@1.0.0-rc.3':
-    resolution: {integrity: sha512-bTTrcPphNHVrFkbJPVcFrrigwwU/N9+trgEa9PF2X/VWWAX0B1gOGSBwqziOKMwThpU7H2Jb3Z6OFMEhpMKaEQ==}
+  '@noir-lang/acvm_js@1.0.0-rc.6':
+    resolution: {integrity: sha512-lGfiYGDQky6QtxVHtz6pJyGaOVR5y3SETlF1MuR6DwVIrK42m3LJkWfM/+duY0tWLI1SM0T61VGLT03cXgTuyQ==}
 
-  '@noir-lang/noir_js@1.0.0-rc.3':
-    resolution: {integrity: sha512-NrJZPd7zpBWXzP240rP78fr6RE8vg3mFIMIsT5Xiqbh6zdBKfLI8Nb7Ea4UFwFWyRFDqZO3qGd3HbGyRWxxZ8Q==}
+  '@noir-lang/noir_js@1.0.0-rc.6':
+    resolution: {integrity: sha512-dpKcx/+Skrgsny2/+XP+aQMwTyfdTC1akFpLco95pwYQ34P1uhogVECz9Fsg/4571w7P2ialMqLpV0KOmVZqvw==}
 
-  '@noir-lang/noirc_abi@1.0.0-rc.3':
-    resolution: {integrity: sha512-jax7q2CAAG4jxCzr8MllH/LZxnxnS5PF1YyzmFJ7DTf97k3+LaHSnBPXE8TwQYDsWwyNxQTqDWw1QVEoO1ESaQ==}
+  '@noir-lang/noirc_abi@1.0.0-rc.6':
+    resolution: {integrity: sha512-wxMX+8GV9sAABu8P9cY++N6vduIBq0BEc2jDxsd0rwPHkQnpH69/jNWIkv2Co3wMiVmDoIRLkjJAZazMZVdhUg==}
 
-  '@noir-lang/types@1.0.0-rc.3':
-    resolution: {integrity: sha512-k1UHd67/OSPJb9E6WNKeMtuoDbflLpu803jtbaVqDlr2P/rH8+joDuIxK+nwBMVlnCO2LlcJaN4wpQ/TRHJ78w==}
+  '@noir-lang/types@1.0.0-rc.6':
+    resolution: {integrity: sha512-3pkaFwuRjbSfXUlqnrgORUxlb14nwnjrKX5oBGQiAs8z49+KfzvBMQNkPqJSD0lKNmFcZx7OydQaAhW35Cg+VQ==}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     resolution: {integrity: sha512-upnNBkA6ZH2VKGcBj9Fyl9IGNPULcjXRlg0LLeaioQWueH30p6IXtJEbKAgvyv+mJaMxSm1l6xwDXYjpEMiLMg==}
@@ -1669,6 +1669,9 @@ packages:
     resolution: {integrity: sha512-Pdlw/oPxN+aXdmM9R00JVC9WVFoCLTKJvDVLgmJ+qAffBMxsV85l/Lu7sNx4zSzPyoL2euImuEwHhOXdEgNFZQ==}
     engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
 
+  proper-lockfile@4.1.2:
+    resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
+
   psl@1.15.0:
     resolution: {integrity: sha512-JZd3gMVBAVQkSs6HdNZo9Sdo0LNcQeMNP3CozBJb3JYC/QUYZTnKxP+f8oWRX4rHP5EurWxqAHTSwUCjlNKa1w==}
 
@@ -1718,6 +1721,10 @@ packages:
   resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
 
+  retry@0.12.0:
+    resolution: {integrity: sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==}
+    engines: {node: '>= 4'}
+
   reusify@1.1.0:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
@@ -1761,6 +1768,9 @@ packages:
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
+
+  signal-exit@3.0.7:
+    resolution: {integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==}
 
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
@@ -2071,13 +2081,14 @@ snapshots:
       '@csstools/css-tokenizer': 3.0.4
       lru-cache: 10.4.3
 
-  '@aztec/bb.js@5.2.1':
+  '@aztec-foundation/bb.js@6.0.0':
     dependencies:
       comlink: 4.4.2
       commander: 12.1.0
       idb-keyval: 6.2.2
       msgpackr: 1.11.9
       pako: 2.1.0
+      proper-lockfile: 4.1.2
       tslib: 2.8.1
 
   '@babel/code-frame@7.29.0':
@@ -2494,20 +2505,20 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@noir-lang/acvm_js@1.0.0-rc.3': {}
+  '@noir-lang/acvm_js@1.0.0-rc.6': {}
 
-  '@noir-lang/noir_js@1.0.0-rc.3':
+  '@noir-lang/noir_js@1.0.0-rc.6':
     dependencies:
-      '@noir-lang/acvm_js': 1.0.0-rc.3
-      '@noir-lang/noirc_abi': 1.0.0-rc.3
-      '@noir-lang/types': 1.0.0-rc.3
+      '@noir-lang/acvm_js': 1.0.0-rc.6
+      '@noir-lang/noirc_abi': 1.0.0-rc.6
+      '@noir-lang/types': 1.0.0-rc.6
       pako: 3.0.2
 
-  '@noir-lang/noirc_abi@1.0.0-rc.3':
+  '@noir-lang/noirc_abi@1.0.0-rc.6':
     dependencies:
-      '@noir-lang/types': 1.0.0-rc.3
+      '@noir-lang/types': 1.0.0-rc.6
 
-  '@noir-lang/types@1.0.0-rc.3': {}
+  '@noir-lang/types@1.0.0-rc.6': {}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true
@@ -3394,6 +3405,12 @@ snapshots:
       ansi-styles: 5.2.0
       react-is: 18.3.1
 
+  proper-lockfile@4.1.2:
+    dependencies:
+      graceful-fs: 4.2.11
+      retry: 0.12.0
+      signal-exit: 3.0.7
+
   psl@1.15.0:
     dependencies:
       punycode: 2.3.1
@@ -3435,6 +3452,8 @@ snapshots:
 
   resolve-pkg-maps@1.0.0:
     optional: true
+
+  retry@0.12.0: {}
 
   reusify@1.1.0: {}
 
@@ -3496,6 +3515,8 @@ snapshots:
   shebang-regex@3.0.0: {}
 
   siginfo@2.0.0: {}
+
+  signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
 

@@ -7,6 +7,9 @@ describe("proof bundle validation", () => {
         const bundle = await makeProofBundle("credit_cancel", "evm", `0x${"00".repeat(32)}`, [
             ...CANCEL_FIXTURE.publicInputs,
         ]);
+        const legacy = { ...bundle };
+        Object.assign(legacy, { bbVersion: "5.2.1" });
+        await expect(assertProofBundle(legacy)).rejects.toThrow();
         await expect(
             assertProofBundle({ ...bundle, artifactSha256: "0".repeat(64) })
         ).rejects.toThrow("Stale");

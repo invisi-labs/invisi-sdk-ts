@@ -107,7 +107,7 @@ export async function makeProofBundle(
         formatVersion: 1,
         circuitName,
         target,
-        bbVersion: "5.2.1",
+        bbVersion: "6.0.0",
         artifactSha256: entry.artifactSha256,
         vkSha256: key.vkSha256,
         proofHex,
@@ -122,7 +122,7 @@ export async function assertProofBundle(bundle: ProofBundle): Promise<void> {
         key = getCircuitKey(bundle.circuitName, bundle.target);
     if (
         bundle.formatVersion !== 1 ||
-        bundle.bbVersion !== "5.2.1" ||
+        bundle.bbVersion !== "6.0.0" ||
         bundle.artifactSha256 !== entry.artifactSha256 ||
         bundle.vkSha256 !== key.vkSha256
     )

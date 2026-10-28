@@ -1,11 +1,11 @@
-import type { Barretenberg } from "@aztec/bb.js";
+import type { Barretenberg } from "@aztec-foundation/bb.js";
 import { FIELD_MODULUS } from "./random";
 
 let bbPromise: Promise<Barretenberg> | null = null;
 
 function getBB(): Promise<Barretenberg> {
     if (!bbPromise) {
-        bbPromise = import("@aztec/bb.js").then(({ Barretenberg, BackendType }) =>
+        bbPromise = import("@aztec-foundation/bb.js").then(({ Barretenberg, BackendType }) =>
             Barretenberg.new({ threads: 1, backend: BackendType.Wasm })
         );
     }

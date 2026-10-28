@@ -53,7 +53,7 @@ function backend(): Prover {
             return {
                 ...request,
                 formatVersion: 1 as const,
-                bbVersion: "5.2.1" as const,
+                bbVersion: "6.0.0" as const,
                 proofHex,
                 proofSha256: bytesToHex(sha256(getBytes(proofHex))),
                 publicInputs: [...request.expectedPublicInputs],

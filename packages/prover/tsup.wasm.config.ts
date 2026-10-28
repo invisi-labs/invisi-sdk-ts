@@ -7,5 +7,5 @@ export default defineConfig({
     sourcemap: false,
     clean: false,
     splitting: true,
-    external: ["@aztec/bb.js"],
+    external: ["@aztec-foundation/bb.js"],
 });

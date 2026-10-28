@@ -44,6 +44,7 @@ const fixtures = {},
     hashTyped = (data) => TypedDataEncoder.hash(data.domain, data.types, data.message);
 for (const count of [1, 15, 57, 113]) {
     const params = {
+            token: context.tokenAddress,
             sources: [{ treeId: 1n, merkleRoot: w(1) }],
             nullifiers: [w(2)],
             outputCommitments: Array.from({ length: count }, (_, i) => w(i + 3)),
@@ -67,6 +68,7 @@ for (const count of [1, 15, 57, 113]) {
     };
 }
 const creation = {
+        token: context.tokenAddress,
         sources: [],
         nullifiers: [],
         creditCommitment: w(5),
@@ -92,6 +94,7 @@ fixtures.create = {
     ),
 };
 const cancel = {
+    token: context.tokenAddress,
     source: { treeId: 1n, merkleRoot: w(1) },
     nullifier: w(2),
     owner,
@@ -116,6 +119,7 @@ fixtures.topUp = {
 };
 for (const count of [1, 2, 13, 51]) {
     const params = {
+            token: context.tokenAddress,
             sources: [{ treeId: 1n, merkleRoot: w(1) }],
             nullifiers: Array.from({ length: count }, (_, i) => w(i + 2)),
             remainderCommitments: Array(count).fill(w(0)),
@@ -150,6 +154,7 @@ const iface = new Interface(
     );
 const output = { identity: w(3), amount: 100n },
     shieldParams = {
+        token: context.tokenAddress,
         outputCommitments: [
             await n.noteCommitment(context, { walletIdentity: 1n, amount: 100n, nonce: 1n }),
         ],
@@ -160,7 +165,12 @@ shieldParams.outputCommitments = [
 ];
 const shieldHash = keccak256(
     AbiCoder.defaultAbiCoder().encode(
-        ["bytes32", "tuple(bytes32[] outputCommitments,uint256 deadline)", "bytes32", "bytes32"],
+        [
+            "bytes32",
+            "tuple(address token,bytes32[] outputCommitments,uint256 deadline)",
+            "bytes32",
+            "bytes32",
+        ],
         [
             keccak256(toUtf8Bytes("InvisiShield")),
             shieldParams,
@@ -250,6 +260,23 @@ const read = (p) => JSON.parse(readFileSync(resolve(root, p))),
     cancelWitness = read("circuits/credit_cancel/target/cancel-fixture.json"),
     topWitness = read("circuits/credit_top_up/target/topUp-fixture.json"),
     userWitness = read("circuits/transact_user_slots14/target/transact-slots-fixture.json");
+const { deriveWallet } = await from("scripts/wallet-client.mjs");
+const { createWalletTransactFixture } = await from("scripts/wallet-transact-fixtures.mjs");
+const sweepWallet = await deriveWallet(w(1));
+const sweepWitness = await createWalletTransactFixture({
+    context: {
+        chainId: 31337n,
+        protocolAddress: "0x0000000000000000000000000000000000001234",
+        tokenAddress: "0x0000000000000000000000000000000000005678",
+    },
+    wallet: sweepWallet,
+    sourceNotes: [
+        { walletIdentity: sweepWallet.walletIdentity, amount: 100n, nonce: 123n, treeId: 1n },
+    ],
+    withdrawalAddress: toBeHex(sweepWallet.walletIdentity, 20),
+    withdrawalAmount: 100n,
+});
+for (const key of ["signature", "public_key_x", "public_key_y"]) sweepWitness.witness[key].fill(0);
 const rows = [
     [
         "CANCEL_FIXTURE",
@@ -263,6 +290,13 @@ const rows = [
         },
     ],
     ["TOP_UP_FIXTURE", { witness: topWitness.witness, publicInputs: topWitness.publicInputs }],
+    [
+        "SWEEP_FIXTURE",
+        {
+            witness: sweepWitness.witness,
+            publicInputs: u.userPublicInputs(sweepWitness.publicInputs, 14),
+        },
+    ],
 ];
 writeFileSync(
     new URL("../../prover/src/test-fixtures.ts", import.meta.url),
@@ -274,4 +308,4 @@ writeFileSync(
             )
             .join("\n")
 );
-console.log("Generated current formatting vectors and three wallet-authorized Noir witnesses");
+console.log("Generated current formatting vectors and four current Noir witnesses");

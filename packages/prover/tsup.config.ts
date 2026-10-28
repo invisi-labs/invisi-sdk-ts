@@ -5,5 +5,5 @@ export default defineConfig({
     dts: true,
     sourcemap: false,
     clean: true,
-    external: ["@aztec/bb.js"],
+    external: ["@aztec-foundation/bb.js"],
 });

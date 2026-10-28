@@ -8,7 +8,7 @@ function check(ok: unknown, message: string): asserts ok {
 export function sameStatement(proof: ProofBundle, expected: ProofStatement): void {
     check(
         proof.formatVersion === 1 &&
-            proof.bbVersion === "5.2.1" &&
+            proof.bbVersion === "6.0.0" &&
             proof.circuitName === expected.circuitName &&
             proof.target === expected.target &&
             proof.artifactSha256 === expected.artifactSha256 &&

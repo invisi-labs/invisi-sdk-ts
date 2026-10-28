@@ -18,13 +18,17 @@ async function run(bbBin: string, args: string[], options: NativeOptions) {
         timeout: options.timeoutMs ?? 600_000,
         maxBuffer: 32 * 1024 * 1024,
         ...(options.signal ? { signal: options.signal } : {}),
-        env: { ...process.env, HARDWARE_CONCURRENCY: String(options.threads ?? 4) },
+        env: {
+            ...process.env,
+            BB_MSM_LEGACY: process.env.BB_MSM_LEGACY ?? "1",
+            HARDWARE_CONCURRENCY: String(options.threads ?? 4),
+        },
     });
 }
 async function assertVersion(bbBin: string, options: NativeOptions): Promise<void> {
     const result = await run(bbBin, ["--version"], options);
-    if (!/(?:^|\s)5\.2\.1(?:\s|$)/.test(result.stdout + result.stderr))
-        throw new Error("Barretenberg 5.2.1 is required");
+    if (!/(?:^|\s)6\.0\.0(?:\s|$)/.test(result.stdout + result.stderr))
+        throw new Error("Barretenberg 6.0.0 is required");
 }
 export async function checkBBAvailable(bbBin = "bb"): Promise<boolean> {
     try {
@@ -117,7 +121,7 @@ export async function proveWithBB(
             await readFile(join(directory, "public_inputs.json"), "utf8")
         ) as { public_inputs: string[] };
         if (
-            proof.bb_version !== "5.2.1" ||
+            proof.bb_version !== "6.0.0" ||
             proof.scheme !== "ultra_honk" ||
             !Array.isArray(proof.proof) ||
             !Array.isArray(inputs.public_inputs)

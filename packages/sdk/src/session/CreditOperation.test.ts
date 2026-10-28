@@ -19,7 +19,7 @@ const backend = (): Prover => ({
     prove: async (request) => ({
         ...request,
         formatVersion: 1,
-        bbVersion: "5.2.1",
+        bbVersion: "6.0.0",
         proofHex: "0x00",
         proofSha256: bytesToHex(sha256(new Uint8Array([0]))),
         publicInputs: [...request.expectedPublicInputs],

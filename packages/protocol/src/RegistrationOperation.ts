@@ -235,7 +235,7 @@ export class RegistrationOperation {
             const expected = p.statement;
             check(
                 proof.formatVersion === 1 &&
-                    proof.bbVersion === "5.2.1" &&
+                    proof.bbVersion === "6.0.0" &&
                     proof.circuitName === expected.circuitName &&
                     proof.target === expected.target &&
                     proof.artifactSha256 === expected.artifactSha256 &&

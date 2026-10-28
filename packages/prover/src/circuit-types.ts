@@ -53,7 +53,7 @@ export interface ProofBundle {
     formatVersion: 1;
     circuitName: CircuitName;
     target: ProofTarget;
-    bbVersion: "5.2.1";
+    bbVersion: "6.0.0";
     artifactSha256: string;
     vkSha256: string;
     proofHex: Hex;

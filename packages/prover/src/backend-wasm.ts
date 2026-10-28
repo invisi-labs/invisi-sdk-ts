@@ -1,4 +1,4 @@
-import type { Barretenberg as BBApi } from "@aztec/bb.js";
+import type { Barretenberg as BBApi } from "@aztec-foundation/bb.js";
 import type { CircuitName, CompiledCircuit, ProofBundle, ProofTarget } from "./circuit-types";
 import {
     assertProofBundle,
@@ -22,7 +22,7 @@ function settings(target: ProofTarget) {
     };
 }
 async function runtime(key: Uint8Array, options: WasmOptions): Promise<BBApi> {
-    const { Barretenberg, BackendType } = await import("@aztec/bb.js");
+    const { Barretenberg, BackendType } = await import("@aztec-foundation/bb.js");
     const logN = Number(BigInt(toHex(key.slice(0, 32))));
     if (!Number.isInteger(logN) || logN < 1 || logN > 28)
         throw new Error("Invalid verification key circuit size");
@@ -30,7 +30,6 @@ async function runtime(key: Uint8Array, options: WasmOptions): Promise<BBApi> {
         backend: BackendType.WasmWorker,
         threads: options.threads ?? 4,
         srsSize: 2 ** logN + 1,
-        legacyMsm: false,
         ...(options.wasmPath === undefined ? {} : { wasmPath: options.wasmPath }),
         ...(options.crsPath === undefined ? {} : { crsPath: options.crsPath }),
     });
@@ -73,7 +72,7 @@ export async function proveWithWasm(
     const api = await runtime(key, params);
     let raw: Uint8Array | undefined;
     try {
-        // 5.2.1 circuitProve accepts uncompressed witness and ACIR, with the released VK.
+        // 6.0.0 circuitProve accepts uncompressed witness and ACIR, with the released VK.
         // Use the released VK directly rather than regenerating a key.
         const compressedAcir = Uint8Array.from(atob(params.circuit.bytecode), (value) =>
             value.charCodeAt(0)

@@ -40,7 +40,7 @@ function eagerBytes(path) {
 const eager = eagerBytes(entryPair[0]);
 const eagerInputs = [...seen].flatMap((path) => Object.keys(result.metafile.outputs[path].inputs));
 assert(
-    !eagerInputs.some((path) => path.includes("/@aztec/bb.js/")),
+    !eagerInputs.some((path) => path.includes("/@aztec-foundation/bb.js/")),
     "public entry eagerly imports the proving runtime"
 );
 assert(eager < 1024 * 1024, `public entry eagerly includes heavy backend assets (${eager} bytes)`);

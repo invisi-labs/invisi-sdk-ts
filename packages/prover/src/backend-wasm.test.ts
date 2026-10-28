@@ -22,15 +22,15 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
                 threads: 4,
             });
             expect(await verifyBrowser(bundle, { threads: 4 })).toBe(true);
-            if (process.env.INVISI_BB_BIN) {
-                expect(await verifyProofBundle(bundle, { bbBin: process.env.INVISI_BB_BIN })).toBe(
+            if (process.env.BB_BINARY_PATH) {
+                expect(await verifyProofBundle(bundle, { bbBin: process.env.BB_BINARY_PATH })).toBe(
                     true
                 );
                 const native = await generateProofBundle({
                     circuitName,
                     inputs: fixture.witness,
                     target,
-                    bbBin: process.env.INVISI_BB_BIN,
+                    bbBin: process.env.BB_BINARY_PATH,
                 });
                 expect(await verifyBrowser(native, { threads: 4 })).toBe(true);
             }
@@ -48,8 +48,8 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
         });
         expect(await verifyBrowser(bundle, { threads: 4 })).toBe(true);
         expect(bundle.publicInputs).toEqual(fixture.publicInputs);
-        if (process.env.INVISI_BB_BIN) {
-            expect(await verifyProofBundle(bundle, { bbBin: process.env.INVISI_BB_BIN })).toBe(
+        if (process.env.BB_BINARY_PATH) {
+            expect(await verifyProofBundle(bundle, { bbBin: process.env.BB_BINARY_PATH })).toBe(
                 true
             );
             const native = await generateProofBundle({
@@ -57,7 +57,7 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
                 inputs: fixture.witness,
                 expectedPublicInputs: fixture.publicInputs,
                 target: "evm",
-                bbBin: process.env.INVISI_BB_BIN,
+                bbBin: process.env.BB_BINARY_PATH,
             });
             expect(await verifyBrowser(native, { threads: 4 })).toBe(true);
         }

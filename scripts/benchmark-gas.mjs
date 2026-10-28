@@ -359,7 +359,7 @@ try {
             verifier: "real",
             assumptions: [
                 "normal CREATE/Factory deployment; no code or storage injection",
-                "Solidity 0.8.27 optimizer 200; real BB 5.2.1 verifiers",
+                "Solidity 0.8.27 optimizer 200; real BB 6.0.0 verifiers",
                 "one source tree; two existing leaves; no rollover or screener",
                 "funding/approval setup excluded; complete transaction receipt gas included",
                 "exact allowance for caller funding; configured benchmark payout balances",

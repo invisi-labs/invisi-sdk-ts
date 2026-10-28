@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@invisi-labs/core": "workspace:*",
-    "@noir-lang/noir_js": "1.0.0-rc.3",
+    "@noir-lang/noir_js": "1.0.0-rc.6",
     "ethers": "^6.17.0"
   },
   "devDependencies": {
@@ -49,7 +49,7 @@
     "vitest": "^1.6.0"
   },
   "optionalDependencies": {
-    "@aztec/bb.js": "5.2.1"
+    "@aztec-foundation/bb.js": "6.0.0"
   },
   "files": [
     "dist",

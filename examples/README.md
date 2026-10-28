@@ -37,7 +37,7 @@ const invisi = new Invisi({ provider, protocolRpc, prover: new NativeProver() })
 
 `Protocol.fromRpc` selects the provider's chain and verifies deployed bytecode and protocol version. Choose a trusted service; consistency checks do not establish official provenance. `connect-custom` loads a trusted team record from `INVISI_DEPLOYMENT_FILE`. The `chains` command lists supported chains and their indexed status.
 
-Chain RPC supplies canonical blocks, receipts, contract reads and transaction submission. Protocol RPC supplies public history, candidates and authenticated paths. Private inputs, signing and proof generation stay local. `new NativeProver()` uses BB5.2.1 from PATH and defaults to four threads; set `bbBin` only for a custom executable path. Shield, connection and disclosure do not require a prover.
+Chain RPC supplies canonical blocks, receipts, contract reads and transaction submission. Protocol RPC supplies public history, candidates and authenticated paths. Private inputs, signing and proof generation stay local. `new NativeProver()` uses BB6.0.0 from PATH and defaults to four threads; set `bbBin` only for a custom executable path. Shield, connection and disclosure do not require a prover.
 
 Only capability-specific settings are needed:
 

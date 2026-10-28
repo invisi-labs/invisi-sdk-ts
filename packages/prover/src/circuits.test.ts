@@ -6,7 +6,7 @@ import type { CircuitName } from "./circuit-types";
 describe("current authenticated release", () => {
     it.each(CIRCUIT_NAMES)("authenticates %s and its direct key", (name) => {
         const circuit = loadCircuit(name);
-        expect(circuit.noir_version).toContain("1.0.0-rc.4");
+        expect(circuit.noir_version).toContain("1.0.0-rc.6");
         expect(circuit.debug_symbols).toBeUndefined();
         expect(circuit.file_map).toBeUndefined();
         expect(loadVerificationKey(name).length).toBeGreaterThan(1000);
@@ -14,10 +14,10 @@ describe("current authenticated release", () => {
     it("publishes the authenticated recursive key fields and hash required by outer witnesses", async () => {
         const key = getCircuitKey("transact_user_slots14", "noir-recursive");
         expect(key.vkSha256).toBe(
-            "8fd94d39491615e178a2bac38a3c125eb0ba536e7e8653a01d81d3c93b9ce788"
+            "148957e28e6339a8ce1121851fb7a232e31f4c5b741e415733b8d627f4b62649"
         );
         expect(key.vkHash).toBe(
-            "0x0887b767a1f88fed05b13ba42b4453b2530a996598ce307b26b0c1a43b78cfab"
+            "0x204a7bd867a375fe5d4bae522876e301ab62ae51ff6b83091639ef983d4aa8b3"
         );
         expect(key.vkFields).toHaveLength(115);
         expect(key.vkFields!.join("").replaceAll("0x", "")).toBe(key.vkHex.slice(2));
@@ -27,7 +27,7 @@ describe("current authenticated release", () => {
             ...key.vkFields!.map(BigInt),
             BigInt(key.vkHash!),
         ]);
-        expect(pin).toBe("0x0bc908c1f2cf6ef37c530616714fb716e6aa39e14e0a21e16226f5eb348167cc");
+        expect(pin).toBe("0x054fe43ede9309e4196d7de8ca89fe426e12b696f263d431fc4920f7726203e4");
         expect(pin).toBe(key.innerVkCommitment);
         for (const count of [4, 8, 12])
             expect(

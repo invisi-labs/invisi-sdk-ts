@@ -12,7 +12,7 @@ This pnpm/Turbo workspace publishes `@invisi-labs/*`. Current Solidity/Noir trut
 - `pnpm lint`: formatting, English-only repository checks and strict TypeScript checks, including examples.
 - `pnpm lint:english`: scan non-ignored project text for Chinese characters.
 - `pnpm sync:protocol`: sync generated ABIs and authenticated circuit/key assets from the sibling protocol repository. Sync scripts also accept an unpacked protocol release directory.
-- `BB_BINARY_PATH=/absolute/path/to/bb INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover test`: real native/WASM interoperability; BB must be5.2.1.
+- `BB_BINARY_PATH=/absolute/path/to/bb INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover test`: real native/WASM interoperability; BB must be6.0.0.
 
 Never publish packages, deploy, or push unless requested. Use normal commits; do not amend existing commits without explicit authorization. Commit messages are English.
 
@@ -26,7 +26,7 @@ Use ethers for generic EVM Provider/Signer, Contract, ABI, EIP712 and transactio
 
 Four ordinary capacities14/56/112/168; only14 supports recursion and aggregates4/8/12. Seven direct-only Credit routes: create,draw1/12/50/120,cancel,top-up. Credit full public widths46/6C+12/11/50; registry3. Top-up requires existing unexpired Credit, expiry not shortened and increased balance. Credit cancellation remains available after expiry/during the local Protocol pause; Factory circuit pause blocks all business including cancellation. Draw/cancel are public ERC20 payouts to leaf-bound addresses.
 
-Node ships15 authenticated compiled circuits and16 target-specific VKs. Use BB5.2.1 and Noir JS1.0.0-rc.3 for compiler rc.4 artifacts. Direct/recursive targets and public-input widths are authenticated; prove and independently verify actual bytes. Never relabel stale proofs, bypass hashes, or claim mock proofs establish circuit soundness. Browser imports must not require Node fs/process/crypto APIs.
+Node ships15 authenticated compiled circuits and16 target-specific VKs. Use BB6.0.0 and Noir JS1.0.0-rc.6 for compiler rc.6 artifacts. Direct/recursive targets and public-input widths are authenticated; prove and independently verify actual bytes. Never relabel stale proofs, bypass hashes, or claim mock proofs establish circuit soundness. Browser imports must not require Node fs/process/crypto APIs.
 
 Tree sync consumes canonical insertion events, not higher-level business events. Handle live rollover, duplicates, gaps and reorg errors without partial corrupt state. Event output positions are authoritative.
 
