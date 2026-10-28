@@ -8,7 +8,7 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write
+  contents: read
   id-token: write # OIDC for npm Trusted Publishing
 
 jobs:
@@ -32,6 +32,23 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Test release validation
+        run: node --test scripts/check-release.test.mjs
+
+      - name: Validate release versions and dependencies
+        run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
+
+      - name: Build and pack release packages
+        run: |
+          pnpm build
+          mkdir -p "$RUNNER_TEMP/release-packages"
+          for package in packages/*; do
+            pnpm --dir "$package" pack --pack-destination "$RUNNER_TEMP/release-packages"
+          done
+
+      - name: Validate packed versions and dependencies
+        run: node scripts/check-release.mjs "$GITHUB_REF_NAME" "$RUNNER_TEMP/release-packages"
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
