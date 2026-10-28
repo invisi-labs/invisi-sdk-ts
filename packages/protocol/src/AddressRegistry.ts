@@ -13,8 +13,8 @@ import {
 } from "./RegistrationOperation";
 import {
     buildRegistrationCalldata,
-    registrationAuthorizationRequest,
-    registrationPublicInputs,
+    registrationTypedData,
+    registrationDigest,
     type AddressRegistration,
     type RegistrationOptions,
     type RegistryContext,
@@ -86,19 +86,19 @@ export class AddressRegistry {
         return (await receiving.resolve(this.#lookup)).toString();
     }
 
-    authorization(registration: AddressRegistration, options?: RegistrationOptions) {
-        return registrationAuthorizationRequest(this.context, registration, options);
+    typedData(registration: AddressRegistration, options?: RegistrationOptions) {
+        return registrationTypedData(this.context, registration, options);
     }
 
-    publicInputs(registration: AddressRegistration, options?: RegistrationOptions) {
-        return registrationPublicInputs(this.context, registration, options);
+    digest(registration: AddressRegistration, options?: RegistrationOptions) {
+        return registrationDigest(this.context, registration, options);
     }
 
     buildCall(
         registration: AddressRegistration,
-        proof: `0x${string}`,
+        signature: `0x${string}`,
         options?: RegistrationOptions
     ) {
-        return buildRegistrationCalldata(this.context, registration, proof, options);
+        return buildRegistrationCalldata(this.context, registration, signature, options);
     }
 }

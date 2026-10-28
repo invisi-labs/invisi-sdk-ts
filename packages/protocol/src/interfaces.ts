@@ -25,6 +25,8 @@ export interface CanonicalReceipt {
 }
 export interface ChainReader {
     getChainId(): Promise<bigint>;
+    /** Required when a selected deployment includes a receiving-key registry. */
+    getProtocolAddressRegistry?(address: Address): Promise<Address>;
     getCode(address: Address): Promise<Hex>;
     getBlock(number: bigint): Promise<CanonicalBlock>;
     getLatestBlockNumber(): Promise<bigint>;

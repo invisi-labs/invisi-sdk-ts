@@ -127,3 +127,26 @@ it("fromRpc rejects incorrect contract code before returning a protocol", async 
         } as unknown as Provider)
     ).rejects.toThrow(/runtime/);
 });
+
+it("authenticates the Protocol's immutable registry against its selected deployment profile", async () => {
+    const p = new Protocol({
+        deployment: { ...deployment, registry: { ...deployment.protocol, address: a } },
+    });
+    const reader = {
+        getChainId: async () => 31337n,
+        getCode: async () => "0x6000" as Hex,
+        getProtocolAddressRegistry: async () => b,
+    };
+    await expect(p.validateDeployment(reader)).rejects.toThrow(/registry binding/);
+    reader.getProtocolAddressRegistry = async () => a as typeof b;
+    await expect(p.validateDeployment(reader)).resolves.toBeUndefined();
+    await expect(
+        p.validateDeployment({ getChainId: reader.getChainId, getCode: reader.getCode })
+    ).rejects.toThrow(/registry.*capability/);
+    await expect(
+        p.validateDeployment({
+            ...reader,
+            getCode: async (target: Hex) => (target === a ? "0x6001" : "0x6000"),
+        })
+    ).rejects.toThrow(/registry runtime/);
+});

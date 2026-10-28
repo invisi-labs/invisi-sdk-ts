@@ -54,6 +54,7 @@ export class Protocol {
             | Provider
             | (Pick<ChainReader, "getChainId" | "getCode"> & {
                   getProtocolVersion?(address: Address): Promise<bigint>;
+                  getProtocolAddressRegistry?(address: Address): Promise<Address>;
               })
     ): Promise<void> {
         const reader =
@@ -62,6 +63,14 @@ export class Protocol {
                       getChainId: async () => (await connection.getNetwork()).chainId,
                       getCode: async (address: Address) =>
                           (await connection.getCode(address)) as Hex,
+                      getProtocolAddressRegistry: async (address: Address) =>
+                          getAddress(
+                              await new Contract(
+                                  address,
+                                  ["function addressRegistry() view returns (address)"],
+                                  connection
+                              ).getFunction("addressRegistry")()
+                          ) as Address,
                       getProtocolVersion: async (address: Address) =>
                           BigInt(
                               await new Contract(
@@ -85,6 +94,23 @@ export class Protocol {
             (await reader.getProtocolVersion(this.context.protocolAddress)) !== 1n
         )
             throw new Error("unsupported onchain protocol version");
+        const registry = this.deployment.registry;
+        if (registry) {
+            if (!reader.getProtocolAddressRegistry)
+                throw new Error("registry binding reader capability is missing");
+            if (
+                getAddress(
+                    await reader.getProtocolAddressRegistry(this.context.protocolAddress)
+                ) !== getAddress(registry.address)
+            )
+                throw new Error("protocol registry binding mismatch");
+            const registryCode = await reader.getCode(registry.address);
+            if (
+                !/^0x(?:[0-9a-fA-F]{2})+$/.test(registryCode) ||
+                keccak256(registryCode) !== registry.runtimeCodeHash
+            )
+                throw new Error("registry runtime code profile mismatch");
+        }
     }
 
     aggregate(request: Omit<BuildTransactAggregateCalldataParams, "context">) {

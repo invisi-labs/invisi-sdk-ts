@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/rpc",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Typed Protocol RPC client for indexed candidates and authenticated membership paths",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generateProofBundle as proveBrowser, verifyProofBundle as verifyBrowser } from "./wasm";
 import { generateProofBundle, verifyProofBundle } from "./prover";
 import { CANCEL_FIXTURE, USER_FIXTURE, TOP_UP_FIXTURE, SWEEP_FIXTURE } from "./test-fixtures";
-import { createRegistrationFixture } from "./registration-fixture";
+import { ZERO_INPUT_FIXTURE } from "./zero-input-fixture";
 const wasm = process.env.INVISI_TEST_WASM === "1" ? describe : describe.skip;
 wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
     it.each([
@@ -37,10 +37,10 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
         },
         600_000
     );
-    it("proves wallet_registration through browser entry and cross-verifies", async () => {
-        const fixture = await createRegistrationFixture();
+    it("proves zero-input transact14 through browser entry and cross-verifies", async () => {
+        const fixture = ZERO_INPUT_FIXTURE;
         const bundle = await proveBrowser({
-            circuitName: "wallet_registration",
+            circuitName: "transact_user_slots14",
             inputs: fixture.witness,
             expectedPublicInputs: fixture.publicInputs,
             target: "evm",
@@ -53,7 +53,7 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
                 true
             );
             const native = await generateProofBundle({
-                circuitName: "wallet_registration",
+                circuitName: "transact_user_slots14",
                 inputs: fixture.witness,
                 expectedPublicInputs: fixture.publicInputs,
                 target: "evm",

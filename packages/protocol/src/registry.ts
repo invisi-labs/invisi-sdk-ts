@@ -2,25 +2,17 @@ import type { Address, Hex } from "./contracts";
 import {
     Contract,
     Interface,
-    concat,
     getAddress,
     getBytes,
     hexlify,
     isHexString,
-    keccak256,
+    TypedDataEncoder,
     toBeHex,
     type ContractRunner,
 } from "ethers";
 
 import { invisiAddressRegistryAbi } from "./contracts";
-import {
-    ReceivingAddress,
-    computeWalletAuthorizationDigest,
-    decodeAddress,
-    walletAuthorizationTypedData,
-    type ReceivingKeyLookup,
-    type WalletAuthorizationRequest,
-} from "@invisi-labs/core";
+import { ReceivingAddress, decodeAddress, type ReceivingKeyLookup } from "@invisi-labs/core";
 
 export interface RegistryContext {
     chainId: bigint;
@@ -33,7 +25,7 @@ export interface RegistryReceivingKeys {
     clueKey: Hex;
 }
 export interface AddressRegistration {
-    /** Nonzero 20-byte EVM owner address. ABI calls zero-pad it to bytes32. */
+    /** Nonzero EVM owner: 20 bytes or canonical zero-padded bytes32. */
     walletIdentity: Hex;
     keys: RegistryReceivingKeys;
     /** The current registry nonce expected for this operation. */
@@ -49,10 +41,8 @@ export interface RegistrationCalldata {
     to: Address;
     callData: Hex;
     value: 0n;
-    publicInputs: readonly [Hex, Hex, Hex];
 }
 const MAX_NONCE = (1n << 64n) - 1n;
-const MASK128 = (1n << 128n) - 1n;
 function uint64(value: bigint, name: string): bigint {
     if (typeof value !== "bigint" || value < 0n || value > MAX_NONCE)
         throw new RangeError(`${name} must be uint64`);
@@ -85,9 +75,13 @@ function normalize(
     uint64(context.chainId, "chainId");
     const registryAddress = getAddress(context.registryAddress) as Hex;
     if (BigInt(registryAddress) === 0n) throw new Error("Registry address must be nonzero");
-    // The core codec validates the complete identity, with no EVM-address truncation.
+    if (!/^0x(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(registration.walletIdentity))
+        throw new Error("Wallet identity must be an EVM owner or padded bytes32");
+    // Converting to 20 bytes rejects nonzero high bits instead of truncating them.
     const walletIdentity = decodeAddress(
-        ReceivingAddress.fromIdentity(registration.walletIdentity).toString()
+        ReceivingAddress.fromIdentity(
+            toBeHex(BigInt(registration.walletIdentity), 20) as Hex
+        ).toString()
     ).walletIdentity;
     const keys = normalizeKeys(walletIdentity, registration.keys);
     const nonce = uint64(registration.nonce, "nonce"),
@@ -107,70 +101,57 @@ function normalize(
     return { registryAddress, registration: { walletIdentity, keys, nonce, deadline } };
 }
 
-/** Private-wallet authorization request; it contains only the public transcript. */
-export function registrationAuthorizationRequest(
-    context: RegistryContext,
-    registration: AddressRegistration,
-    options: RegistrationOptions = {}
-): WalletAuthorizationRequest {
-    const normalized = normalize(context, registration, options),
-        r = normalized.registration;
-    const keysHash = BigInt(
-        keccak256(concat([r.keys.viewingPublicKey, r.keys.clueKey]) as Hex) as Hex
-    );
-    return {
-        context: { chainId: context.chainId, protocolAddress: BigInt(normalized.registryAddress) },
-        operation: options.update ? "update-address" : "register-address",
-        capacity: 0,
-        words: [
-            context.chainId,
-            BigInt(normalized.registryAddress),
-            BigInt(r.walletIdentity),
-            r.nonce,
-            r.deadline,
-            keysHash >> 128n,
-            keysHash & MASK128,
-        ],
-    };
-}
+/** Standard registry EIP-712 data, independent of private WalletAuthorization. */
 export function registrationTypedData(
     context: RegistryContext,
     registration: AddressRegistration,
     options: RegistrationOptions = {}
 ) {
-    return walletAuthorizationTypedData(
-        registrationAuthorizationRequest(context, registration, options)
-    );
+    const { registryAddress, registration: r } = normalize(context, registration, options);
+    const primaryType = options.update ? "UpdateReceivingKeys" : "RegisterReceivingKeys";
+    return {
+        domain: {
+            name: "InvisiAddressRegistry",
+            version: "1",
+            chainId: context.chainId,
+            verifyingContract: registryAddress,
+        },
+        primaryType,
+        types: {
+            [primaryType]: [
+                { name: "walletIdentity", type: "bytes32" },
+                { name: "viewingPublicKey", type: "bytes" },
+                { name: "clueKey", type: "bytes32" },
+                { name: "nonce", type: "uint64" },
+                { name: "deadline", type: "uint64" },
+            ],
+        },
+        message: {
+            walletIdentity: toBeHex(BigInt(r.walletIdentity), 32),
+            ...r.keys,
+            nonce: r.nonce,
+            deadline: r.deadline,
+        },
+    };
 }
-/** Exact wallet_registration public statement: WID, digest high128, digest low128. */
-export function registrationPublicInputs(
+export function registrationDigest(
     context: RegistryContext,
     registration: AddressRegistration,
     options: RegistrationOptions = {}
-): readonly [Hex, Hex, Hex] {
-    const request = registrationAuthorizationRequest(context, registration, options);
-    const digest = BigInt(computeWalletAuthorizationDigest(request));
-    return [
-        toBeHex(request.words[2]!, 32) as Hex,
-        toBeHex(digest >> 128n, 32) as Hex,
-        toBeHex(digest & MASK128, 32) as Hex,
-    ];
+): Hex {
+    const typed = registrationTypedData(context, registration, options);
+    return TypedDataEncoder.hash(typed.domain, typed.types, typed.message) as Hex;
 }
-/** Encode a relayer-ready call after obtaining a proof; does not sign or broadcast. */
+/** Encode an owner call (empty signature) or an EIP-712 / ERC-1271 authorized relay. */
 export function buildRegistrationCalldata(
     context: RegistryContext,
     registration: AddressRegistration,
-    proof: Hex,
+    signature: Hex,
     options: RegistrationOptions = {}
 ): RegistrationCalldata {
     const normalized = normalize(context, registration, options);
-    if (
-        typeof proof !== "string" ||
-        !isHexString(proof) ||
-        proof.length <= 2 ||
-        proof.length % 2 !== 0
-    )
-        throw new Error("Registration proof must be nonempty hexadecimal bytes");
+    if (typeof signature !== "string" || !isHexString(signature) || signature.length % 2 !== 0)
+        throw new Error("Registration signature must be hexadecimal bytes");
     return {
         to: normalized.registryAddress,
         value: 0n,
@@ -181,10 +162,9 @@ export function buildRegistrationCalldata(
                     ...normalized.registration,
                     walletIdentity: toBeHex(BigInt(normalized.registration.walletIdentity), 32),
                 },
-                proof,
+                signature,
             ]
         ) as Hex,
-        publicInputs: registrationPublicInputs(context, normalized.registration, options),
     };
 }
 

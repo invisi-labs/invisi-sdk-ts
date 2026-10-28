@@ -13,7 +13,6 @@ export const CIRCUIT_NAMES = [
     "credit_draw_slots120",
     "credit_cancel",
     "credit_top_up",
-    "wallet_registration",
 ] as const;
 export type CircuitName = (typeof CIRCUIT_NAMES)[number];
 export type ProofTarget = "evm" | "noir-recursive";

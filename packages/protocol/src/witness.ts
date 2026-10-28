@@ -47,13 +47,6 @@ import {
     transactUserPublicInputs,
     type BuildTransactCalldataParams,
 } from "./funds";
-import {
-    registrationAuthorizationRequest,
-    registrationPublicInputs,
-    type AddressRegistration,
-    type RegistrationOptions,
-    type RegistryContext,
-} from "./registry";
 import { FIELD_MODULUS, type FundingInput } from "./validation";
 import layouts from "./witness-layouts.json";
 
@@ -607,30 +600,5 @@ export class WitnessBuilder {
             },
             words
         );
-    }
-    static async registration(
-        context: RegistryContext,
-        registration: AddressRegistration,
-        authorization: AuthorizedStatement,
-        options?: RegistrationOptions
-    ): Promise<ProvingRequest> {
-        const request = registrationAuthorizationRequest(context, registration, options),
-            words = registrationPublicInputs(context, registration, options);
-        check(
-            authorization.walletIdentity === registration.walletIdentity &&
-                authorization.digest === computeWalletAuthorizationDigest(request),
-            "registry authorization mismatch"
-        );
-        const witness = authorization.withWitness((value) => value);
-        check(
-            await verifyWalletAuthorization(
-                registration.walletIdentity,
-                Uint8Array.from([4, ...witness.public_key_x, ...witness.public_key_y]),
-                Uint8Array.from(witness.signature),
-                request
-            ),
-            "invalid registry authority"
-        );
-        return provingRequest("wallet_registration", { ...witness }, words);
     }
 }

@@ -54,6 +54,14 @@ if (mode === "--check") {
         throw new Error("Protocol runtime mismatch");
     if ((await runtimeHash(profile.registry.address)) !== profile.registry.runtimeCodeHash)
         throw new Error("Registry runtime mismatch");
+    const { Contract } = require("ethers");
+    const instance = new Contract(
+        profile.protocol.address,
+        ["function addressRegistry() view returns (address)"],
+        provider
+    );
+    if (getAddress(await instance.addressRegistry()) !== getAddress(profile.registry.address))
+        throw new Error("Protocol registry binding mismatch");
     console.log(
         "Local Protocol and registry deployment profiles match the running chain (mock verifiers)."
     );
@@ -97,34 +105,18 @@ const addresses = JSON.parse(
 const broadcast = JSON.parse(
     readFileSync(resolve(protocolRoot, "broadcast/DeployLocal.s.sol/31337/run-latest.json"), "utf8")
 );
-const verifier = broadcast.transactions.find(
-    (tx) => tx.contractName === "LocalPassthroughVerifier"
-)?.contractAddress;
-if (!verifier || addresses.chainId !== 31337 || getAddress(addresses.factoryOwner) !== account)
+if (addresses.chainId !== 31337 || getAddress(addresses.factoryOwner) !== account)
     throw new Error("Invalid local deployment record");
-const registryResult = JSON.parse(
-    execFileSync(
-        "forge",
-        [
-            "create",
-            "contracts/src/InvisiAddressRegistry.sol:InvisiAddressRegistry",
-            "--rpc-url",
-            rpc,
-            "--unlocked",
-            "--from",
-            account,
-            "--broadcast",
-            "--json",
-            "--constructor-args",
-            verifier,
-        ],
-        { cwd: protocolRoot, encoding: "utf8" }
-    )
+const registryAddress = getAddress(addresses.registry);
+const registryTransaction = broadcast.transactions.find(
+    (tx) =>
+        tx.contractName === "InvisiAddressRegistry" &&
+        tx.contractAddress?.toLowerCase() === registryAddress.toLowerCase()
 );
-const registryReceipt = await provider.getTransactionReceipt(registryResult.transactionHash);
+if (!registryTransaction) throw new Error("Missing registry deployment transaction");
+const registryReceipt = await provider.getTransactionReceipt(registryTransaction.hash);
 if (!registryReceipt || registryReceipt.status !== 1)
     throw new Error("Registry deployment reverted");
-const registryAddress = getAddress(registryResult.deployedTo);
 const registry = {
     address: registryAddress,
     runtimeCodeHash: await runtimeHash(registryAddress),

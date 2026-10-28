@@ -41,3 +41,37 @@ it("exports the independent receiving-key registry interface", () => {
         ).toBe(true);
     }
 });
+
+it("binds each Protocol and Factory deployment to its address registry", () => {
+    const protocol = contracts.invisiProtocolAbi.find(
+        (entry) => entry.type === "function" && entry.name === "addressRegistry"
+    );
+    expect(protocol).toMatchObject({
+        inputs: [],
+        outputs: [{ type: "address" }],
+        stateMutability: "view",
+    });
+    for (const name of ["deploy", "computeInstanceAddress"]) {
+        const method = contracts.invisiFactoryAbi.find(
+            (entry) => entry.type === "function" && entry.name === name
+        )!;
+        expect(method).toMatchObject({
+            inputs: expect.arrayContaining([
+                { internalType: "address", name: "addressRegistry_", type: "address" },
+            ]),
+        });
+        expect("inputs" in method && method.inputs).toHaveLength(6);
+    }
+    const constructor = contracts.invisiAddressRegistryAbi.find(
+        (entry) => entry.type === "constructor"
+    );
+    expect(constructor).toMatchObject({ inputs: [] });
+    for (const name of ["registerKeys", "updateKeys"]) {
+        const method = contracts.invisiAddressRegistryAbi.find(
+            (entry) => entry.type === "function" && entry.name === name
+        )!;
+        expect(method).toMatchObject({
+            inputs: [{ type: "tuple" }, { name: "signature", type: "bytes" }],
+        });
+    }
+});

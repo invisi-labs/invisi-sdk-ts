@@ -50,8 +50,7 @@ describe("current authenticated release", () => {
         expect(() => loadCircuit("transact_aggregate_56_4" as CircuitName)).toThrow("Unknown");
         expect(() => loadCircuit("batch_settle_1" as CircuitName)).toThrow("Unknown");
         expect(getCircuitMetadata("credit_top_up").publicInputCount).toBe(50);
-        expect(getCircuitMetadata("wallet_registration").publicInputCount).toBe(3);
-        expect(() => getCircuitKey("wallet_registration", "noir-recursive")).toThrow("Unsupported");
-        expect(CIRCUIT_NAMES).toHaveLength(15);
+        expect(() => loadCircuit("wallet_registration" as CircuitName)).toThrow("Unknown");
+        expect(CIRCUIT_NAMES).toHaveLength(14);
     });
 });

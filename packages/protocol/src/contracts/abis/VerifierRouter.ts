@@ -31,7 +31,7 @@ export const verifierRouterAbi = [
     "name": "getCreditDrawVerifier",
     "inputs": [
       {
-        "name": "inputs",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }

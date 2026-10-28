@@ -1,7 +1,7 @@
 /** Import only authenticated, published proving artifacts. No witnesses or source maps. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync, mkdirSync, rmSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, renameSync, readdirSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,16 +20,11 @@ const field = (value) => {
 let recursiveHasher;
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const json = (p) => JSON.parse(readFileSync(join(root, p), "utf8"));
-const manifestPaths = [
-    "circuits/transact-user-manifest.json",
-    "circuits/credit-manifest.json",
-    "circuits/wallet-registration-manifest.json",
-];
+const manifestPaths = ["circuits/transact-user-manifest.json", "circuits/credit-manifest.json"];
 const manifests = manifestPaths.map(json);
 for (const [i, version, format] of [
     [0, 3, 7],
     [1, 3, 4],
-    [2, 1, 1],
 ]) {
     assert.equal(manifests[i].version, version, "retired manifest version");
     assert.equal(manifests[i].formatVersion, format, "retired proof format");
@@ -142,14 +137,18 @@ try {
         bbVersion: "6.0.0",
         noirVersion: "1.0.0-rc.6",
         manifests: manifests.map((m, i) => ({
-            name: ["transact-user", "credit", "wallet-registration"][i],
+            name: ["transact-user", "credit"][i],
             sha256: digest(readFileSync(join(root, manifestPaths[i]))),
         })),
         entries,
     };
     writeFileSync(join(stage, "manifest.json"), JSON.stringify(release, null, 2) + "\n");
-    rmSync(destination, { recursive: true, force: true });
-    renameSync(stage, destination);
+    mkdirSync(destination, { recursive: true });
+    for (const filename of readdirSync(stage))
+        renameSync(join(stage, filename), join(destination, filename));
+    for (const filename of ["wallet_registration.json", "wallet_registration.evm.vk"])
+        rmSync(join(destination, filename), { force: true });
+    rmSync(stage, { recursive: true, force: true });
     console.log(
         `Synced ${entries.length} authenticated circuits and their published verification keys`
     );

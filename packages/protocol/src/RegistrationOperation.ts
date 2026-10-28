@@ -1,31 +1,24 @@
-import type { Hex } from "./contracts";
-import { hexlify, Interface } from "ethers";
+import type { Address, Hex } from "./contracts";
+import { hexlify, Interface, getBytes, verifyTypedData, type Signer } from "ethers";
 
 import { invisiAddressRegistryAbi } from "./contracts";
-import {
-    computeWalletAuthorizationDigest,
-    MissingCapabilityError,
-    ReceivingAddress,
-    type AuthorizedStatement,
-    type Wallet,
-    type WalletAuthorizationProvider,
-} from "@invisi-labs/core";
-import type { ProofBundle, ProofStatement, Prover, ProverOptions } from "@invisi-labs/prover";
+import { ReceivingAddress, type Wallet } from "@invisi-labs/core";
 import type { AddressRegistry } from "./AddressRegistry";
 import type { CanonicalBlock, ChainReader, TransactionCall } from "./interfaces";
 import {
     buildRegistrationCalldata,
-    registrationAuthorizationRequest,
-    registrationPublicInputs,
+    registrationTypedData,
+    registrationDigest,
     type AddressRegistration,
     type RegistryContext,
 } from "./registry";
-import { WitnessBuilder } from "./witness";
 
 export interface RegistryReader extends Pick<
     ChainReader,
     "getChainId" | "getCode" | "getBlock" | "getLatestBlockNumber" | "getTransaction" | "getReceipt"
 > {
+    /** Validate arbitrary ERC-1271 bytes for a contract owner; transport errors propagate. */
+    isValidRegistrationSignature?(owner: Address, digest: Hex, signature: Hex): Promise<boolean>;
     getRegistryNonce(
         context: RegistryContext,
         walletIdentity: Hex,
@@ -36,15 +29,13 @@ export interface RegistryReader extends Pick<
 export interface RegistrationPreparation {
     wallet: Wallet;
     reader: RegistryReader;
-    authorization?: WalletAuthorizationProvider;
-    prover?: Prover;
+    signer?: Signer;
     deadline?: bigint;
     update?: boolean;
 }
 
 export type RegistrationStatus =
     | "prepared"
-    | "authorized"
     | "ready"
     | "submitted"
     | "confirmed"
@@ -58,7 +49,6 @@ interface RegistrationPlan {
     context: RegistryContext;
     registration: AddressRegistration;
     update: boolean;
-    statement: ProofStatement;
 }
 
 function check(ok: unknown, message: string): asserts ok {
@@ -67,26 +57,11 @@ function check(ok: unknown, message: string): asserts ok {
     }
 }
 
-function publicProof(bundle: ProofBundle): ProofBundle {
-    return {
-        formatVersion: bundle.formatVersion,
-        bbVersion: bundle.bbVersion,
-        circuitName: bundle.circuitName,
-        target: bundle.target,
-        artifactSha256: bundle.artifactSha256,
-        vkSha256: bundle.vkSha256,
-        proofHex: bundle.proofHex,
-        proofSha256: bundle.proofSha256,
-        publicInputs: [...bundle.publicInputs],
-    };
-}
-
 export class RegistrationOperation {
     readonly #registry: AddressRegistry;
     readonly #runtime: RegistrationPreparation;
     readonly #plan: RegistrationPlan;
-    readonly #authorization: AuthorizedStatement | undefined;
-    readonly #proof: ProofBundle | undefined;
+    readonly #signature: Hex | undefined;
     readonly #hash: Hex | undefined;
     readonly #anchor: CanonicalBlock | undefined;
     readonly status: RegistrationStatus;
@@ -96,8 +71,7 @@ export class RegistrationOperation {
         runtime: RegistrationPreparation,
         plan: RegistrationPlan,
         status: RegistrationStatus,
-        authorization?: AuthorizedStatement,
-        proof?: ProofBundle,
+        signature?: Hex,
         hash?: Hex,
         anchor?: CanonicalBlock
     ) {
@@ -105,8 +79,7 @@ export class RegistrationOperation {
         this.#runtime = { ...runtime };
         this.#plan = structuredClone(plan);
         this.status = status;
-        this.#authorization = authorization;
-        this.#proof = proof ? publicProof(proof) : undefined;
+        this.#signature = signature;
         this.#hash = hash;
         this.#anchor = anchor ? { ...anchor } : undefined;
         Object.freeze(this);
@@ -146,11 +119,7 @@ export class RegistrationOperation {
             nonce,
             deadline: options.deadline ?? block.timestamp + 300n,
         };
-        const words = registrationPublicInputs(context, registration, {
-            update,
-            expectedNonce: nonce,
-        });
-        const statement = WitnessBuilder.statement("wallet_registration", words);
+        registrationTypedData(context, registration, { update, expectedNonce: nonce });
         check(
             (await runtime.reader.getBlock(block.number)).hash === block.hash,
             "canonical registry block changed while preparing"
@@ -158,7 +127,7 @@ export class RegistrationOperation {
         return new RegistrationOperation(
             registry,
             runtime,
-            { id: crypto.randomUUID(), context, registration, update, statement },
+            { id: crypto.randomUUID(), context, registration, update },
             "prepared"
         );
     }
@@ -178,105 +147,95 @@ export class RegistrationOperation {
         };
     }
 
-    async authorize(options: { signal?: AbortSignal } = {}): Promise<RegistrationOperation> {
-        check(
-            this.status === "prepared" || this.status === "authorized",
-            "registry operation is not awaiting authorization"
-        );
+    /** Sign with ethers, or attach externally obtained ERC-1271 signature bytes. */
+    async authorize(
+        options: { signal?: AbortSignal; signature?: Hex } = {}
+    ): Promise<RegistrationOperation> {
+        check(this.status === "prepared", "registry operation is not awaiting authorization");
         options.signal?.throwIfAborted();
-        const provider = this.#runtime.authorization ?? this.#runtime.wallet.exportAuthorization();
+        await this.validateFreshness();
+        options.signal?.throwIfAborted();
+        let signature = options.signature;
+        if (signature === undefined) {
+            const signer = this.#runtime.signer;
+            check(signer, "registry signer capability is missing");
+            check(
+                BigInt(await signer.getAddress()) ===
+                    BigInt(this.#plan.registration.walletIdentity),
+                "registry signer does not match wallet owner"
+            );
+            const typed = this.typedData();
+            signature = (await signer.signTypedData(
+                typed.domain,
+                typed.types,
+                typed.message
+            )) as Hex;
+        }
+        check(
+            /^0x(?:[a-fA-F0-9]{2})+$/.test(signature),
+            "registry signature must be nonempty hexadecimal bytes"
+        );
         const p = this.#plan;
-        check(
-            provider.walletIdentity === p.registration.walletIdentity,
-            "registry wallet authorization capability mismatch"
-        );
-        const request = registrationAuthorizationRequest(p.context, p.registration, {
-            update: p.update,
-            expectedNonce: p.registration.nonce,
-        });
-        const authorization = await provider.authorize(request);
-        check(
-            authorization.walletIdentity === provider.walletIdentity &&
-                authorization.digest === computeWalletAuthorizationDigest(request),
-            "registry authorization statement mismatch"
-        );
+        const owner = p.registration.walletIdentity as Address;
+        // Match the protocol's SignatureChecker: canonical ECDSA first, including
+        // delegated EOAs with code, then the contract-owner ERC-1271 fallback.
+        let valid = false;
+        try {
+            const bytes = getBytes(signature);
+            const typed = this.typedData();
+            valid =
+                bytes.length === 65 &&
+                (bytes[64] === 27 || bytes[64] === 28) &&
+                BigInt(verifyTypedData(typed.domain, typed.types, typed.message, signature)) ===
+                    BigInt(owner);
+        } catch {
+            valid = false;
+        }
+        if (!valid) {
+            const code = await this.#runtime.reader.getCode(owner);
+            check(/^0x(?:[a-fA-F0-9]{2})*$/.test(code), "invalid owner contract code");
+            check(code !== "0x", "invalid EOA registry signature");
+            const verify = this.#runtime.reader.isValidRegistrationSignature;
+            check(verify, "ERC-1271 registry signature verification capability is missing");
+            check(
+                await verify.call(
+                    this.#runtime.reader,
+                    owner,
+                    registrationDigest(p.context, p.registration, { update: p.update }),
+                    signature
+                ),
+                "invalid ERC-1271 registry signature"
+            );
+        }
         options.signal?.throwIfAborted();
         return new RegistrationOperation(
             this.#registry,
             this.#runtime,
-            p,
-            "authorized",
-            authorization
+            this.#plan,
+            "ready",
+            signature
         );
     }
 
-    async prove(options: ProverOptions = {}): Promise<RegistrationOperation> {
-        check(
-            this.status === "authorized" && this.#authorization,
-            "private registry authorization required"
-        );
-        const prover = this.#runtime.prover;
-        if (!prover) {
-            throw new MissingCapabilityError("registry prover");
-        }
+    /** Empty signatures require the transaction sender to be the wallet owner. */
+    async authorizeDirect(): Promise<RegistrationOperation> {
+        check(this.status === "prepared", "registry operation is not awaiting authorization");
+        await this.validateFreshness();
+        return new RegistrationOperation(this.#registry, this.#runtime, this.#plan, "ready", "0x");
+    }
+
+    typedData() {
         const p = this.#plan;
-        const request = await WitnessBuilder.registration(
-            p.context,
-            p.registration,
-            this.#authorization,
-            { update: p.update, expectedNonce: p.registration.nonce }
-        );
-        check(
-            JSON.stringify({ ...request, witness: undefined }) === JSON.stringify(p.statement),
-            "registry proof statement changed"
-        );
-        try {
-            const proof = publicProof(await prover.prove(request, options));
-            const expected = p.statement;
-            check(
-                proof.formatVersion === 1 &&
-                    proof.bbVersion === "6.0.0" &&
-                    proof.circuitName === expected.circuitName &&
-                    proof.target === expected.target &&
-                    proof.artifactSha256 === expected.artifactSha256 &&
-                    proof.vkSha256 === expected.vkSha256 &&
-                    proof.publicInputs.length === 3 &&
-                    proof.publicInputs.every(
-                        (word, i) => word === expected.expectedPublicInputs[i]
-                    ),
-                "registry proof release or public statement mismatch"
-            );
-            check(/^0x(?:[a-fA-F0-9]{2})+$/.test(proof.proofHex), "malformed registry proof");
-            const bytes = Uint8Array.from(proof.proofHex.slice(2).match(/../g)!, (byte) =>
-                parseInt(byte, 16)
-            );
-            const hash = (
-                hexlify(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))) as Hex
-            ).slice(2);
-            check(
-                hash === proof.proofSha256 &&
-                    (await prover.verify(publicProof(proof), structuredClone(expected), options)),
-                "registry proof verification failed"
-            );
-            options.signal?.throwIfAborted();
-            return new RegistrationOperation(
-                this.#registry,
-                this.#runtime,
-                p,
-                "ready",
-                undefined,
-                proof
-            );
-        } catch {
-            options.signal?.throwIfAborted();
-            throw new Error("registry proof generation or verification failed");
-        }
+        return registrationTypedData(p.context, p.registration, {
+            update: p.update,
+            expectedNonce: p.registration.nonce,
+        });
     }
 
     private call(): TransactionCall {
-        check(this.#proof, "registry proof is missing");
+        check(this.#signature !== undefined, "registry signature is missing");
         const p = this.#plan;
-        const result = buildRegistrationCalldata(p.context, p.registration, this.#proof.proofHex, {
+        const result = buildRegistrationCalldata(p.context, p.registration, this.#signature, {
             update: p.update,
             expectedNonce: p.registration.nonce,
         });
@@ -285,9 +244,14 @@ export class RegistrationOperation {
 
     async exportTransaction(): Promise<TransactionCall> {
         check(
-            this.#proof && this.status !== "prepared" && this.status !== "authorized",
+            this.#signature !== undefined && this.status !== "prepared",
             "registry operation is not ready"
         );
+        await this.validateFreshness();
+        return this.call();
+    }
+
+    private async validateFreshness(): Promise<void> {
         await this.#registry.validateDeployment(this.#runtime.reader);
         const block = await this.#runtime.reader.getBlock(
             await this.#runtime.reader.getLatestBlockNumber()
@@ -302,14 +266,17 @@ export class RegistrationOperation {
             )) === p.registration.nonce,
             "registry nonce changed; prepare again"
         );
-        return this.call();
+        check(
+            (await this.#runtime.reader.getBlock(block.number)).hash === block.hash,
+            "canonical registry block changed during authorization"
+        );
     }
 
     /** Associate a signed/broadcast transaction; ethers owns sending and receipt waiting. */
     trackTransaction(transactionHash: string): RegistrationOperation {
         check(/^0x[a-fA-F0-9]{64}$/.test(transactionHash), "invalid registry transaction hash");
         check(
-            this.#proof && ["ready", "uncertain"].includes(this.status),
+            this.#signature !== undefined && ["ready", "uncertain"].includes(this.status),
             "registry operation is not ready"
         );
         return new RegistrationOperation(
@@ -317,8 +284,7 @@ export class RegistrationOperation {
             this.#runtime,
             this.#plan,
             "uncertain",
-            undefined,
-            this.#proof,
+            this.#signature,
             transactionHash as Hex
         );
     }
@@ -339,8 +305,7 @@ export class RegistrationOperation {
                 this.#runtime,
                 p,
                 "reorged",
-                undefined,
-                this.#proof,
+                this.#signature,
                 this.#hash
             );
         }
@@ -359,7 +324,9 @@ export class RegistrationOperation {
                     transaction.transactionHash === hash &&
                     transaction.to.toLowerCase() === call.to.toLowerCase() &&
                     transaction.data.toLowerCase() === call.data.toLowerCase() &&
-                    transaction.value === 0n,
+                    transaction.value === 0n &&
+                    (this.#signature !== "0x" ||
+                        BigInt(transaction.from) === BigInt(p.registration.walletIdentity)),
                 "registry transaction differs from frozen request"
             );
             check(
@@ -409,8 +376,7 @@ export class RegistrationOperation {
                     this.#runtime,
                     p,
                     "confirmed",
-                    undefined,
-                    this.#proof,
+                    this.#signature,
                     hash,
                     receipt.block
                 );
@@ -431,8 +397,7 @@ export class RegistrationOperation {
                 : nonce !== p.registration.nonce
                   ? "failed"
                   : "uncertain",
-            undefined,
-            this.#proof,
+            this.#signature,
             hash
         );
     }
@@ -440,7 +405,7 @@ export class RegistrationOperation {
     toJSON() {
         return {
             id: this.id,
-            kind: this.#plan.update ? "update-address" : "register-address",
+            kind: this.#plan.update ? "update-receiving-keys" : "register-receiving-keys",
             status: this.status,
         };
     }

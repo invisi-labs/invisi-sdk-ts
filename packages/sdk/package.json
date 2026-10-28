@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/sdk",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Invisi client wallet sessions, operations and infrastructure integration",
   "type": "module",
   "main": "./dist/index.cjs",

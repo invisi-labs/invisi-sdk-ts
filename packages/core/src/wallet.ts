@@ -24,8 +24,6 @@ const OPERATIONS = {
     "credit-draw": "CreditDraw",
     "cancel-credit": "CancelCredit",
     "top-up-credit": "TopUpCredit",
-    "register-address": "RegisterAddress",
-    "update-address": "UpdateAddress",
 } as const;
 export type WalletOperation = keyof typeof OPERATIONS;
 export interface WalletAuthorizationRequest {

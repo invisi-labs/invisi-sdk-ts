@@ -39,6 +39,11 @@ export const invisiProtocolAbi = [
         "name": "_screener",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_addressRegistry",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -111,6 +116,19 @@ export const invisiProtocolAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "addressRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAddressRegistry"
       }
     ],
     "stateMutability": "view"
@@ -308,7 +326,7 @@ export const invisiProtocolAbi = [
           {
             "name": "permit",
             "type": "tuple",
-            "internalType": "struct IInvisiMetaTx.TokenPermit",
+            "internalType": "struct IMetaTx.TokenPermit",
             "components": [
               {
                 "name": "deadline",
@@ -851,7 +869,7 @@ export const invisiProtocolAbi = [
           {
             "name": "permit",
             "type": "tuple",
-            "internalType": "struct IInvisiMetaTx.TokenPermit",
+            "internalType": "struct IMetaTx.TokenPermit",
             "components": [
               {
                 "name": "deadline",
@@ -1033,7 +1051,7 @@ export const invisiProtocolAbi = [
           {
             "name": "permit",
             "type": "tuple",
-            "internalType": "struct IInvisiMetaTx.TokenPermit",
+            "internalType": "struct IMetaTx.TokenPermit",
             "components": [
               {
                 "name": "deadline",
@@ -1181,7 +1199,7 @@ export const invisiProtocolAbi = [
               {
                 "name": "permit",
                 "type": "tuple",
-                "internalType": "struct IInvisiMetaTx.TokenPermit",
+                "internalType": "struct IMetaTx.TokenPermit",
                 "components": [
                   {
                     "name": "deadline",
@@ -1331,7 +1349,7 @@ export const invisiProtocolAbi = [
               {
                 "name": "permit",
                 "type": "tuple",
-                "internalType": "struct IInvisiMetaTx.TokenPermit",
+                "internalType": "struct IMetaTx.TokenPermit",
                 "components": [
                   {
                     "name": "deadline",
@@ -2417,6 +2435,11 @@ export const invisiProtocolAbi = [
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidAddressRegistry",
+    "inputs": []
   },
   {
     "type": "error",

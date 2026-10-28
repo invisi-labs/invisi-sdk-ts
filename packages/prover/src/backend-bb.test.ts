@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { checkBBAvailable } from "./backend-bb";
 import { generateProofBundle, verifyProofBundle } from "./prover";
 import { CANCEL_FIXTURE, USER_FIXTURE, TOP_UP_FIXTURE, SWEEP_FIXTURE } from "./test-fixtures";
-import { createRegistrationFixture } from "./registration-fixture";
+import { ZERO_INPUT_FIXTURE } from "./zero-input-fixture";
 const bbBin = process.env.BB_BINARY_PATH;
 const native = bbBin ? describe : describe.skip;
 native("real BB6.0.0 native proving (set BB_BINARY_PATH)", () => {
@@ -34,10 +34,10 @@ native("real BB6.0.0 native proving (set BB_BINARY_PATH)", () => {
         },
         600_000
     );
-    it("proves and independently verifies wallet_registration", async () => {
-        const fixture = await createRegistrationFixture();
+    it("proves and independently verifies zero-input transact14", async () => {
+        const fixture = ZERO_INPUT_FIXTURE;
         const bundle = await generateProofBundle({
-            circuitName: "wallet_registration",
+            circuitName: "transact_user_slots14",
             inputs: fixture.witness,
             expectedPublicInputs: fixture.publicInputs,
             target: "evm",

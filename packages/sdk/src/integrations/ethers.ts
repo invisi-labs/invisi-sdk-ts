@@ -84,6 +84,38 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
         return (await this.client.getNetwork()).chainId;
     }
 
+    async isValidRegistrationSignature(
+        owner: Address,
+        digest: Hex,
+        signature: Hex
+    ): Promise<boolean> {
+        try {
+            const result = await this.client.call({
+                to: getAddress(owner),
+                data: new Interface(erc1271Abi).encodeFunctionData("isValidSignature", [
+                    digest,
+                    signature,
+                ]),
+            });
+            // SignatureChecker compares the complete first return word, including padding.
+            return (
+                result.length >= 66 &&
+                result.slice(0, 66).toLowerCase() === "0x1626ba7e" + "00".repeat(28)
+            );
+        } catch (error) {
+            if (isError(error, "CALL_EXCEPTION")) return false;
+            throw error;
+        }
+    }
+
+    async getProtocolAddressRegistry(address: Address): Promise<Address> {
+        return getAddress(
+            await new Contract(getAddress(address), invisiProtocolAbi, this.client).getFunction(
+                "addressRegistry"
+            )()
+        );
+    }
+
     async getProtocolVersion(address: Address): Promise<bigint> {
         return BigInt(
             await new Contract(getAddress(address), invisiProtocolAbi, this.client).getFunction(

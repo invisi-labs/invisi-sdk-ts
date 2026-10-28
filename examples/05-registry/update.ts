@@ -1,6 +1,5 @@
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 import { ProtocolRpcClient, Wallet, AddressRegistry } from "@invisi-labs/sdk";
-import { NativeProver } from "@invisi-labs/prover/native";
 import { EthersAddressResolver } from "@invisi-labs/sdk/ethers";
 import { required } from "../environment.js";
 import type { ExampleResources } from "../resources.js";
@@ -15,8 +14,6 @@ export async function main(resources: ExampleResources) {
 
     const wallet = await Wallet.fromPrivateKey(required("WALLET_ACCOUNT_PRIVATE_KEY"));
     const signer = new EthereumWallet(process.env.FUNDING_PRIVATE_KEY ?? required("WALLET_ACCOUNT_PRIVATE_KEY"), provider);
-
-    const prover = new NativeProver();
 
     console.log("1. Select a registry deployment and its trusted runtime profile, independently from the funds protocol");
     const context = {
@@ -34,21 +31,16 @@ export async function main(resources: ExampleResources) {
     const prepared = await registry.prepareRegistration({
         wallet,
         provider,
-        prover,
+        signer: new EthereumWallet(required("WALLET_ACCOUNT_PRIVATE_KEY")),
         update: true,
     });
     console.log("Local operation review:", prepared.preview());
 
-    console.log("3. Privately authorize the key snapshot and prove; an EVM account only relays the write");
-    const authorized = await prepared.authorize();
-
-    const proved = await authorized.prove({
-        onProgress: (event) => console.log("Proof phase:", event.phase),
-    });
-
-    const call = await proved.exportTransaction();
+    console.log("3. Sign the registry EIP-712 key snapshot with the owner; relay with ethers");
+    const ready = await prepared.authorize();
+    const call = await ready.exportTransaction();
     const transaction = await signer.sendTransaction(call);
-    const tracked = proved.trackTransaction(transaction.hash);
+    const tracked = ready.trackTransaction(transaction.hash);
     console.log("Transaction hash:", transaction.hash);
     const receipt = await transaction.wait();
     if (!receipt) throw new Error("Registry receipt is not available");

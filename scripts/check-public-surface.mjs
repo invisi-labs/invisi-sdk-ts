@@ -113,6 +113,15 @@ assert.equal(
 );
 assert(!("resolveInstance" in sdk.Protocol.prototype), "retired token instance discovery remains");
 const protocol = await import(resolve("packages/protocol/dist/index.js"));
+for (const name of ["registrationAuthorizationRequest", "registrationPublicInputs"])
+    assert(!(name in protocol), `retired registry circuit API: ${name}`);
+assert(!("registration" in protocol.WitnessBuilder), "registry witness builder remains");
+assert(
+    !("prove" in protocol.RegistrationOperation.prototype),
+    "registry operation requires a prover"
+);
+for (const name of ["registrationTypedData", "registrationDigest", "buildRegistrationCalldata"])
+    assert.equal(typeof protocol[name], "function", `missing signature registry helper: ${name}`);
 for (const name of ["buildApproveCalldata", "buildPermitTypedData", "permitTypes"])
     assert(!(name in protocol), `generic Ethereum helper must remain in ethers: ${name}`);
 

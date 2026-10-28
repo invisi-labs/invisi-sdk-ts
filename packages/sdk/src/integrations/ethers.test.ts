@@ -117,3 +117,35 @@ it("reads Protocol VERSION through ethers", async () => {
         data: abi.encodeFunctionData("VERSION"),
     });
 });
+
+it("reads the immutable Protocol registry binding through ethers", async () => {
+    const abi = new Interface(invisiProtocolAbi);
+    const call = vi.fn(async () => abi.encodeFunctionResult("addressRegistry", [token]));
+    const reader = new EthersChainReader(provider({ call }));
+    expect(await reader.getProtocolAddressRegistry(address)).toBe(token);
+    expect(call.mock.calls[0]).toMatchObject([
+        { to: address, data: abi.encodeFunctionData("addressRegistry") },
+    ]);
+});
+
+it("checks arbitrary registry signature bytes through ERC-1271 and propagates RPC failures", async () => {
+    const abi = new Interface(["function isValidSignature(bytes32,bytes) view returns(bytes4)"]);
+    const digest = word(42n);
+    const call = vi.fn(async (_request: { to: string; data: string }) =>
+        abi.encodeFunctionResult("isValidSignature", ["0x1626ba7e"])
+    );
+    const reader = new EthersChainReader(provider({ call }));
+    expect(await reader.isValidRegistrationSignature(address, digest, "0xaabb")).toBe(true);
+    expect(abi.decodeFunctionData("isValidSignature", call.mock.calls[0]![0].data).slice()).toEqual(
+        [digest, "0xaabb"]
+    );
+    call.mockResolvedValueOnce(abi.encodeFunctionResult("isValidSignature", ["0xffffffff"]));
+    expect(await reader.isValidRegistrationSignature(address, digest, "0xaabb")).toBe(false);
+    call.mockResolvedValueOnce("0x1626ba7e" + "ff".repeat(28));
+    expect(await reader.isValidRegistrationSignature(address, digest, "0xaabb")).toBe(false);
+    const failure = new Error("RPC unavailable");
+    call.mockRejectedValueOnce(failure);
+    await expect(reader.isValidRegistrationSignature(address, digest, "0xaabb")).rejects.toBe(
+        failure
+    );
+});

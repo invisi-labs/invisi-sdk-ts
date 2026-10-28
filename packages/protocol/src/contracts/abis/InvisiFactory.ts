@@ -74,6 +74,11 @@ export const invisiFactoryAbi = [
         "name": "screener_",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "addressRegistry_",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
@@ -124,6 +129,11 @@ export const invisiFactoryAbi = [
       },
       {
         "name": "screener_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "addressRegistry_",
         "type": "address",
         "internalType": "address"
       }

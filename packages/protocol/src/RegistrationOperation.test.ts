@@ -1,9 +1,15 @@
 import type { Hex } from "./contracts";
-import { Interface, keccak256, zeroPadValue } from "ethers";
+import {
+    Interface,
+    Wallet as EthereumWallet,
+    keccak256,
+    zeroPadValue,
+    verifyTypedData,
+    toBeHex,
+} from "ethers";
 import { invisiAddressRegistryAbi } from "./contracts";
 
 import { Wallet } from "@invisi-labs/core";
-import type { Prover } from "@invisi-labs/prover";
 import { expect, it, vi } from "vitest";
 import { AddressRegistry } from "./AddressRegistry";
 const context = {
@@ -21,32 +27,17 @@ async function fixture() {
     let nonce = 0n;
     const reader = {
         getChainId: async () => context.chainId,
-        getCode: async () => "0x6000" as const,
+        getCode: vi.fn(async (address: Hex): Promise<Hex> =>
+            address === context.registryAddress ? "0x6000" : "0x"
+        ),
+        isValidRegistrationSignature: vi.fn(
+            async (_owner: Hex, _digest: Hex, _signature: Hex) => true
+        ),
         getLatestBlockNumber: async () => 12n,
         getBlock: async () => block,
         getRegistryNonce: async () => nonce,
         getReceipt: vi.fn(),
         getTransaction: vi.fn(),
-    };
-    const prover: Prover = {
-        prove: vi.fn(async (request) => {
-            const proofHex = `0x${"00".repeat(32)}` as const,
-                hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(32)));
-            return {
-                formatVersion: 1 as const,
-                circuitName: request.circuitName,
-                target: request.target,
-                bbVersion: "6.0.0" as const,
-                artifactSha256: request.artifactSha256,
-                vkSha256: request.vkSha256,
-                proofHex,
-                proofSha256: Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join(
-                    ""
-                ),
-                publicInputs: [...request.expectedPublicInputs],
-            };
-        }),
-        verify: vi.fn(async () => true),
     };
     const registry = new AddressRegistry(context, {
         expectedRuntimeCodeHash: keccak256("0x6000") as Hex,
@@ -54,30 +45,37 @@ async function fixture() {
     return {
         wallet,
         reader,
-        prover,
+        signer: new EthereumWallet(`0x${"01".repeat(32)}`),
         registry,
         setNonce: (value: bigint) => {
             nonce = value;
         },
     };
 }
-it("prepares, privately authorizes and proves a registry request in its independent nonce domain", async () => {
+it("prepares and signs registry EIP-712 data without a prover in its independent nonce domain", async () => {
     const h = await fixture(),
         operation = await h.registry.prepareRegistration({
-            wallet: h.wallet,
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
-            prover: h.prover,
+            signer: h.signer,
         }),
         preview = operation.preview();
     expect(preview.nonce).toBe(0n);
     expect(preview.registryAddress).toBe(context.registryAddress);
-    const ready = await (await operation.authorize()).prove(),
+    const ready = await operation.authorize(),
         call = await ready.exportTransaction();
     expect(ready.status).toBe("ready");
     expect(call.to).toBe(context.registryAddress);
     expect(call.value).toBe(0n);
+    const signature = new Interface(invisiAddressRegistryAbi).parseTransaction({ data: call.data })!
+        .args[1];
+    const typed = operation.typedData();
+    expect(signature).toHaveLength(132);
+    expect(verifyTypedData(typed.domain, typed.types, typed.message, signature).toLowerCase()).toBe(
+        h.wallet.walletIdentity.toLowerCase()
+    );
     expect(JSON.stringify(ready)).not.toMatch(/nullifier_key|signature|privateKey|public_key_x/);
-    expect(h.prover.verify).toHaveBeenCalledOnce();
+    expect(ready).not.toHaveProperty("prove");
 });
 it("requires explicit write profiles and signing capability, and rechecks registry nonce before export", async () => {
     const h = await fixture();
@@ -87,15 +85,14 @@ it("requires explicit write profiles and signing capability, and rechecks regist
     const publicOnly = await h.registry.prepareRegistration({
         wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
-        prover: h.prover,
     });
     await expect(publicOnly.authorize()).rejects.toThrow(/capability/);
     const operation = await h.registry.prepareRegistration({
             wallet: h.wallet,
             reader: h.reader,
-            prover: h.prover,
+            signer: h.signer,
         }),
-        ready = await (await operation.authorize()).prove();
+        ready = await operation.authorize();
     h.setNonce(1n);
     await expect(ready.exportTransaction()).rejects.toThrow(/nonce/);
     expect(ready).not.toHaveProperty("submit");
@@ -103,50 +100,57 @@ it("requires explicit write profiles and signing capability, and rechecks regist
     const update = await h.registry.prepareRegistration({
         wallet: h.wallet,
         reader: h.reader,
-        prover: h.prover,
+        signer: h.signer,
         update: true,
     });
     expect(update.preview().nonce).toBe(1n);
     expect(update.preview().update).toBe(true);
-    expect((await (await update.authorize()).prove()).status).toBe("ready");
+    expect((await update.authorize()).status).toBe("ready");
 });
 
-it("confirms a registration whose event encodes the EVM owner as bytes32", async () => {
-    const h = await fixture();
-    const operation = await h.registry.prepareRegistration({
-        wallet: h.wallet,
-        reader: h.reader,
-        prover: h.prover,
-    });
-    const ready = await (await operation.authorize()).prove();
-    const call = await ready.exportTransaction();
-    const hash = `0x${"34".repeat(32)}` as const;
-    const keys = h.wallet.getReceivingAddress().getReceivingKeys();
-    const iface = new Interface(invisiAddressRegistryAbi);
-    const log = iface.encodeEventLog(iface.getEvent("ReceivingKeysSet")!, [
-        zeroPadValue(h.wallet.walletIdentity, 32),
-        keys.viewingPublicKey,
-        keys.clueKey,
-        1n,
-    ]);
-    h.reader.getReceipt.mockResolvedValue({
-        transactionHash: hash,
-        block,
-        status: "success",
-        logs: [{ ...log, address: context.registryAddress, transactionHash: hash }],
-    });
-    h.reader.getTransaction.mockResolvedValue({ ...call, transactionHash: hash });
-    expect((await ready.reconcile({ transactionHash: hash })).status).toBe("confirmed");
-});
+it.each([false, true])(
+    "confirms a registration whose event encodes the EVM owner as bytes32 (direct=%s)",
+    async (direct) => {
+        const h = await fixture();
+        const operation = await h.registry.prepareRegistration({
+            wallet: h.wallet,
+            reader: h.reader,
+            signer: h.signer,
+        });
+        const ready = direct ? await operation.authorizeDirect() : await operation.authorize();
+        const call = await ready.exportTransaction();
+        const hash = `0x${"34".repeat(32)}` as const;
+        const keys = h.wallet.getReceivingAddress().getReceivingKeys();
+        const iface = new Interface(invisiAddressRegistryAbi);
+        const log = iface.encodeEventLog(iface.getEvent("ReceivingKeysSet")!, [
+            zeroPadValue(h.wallet.walletIdentity, 32),
+            keys.viewingPublicKey,
+            keys.clueKey,
+            1n,
+        ]);
+        h.reader.getReceipt.mockResolvedValue({
+            transactionHash: hash,
+            block,
+            status: "success",
+            logs: [{ ...log, address: context.registryAddress, transactionHash: hash }],
+        });
+        h.reader.getTransaction.mockResolvedValue({
+            ...call,
+            transactionHash: hash,
+            from: direct ? h.wallet.walletIdentity : context.registryAddress,
+        });
+        expect((await ready.reconcile({ transactionHash: hash })).status).toBe("confirmed");
+    }
+);
 
 it("associates an application-owned registry hash without providing a transaction sender", async () => {
     const h = await fixture();
     const prepared = await h.registry.prepareRegistration({
         wallet: h.wallet,
         reader: h.reader,
-        prover: h.prover,
+        signer: h.signer,
     });
-    const ready = await (await prepared.authorize()).prove();
+    const ready = await prepared.authorize();
     await ready.exportTransaction();
     expect(() => ready.trackTransaction("invalid")).toThrow(/hash/);
     const tracked = ready.trackTransaction(`0x${"ab".repeat(32)}`);
@@ -154,4 +158,136 @@ it("associates an application-owned registry hash without providing a transactio
     expect(tracked).not.toHaveProperty("submit");
     expect(tracked).not.toHaveProperty("wait");
     expect(h.reader.getReceipt).not.toHaveBeenCalled();
+});
+
+it("accepts arbitrary ERC-1271 signature bytes without EOA-only recovery", async () => {
+    const h = await fixture();
+    h.reader.getCode.mockResolvedValue("0x6000");
+    const prepared = await h.registry.prepareRegistration({ wallet: h.wallet, reader: h.reader });
+    const ready = await prepared.authorize({ signature: "0xaabb" });
+    const call = await ready.exportTransaction();
+    expect(
+        new Interface(invisiAddressRegistryAbi).parseTransaction({ data: call.data })!.args[1]
+    ).toBe("0xaabb");
+});
+it("direct owner authorization freezes an empty signature and rejects a different sender", async () => {
+    const h = await fixture();
+    const prepared = await h.registry.prepareRegistration({ wallet: h.wallet, reader: h.reader });
+    const ready = await prepared.authorizeDirect();
+    const call = await ready.exportTransaction();
+    expect(
+        new Interface(invisiAddressRegistryAbi).parseTransaction({ data: call.data })!.args[1]
+    ).toBe("0x");
+    const hash = `0x${"34".repeat(32)}` as const;
+    h.reader.getReceipt.mockResolvedValue({
+        transactionHash: hash,
+        block,
+        status: "reverted",
+        logs: [],
+    });
+    h.reader.getTransaction.mockResolvedValue({
+        ...call,
+        transactionHash: hash,
+        from: context.registryAddress,
+    });
+    await expect(ready.reconcile({ transactionHash: hash })).rejects.toThrow(/frozen request/);
+});
+
+it("validates the deadline before preparing a direct owner call", async () => {
+    const h = await fixture();
+    await expect(
+        h.registry.prepareRegistration({
+            wallet: h.wallet,
+            reader: h.reader,
+            deadline: block.timestamp - 1n,
+        })
+    ).rejects.toThrow(/expired/);
+});
+
+it("rejects an ethers signer for a different owner and requires explicit direct authorization", async () => {
+    const h = await fixture();
+    const prepared = await h.registry.prepareRegistration({
+        wallet: h.wallet,
+        reader: h.reader,
+        signer: EthereumWallet.createRandom(),
+    });
+    await expect(prepared.authorize()).rejects.toThrow(/signer.*owner/);
+    await expect(prepared.authorize({ signature: "0x" })).rejects.toThrow(/nonempty/);
+});
+
+it("rejects malformed, compact, high-s and mismatched EOA registry signatures before ready", async () => {
+    const h = await fixture();
+    const operation = await h.registry.prepareRegistration({ wallet: h.wallet, reader: h.reader });
+    const typed = operation.typedData();
+    const signature = await h.signer.signTypedData(typed.domain, typed.types, typed.message);
+    const curveN = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+    const highS =
+        signature.slice(0, 66) +
+        toBeHex(curveN - BigInt("0x" + signature.slice(66, 130)), 32).slice(2) +
+        signature.slice(130);
+    const wrong = await EthereumWallet.createRandom().signTypedData(
+        typed.domain,
+        typed.types,
+        typed.message
+    );
+    for (const signature of ["0xaabb", "0x" + "00".repeat(64), highS, wrong]) {
+        await expect(operation.authorize({ signature: signature as Hex })).rejects.toThrow(
+            /signature/
+        );
+    }
+});
+it("requires the contract-owner ERC-1271 check and propagates verifier failures", async () => {
+    const h = await fixture();
+    h.reader.getCode.mockResolvedValue("0x6000");
+    const operation = await h.registry.prepareRegistration({ wallet: h.wallet, reader: h.reader });
+    h.reader.isValidRegistrationSignature.mockResolvedValue(false);
+    await expect(operation.authorize({ signature: "0xaabb" })).rejects.toThrow(/signature/);
+    const failure = new Error("RPC unavailable");
+    h.reader.isValidRegistrationSignature.mockRejectedValue(failure);
+    await expect(operation.authorize({ signature: "0xaabb" })).rejects.toBe(failure);
+    const { isValidRegistrationSignature: _verify, ...withoutVerifier } = h.reader;
+    await expect(
+        (
+            await h.registry.prepareRegistration({
+                wallet: h.wallet,
+                reader: withoutVerifier,
+            })
+        ).authorize({ signature: "0xaabb" })
+    ).rejects.toThrow(/capability/);
+});
+it("checks current nonce and deadline before prompting an ethers signer", async () => {
+    const h = await fixture();
+    const sign = vi.spyOn(h.signer, "signTypedData");
+    const operation = await h.registry.prepareRegistration({
+        wallet: h.wallet,
+        reader: h.reader,
+        signer: h.signer,
+    });
+    h.setNonce(1n);
+    await expect(operation.authorize()).rejects.toThrow(/nonce/);
+    await expect(operation.authorizeDirect()).rejects.toThrow(/nonce/);
+    expect(sign).not.toHaveBeenCalled();
+    h.setNonce(0n);
+    const short = await h.registry.prepareRegistration({
+        wallet: h.wallet,
+        reader: h.reader,
+        signer: h.signer,
+        deadline: block.timestamp,
+    });
+    h.reader.getBlock = async () => ({ ...block, timestamp: block.timestamp + 1n });
+    await expect(short.authorize()).rejects.toThrow(/expired/);
+    expect(sign).not.toHaveBeenCalled();
+});
+
+it("accepts canonical EOA recovery for a delegated account even when it has code", async () => {
+    const h = await fixture();
+    h.reader.getCode.mockResolvedValue("0x6000");
+    h.reader.isValidRegistrationSignature.mockResolvedValue(false);
+    const operation = await h.registry.prepareRegistration({
+        wallet: h.wallet,
+        reader: h.reader,
+        signer: h.signer,
+    });
+    expect((await operation.authorize()).status).toBe("ready");
+    expect(h.reader.isValidRegistrationSignature).not.toHaveBeenCalled();
 });

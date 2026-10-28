@@ -17,7 +17,6 @@ const loaders: Record<CircuitName, () => Promise<{ default: unknown }>> = {
     credit_draw_slots120: () => import("../circuits/credit_draw_slots120.json"),
     credit_cancel: () => import("../circuits/credit_cancel.json"),
     credit_top_up: () => import("../circuits/credit_top_up.json"),
-    wallet_registration: () => import("../circuits/wallet_registration.json"),
 };
 export async function loadCircuitBrowser(name: CircuitName): Promise<CompiledCircuit> {
     const loader = loaders[name];

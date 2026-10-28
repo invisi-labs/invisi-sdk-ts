@@ -2,13 +2,7 @@
 export const invisiAddressRegistryAbi = [
   {
     "type": "constructor",
-    "inputs": [
-      {
-        "name": "verifier",
-        "type": "address",
-        "internalType": "contract IVerifier"
-      }
-    ],
+    "inputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -20,6 +14,49 @@ export const invisiAddressRegistryAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eip712Domain",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "fields",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "extensions",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -76,7 +113,7 @@ export const invisiAddressRegistryAbi = [
       {
         "name": "keys",
         "type": "tuple",
-        "internalType": "struct IInvisiAddressRegistry.ReceivingKeys",
+        "internalType": "struct IAddressRegistry.ReceivingKeys",
         "components": [
           {
             "name": "viewingPublicKey",
@@ -105,7 +142,7 @@ export const invisiAddressRegistryAbi = [
       {
         "name": "registration",
         "type": "tuple",
-        "internalType": "struct IInvisiAddressRegistry.Registration",
+        "internalType": "struct IAddressRegistry.Registration",
         "components": [
           {
             "name": "walletIdentity",
@@ -115,7 +152,7 @@ export const invisiAddressRegistryAbi = [
           {
             "name": "keys",
             "type": "tuple",
-            "internalType": "struct IInvisiAddressRegistry.ReceivingKeys",
+            "internalType": "struct IAddressRegistry.ReceivingKeys",
             "components": [
               {
                 "name": "viewingPublicKey",
@@ -142,26 +179,13 @@ export const invisiAddressRegistryAbi = [
         ]
       },
       {
-        "name": "proof",
+        "name": "signature",
         "type": "bytes",
         "internalType": "bytes"
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "registrationVerifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IVerifier"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -189,7 +213,7 @@ export const invisiAddressRegistryAbi = [
       {
         "name": "registration",
         "type": "tuple",
-        "internalType": "struct IInvisiAddressRegistry.Registration",
+        "internalType": "struct IAddressRegistry.Registration",
         "components": [
           {
             "name": "walletIdentity",
@@ -199,7 +223,7 @@ export const invisiAddressRegistryAbi = [
           {
             "name": "keys",
             "type": "tuple",
-            "internalType": "struct IInvisiAddressRegistry.ReceivingKeys",
+            "internalType": "struct IAddressRegistry.ReceivingKeys",
             "components": [
               {
                 "name": "viewingPublicKey",
@@ -226,13 +250,19 @@ export const invisiAddressRegistryAbi = [
         ]
       },
       {
-        "name": "proof",
+        "name": "signature",
         "type": "bytes",
         "internalType": "bytes"
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "EIP712DomainChanged",
+    "inputs": [],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -287,22 +317,17 @@ export const invisiAddressRegistryAbi = [
   },
   {
     "type": "error",
-    "name": "InvalidRegistrationProof",
+    "name": "InvalidRegistrationSignature",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidVerifier",
+    "name": "InvalidShortString",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidWalletIdentity",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidWalletStatement",
     "inputs": []
   },
   {
@@ -324,5 +349,16 @@ export const invisiAddressRegistryAbi = [
     "type": "error",
     "name": "RegistrationExpired",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "StringTooLong",
+    "inputs": [
+      {
+        "name": "str",
+        "type": "string",
+        "internalType": "string"
+      }
+    ]
   }
 ] as const
