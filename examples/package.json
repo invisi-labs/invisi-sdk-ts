@@ -1,0 +1,29 @@
+{
+  "name": "@invisi-examples/scenarios",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "build": "rm -rf dist && tsc --outDir dist --noEmit false",
+    "start": "node dist/run.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/prover": "workspace:*",
+    "@invisi-labs/react": "workspace:*",
+    "@invisi-labs/sdk": "workspace:*",
+    "@invisi-labs/vue": "workspace:*",
+    "ethers": "^6.17.0",
+    "@invisi-labs/rpc": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "typescript": "^5.4.0",
+    "vue": "^3.4.0"
+  }
+}

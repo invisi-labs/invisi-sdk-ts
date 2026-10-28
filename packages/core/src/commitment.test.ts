@@ -1,89 +1,92 @@
-import { describe, it, expect } from "vitest"
-import { computeIdentityCommitment, computePaymentCommitment, computeChangeCommitment } from "./commitment"
+import { describe, it, expect } from "vitest";
+import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
+import { FIELD_MODULUS } from "./random";
+import vectors from "./testdata/wallet-note-vectors.json";
 
-const CHAIN_ID = 1n
+const CHAIN_ID = BigInt(vectors.context.chainId);
+const WALLET_IDENTITY = BigInt(vectors.note.walletIdentity);
+const NONCE = BigInt(vectors.note.nonce);
+const TOKEN = BigInt(vectors.context.tokenAddress);
+const hex = (n: bigint): `0x${string}` => `0x${n.toString(16).padStart(64, "0")}`;
+const IDENTITY = hex(BigInt(vectors.note.identity));
 
-describe("computeIdentityCommitment", () => {
-  it("returns a valid hex string", async () => {
-    const result = await computeIdentityCommitment(42n, 0xdeadn)
-    expect(result).toMatch(/^0x[0-9a-f]{64}$/i)
-  })
+describe("computeNoteIdentity", () => {
+    it("matches the independent current protocol identity vector", async () => {
+        expect(await computeNoteIdentity(WALLET_IDENTITY, NONCE)).toBe(IDENTITY);
+    });
+    it("is deterministic and returns a canonical hex string", async () => {
+        const a = await computeNoteIdentity(WALLET_IDENTITY, NONCE);
+        expect(a).toMatch(/^0x[0-9a-f]{64}$/);
+        expect(await computeNoteIdentity(WALLET_IDENTITY, NONCE)).toBe(a);
+    });
+    it("different nonces produce different identities", async () => {
+        expect(await computeNoteIdentity(WALLET_IDENTITY, NONCE + 1n)).not.toBe(IDENTITY);
+    });
+    it("different wallets produce different identities", async () => {
+        expect(await computeNoteIdentity(WALLET_IDENTITY + 1n, NONCE)).not.toBe(IDENTITY);
+    });
+    it("requires a positive canonical wallet identity and canonical nonce", async () => {
+        for (const wallet of [-1n, 0n, FIELD_MODULUS]) {
+            await expect(computeNoteIdentity(wallet, NONCE)).rejects.toThrow(RangeError);
+        }
+        for (const nonce of [-1n, FIELD_MODULUS]) {
+            await expect(computeNoteIdentity(WALLET_IDENTITY, nonce)).rejects.toThrow(RangeError);
+        }
+        await expect(computeNoteIdentity((1n << 160n) - 1n, 0n)).resolves.toMatch(
+            /^0x[0-9a-f]{64}$/
+        );
+    });
+});
 
-  it("is deterministic", async () => {
-    const a = await computeIdentityCommitment(42n, 0xdeadn)
-    const b = await computeIdentityCommitment(42n, 0xdeadn)
-    expect(a).toBe(b)
-  })
-
-  it("different addresses produce different commitments", async () => {
-    const a = await computeIdentityCommitment(42n, 0xdeadn)
-    const b = await computeIdentityCommitment(42n, 0xbeefn)
-    expect(a).not.toBe(b)
-  })
-
-  it("different nullifier keys produce different commitments", async () => {
-    const a = await computeIdentityCommitment(42n, 0xdeadn)
-    const b = await computeIdentityCommitment(43n, 0xdeadn)
-    expect(a).not.toBe(b)
-  })
-})
-
-describe("computePaymentCommitment", () => {
-  it("returns a valid hex string", async () => {
-    const ic = await computeIdentityCommitment(42n, 0xdeadn)
-    const result = await computePaymentCommitment(CHAIN_ID, ic, 0xbeefn, 1000n, 12345n)
-    expect(result).toMatch(/^0x[0-9a-f]{64}$/i)
-  })
-
-  it("is deterministic", async () => {
-    const ic = await computeIdentityCommitment(42n, 0xdeadn)
-    const a = await computePaymentCommitment(CHAIN_ID, ic, 0xbeefn, 1000n, 12345n)
-    const b = await computePaymentCommitment(CHAIN_ID, ic, 0xbeefn, 1000n, 12345n)
-    expect(a).toBe(b)
-  })
-
-  it("different nonces produce different commitments", async () => {
-    const ic = await computeIdentityCommitment(42n, 0xdeadn)
-    const a = await computePaymentCommitment(CHAIN_ID, ic, 0xbeefn, 1000n, 1n)
-    const b = await computePaymentCommitment(CHAIN_ID, ic, 0xbeefn, 1000n, 2n)
-    expect(a).not.toBe(b)
-  })
-
-  it("different chain IDs produce different commitments", async () => {
-    const ic = await computeIdentityCommitment(42n, 0xdeadn)
-    const a = await computePaymentCommitment(1n, ic, 0xbeefn, 1000n, 1n)
-    const b = await computePaymentCommitment(2n, ic, 0xbeefn, 1000n, 1n)
-    expect(a).not.toBe(b)
-  })
-})
-
-describe("computeChangeCommitment", () => {
-  it("returns a valid hex string", async () => {
-    const result = await computeChangeCommitment(CHAIN_ID, 42n, 0xdeadn, 0xbeefn, 1000n, 12345n)
-    expect(result).toMatch(/^0x[0-9a-f]{64}$/i)
-  })
-
-  it("is deterministic", async () => {
-    const a = await computeChangeCommitment(CHAIN_ID, 42n, 0xdeadn, 0xbeefn, 1000n, 12345n)
-    const b = await computeChangeCommitment(CHAIN_ID, 42n, 0xdeadn, 0xbeefn, 1000n, 12345n)
-    expect(a).toBe(b)
-  })
-
-  it("structurally identical to paymentCommitment with matching identity commitment", async () => {
-    const nullifierKey = 42n
-    const address = 0xdeadn
-    const token = 0xbeefn
-    const amount = 1000n
-    const nonce = 1n
-    const ic = await computeIdentityCommitment(nullifierKey, address)
-    const pc = await computePaymentCommitment(CHAIN_ID, ic, token, amount, nonce)
-    const cc = await computeChangeCommitment(CHAIN_ID, nullifierKey, address, token, amount, nonce)
-    expect(cc).toBe(pc)
-  })
-
-  it("different nonces produce different change commitments", async () => {
-    const a = await computeChangeCommitment(CHAIN_ID, 42n, 0xdeadn, 0xbeefn, 1000n, 1n)
-    const b = await computeChangeCommitment(CHAIN_ID, 42n, 0xdeadn, 0xbeefn, 1000n, 2n)
-    expect(a).not.toBe(b)
-  })
-})
+describe("computeNoteCommitment", () => {
+    it("matches the independent current protocol leaf vector", async () => {
+        expect(await computeNoteCommitment(CHAIN_ID, IDENTITY, TOKEN, 70n)).toBe(
+            vectors.note.commitment
+        );
+    });
+    it("is deterministic and returns a canonical hex string", async () => {
+        const a = await computeNoteCommitment(CHAIN_ID, IDENTITY, TOKEN, 70n);
+        expect(a).toMatch(/^0x[0-9a-f]{64}$/);
+        expect(await computeNoteCommitment(CHAIN_ID, IDENTITY, TOKEN, 70n)).toBe(a);
+    });
+    it("different nonces change the leaf through the randomized identity", async () => {
+        const identity = await computeNoteIdentity(WALLET_IDENTITY, NONCE + 1n);
+        expect(await computeNoteCommitment(CHAIN_ID, identity, TOKEN, 70n)).not.toBe(
+            vectors.note.commitment
+        );
+    });
+    it("binds the chain, identity, token, and amount", async () => {
+        for (const [chainId, identity, token, amount] of [
+            [CHAIN_ID + 1n, IDENTITY, TOKEN, 70n],
+            [CHAIN_ID, hex(BigInt(IDENTITY) + 1n), TOKEN, 70n],
+            [CHAIN_ID, IDENTITY, TOKEN + 1n, 70n],
+            [CHAIN_ID, IDENTITY, TOKEN, 71n],
+        ] as const)
+            expect(await computeNoteCommitment(chainId, identity, token, amount)).not.toBe(
+                vectors.note.commitment
+            );
+    });
+    it("enforces positive u128 amounts, u64 chains and u160 tokens", async () => {
+        for (const amount of [-1n, 0n, 1n << 128n])
+            await expect(
+                computeNoteCommitment(CHAIN_ID, IDENTITY, TOKEN, amount)
+            ).rejects.toThrow();
+        for (const chain of [-1n, 1n << 64n])
+            await expect(computeNoteCommitment(chain, IDENTITY, TOKEN, 70n)).rejects.toThrow();
+        for (const token of [-1n, 1n << 160n])
+            await expect(computeNoteCommitment(CHAIN_ID, IDENTITY, token, 70n)).rejects.toThrow();
+        await expect(
+            computeNoteCommitment((1n << 64n) - 1n, IDENTITY, (1n << 160n) - 1n, (1n << 128n) - 1n)
+        ).resolves.toMatch(/^0x[0-9a-f]{64}$/);
+        await expect(computeNoteCommitment(0n, IDENTITY, 0n, 1n)).resolves.toMatch(
+            /^0x[0-9a-f]{64}$/
+        );
+    });
+    it("rejects malformed or noncanonical identity fields", async () => {
+        for (const identity of ["0x01", "0x" + "z".repeat(64), hex(FIELD_MODULUS)]) {
+            await expect(
+                computeNoteCommitment(CHAIN_ID, identity as `0x${string}`, TOKEN, 70n)
+            ).rejects.toThrow();
+        }
+    });
+});

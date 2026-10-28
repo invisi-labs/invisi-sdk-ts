@@ -1,0 +1,16 @@
+# Dependency, build and cache output.
+**/node_modules/
+**/dist/
+**/.turbo/
+**/coverage/
+.worktrees/
+
+# Protocol-generated source and authenticated proving resources.
+packages/protocol/src/contracts/abis/*.ts
+!packages/protocol/src/contracts/abis/*.test.ts
+packages/protocol/src/contracts/protocol-artifacts.ts
+packages/prover/circuits/
+**/generated/
+
+# Shared wire fixtures must retain their canonical bytes.
+**/*vectors.json

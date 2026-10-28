@@ -1,0 +1,31 @@
+{
+  "tabWidth": 4,
+  "useTabs": false,
+  "printWidth": 100,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "es5",
+  "arrowParens": "always",
+  "quoteProps": "preserve",
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": [
+        "*.json",
+        "*.yml",
+        "*.yaml"
+      ],
+      "options": {
+        "tabWidth": 2
+      }
+    },
+    {
+      "files": [
+        "examples/**/*.{ts,tsx}"
+      ],
+      "options": {
+        "printWidth": 140
+      }
+    }
+  ]
+}

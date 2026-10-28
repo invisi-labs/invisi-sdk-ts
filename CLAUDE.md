@@ -1,87 +1,49 @@
-# CLAUDE.md
+# Repository guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This pnpm/Turbo workspace publishes `@invisi-labs/*`. Current Solidity/Noir truth is `../invisi-protocol`; canonical protocol docs are `../protocol-docs/01-protocol` and `02-zk-circuits`. Canonical documentation is not an ABI source.
 
 ## Commands
 
-```bash
-# Install dependencies
-pnpm install
+- `pnpm install --frozen-lockfile`
+- `pnpm build`: ESM/CJS/declarations in dependency order.
+- `pnpm test`: all package tests; tests are not cached.
+- `pnpm format`: format handwritten TypeScript and JavaScript sources, tests, examples and scripts.
+- `pnpm format:check`: check source formatting without modifying files.
+- `pnpm lint`: formatting, English-only repository checks and strict TypeScript checks, including examples.
+- `pnpm lint:english`: scan non-ignored project text for Chinese characters.
+- `pnpm sync:protocol`: sync generated ABIs and authenticated circuit/key assets from the sibling protocol repository. Sync scripts also accept an unpacked protocol release directory.
+- `BB_BINARY_PATH=/absolute/path/to/bb INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover test`: real native/WASM interoperability; BB must be5.2.1.
 
-# Build all packages (respects dependency order)
-pnpm build
+Never publish packages, deploy, or push unless requested. Use normal commits; do not amend existing commits without explicit authorization. Commit messages are English.
 
-# Run all tests
-pnpm test
+Use English throughout the repository: code comments, JSDoc, runtime messages, example walkthroughs, tests, and documentation. Do not add Chinese text to project files.
 
-# Type-check all packages
-pnpm lint
+## Current architecture
 
-# Clean all dist folders
-pnpm clean
+Core derives Invisi wallet capabilities from valid EVM account private keys through versioned HKDF-SHA256; the application owns HD/mnemonic derivation. Core provides, checked long/short receiving addresses, private WalletAuthorization, canonical Poseidon2 notes/nullifiers, recipient-role-bound delivery, Credit recovery and optional Decaf377 FMD. Invoice identifiers are business data. The original EVM key authorizes arbitrary spending. Complete funds notes permit unsigned full sweeps to that same EVM owner, with no private outputs, deposits, change or fees. Credit lifecycle remains signed. Never restore noteSecret ownership or accept unrestricted unsigned spends.
 
-# Target a specific package
-pnpm turbo run test --filter=@invisi-labs/core
-pnpm turbo run build --filter=@invisi-labs/receiver
+Use ethers for generic EVM Provider/Signer, Contract, ABI, EIP712 and transaction waiting. Do not reimplement those capabilities or restore viem dependencies. Invisi composes protocol-specific ethers adapters internally from provider/signer, without implicit event sources or public tree providers. Ethers owns transaction sending, gas, EVM nonces and receipt waiting. Do not add Operation Submitter/submit()/wait() wrappers. WalletSession.sendTransaction may thinly delegate to an injected ethers Signer and return its original TransactionResponse; its Operation overload exports and tracks the hash. Exported plain calls remain usable directly with ethers. Reconcile protocol state independently. WalletSession applies external WalletUpdateBatch candidates through applyUpdates, authenticating receipts via the configured reader and paths against RPC roots; inject MembershipProvider for operation paths. Explicit capability interfaces remain available for custom services. Protocol builds typed calldata and authorization statements; WalletSession owns business orchestration. Use shield, transact, createCredit, creditDraw, cancelCredit, topUpCredit and the separate receiving-key registry. Every Delivery binds ciphertext and clue. Wallet authorization consumes no EVM nonce; funding, permit and registry nonce domains remain independent. Never reintroduce payOpen/payBlind/withdraw/depositCredit/reclaim calls or obsolete deterministic ordinary change rules.
 
-# Run tests inside a package directly
-cd packages/core && pnpm test
+Four ordinary capacities14/56/112/168; only14 supports recursion and aggregates4/8/12. Seven direct-only Credit routes: create,draw1/12/50/120,cancel,top-up. Credit full public widths46/6C+12/11/50; registry3. Top-up requires existing unexpired Credit, expiry not shortened and increased balance. Credit cancellation remains available after expiry/during the local Protocol pause; Factory circuit pause blocks all business including cancellation. Draw/cancel are public ERC20 payouts to leaf-bound addresses.
 
-# Release flow
-pnpm changeset          # Create a changeset
-pnpm version-packages   # Bump versions
-pnpm release            # Build + publish
-```
+Node ships15 authenticated compiled circuits and16 target-specific VKs. Use BB5.2.1 and Noir JS1.0.0-rc.3 for compiler rc.4 artifacts. Direct/recursive targets and public-input widths are authenticated; prove and independently verify actual bytes. Never relabel stale proofs, bypass hashes, or claim mock proofs establish circuit soundness. Browser imports must not require Node fs/process/crypto APIs.
 
-**Requirements:** pnpm 9.4.0+, Node >= 20.
+Tree sync consumes canonical insertion events, not higher-level business events. Handle live rollover, duplicates, gaps and reorg errors without partial corrupt state. Event output positions are authoritative.
 
-## Architecture
+React/Vue useOperation wraps explicit immutable SDK stages. Chain events deliver notes; business negotiation belongs to the application. Never serialize wallet seeds, spending private keys or shared recovery keys into logs or public requests. Explicit low-level remote proving discloses its sensitive witness and is never a high-level automatic fallback.
 
-This is a **Turbo + pnpm monorepo** for a privacy-preserving payment protocol SDK. All packages live under `packages/` and are published as `@invisi-labs/*`.
+## Examples
 
-### Package Dependency Graph
+Examples demonstrate public SDK workflows. Keep cryptographic, authorization, state, and synchronization tests in their owning packages; do not add test files, fixture imports, a test runner or an alternative implementation of SDK behavior under examples. Keep only small environment readers in examples/environment.ts. Show deployment selection, ethers Provider/Signer, prover, Wallet, Protocol and Invisi construction directly where required; keep WalletStore and WalletSession setup in 08-wallet-session; do not hide SDK composition behind aggregate configuration or infrastructure helpers. Each example reads only the environment values required by its capabilities. Use build/typecheck and the offline wallet CLI smoke run to check examples. Client update transport and subscription lifetime belong to the application. Keep examples in nine numbered topics: 00-wallet, 01-connect, 02-shield, 03-funds, 04-credit, 05-registry, 06-aggregation, 07-disclosure and 08-wallet-session. Business examples use explicit inputs and PreparedTransaction without a Store or WalletSession. Chain discovery and deployment verification belong to 01-connect; managed inventory restoration, incremental refresh, operation recovery and browser/framework integration belong to 08-wallet-session. Examples consume Protocol RPC; do not add public indexing, tree building or relayer service implementations.
 
-```
-@invisi-labs/core          ← Poseidon hash, commitments, nullifiers, key derivation
-       ↓                  (uses @aztec/bb.js for Barretenberg cryptography)
-@invisi-labs/ipp           ← IPP data format, encoding, CAIP-2, Interaction Protocol client (uses @msgpack/msgpack)
-@invisi-labs/contracts     ← InvisiProtocol ABI + TypeScript types (no dependencies)
-@invisi-labs/deployments   ← Chain deployment registry (no dependencies)
-       ↓
-@invisi-labs/payer         ← buildPayOpenCalldata, buildPayBlindCalldata, buildPaymentFromRequest, verifyPaymentCommitment
-                          (uses viem + @invisi-labs/contracts + @invisi-labs/ipp)
-@invisi-labs/receiver      ← generateInvoice, buildWithdrawCalldata, createPaymentRequest, computePaymentCommitmentForPropose
-                          (uses @invisi-labs/core + @invisi-labs/contracts + @invisi-labs/deployments + @invisi-labs/ipp + viem)
-       ↓
-@invisi-labs/react         ← usePayOpen() hook, usePayBlind() hook (wraps @invisi-labs/payer)
-@invisi-labs/vue           ← usePayOpen() composable, usePayBlind() composable (wraps @invisi-labs/payer)
+## Generated files and verification
 
-@invisi-labs/node          ← Server-side ZK proof generation via nargo + bb CLI
-                          (uses @invisi-labs/core, requires nargo & bb binaries)
-```
+Do not hand-edit ABI/circuit/VK assets. Generate ABI from `contracts/out/<name>.sol/<name>.json`, and import circuit assets only after manifest/dependency/artifact/VK checks. Deployment addresses must come from verified records or caller configuration. ProtocolDeployment is defined and parsed by @invisi-labs/rpc: chainId, protocol and optional registry; both contracts use address, runtimeCodeHash and fromBlock. The SDK and its Protocol class must not maintain deployment profiles or catalogs. Invisi.connect validates one multi-token Protocol; WalletSession owns its shared state and canonical synchronization, and each preparation explicitly chooses tokenAddress. TokenProtocol is a per-operation binding composed through protocol.forToken; never restore token-to-instance discovery. Local profiles use mock verifiers and are reproduced by scripts/deploy-local.mjs on fresh default Anvil chain31337. Both local assets use the same Protocol without token registration. The single deployment catalog belongs to ../invisi-protocol/deployment/deployment.json. Protocol deployment tooling owns it; RPC reads that file. Regenerate its local entry only from that controlled deployment. Applications select a trusted Protocol RPC service or independently pin its deployment.
 
-### Key Concepts
+Use independent protocol fixtures for cryptographic and ABI vectors, real calldata decoding for builders, and genuine current Noir/native/WASM proving where applicable. Keep all pnpm build/test/lint checks green. A successful mock verifier says nothing about cryptographic soundness.
 
-- **Claiming key**: Derived per-invoice from a master key (`deriveClaimingKey(masterKey, invoiceId)` in `@invisi-labs/core`). Used to compute commitments and nullifiers.
-- **Payment commitment**: `poseidonHash(identityCommitment, amount)` — stored on-chain when a payer deposits.
-- **Nullifier**: `poseidonHash(claimingKey, amount)` — prevents double-spending during settlement.
-- **Proof circuits**: `single_withdraw`, `batch_withdraw`, `shielded_payment` — generated server-side by `@invisi-labs/node` via two-step process: `nargo execute` (witness) then `bb prove` (proof).
-- **IPPClient**: `new IPPClient(endpoint)` — HTTP client for IPP Interaction Protocol. Methods: `info`, `propose`, `authorize`, `status`, `notify`, `withdraw`, `creditDraw`, `creditReclaim`, `creditStatus`, `relay`, `relayStatus`.
-- **createPaymentRequest**: Generates an `IPPRequest` from receiver credentials. Automatically computes `identityCommitment` and optionally pre-computes `nonce` + `paymentCommitment` (mode 1a).
-- **buildPaymentFromRequest**: Constructs on-chain calldata from an `IPPRequest` + propose response. Verifies `paymentCommitment` before building.
+## Source layout
 
-### Contracts Sync
+Use four spaces, double quotes and semicolons. The formatter prefers 100 columns, or 140 in examples to keep walkthrough messages on one line; this is not a hard line limit. Keep one operation per statement, separate logical phases with blank lines, and expand nontrivial constructors, control flow and business dispatch. Simple accessors may stay compact. Prefer descriptive local names over compressed aliases in lifecycle code.
 
-ABIs in `@invisi-labs/contracts` and deployment addresses in `@invisi-labs/deployments` are auto-synced from the `invisi-protocol` repo via the `protocol-sync` GitHub Actions workflow (triggered by a `protocol-release` repository dispatch event). Do not manually edit ABI files — they are generated.
-
-### Build System
-
-- **tsup** bundles each package to ESM + CJS with TypeScript declarations
-- **turbo** orchestrates builds in dependency order (`^build` = dependencies must build first)
-- Tests do not cache in turbo (`"cache": false`) — always run fresh
-- Base TypeScript config in `tsconfig.base.json`: strict mode, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, ES2022 target
-
-### Supported Chains
-
-Mainnet: Ethereum (1), Optimism (10), Base (8453), Arbitrum (42161)
-Testnet: Sepolia (11155111), Optimism Sepolia (11155420), Base Sepolia (84532), Arbitrum Sepolia (421614)
+Run `pnpm format` after source edits and `pnpm lint` before committing. The root formatter covers handwritten code under packages, examples and scripts. Protocol-generated ABI source, ABI identities, witness layouts, circuit/key resources and shared wire fixture bytes are excluded; update those only through their generators. Formatting and behavior changes belong in separate commits.

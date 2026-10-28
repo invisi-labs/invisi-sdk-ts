@@ -1,2 +1,2 @@
-export { usePayOpen } from "./usePayOpen"
-export { usePayBlind } from "./usePayBlind"
+export { useOperation } from "./useOperation";
+export type { UseOperationResult } from "./useOperation";

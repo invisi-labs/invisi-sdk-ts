@@ -4,14 +4,11 @@
   "fixed": [
     [
       "@invisi-labs/core",
-      "@invisi-labs/contracts",
-      "@invisi-labs/deployments",
-      "@invisi-labs/ipp",
-      "@invisi-labs/node",
-      "@invisi-labs/payer",
-      "@invisi-labs/receiver",
-      "@invisi-labs/tree",
+      "@invisi-labs/protocol",
+      "@invisi-labs/prover",
       "@invisi-labs/react",
+      "@invisi-labs/rpc",
+      "@invisi-labs/sdk",
       "@invisi-labs/vue"
     ]
   ],

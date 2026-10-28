@@ -1,15 +1,11 @@
-/** Domain tags for Poseidon2 hash isolation */
-export const D_NKEY    = 1n
-export const D_IDENT  = 2n
-export const D_PAY    = 3n
-export const D_NULL   = 4n
-export const D_CREDIT = 5n
-export const D_CNULL  = 6n
-export const D_NKHASH = 7n
-export const D_DERIVE = 8n
-export const D_REFLINK = 9n
-export const D_CREDIT_NKEY = 10n
-export const D_CHANGE_NKEY = 11n  // derivation salt is this payment's paymentCommitment
+/** Current protocol Poseidon2 domain tags. */
+export const D_IDENT = 2n;
+export const D_NOTE = 3n;
+export const D_NULL = 4n;
+export const D_CREDIT = 5n;
+export const D_CNULL = 6n;
+export const D_CREDIT_KEY_HASH = 7n;
+export const D_CREDIT_RECOVERY = 9n;
+export const D_CREDIT_REMAINDER_NONCE = 10n;
 
-/** Protocol constants */
-export const TREE_DEPTH = 16
+export const TREE_DEPTH = 16;

@@ -1,17 +1,83 @@
-export const VERSION = "0.0.1"
-
-export { poseidonHash } from "./poseidon"
-export { D_NKEY, D_IDENT, D_PAY, D_NULL, D_CREDIT, D_CNULL, D_NKHASH, D_DERIVE, D_REFLINK, D_CREDIT_NKEY, D_CHANGE_NKEY, TREE_DEPTH } from "./domains"
-export { computeIdentityCommitment, computePaymentCommitment, computeChangeCommitment } from "./commitment"
-export { computePaymentNullifier, computeNullifier } from "./nullifier"
-export { deriveNullifierKey, deriveCreditNullifierKey, deriveChangeNullifierKey } from "./keyDerivation"
+export type {
+    ProtocolContext,
+    Note,
+    CreditNote,
+    CreditDeliveryState,
+    ReceivingKeys,
+    CreditRemainderRecovery,
+} from "./types";
+export type {
+    WalletAuthorizationWitness,
+    WalletBytes,
+    WalletOperation,
+    WalletAuthorizationRequest,
+} from "./wallet";
 export {
-  computeNullifierKeyHash,
-  computeCreditCommitment,
-  computeCreditNullifier,
-  deriveRemainderNonce,
-  deriveRemainderNullifierKey,
-} from "./creditCommitment"
-export { computeRefundLink } from "./refundLink"
-export { FIELD_MODULUS, generateNonce } from "./random"
-export { bytesToField } from "./field"
+    computeWalletIdentity,
+    walletAuthorizationTypedData,
+    computeWalletAuthorizationDigest,
+    signWalletAuthorization,
+    verifyWalletAuthorization,
+    WALLET_AUTHORIZATION_TYPES,
+} from "./wallet";
+export type { DecodedAddress, ReceivingKeyLookup } from "./address";
+export { decodeAddress } from "./address";
+export { Wallet } from "./wallet-object";
+export { Disclosure } from "./disclosure";
+export type {
+    CreditOpening,
+    DisclosureOutput,
+    DisclosureExport,
+    DisclosureResult,
+} from "./disclosure";
+export { ReceivingAddress } from "./receiving-address";
+export {
+    ViewingCapability,
+    Detector,
+    NullifierCapability,
+    WalletAuthorization,
+    AuthorizedStatement,
+} from "./capabilities";
+export type { WalletAuthorizationProvider } from "./capabilities";
+export { MissingCapabilityError } from "./errors";
+export { deriveClueKey, validateClueKey, createClue, createClueFromSeed } from "./fmd";
+export { poseidonHash } from "./poseidon";
+export {
+    D_IDENT,
+    D_NOTE,
+    D_NULL,
+    D_CREDIT,
+    D_CNULL,
+    D_CREDIT_KEY_HASH,
+    D_CREDIT_RECOVERY,
+    D_CREDIT_REMAINDER_NONCE,
+    TREE_DEPTH,
+} from "./domains";
+export { computeNoteIdentity, computeNoteCommitment } from "./commitment";
+export { computeNoteNullifier } from "./nullifier";
+export {
+    computeCreditSharedKeyHash,
+    computeCreditCommitment,
+    computeCreditNullifier,
+    deriveRemainderNonce,
+    computeCreditRecoveryPad,
+    recoverCreditRemainder,
+} from "./creditCommitment";
+export { FIELD_MODULUS, generateNonce, generateCreditSharedKey } from "./random";
+export type {
+    NoteBytes,
+    NoteEncryptionContext,
+    NoteDecryptionContext,
+    CreditNoteEncryptionContext,
+    CreditNoteDecryptionContext,
+} from "./encryption";
+export {
+    viewingPublicKey,
+    encryptPrivateTransferNote,
+    decryptPrivateTransferNote,
+    encryptCreditNote,
+    decryptCreditNote,
+    normalizeCreditDeliveryState,
+} from "./encryption";
+
+export type { Hex, Address } from "./primitives";

@@ -1,0 +1,146 @@
+// AUTO-GENERATED from invisi-protocol build artifacts. Run pnpm sync:abis.
+export const verifierRouterAbi = [
+  {
+    "type": "function",
+    "name": "getCreateCreditVerifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCreditCancelVerifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCreditDrawVerifier",
+    "inputs": [
+      {
+        "name": "inputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCreditTopUpVerifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCrossTreeVerifier",
+    "inputs": [
+      {
+        "name": "inputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "outputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPrivateTransferVerifier",
+    "inputs": [
+      {
+        "name": "inputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "outputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedCreditCreation",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedCrossTreeShape",
+    "inputs": [
+      {
+        "name": "inputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "outputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedPrivateTransferShape",
+    "inputs": [
+      {
+        "name": "inputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "outputs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  }
+] as const

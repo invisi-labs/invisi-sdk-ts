@@ -1,0 +1,58 @@
+{
+  "name": "@invisi-labs/prover",
+  "version": "2.6.1",
+  "description": "Runtime-neutral proving interfaces with explicit native and WASM backends",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./native": {
+      "types": "./dist/native.d.ts",
+      "import": "./dist/native.js",
+      "require": "./dist/native.cjs"
+    },
+    "./wasm": {
+      "types": "./dist/wasm.d.ts",
+      "import": "./dist/wasm.js"
+    },
+    "./aggregate": {
+      "types": "./dist/aggregate.d.ts",
+      "import": "./dist/aggregate.js",
+      "require": "./dist/aggregate.cjs"
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsup --config tsup.config.ts && tsup --config tsup.wasm.config.ts",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "sync:circuits": "node scripts/sync-circuits.mjs"
+  },
+  "dependencies": {
+    "@invisi-labs/core": "workspace:*",
+    "@noir-lang/noir_js": "1.0.0-rc.3",
+    "ethers": "^6.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "optionalDependencies": {
+    "@aztec/bb.js": "5.2.1"
+  },
+  "files": [
+    "dist",
+    "circuits"
+  ]
+}

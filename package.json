@@ -4,14 +4,25 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "pnpm format:check && pnpm lint:english && turbo run lint",
     "clean": "turbo run clean",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build && changeset publish"
+    "release": "turbo run build && changeset publish",
+    "sync:abis": "node scripts/sync-protocol-abis.mjs",
+    "sync:protocol": "node scripts/sync-protocol.mjs",
+    "examples": "pnpm --filter @invisi-examples/scenarios start",
+    "lint:english": "node scripts/check-english.mjs",
+    "check:browser": "node scripts/check-browser-entrypoints.mjs",
+    "check:surface": "node scripts/check-public-surface.mjs",
+    "format": "prettier --write \"{packages,examples,scripts}/**/*.{ts,tsx,js,mjs,cjs}\"",
+    "format:check": "prettier --check \"{packages,examples,scripts}/**/*.{ts,tsx,js,mjs,cjs}\"",
+    "deploy:local": "node scripts/deploy-local.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
+    "esbuild": "0.27.4",
+    "prettier": "3.9.10",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   },
