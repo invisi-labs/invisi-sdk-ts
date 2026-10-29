@@ -67,6 +67,7 @@ export interface FundingSource {
     permit?: NonNullable<FundingInput["permit"]>;
 }
 export interface PaymentOutput {
+    memo?: string | Uint8Array;
     to: string;
     amount: bigint;
 }
@@ -105,6 +106,7 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
+    memo?: string | Uint8Array;
     tokenAddress: Address;
     spender: string;
     amount: bigint;
@@ -114,10 +116,11 @@ export interface CreateCreditPreparation {
 }
 export interface DrawCreditPreparation {
     tokenAddress: Address;
-    credits: readonly { credit: Hex; amount: bigint }[];
+    credits: readonly { credit: Hex; amount: bigint; memo?: string | Uint8Array }[];
     deadline?: bigint;
 }
 export interface TopUpCreditPreparation {
+    memo?: string | Uint8Array;
     tokenAddress: Address;
     credit: Hex;
     additionalAmount: bigint;

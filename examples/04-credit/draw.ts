@@ -80,7 +80,7 @@ export async function main(resources: ExampleResources) {
         creditInputs,
         tokenAddress,
         // Add more current Credit entries to demonstrate the 12/50/120 batch circuits.
-        credits: [{ credit, amount }],
+        credits: [{ credit, amount, memo: "Receipt R-1042" }], // Omit memo to preserve each parent memo.
     });
     console.log("Local operation review:", prepared.preview());
 

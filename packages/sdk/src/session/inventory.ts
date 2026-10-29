@@ -1,6 +1,7 @@
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import {
+    encodeMemo,
     computeCreditCommitment,
     computeCreditNullifier,
     computeCreditSharedKeyHash,
@@ -193,6 +194,11 @@ export abstract class InventoryProcessor {
                         if (!remainder) {
                             continue;
                         }
+                        // Financial recovery alone cannot establish uncommitted child metadata.
+                        const child = foundByKey.get(
+                            params.remainderCommitments[index]! + ":" + previous.role
+                        );
+                        const memo = child?.state.note.memo;
                         const record: StoredCredit = {
                             commitment: params.remainderCommitments[index]!,
                             treeId: BigInt(args.outputTreeId as bigint),
@@ -201,7 +207,13 @@ export abstract class InventoryProcessor {
                             blockHash: event.blockHash!,
                             transactionHash: event.transactionHash!,
                             role: previous.role,
-                            state: { ...clone(previous.state), note: remainder },
+                            state: {
+                                ...clone(previous.state),
+                                note: {
+                                    ...remainder,
+                                    ...(memo === undefined ? {} : { memo: encodeMemo(memo) }),
+                                },
+                            },
                             receivingKeySource: { kind: "draw", commitment: previous.commitment },
                             spent: "unknown",
                         };

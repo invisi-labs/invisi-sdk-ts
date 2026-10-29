@@ -53,11 +53,11 @@ for (const [role, code] of [
 vectors.credit.ownerReceivingKeys = state.ownerReceivingKeys;
 vectors.credit.spenderReceivingKeys = state.spenderReceivingKeys;
 vectors.credit.deliverySource = {
-    envelopeVersion: 3,
-    ciphertextBytes: 400,
+    envelopeVersion: 4,
+    ciphertextBytes: 402,
     protocolClientSha256: createHash("sha256").update(readFileSync(source)).digest("hex"),
     purpose:
         "Independent Node crypto delivery vectors; canonical fixture clue points do not claim FMD detectability.",
 };
 writeFileSync(file, JSON.stringify(vectors, null, 2) + "\n");
-console.log("Refreshed two 400-byte Credit envelopes from the protocol implementation.");
+console.log("Refreshed two 402-byte Credit envelopes from the protocol implementation.");

@@ -105,6 +105,7 @@ export async function main(resources: ExampleResources) {
         tokenAddress,
         credit,
         additionalAmount,
+        memo: "Allowance renewed", // Omit memo to preserve the previous Credit memo.
         expiry,
     });
     console.log("Local operation review:", prepared.preview());

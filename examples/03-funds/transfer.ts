@@ -61,6 +61,7 @@ export async function main(resources: ExampleResources) {
         outputs: Array.from({ length: outputCount }, () => ({
             to: recipientAddress,
             amount,
+            memo: "Invoice INV-2026-1042", // Optional UTF-8 text; at most 256 encoded bytes.
         })),
     });
     console.log("Local operation review:", prepared.preview());

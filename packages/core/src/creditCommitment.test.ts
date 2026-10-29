@@ -323,3 +323,13 @@ describe("current protocol vectors", () => {
 function ownerHex(value: string | number | bigint): `0x${string}` {
     return `0x${BigInt(value).toString(16).padStart(40, "0")}`;
 }
+
+it("recovers financial Credit fields without fabricating a child memo from the parent", async () => {
+    const result = await core.recoverCreditRemainder(
+        context,
+        { ...note, memo: new Uint8Array([255]) },
+        recovery
+    );
+    expect(result).not.toHaveProperty("memo");
+    expect(result!.amount).toBe(remainderAmount);
+});

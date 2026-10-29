@@ -26,7 +26,7 @@ const backend = (): Prover => ({
     }),
     verify: async () => true,
 });
-async function creditFixture(amount = 100n, sameWallet = false) {
+async function creditFixture(amount = 100n, sameWallet = false, memo?: string | Uint8Array) {
     const h = await fixture();
     if (sameWallet) h.bob = h.wallet;
     const state: CreditDeliveryState = {
@@ -39,6 +39,7 @@ async function creditFixture(amount = 100n, sameWallet = false) {
             ownerPayout: BigInt(h.wallet.walletIdentity),
             spenderPayout: BigInt(h.bob.walletIdentity),
             amount,
+            ...(memo === undefined ? {} : { memo }),
             nonce: 456n,
             expiry: 2000003600n,
             creditSharedKey: 789n,
@@ -87,7 +88,7 @@ async function creditFixture(amount = 100n, sameWallet = false) {
         spenderSession: new WalletSession({ ...h.options, wallet: h.bob, prover: backend() }),
     };
 }
-it("creates a privately funded Credit with complete dual 400-byte snapshots and ordinary random change", async () => {
+it("creates a privately funded Credit with complete dual 402-byte snapshots and ordinary random change", async () => {
     const h = await fixture(),
         session = new WalletSession({ ...h.options, prover: backend() }),
         operation = await session.prepareCreateCredit({
@@ -102,7 +103,7 @@ it("creates a privately funded Credit with complete dual 400-byte snapshots and 
     expect(credit.outputs[0]!.state.note.amount).toBe(70n);
     expect(saved.plan.outputs[0]!.note.amount).toBe(30n);
     expect(credit.deliveries.map((delivery) => (delivery.ciphertext.length - 2) / 2)).toEqual([
-        400, 400, 158,
+        402, 402, 160,
     ]);
     const recovered = await h.bob.getViewer().decryptCredit(credit.deliveries[1]!.ciphertext, {
         chainId: h.scope.chainId,
@@ -380,4 +381,62 @@ it("normalizes direct reservation requests to one underlying Credit across role 
     expect((await h.store.readSnapshot(h.scope)).reservations["credit:" + h.commitment]).toBe(
         "spender-operation"
     );
+});
+
+it("preserves Credit memos by default and applies top-up and per-remainder overrides", async () => {
+    for (const override of [undefined, "replacement", new Uint8Array([0, 255]), ""]) {
+        const h = await creditFixture(100n, false, new Uint8Array([65, 0, 255]));
+        const tokenAddress = h.context.tokenAddress;
+        const request = {
+            tokenAddress,
+            credit: h.commitment,
+            additionalAmount: 10n,
+            ...(override === undefined ? {} : { memo: override }),
+        };
+        const topUp = await h.ownerSession.prepareTopUpCredit(request);
+        const topPlan = (
+            (await h.store.readSnapshot(h.scope)).operations[topUp.id]!.payload as SavedOperation
+        ).plan;
+        const expected =
+            override === undefined
+                ? new Uint8Array([65, 0, 255])
+                : typeof override === "string"
+                  ? new TextEncoder().encode(override)
+                  : override;
+        if (expected.length === 0)
+            expect(topPlan.credit!.outputs[0]!.state.note).not.toHaveProperty("memo");
+        else expect(topPlan.credit!.outputs[0]!.state.note.memo).toEqual(expected);
+        await topUp.abandon();
+        const draw = await h.spenderSession.prepareDrawCredit({
+            tokenAddress,
+            credits: [
+                {
+                    credit: h.commitment,
+                    amount: 30n,
+                    ...(override === undefined ? {} : { memo: override }),
+                },
+            ],
+        });
+        const scope = { ...h.scope, walletIdentity: h.bob.walletIdentity };
+        const drawPlan = (
+            (await h.store.readSnapshot(scope)).operations[draw.id]!.payload as SavedOperation
+        ).plan;
+        for (const role of ["owner", "spender"] as const) {
+            const wallet = role === "owner" ? h.wallet : h.bob;
+            const result = await wallet
+                .getViewer()
+                .decryptCredit(
+                    drawPlan.credit!.outputs[0]!.deliveries[role === "owner" ? 0 : 1].ciphertext,
+                    {
+                        ...h.context,
+                        protocolAddress: BigInt(h.context.protocolAddress),
+                        tokenAddress: BigInt(tokenAddress),
+                        role,
+                        outputCommitment: drawPlan.credit!.outputs[0]!.commitment,
+                    }
+                );
+            if (expected.length === 0) expect(result.note).not.toHaveProperty("memo");
+            else expect(result.note.memo).toEqual(expected);
+        }
+    }
 });

@@ -75,8 +75,13 @@ export function notes(v: readonly Hex[], name: string) {
         throw new Error(`duplicate or zero ${name}`);
     return r;
 }
-export function envelope(v: Hex, length: number, version?: number): Hex {
-    if (!isHexString(v) || !/^0x(?:[a-fA-F0-9]{2})*$/.test(v) || dataLength(v) !== length)
+export function envelope(v: Hex, length: number, version?: number, maximum = length): Hex {
+    if (
+        !isHexString(v) ||
+        !/^0x(?:[a-fA-F0-9]{2})*$/.test(v) ||
+        dataLength(v) < length ||
+        dataLength(v) > maximum
+    )
         throw new Error(`ciphertext must be ${length} bytes`);
     if (version !== undefined && Number.parseInt(v.slice(2, 4), 16) !== version)
         throw new Error("unsupported ciphertext envelope version");
@@ -135,8 +140,9 @@ export function normalizeDelivery(
     }
     const ciphertext = envelope(
         value.ciphertext,
-        options.credit ? 400 : 158,
-        options.credit ? 3 : 1
+        options.credit ? 402 : 160,
+        options.credit ? 4 : 2,
+        options.credit ? 658 : 416
     );
     const clue = envelope(value.clue, 68);
     if (clue.slice(130, 132).toLowerCase() !== "18") throw new Error("clue precision must be 24");

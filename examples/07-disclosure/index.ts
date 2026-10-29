@@ -1,4 +1,4 @@
-import { Disclosure, Wallet, type CreditNote, type Note } from "@invisi-labs/sdk";
+import { Disclosure, decodeMemoText, Wallet, type CreditNote, type Note } from "@invisi-labs/sdk";
 import { encryptPrivateTransferNote, generateCreditSharedKey, generateNonce } from "@invisi-labs/core";
 
 /** Offline illustration only. These public demo keys and numeric contexts are not a deployment. */
@@ -7,13 +7,20 @@ export async function main() {
     const alice = await Wallet.fromPrivateKey(`0x${"01".padStart(64, "0")}`);
     const bob = await Wallet.fromPrivateKey(`0x${"02".padStart(64, "0")}`);
     const offlineContext = { chainId: 31337n, protocolAddress: 1n, tokenAddress: 2n };
-    const note: Note = { ...offlineContext, walletIdentity: bob.walletIdentity, amount: 30n, nonce: generateNonce() };
+    const note: Note = {
+        ...offlineContext,
+        walletIdentity: bob.walletIdentity,
+        amount: 30n,
+        nonce: generateNonce(),
+        memo: "Invoice INV-1042",
+    };
 
     console.log("2. Create a commitment opening and explicitly export its sensitive contents");
     const opening = await Disclosure.fromNote(note);
     const openingMaterial = opening.export();
     const output = { ...offlineContext, outputCommitment: openingMaterial.context.outputCommitment, role: "funds" as const };
 
+    // A commitment opening excludes the memo; the memo is authenticated by the encrypted delivery.
     // A complete funds opening permits consumption tracking and owner-only full sweep.
     // This checks the opening only. No RPC or canonical inclusion is claimed in this offline example.
     // verify-on-chain.ts independently resolves the transaction, insertion and delivery from a trusted RPC.
@@ -35,6 +42,8 @@ export async function main() {
     const importedKey = await Disclosure.fromExport(JSON.parse(JSON.stringify(sensitiveMaterial)));
     const decrypted = await importedKey.verify({ ...output, ciphertext });
     console.log("Payload verified; disclosed amount:", decrypted.note.amount);
+    // Decryption returns raw bytes. Decode explicitly only when your application expects UTF-8 text.
+    if (decrypted.note.memo instanceof Uint8Array) console.log("Disclosed memo:", decodeMemoText(decrypted.note.memo));
 
     console.log("6. Disclose a Credit opening while retaining the shared recovery key");
     const credit: CreditNote = {

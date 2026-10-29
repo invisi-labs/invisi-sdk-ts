@@ -22,7 +22,7 @@ it("encodes a single source in the canonical two-argument direct request", () =>
     };
     const deliveries = [
         {
-            ciphertext: ("0x01" + "11".repeat(157)) as `0x${string}`,
+            ciphertext: ("0x02" + "11".repeat(159)) as `0x${string}`,
             clue: ("0x" + "22".repeat(64) + "18" + "33".repeat(3)) as `0x${string}`,
         },
     ];

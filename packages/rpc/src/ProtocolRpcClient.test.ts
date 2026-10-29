@@ -90,7 +90,7 @@ describe("ProtocolRpcClient", () => {
         expect(client.toJSON()).toEqual({ type: "ProtocolRpcClient", redacted: true });
     });
 
-    it("accepts Go decimal pins and enriches the indexed head independently", async () => {
+    it("accepts API v1 and Protocol version 1 decimal pins and enriches the indexed head independently", async () => {
         const { client } = setup(() => status());
         expect((await client.getStatus(context)).indexedHead).toEqual(block);
     });

@@ -227,27 +227,27 @@ export function extractDeliveryCandidates(
                 start = index(a.startLeafIndex),
                 packed = a.packedDeliveries;
             check(
-                typeof packed === "string" &&
-                    /^0x(?:[0-9a-fA-F]{2})*$/.test(packed) &&
-                    packed.length === 2 + 452 * cs.length,
+                typeof packed === "string" && /^0x(?:[0-9a-fA-F]{2})*$/.test(packed),
                 "invalid packed deliveries"
             );
             check(tokens.length === cs.length, "batch token count mismatch");
+            check(start + cs.length <= 65536, "batch exceeds tree capacity");
+            let offset = 2;
             cs.forEach((c, i) => {
-                const segment = packed.slice(2 + 452 * i, 2 + 452 * (i + 1));
-                add(
-                    log,
-                    tree,
-                    start + i,
-                    c,
-                    "funds",
-                    {
-                        ciphertext: `0x${segment.slice(0, 316)}`,
-                        clue: `0x${segment.slice(316)}`,
-                    },
-                    tokens[i]
+                check(offset + 4 <= packed.length, "truncated delivery length prefix");
+                const length = Number.parseInt(packed.slice(offset, offset + 4), 16);
+                offset += 4;
+                check(
+                    length >= 160 && length <= 416 && offset + length * 2 + 136 <= packed.length,
+                    "invalid packed delivery length"
                 );
+                const ciphertext = `0x${packed.slice(offset, offset + length * 2)}`;
+                offset += length * 2;
+                const clue = `0x${packed.slice(offset, offset + 136)}`;
+                offset += 136;
+                add(log, tree, start + i, c, "funds", { ciphertext, clue }, tokens[i]);
             });
+            check(offset === packed.length, "trailing packed delivery bytes");
         } else if (log.eventName === "CreditCreated") creation(log, a, a);
         else if (log.eventName === "CreditToppedUp")
             creation(log, a, object(object(a.params).creation));

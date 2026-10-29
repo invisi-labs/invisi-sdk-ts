@@ -47,8 +47,8 @@ describe("self-contained Credit delivery state", () => {
                     role,
                 };
             const envelope = await encryptCreditNote(hexBytes(wallet.viewingPublicKey), state, c);
-            expect(envelope).toHaveLength(400);
-            expect(envelope[0]).toBe(3);
+            expect(envelope).toHaveLength(402);
+            expect(envelope[0]).toBe(4);
             expect(
                 await decryptCreditNote(hexBytes(wallet.viewingPrivateKey), envelope, c)
             ).toEqual(state);
@@ -56,7 +56,7 @@ describe("self-contained Credit delivery state", () => {
             // This reference decrypts using Node, independently of production WebCrypto.
             const ecdh = createECDH("secp256k1");
             ecdh.setPrivateKey(hexBytes(wallet.viewingPrivateKey));
-            const domain = Buffer.from("Invisi.CreditDelivery.v1"),
+            const domain = Buffer.from("Invisi.CreditDelivery.v2"),
                 data = Buffer.from(envelope);
             const key = hkdfSync(
                 "sha256",
@@ -81,10 +81,10 @@ describe("self-contained Credit delivery state", () => {
                     word(BigInt(leaf)),
                 ])
             );
-            cipher.setAuthTag(data.subarray(384));
-            const plain = Buffer.concat([cipher.update(data.subarray(62, 384)), cipher.final()]);
-            expect(plain).toHaveLength(322);
-            expect(plain.subarray(192)).toEqual(
+            cipher.setAuthTag(data.subarray(386));
+            const plain = Buffer.concat([cipher.update(data.subarray(62, 386)), cipher.final()]);
+            expect(plain).toHaveLength(324);
+            expect(plain.subarray(192, 322)).toEqual(
                 Buffer.concat([
                     state.ownerReceivingKeys.viewingPublicKey,
                     clueKey,

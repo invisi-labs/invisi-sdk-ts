@@ -1,3 +1,4 @@
+import { encodeMemo } from "./memo";
 import { bytesToHex } from "@noble/hashes/utils";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
 import { computeCreditCommitment, computeCreditSharedKeyHash } from "./creditCommitment";
@@ -14,8 +15,8 @@ import {
 import { FIELD_MODULUS } from "./random";
 import type { Note, CreditNote } from "./types";
 
-/** A Credit commitment opening excludes the shared recovery/nullifier secret. */
-export interface CreditOpening extends Omit<CreditNote, "creditSharedKey"> {
+/** A Credit commitment opening excludes encrypted memos and the shared recovery/nullifier secret. */
+export interface CreditOpening extends Omit<CreditNote, "creditSharedKey" | "memo"> {
     creditSharedKeyHash: `0x${string}`;
 }
 
@@ -44,7 +45,8 @@ export interface DisclosureExport {
 }
 
 export type DisclosureResult =
-    { kind: "note"; note: Readonly<Note> } | { kind: "credit"; note: Readonly<CreditOpening> };
+    | { kind: "note"; note: Readonly<Note> }
+    | { kind: "credit"; note: Readonly<CreditOpening & { memo?: Uint8Array }> };
 
 const NOTE_FIELDS = ["walletIdentity", "amount", "nonce"] as const;
 const CREDIT_FIELDS = [
@@ -354,6 +356,7 @@ export class Disclosure {
             revealsNoteConsumption: kind === "note",
             revealsCreditSharedKey: kind === "credit" && method === "payload-key",
             revealsReceivingKeys: kind === "credit" && method === "payload-key",
+            revealsMemo: method === "payload-key",
         };
     }
 
@@ -413,7 +416,13 @@ export class Disclosure {
                 output.ciphertext,
                 { ...decryption, role: output.role as "owner" | "spender" }
             );
-            return { kind: "credit", note: Object.freeze(await creditOpening(state.note)) };
+            return {
+                kind: "credit",
+                note: Object.freeze({
+                    ...(await creditOpening(state.note)),
+                    ...(state.note.memo === undefined ? {} : { memo: encodeMemo(state.note.memo) }),
+                }),
+            };
         }
         if (material.kind === "note") {
             const note: Note = {

@@ -1,3 +1,4 @@
+import vectors from "../../../core/src/testdata/wallet-note-vectors.json";
 import { expect, it } from "vitest";
 import {
     MemoryAtomicRecords,
@@ -201,4 +202,72 @@ it("merges fresh spent observations for duplicate notes without regressing newer
         0n
     );
     expect(state.notes[leaf(1)]!.checkedThrough!.number).toBe(20n);
+});
+
+it("reloads raw encrypted memo metadata through the record codec without aliasing", async () => {
+    const records = new MemoryAtomicRecords();
+    const codec = new MemoryRecordCodec();
+    const store = new TransactionalWalletStore(records, codec, { persistent: false });
+    const memo = new Uint8Array([0, 255, 192, 128]);
+    await store.transaction(scope, (draft) => {
+        const record = input();
+        draft.notes[leaf(1)] = { ...record, note: { ...record.note, memo } };
+        const keys = (role: "owner" | "spender") => ({
+            viewingPublicKey: Uint8Array.from(
+                Buffer.from(
+                    vectors.credit[
+                        role === "owner" ? "ownerReceivingKeys" : "spenderReceivingKeys"
+                    ].viewingPublicKey.slice(2),
+                    "hex"
+                )
+            ),
+            clueKey: Uint8Array.from(
+                Buffer.from(
+                    vectors.credit[
+                        role === "owner" ? "ownerReceivingKeys" : "spenderReceivingKeys"
+                    ].clueKey.slice(2),
+                    "hex"
+                )
+            ),
+        });
+        draft.credits[leaf(2) + ":owner"] = {
+            ...record,
+            commitment: leaf(2),
+            leafIndex: 1,
+            role: "owner",
+            state: {
+                note: {
+                    chainId: scope.chainId,
+                    protocolAddress: BigInt(scope.protocolAddress),
+                    tokenAddress: record.note.tokenAddress,
+                    ownerWalletIdentity: scope.walletIdentity,
+                    spenderWalletIdentity: scope.walletIdentity,
+                    ownerPayout: 1n,
+                    spenderPayout: 1n,
+                    amount: 100n,
+                    nonce: 2n,
+                    expiry: 2000000000n,
+                    creditSharedKey: 3n,
+                    memo,
+                },
+                ownerReceivingKeys: keys("owner"),
+                spenderReceivingKeys: keys("spender"),
+            },
+        };
+    });
+    memo.fill(7);
+    const reloaded = new TransactionalWalletStore(records, codec, { persistent: false });
+    const snapshot = await reloaded.readSnapshot(scope);
+    expect(snapshot.notes[leaf(1)]!.note.memo).toEqual(new Uint8Array([0, 255, 192, 128]));
+    expect(snapshot.credits[leaf(2) + ":owner"]!.state.note.memo).toEqual(
+        new Uint8Array([0, 255, 192, 128])
+    );
+    (snapshot.notes[leaf(1)]!.note.memo as Uint8Array).fill(8);
+    (snapshot.credits[leaf(2) + ":owner"]!.state.note.memo as Uint8Array).fill(8);
+    expect(
+        (await reloaded.readSnapshot(scope)).credits[leaf(2) + ":owner"]!.state.note.memo
+    ).toEqual(new Uint8Array([0, 255, 192, 128]));
+    expect((await reloaded.readSnapshot(scope)).notes[leaf(1)]!.note.memo).toEqual(
+        new Uint8Array([0, 255, 192, 128])
+    );
 });

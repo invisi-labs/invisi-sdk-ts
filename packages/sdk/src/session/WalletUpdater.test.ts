@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { Interface, keccak256 } from "ethers";
 import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
-import { ReceivingAddress, ViewingCapability, Wallet } from "@invisi-labs/core";
+import { ReceivingAddress, ViewingCapability, Wallet, encryptCreditNote } from "@invisi-labs/core";
 import {
     Protocol,
     type CanonicalBlock,
@@ -299,118 +299,174 @@ it("rejects a changed chain during processing without committing candidate notes
     expect(state.invalidated).toBeTruthy();
 });
 
-it("recovers a Credit remainder from the canonical draw even when the delivered envelope is invalid", async () => {
-    const h = await harness();
-    const p = vectors.credit;
-    const tree = await MerkleFixture.create();
-    await tree.insert(BigInt(p.commitment));
-    await tree.insert(BigInt(p.remainder.remainderCommitment));
-    const abi = new Interface(invisiProtocolAbi);
-    const event = (name: string, args: Record<string, unknown>, hash: Hex, logIndex: number) => ({
-        ...abi.encodeEventLog(
-            name,
-            abi.getEvent(name)!.inputs.map((field) => args[field.name])
-        ),
-        address: context.protocolAddress,
-        transactionHash: hash,
-        logIndex,
-    });
-    const clue = `0x${clues.vectors[0]!.clue}`;
-    const corrupt = { ciphertext: "0x03" + "11".repeat(399), clue };
-    const created: CanonicalReceipt = {
-        block: block(),
-        transactionHash: hex(101n),
-        status: "success",
-        logs: [
-            event(
-                "CommitmentsInserted",
-                { treeId: 1n, startLeafIndex: 0, commitments: [p.commitment] },
-                hex(101n),
-                0
+it.each([false, true])(
+    "recovers Credit financial fields and retains only authenticated child memos (valid envelope: %s)",
+    async (validChild) => {
+        const h = await harness();
+        const p = vectors.credit;
+        const tree = await MerkleFixture.create();
+        await tree.insert(BigInt(p.commitment));
+        await tree.insert(BigInt(p.remainder.remainderCommitment));
+        const abi = new Interface(invisiProtocolAbi);
+        const event = (
+            name: string,
+            args: Record<string, unknown>,
+            hash: Hex,
+            logIndex: number
+        ) => ({
+            ...abi.encodeEventLog(
+                name,
+                abi.getEvent(name)!.inputs.map((field) => args[field.name])
             ),
-            event(
-                "CreditCreated",
-                {
-                    token,
-                    owner: `0x${BigInt(p.ownerPayout).toString(16).padStart(40, "0")}`,
-                    outputTreeId: 1n,
-                    sources: [],
-                    nullifiers: [],
-                    creditCommitment: p.commitment,
-                    changeCommitment: hex(0n),
-                    leafIndices: [0],
-                    deliveries: [
-                        { ciphertext: p.ownerCiphertext, clue },
-                        { ciphertext: p.spenderCiphertext, clue },
-                        { ciphertext: "0x", clue: "0x" },
-                    ],
-                    expiry: BigInt(p.expiry),
-                },
-                hex(101n),
-                1
-            ),
-        ] as CanonicalReceipt["logs"],
-    };
-    const drawn: CanonicalReceipt = {
-        block: block(13n),
-        transactionHash: hex(102n),
-        status: "success",
-        logs: [
-            event(
-                "CommitmentsInserted",
-                { treeId: 1n, startLeafIndex: 1, commitments: [p.remainder.remainderCommitment] },
-                hex(102n),
-                2
-            ),
-            event(
-                "CreditDraw",
-                {
-                    spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
-                    outputTreeId: 1n,
-                    params: {
+            address: context.protocolAddress,
+            transactionHash: hash,
+            logIndex,
+        });
+        const clue = `0x${clues.vectors[0]!.clue}`;
+        const corrupt = { ciphertext: "0x04" + "11".repeat(401), clue };
+        const parent = vectors.memoVectors.find(
+            (v) => v.kind === "credit" && v.role === "owner" && v.name === "binary"
+        )!;
+        const parentState = await new ViewingCapability(
+            ownerHex(BigInt(vectors.owner.walletIdentity)),
+            vectors.owner.viewingPrivateKey as Hex
+        ).decryptCredit(parent.ciphertext as Hex, {
+            ...context,
+            protocolAddress: BigInt(context.protocolAddress),
+            tokenAddress: BigInt(token),
+            outputCommitment: p.commitment as Hex,
+            role: "owner",
+        });
+        const childMemo = new Uint8Array([65, 0, 255]);
+        const childCiphertext = validChild
+            ? await encryptCreditNote(
+                  parentState.ownerReceivingKeys.viewingPublicKey,
+                  {
+                      ...parentState,
+                      note: {
+                          ...parentState.note,
+                          amount: BigInt(p.remainder.remainder.amount),
+                          nonce: BigInt(p.remainder.remainder.nonce),
+                          memo: childMemo,
+                      },
+                  },
+                  {
+                      ...context,
+                      protocolAddress: BigInt(context.protocolAddress),
+                      outputCommitment: p.remainder.remainderCommitment as Hex,
+                      role: "owner",
+                  }
+              )
+            : undefined;
+        const childDelivery = childCiphertext
+            ? { ciphertext: `0x${Buffer.from(childCiphertext).toString("hex")}`, clue }
+            : corrupt;
+        const created: CanonicalReceipt = {
+            block: block(),
+            transactionHash: hex(101n),
+            status: "success",
+            logs: [
+                event(
+                    "CommitmentsInserted",
+                    { treeId: 1n, startLeafIndex: 0, commitments: [p.commitment] },
+                    hex(101n),
+                    0
+                ),
+                event(
+                    "CreditCreated",
+                    {
                         token,
-                        sources: [{ treeId: 1n, merkleRoot: hex(tree.getRoot()) }],
-                        nullifiers: [p.nullifier],
-                        remainderCommitments: [p.remainder.remainderCommitment],
-                        expiries: [BigInt(p.expiry)],
-                        recoveryAmounts: [p.remainder.recoveryAmount],
-                        spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
-                        totalAmount: 30n,
-                        deadline: 2000000100n,
+                        owner: `0x${BigInt(p.ownerPayout).toString(16).padStart(40, "0")}`,
+                        outputTreeId: 1n,
+                        sources: [],
+                        nullifiers: [],
+                        creditCommitment: p.commitment,
+                        changeCommitment: hex(0n),
+                        leafIndices: [0],
+                        deliveries: [
+                            { ciphertext: parent.ciphertext, clue },
+                            { ciphertext: p.spenderCiphertext, clue },
+                            { ciphertext: "0x", clue: "0x" },
+                        ],
+                        expiry: BigInt(p.expiry),
                     },
-                    remainderLeafIndices: [1],
-                    deliveries: [corrupt, corrupt],
-                },
-                hex(102n),
-                3
-            ),
-        ] as CanonicalReceipt["logs"],
-    };
-    h.reader.getReceipt = async (hash) => structuredClone(hash === hex(101n) ? created : drawn);
-    h.treeRoots.set(1n, hex(tree.getRoot()));
-    h.reader.isSpent = async (_, words) => words.map((value) => value === p.nullifier);
-    const memberships = [p.commitment, p.remainder.remainderCommitment].map((leaf, leafIndex) => ({
-        treeId: 1n,
-        leafIndex,
-        leaf: leaf as Hex,
-        root: hex(tree.getRoot()),
-        path: tree.getProof(leafIndex).merklePath,
-        block: block(13n),
-    }));
-    h.setMemberships(memberships);
-    // Reordered candidates still recover the parent before the draw is applied.
-    await h.updater.applyUpdates({
-        context,
-        block: block(13n),
-        transactionHashes: [hex(102n), hex(101n)],
-    });
-    const state = await h.store.readSnapshot(h.session.scope);
-    const remainder = state.credits[p.remainder.remainderCommitment + ":owner"]!;
-    expect(remainder.state.note.amount).toBe(70n);
-    expect(remainder.spent).toBe("unspent");
-    expect(remainder.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
-    expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");
-});
+                    hex(101n),
+                    1
+                ),
+            ] as CanonicalReceipt["logs"],
+        };
+        const drawn: CanonicalReceipt = {
+            block: block(13n),
+            transactionHash: hex(102n),
+            status: "success",
+            logs: [
+                event(
+                    "CommitmentsInserted",
+                    {
+                        treeId: 1n,
+                        startLeafIndex: 1,
+                        commitments: [p.remainder.remainderCommitment],
+                    },
+                    hex(102n),
+                    2
+                ),
+                event(
+                    "CreditDraw",
+                    {
+                        spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
+                        outputTreeId: 1n,
+                        params: {
+                            token,
+                            sources: [{ treeId: 1n, merkleRoot: hex(tree.getRoot()) }],
+                            nullifiers: [p.nullifier],
+                            remainderCommitments: [p.remainder.remainderCommitment],
+                            expiries: [BigInt(p.expiry)],
+                            recoveryAmounts: [p.remainder.recoveryAmount],
+                            spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
+                            totalAmount: 30n,
+                            deadline: 2000000100n,
+                        },
+                        remainderLeafIndices: [1],
+                        deliveries: [childDelivery, corrupt],
+                    },
+                    hex(102n),
+                    3
+                ),
+            ] as CanonicalReceipt["logs"],
+        };
+        h.reader.getReceipt = async (hash) => structuredClone(hash === hex(101n) ? created : drawn);
+        h.treeRoots.set(1n, hex(tree.getRoot()));
+        h.reader.isSpent = async (_, words) => words.map((value) => value === p.nullifier);
+        const memberships = [p.commitment, p.remainder.remainderCommitment].map(
+            (leaf, leafIndex) => ({
+                treeId: 1n,
+                leafIndex,
+                leaf: leaf as Hex,
+                root: hex(tree.getRoot()),
+                path: tree.getProof(leafIndex).merklePath,
+                block: block(13n),
+            })
+        );
+        h.setMemberships(memberships);
+        // Reordered candidates still recover the parent before the draw is applied.
+        await h.updater.applyUpdates({
+            context,
+            block: block(13n),
+            transactionHashes: [hex(102n), hex(101n)],
+        });
+        const state = await h.store.readSnapshot(h.session.scope);
+        const remainder = state.credits[p.remainder.remainderCommitment + ":owner"]!;
+        expect(remainder.state.note.amount).toBe(70n);
+        if (validChild) expect(remainder.state.note.memo).toEqual(childMemo);
+        else expect(remainder.state.note).not.toHaveProperty("memo");
+        expect(state.credits[p.commitment + ":owner"]!.state.note.memo).toEqual(
+            new Uint8Array([0, 255, 128, 0, 17])
+        );
+        expect(remainder.spent).toBe("unspent");
+        expect(remainder.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
+        expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");
+    }
+);
 
 it("orders same-block Credit parents before successors across different trees", async () => {
     const h = await harness();
@@ -431,7 +487,7 @@ it("orders same-block Credit parents before successors across different trees", 
         logIndex,
     });
     const clue = `0x${clues.vectors[0]!.clue}`;
-    const corrupt = { ciphertext: "0x03" + "11".repeat(399), clue };
+    const corrupt = { ciphertext: "0x04" + "11".repeat(401), clue };
     const created: CanonicalReceipt = {
         block: block(),
         transactionHash: hex(101n),

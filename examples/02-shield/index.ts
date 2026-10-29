@@ -41,6 +41,7 @@ export async function main(resources: ExampleResources) {
         outputs: Array.from({ length: count }, () => ({
             to: recipient,
             amount: amount / BigInt(count),
+            memo: new Uint8Array([0x00, 0xff, 0x42]), // Opaque application bytes; UTF-8 is optional.
         })),
         funding: { payer, amount, authorization: "caller" },
     });

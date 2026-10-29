@@ -236,6 +236,7 @@ it("constructs all Credit lifecycle routes with explicit role-specific inputs", 
             ownerPayout: BigInt(h.wallet.walletIdentity),
             spenderPayout: BigInt(h.bob.walletIdentity),
             amount: 100n,
+            memo: new Uint8Array([0, 255]),
             nonce: 456n,
             expiry: 2000003600n,
             creditSharedKey: 789n,
@@ -269,6 +270,7 @@ it("constructs all Credit lifecycle routes with explicit role-specific inputs", 
             inputs: h.inputs,
             spender: h.bob.getAddress(),
             amount: 70n,
+            memo: "created",
             expiry: 2000003600n,
         }),
         await h.invisi.prepareTopUpCredit({
@@ -277,6 +279,7 @@ it("constructs all Credit lifecycle routes with explicit role-specific inputs", 
             creditInputs: [ownerInput],
             credit: commitment,
             additionalAmount: 30n,
+            memo: "top-up",
             expiry: 2000007200n,
         }),
         await h.invisi.prepareCancelCredit({
@@ -288,12 +291,55 @@ it("constructs all Credit lifecycle routes with explicit role-specific inputs", 
             ...identity,
             wallet: h.bob,
             creditInputs: [{ ...ownerInput, role: "spender" }],
+            credits: [{ credit: commitment, amount: 30n, memo: "remainder" }],
+        }),
+        await h.invisi.prepareTopUpCredit({
+            ...identity,
+            inputs: h.inputs,
+            creditInputs: [ownerInput],
+            credit: commitment,
+            additionalAmount: 10n,
+        }),
+        await h.invisi.prepareDrawCredit({
+            ...identity,
+            wallet: h.bob,
+            creditInputs: [{ ...ownerInput, role: "spender" }],
             credits: [{ credit: commitment, amount: 30n }],
         }),
     ];
-    for (const operation of operations) {
+    const memos = [
+        new TextEncoder().encode("created"),
+        new TextEncoder().encode("top-up"),
+        undefined,
+        new TextEncoder().encode("remainder"),
+        new Uint8Array([0, 255]),
+        new Uint8Array([0, 255]),
+    ];
+    for (const [i, operation] of operations.entries()) {
         const ready = await (await operation.authorize()).prove();
-        expect((await ready.exportTransaction()).data.length).toBeGreaterThan(10);
+        const call = await ready.exportTransaction();
+        expect(call.data.length).toBeGreaterThan(10);
+        const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+        if (decoded.name === "cancelCredit") continue;
+        const outputCommitment =
+            decoded.name === "creditDraw"
+                ? decoded.args[1].remainderCommitments[0]
+                : decoded.name === "topUpCredit"
+                  ? decoded.args[1].creation.creditCommitment
+                  : decoded.args[1].creditCommitment;
+        for (const role of ["owner", "spender"] as const) {
+            const wallet = role === "owner" ? h.wallet : h.bob;
+            const received = await wallet
+                .getViewer()
+                .decryptCredit(decoded.args[2][role === "owner" ? 0 : 1].ciphertext, {
+                    chainId: h.context.chainId,
+                    protocolAddress: BigInt(h.context.protocolAddress),
+                    tokenAddress: BigInt(h.context.tokenAddress),
+                    role,
+                    outputCommitment,
+                });
+            expect(received.note.memo).toEqual(memos[i]);
+        }
     }
     await expect(
         h.invisi.prepareDrawCredit({
@@ -410,4 +456,47 @@ realNativeProof(
         expect((await ready.exportTransaction()).data.length).toBeGreaterThan(1000);
     },
     600000
+);
+
+it.each(["shield", "transfer"] as const)(
+    "copies per-output memos before async store-free %s preparation",
+    async (kind) => {
+        const h = await setup();
+        const memo = new Uint8Array([0, 255, 65]);
+        const common = {
+            wallet: h.wallet,
+            protocol: h.protocol,
+            tokenAddress: h.context.tokenAddress,
+            outputs: [{ to: h.bob.getAddress(), amount: 30n, memo }],
+        };
+        const pending =
+            kind === "shield"
+                ? h.invisi.prepareShield({
+                      ...common,
+                      funding: {
+                          payer: h.wallet.ownerAddress,
+                          amount: 30n,
+                          authorization: "caller",
+                      },
+                  })
+                : h.invisi.prepareTransfer({ ...common, inputs: h.inputs });
+        memo.fill(9);
+        const prepared = await pending;
+        const ready =
+            kind === "shield" ? await prepared.ready() : await (await prepared.authorize()).prove();
+        const call = await ready.exportTransaction();
+        const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+        const commitment =
+            kind === "shield"
+                ? decoded.args[0].outputCommitments[0]
+                : decoded.args[1].params.outputCommitments[0];
+        const delivery = kind === "shield" ? decoded.args[2][0] : decoded.args[1].deliveries[0];
+        const note = await h.bob.getViewer().decryptNote(delivery.ciphertext, {
+            chainId: h.context.chainId,
+            protocolAddress: BigInt(h.context.protocolAddress),
+            tokenAddress: BigInt(h.context.tokenAddress),
+            outputCommitment: commitment,
+        });
+        expect(note.memo).toEqual(new Uint8Array([0, 255, 65]));
+    }
 );

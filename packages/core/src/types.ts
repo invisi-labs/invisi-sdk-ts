@@ -1,3 +1,4 @@
+import type { Memo } from "./memo";
 /** Chain and deployed contract context. Addresses are unsigned 160-bit values. */
 export interface ProtocolContext {
     chainId: bigint;
@@ -10,6 +11,8 @@ export interface Note extends ProtocolContext {
     tokenAddress: bigint;
     amount: bigint;
     nonce: bigint;
+    /** Encrypted metadata, excluded from commitments. Decryption returns copied raw bytes. */
+    memo?: Memo;
 }
 
 /** Deployment-scoped private Credit note, with a shared nonzero random secret. */
@@ -21,6 +24,8 @@ export interface CreditNote extends ProtocolContext {
     tokenAddress: bigint;
     amount: bigint;
     nonce: bigint;
+    /** Encrypted metadata, excluded from commitments. Decryption returns copied raw bytes. */
+    memo?: Memo;
     expiry: bigint;
     creditSharedKey: bigint;
 }

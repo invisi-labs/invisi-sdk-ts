@@ -81,3 +81,5 @@ export {
 } from "./encryption";
 
 export type { Hex, Address } from "./primitives";
+
+export { encodeMemo, decodeMemoText, MAX_MEMO_BYTES, type Memo } from "./memo";

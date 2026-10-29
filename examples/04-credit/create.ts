@@ -65,6 +65,7 @@ export async function main(resources: ExampleResources) {
     await approval.wait();
 
     const prepared = await invisi.prepareCreateCredit({
+        memo: "Monthly allowance", // Encrypted in both recipient copies; excluded from the commitment.
         wallet,
         protocol,
         inputs,

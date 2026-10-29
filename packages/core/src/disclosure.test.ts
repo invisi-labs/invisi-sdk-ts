@@ -86,7 +86,7 @@ describe("selective disclosure", () => {
             ecdh.computeSecret(envelope.subarray(1, 34)),
             envelope.subarray(34, 50),
             Buffer.concat([
-                Buffer.from("Invisi.NoteDelivery.v1"),
+                Buffer.from("Invisi.NoteDelivery.v2"),
                 envelope.subarray(1, 34),
                 ecdh.getPublicKey(undefined, "compressed"),
             ]),

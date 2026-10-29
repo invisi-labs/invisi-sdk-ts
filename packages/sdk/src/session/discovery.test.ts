@@ -81,7 +81,10 @@ it("rejects malformed batches and removed logs without retaining failed state", 
     expect((await decrypt([inserted(), shield()])).notes).toHaveLength(1);
 });
 it("maps packed aggregate segments and Credit owner/spender slots without treating public refunds as notes", async () => {
-    const packed = delivery.ciphertext + clue.slice(2);
+    const packed =
+        toBeHex((delivery.ciphertext.length - 2) / 2, 2) +
+        delivery.ciphertext.slice(2) +
+        clue.slice(2);
     const aggregate = {
         ...meta,
         eventName: "BatchOutputs",

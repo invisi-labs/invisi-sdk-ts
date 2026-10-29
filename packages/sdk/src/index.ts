@@ -8,10 +8,14 @@ export {
     WalletAuthorization,
     MissingCapabilityError,
     Disclosure,
+    encodeMemo,
+    decodeMemoText,
+    MAX_MEMO_BYTES,
 } from "@invisi-labs/core";
 export type {
     Address,
     Hex,
+    Memo,
     Note,
     CreditNote,
     CreditDeliveryState,

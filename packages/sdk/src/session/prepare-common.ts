@@ -2,6 +2,7 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress, hexlify } from "ethers";
 
 import {
+    encodeMemo,
     MissingCapabilityError,
     ReceivingAddress,
     computeNoteCommitment,
@@ -122,6 +123,7 @@ export class Preparation<Result> {
         const recipient = await ReceivingAddress.parse(payment.to).resolve(
             this.runtime.options.addressResolver
         );
+        const memo = encodeMemo(payment.memo);
         const nonce = generateNonce();
         const identity = await computeNoteIdentity(BigInt(recipient.walletIdentity), nonce);
         const keys = recipient.getReceivingKeys();
@@ -131,6 +133,7 @@ export class Preparation<Result> {
             tokenAddress: BigInt(context.tokenAddress),
             walletIdentity: recipient.walletIdentity,
             amount: payment.amount,
+            ...(memo.length === 0 ? {} : { memo }),
             nonce,
         };
         const commitment = await computeNoteCommitment(

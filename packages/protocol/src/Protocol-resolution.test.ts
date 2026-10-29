@@ -61,7 +61,7 @@ describe("direct multi-token deployment", () => {
     });
 });
 
-it("checks the onchain version when the reader provides it", async () => {
+it("accepts onchain Protocol version 1 and rejects version 2 when the reader provides it", async () => {
     const p = new Protocol({ deployment });
     const reader = {
         getChainId: async () => 31337n,

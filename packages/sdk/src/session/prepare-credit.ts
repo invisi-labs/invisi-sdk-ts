@@ -170,6 +170,7 @@ export class CreditPreparation<Result> {
                     ownerPayout: BigInt(ownerPayout),
                     spenderPayout: BigInt(spenderPayout),
                     amount: options.amount,
+                    ...(options.memo === undefined ? {} : { memo: options.memo }),
                     expiry,
                     nonce: generateNonce(),
                     creditSharedKey: generateCreditSharedKey(),
@@ -272,7 +273,16 @@ export class CreditPreparation<Result> {
         }
         const amount = positiveAmount(old.note.amount + options.additionalAmount, 126);
         const output = await this.seal(
-            { ...old, note: { ...old.note, amount, expiry, nonce: generateNonce() } },
+            {
+                ...old,
+                note: {
+                    ...old.note,
+                    amount,
+                    expiry,
+                    nonce: generateNonce(),
+                    ...(options.memo === undefined ? {} : { memo: options.memo }),
+                },
+            },
             frame
         );
         return this.creation(
@@ -342,6 +352,9 @@ export class CreditPreparation<Result> {
                     note: {
                         ...n,
                         amount: remaining,
+                        ...(options.credits[i]!.memo === undefined
+                            ? {}
+                            : { memo: options.credits[i]!.memo! }),
                         nonce: await deriveRemainderNonce(...args),
                     },
                 },

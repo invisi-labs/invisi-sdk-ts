@@ -145,7 +145,7 @@ export async function recoverCreditRemainder(
     recovery: CreditRemainderRecovery
 ): Promise<CreditNote | null> {
     const scopedContext = { ...context };
-    const scopedNote = { ...previousNote };
+    const { memo: _unknownMemo, ...scopedNote } = previousNote;
     const scopedRecovery = { ...recovery };
     uint(scopedContext.chainId, 64, "chainId");
     uint(scopedContext.protocolAddress, 160, "protocolAddress");
