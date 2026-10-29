@@ -1,5 +1,16 @@
 # @invisi-labs/rpc
 
+## 1.1.2
+
+### Patch Changes
+
+- Support optional encrypted output memos of up to 256 bytes, with text and arbitrary byte payloads across funds notes, Credit lifecycle, storage, recovery and scoped disclosure.
+
+    Use version 2 funds envelopes, version 4 Credit envelopes and length-prefixed aggregate deliveries. Keep the contract and RPC API at version 1, synchronize interoperability vectors, and update the examples. Deployments must support the new envelope formats.
+
+- Updated dependencies
+    - @invisi-labs/core@1.1.2
+
 ## 1.1.1
 
 ### Patch Changes
