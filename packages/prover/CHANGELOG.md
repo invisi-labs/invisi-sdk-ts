@@ -1,5 +1,18 @@
 # @invisi-labs/prover
 
+## 1.1.3
+
+### Patch Changes
+
+- Support per-Credit single, UTC daily and UTC monthly spending limits, tracking actual usage even while a limit is disabled. Allow owner-authorized unexpired top-ups to update limits without resetting usage.
+
+    Use authenticated Credit envelope version 5 and current Credit circuits, with chain-derived period validation and confirmed block timestamps for recovery. Previous Credit formats are rejected; compatible Protocol deployments and Protocol RPC v1.1.2 are required.
+
+    Refresh real-verifier Credit gas references across creation, all four full/partial draw tiers, unchanged/changed-policy top-ups and cancellation. Synchronize 61 TypeScript/Go estimation vectors and document transaction gas-limit constraints.
+
+- Updated dependencies
+    - @invisi-labs/core@1.1.3
+
 ## 1.1.2
 
 ### Patch Changes
