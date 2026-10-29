@@ -14,6 +14,8 @@ import type { DeploymentContext } from "@invisi-labs/rpc";
 export interface TransactionContext extends DeploymentContext {
     tokenAddress: Address;
     now?: bigint;
+    /** Explicit chain timestamp used to bind Credit draw UTC periods. */
+    timestamp?: bigint;
 }
 export const FIELD_MODULUS =
     21888242871839275222246405745257275088548364400416034343698204186575808495617n;
@@ -140,9 +142,9 @@ export function normalizeDelivery(
     }
     const ciphertext = envelope(
         value.ciphertext,
-        options.credit ? 402 : 160,
-        options.credit ? 4 : 2,
-        options.credit ? 658 : 416
+        options.credit ? 498 : 160,
+        options.credit ? 5 : 2,
+        options.credit ? 754 : 416
     );
     const clue = envelope(value.clue, 68);
     if (clue.slice(130, 132).toLowerCase() !== "18") throw new Error("clue precision must be 24");

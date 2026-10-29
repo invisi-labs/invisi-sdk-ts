@@ -21,6 +21,7 @@ const w = (x) => toBeHex(x, 32),
         JSON.stringify(v, (_, x) => (typeof x === "bigint" ? x.toString() : x), 2) + "\n";
 const context = {
         chainId: 31337n,
+        timestamp: 100n,
         protocolAddress: "0x1111111111111111111111111111111111111111",
         tokenAddress: "0x2222222222222222222222222222222222222222",
     },
@@ -28,7 +29,7 @@ const context = {
     payer = "0x4444444444444444444444444444444444444444";
 const clue = "0x" + "22".repeat(64) + "18" + "33".repeat(3),
     delivery = { ciphertext: "0x02" + "11".repeat(159), clue },
-    creditDelivery = { ciphertext: "0x04" + "22".repeat(401), clue },
+    creditDelivery = { ciphertext: "0x05" + "22".repeat(497), clue },
     empty = { ciphertext: "0x", clue: "0x" };
 const funding = { payer, amount: 100n, sigNonce: 7n, deadline: 1000n },
     fund = { ...funding, signature: "0xabcd", permit: { deadline: 0n, v: 0, r: w(0), s: w(0) } },
@@ -277,7 +278,22 @@ const sweepWitness = await createWalletTransactFixture({
     withdrawalAmount: 100n,
 });
 for (const key of ["signature", "public_key_x", "public_key_y"]) sweepWitness.witness[key].fill(0);
+const limitedDraw = read("circuits/credit_draw_slots1/target/limitedSecondDraw-fixture.json"),
+    limitedTopUp = read("circuits/credit_top_up/target/limitedLoweredTopUp-fixture.json"),
+    limitedCreate = read("circuits/create_credit/target/limitedCreation-fixture.json");
 const rows = [
+    [
+        "LIMITED_DRAW_FIXTURE",
+        { witness: limitedDraw.witness, publicInputs: limitedDraw.publicInputs },
+    ],
+    [
+        "LIMITED_TOP_UP_FIXTURE",
+        { witness: limitedTopUp.witness, publicInputs: limitedTopUp.publicInputs },
+    ],
+    [
+        "LIMITED_CREATE_FIXTURE",
+        { witness: limitedCreate.witness, publicInputs: limitedCreate.publicInputs },
+    ],
     [
         "CANCEL_FIXTURE",
         { witness: cancelWitness.witness, publicInputs: cancelWitness.publicInputs },

@@ -35,7 +35,7 @@ describe("current credit lifecycle reference vectors", () => {
             const f = fixtures["draw" + n];
             expect(creditDrawPublicInputs(context, f.params, f.deliveries)).toEqual(f.publicInputs);
             expect(creditDrawPublicInputs(context, f.params, f.deliveries)).toHaveLength(
-                6 * selectCreditDrawCircuit(n).maxSize + 12
+                6 * selectCreditDrawCircuit(n).maxSize + 14
             );
             expect(encodeCreditDrawTypedData(context, f.params, f.deliveries)).toEqual(f.typedData);
         });
@@ -84,7 +84,7 @@ describe("current credit lifecycle reference vectors", () => {
         expect(() => creditDrawPublicInputs(context, partial, f.deliveries)).toThrow();
         expect(
             creditDrawPublicInputs(context, partial, fixtures.create.deliveries.slice(0, 2))
-        ).toHaveLength(18);
+        ).toHaveLength(20);
     });
     it("encodes draw and top-up with current direct Credit proof frames", () => {
         const draw = fixtures.draw1,

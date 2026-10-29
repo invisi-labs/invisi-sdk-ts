@@ -2,6 +2,7 @@ export type {
     ProtocolContext,
     Note,
     CreditNote,
+    CreditPolicy,
     CreditDeliveryState,
     ReceivingKeys,
     CreditRemainderRecovery,
@@ -57,6 +58,10 @@ export { computeNoteIdentity, computeNoteCommitment } from "./commitment";
 export { computeNoteNullifier } from "./nullifier";
 export {
     computeCreditSharedKeyHash,
+    normalizeCreditPolicy,
+    creditPeriods,
+    applyCreditDrawUsage,
+    CREDIT_POLICY_FIELDS,
     computeCreditCommitment,
     computeCreditNullifier,
     deriveRemainderNonce,

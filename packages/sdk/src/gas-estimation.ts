@@ -43,6 +43,24 @@ export interface GasBenchmarkProfile {
     deployment: GasBenchmarkDeployment;
     source: {
         protocolCommit: string;
+        fingerprints?: {
+            protocolSourceSha256: string;
+            dirtyDiffSha256: string;
+            compiledArtifactsSha256: string;
+            creditManifestSha256: string;
+            userManifestSha256: string;
+            sdkSourceSha256: string;
+        };
+        toolchain?: {
+            solidity: string;
+            barretenberg: string;
+            noir: string;
+            evmVersion: string;
+            optimizerRuns: number;
+            anvil: string;
+        };
+        blockGasLimit?: string;
+        runtimeContracts?: Record<string, { address: Hex; runtimeCodeHash: Hex }>;
         measuredAt: string;
         chain: string;
         hardfork: string;
@@ -118,6 +136,43 @@ export function copyGasBenchmarks(profiles: readonly GasBenchmarkProfile[]): Gas
             !p.measurements.length
         )
             throw new Error("invalid gas benchmark profile");
+        if (
+            p.source.fingerprints &&
+            ![
+                "protocolSourceSha256",
+                "dirtyDiffSha256",
+                "compiledArtifactsSha256",
+                "creditManifestSha256",
+                "userManifestSha256",
+                "sdkSourceSha256",
+            ].every((key) => {
+                const v = (p.source.fingerprints as unknown as Record<string, unknown>)[key];
+                return typeof v === "string" && /^[a-f0-9]{64}$/i.test(v);
+            })
+        )
+            throw new Error("invalid benchmark source fingerprint");
+        if (
+            p.source.blockGasLimit !== undefined &&
+            (!decimal.test(p.source.blockGasLimit) || BigInt(p.source.blockGasLimit) <= 0n)
+        )
+            throw new Error("invalid benchmark block gas limit");
+        if (
+            p.source.runtimeContracts &&
+            !Object.values(p.source.runtimeContracts).every(
+                (v) => address.test(v.address) && word.test(v.runtimeCodeHash)
+            )
+        )
+            throw new Error("invalid benchmark runtime identity");
+        if (
+            p.source.toolchain &&
+            (!["solidity", "barretenberg", "noir", "evmVersion", "anvil"].every((key) => {
+                const v = (p.source.toolchain as unknown as Record<string, unknown>)[key];
+                return typeof v === "string" && v.length > 0;
+            }) ||
+                !Number.isSafeInteger(p.source.toolchain.optimizerRuns) ||
+                p.source.toolchain.optimizerRuns < 0)
+        )
+            throw new Error("invalid benchmark toolchain");
         for (const m of p.measurements) {
             if (
                 !m.id ||
@@ -243,13 +298,31 @@ export function estimateBenchmarkGas(
     );
     if (!request.deployment.runtimeCodeHash || !candidates.length)
         return { ...base, available: false, reason: "deployment-not-covered" };
-    for (const profile of candidates) {
-        const measurement = profile.measurements.find(
-            (m) =>
-                shapeKeys.every((key) => m.shape[key] === request.shape[key]) &&
-                sameCircuit(m.circuit, request.circuit)
+    const exact = candidates.flatMap((profile) =>
+        profile.measurements
+            .filter(
+                (m) =>
+                    shapeKeys.every((key) => m.shape[key] === request.shape[key]) &&
+                    sameCircuit(m.circuit, request.circuit)
+            )
+            .map((measurement) => ({ profile, measurement }))
+    );
+    const mean = (measurement: GasBenchmarkProfile["measurements"][number]) => {
+        const count = BigInt(measurement.samples.length);
+        return (
+            (measurement.samples.reduce((sum, s) => sum + BigInt(s.gasUsed), 0n) + count - 1n) /
+            count
         );
-        if (!measurement) continue;
+    };
+    exact.sort((a, b) =>
+        mean(a.measurement) > mean(b.measurement)
+            ? -1
+            : mean(a.measurement) < mean(b.measurement)
+              ? 1
+              : a.measurement.id.localeCompare(b.measurement.id)
+    );
+    if (exact.length) {
+        const { profile, measurement } = exact[0]!;
         const gas = measurement.samples.map((sample) => BigInt(sample.gasUsed));
         const count = BigInt(gas.length);
         return {
@@ -292,14 +365,23 @@ export function estimateShapeGas(
             measurement.shape.target === request.shape.target &&
             sameCircuit(measurement.circuit, request.circuit)
     );
-    const exact = matching.find((measurement) =>
+    const exact = matching.filter((measurement) =>
         shapeKeys.every((key) => measurement.shape[key] === request.shape[key])
     );
-    if (exact) {
-        const gas = exact.samples.map((sample) => BigInt(sample.gasUsed));
-        const count = BigInt(gas.length);
-        return { gasUnits: (gas.reduce((sum, value) => sum + value, 0n) + count - 1n) / count };
+    if (exact.length) {
+        const means = exact.map((m) => {
+            const count = BigInt(m.samples.length);
+            return (m.samples.reduce((sum, s) => sum + BigInt(s.gasUsed), 0n) + count - 1n) / count;
+        });
+        return { gasUnits: means.reduce((max, v) => (v > max ? v : max)) };
     }
+    if (
+        ["create-credit", "draw-credit", "top-up-credit", "cancel-credit"].includes(
+            request.shape.kind
+        ) &&
+        !matching.length
+    )
+        throw new Error("No current Credit gas reference for this artifact and verification key");
     const candidates = matching.length
         ? matching
         : measurements.filter(
@@ -320,7 +402,26 @@ export function estimateShapeGas(
         "deliveryBytes",
         ...(!matching.length ? ["capacity"] : []),
     ] as const;
-    const estimates = candidates.map((measurement) => {
+    // Same public shape may have several private-policy variants. Use their worst observed
+    // receipt before comparing different workload baselines, so a cheaper variant cannot win.
+    const groups = new Map<string, (typeof candidates)[number]>();
+    for (const candidate of candidates) {
+        const key = JSON.stringify([
+            shapeKeys.map((k) => candidate.shape[k]),
+            candidate.circuit?.circuitName,
+            candidate.circuit?.target,
+            candidate.circuit?.artifactSha256.toLowerCase(),
+            candidate.circuit?.vkSha256.toLowerCase(),
+        ]);
+        const previous = groups.get(key);
+        groups.set(
+            key,
+            previous
+                ? { ...candidate, samples: [...previous.samples, ...candidate.samples] }
+                : candidate
+        );
+    }
+    const estimates = [...groups.values()].map((measurement) => {
         let numerator = 1n;
         let denominator = 1n;
         for (const key of dimensions) {

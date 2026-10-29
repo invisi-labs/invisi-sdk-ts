@@ -182,29 +182,33 @@ const finalGas = await signer.estimateGas(call);
 
 `gasUnits` is a synchronous pre-proof reference, not a gas limit. The public result contains only this bigint field. It is never passed automatically to ethers sending. Combine it with current ethers fee data for a review UI; currency conversion and additional chain-specific fees belong to the application. Final estimation and transaction validity remain chain-dependent.
 
-Exact measured shapes use the rounded-up receipt mean. The bundled [receipt catalog](packages/sdk/src/data/gas-benchmarks.json) supplies deployment-independent references for the current SDK operation family. Other input/output counts use an upward-only workload envelope: scale the measured maximum by the largest workload ratio (counts plus one), retaining shared verification costs. Different circuit capacities additionally scale capacity when no same-circuit measurement exists. Signature funding and Permit each double the unmatched reference when absent from the baseline. This intentionally coarse fallback can substantially overestimate complex operations; it is not a calibrated prediction or guaranteed upper bound. The receipt matrix below remains the measured evidence, not a claim that every combination was benchmarked.
+Exact measured shapes use the largest rounded-up receipt mean among matching records, including private policy variants. Unmeasured shapes use an upward-only workload envelope based on the worst observed sample per matching shape and circuit; duplicate policy variants are grouped before selecting a baseline. Signature funding and Permit each double an unmatched reference when absent from its baseline. Credit references require the current artifact and verification-key identity; historical Credit circuits cannot supply fallback costs. Historical Funds references retain the family-capacity fallback. These coarse references are not guaranteed upper bounds.
 
 All eight direct preparation methods support this API. A recursive member has no standalone transaction cost and throws; estimate the complete aggregate separately. Unknown operation kinds/targets also throw. Custom exact deployment/circuit/shape measurements take priority through `new Invisi({ ..., gasBenchmarks: defineGasBenchmarks(teamCatalog) })`. Validation checks record format, not publisher authenticity. Session construction snapshots custom catalogs. Token behavior, screening, storage/tree occupancy, chain execution rules and deployment modifications can change actual costs. Recheck references when updating contracts or circuit assets.
 
 ### Current receipt matrix
 
-Protocol `92ef274`, Anvil chain31337 / Osaka, Solidity0.8.27 optimizer200, real BB5.2.1 verifiers. Normal deployment through Factory, no injected code/storage. Three independently prepared transactions per row, restored to the same canonical initial snapshot. Inputs have one source tree; that tree starts with two leaves, no rollover or screener. Approval/setup transactions are excluded; gas below includes the full measured transaction receipt. All four funds circuit capacities were actually verified on chain. Credit draw coverage is one partial input; larger draw and aggregate routes are not covered.
+Current Credit measurements use authenticated BB6.0.0 verifiers, Solidity0.8.38 optimizer200 and Anvil Prague with a 500,000,000 block gas limit. Normal Factory/CREATE deployments use no injected code or storage. Three independently proved transactions per row restore the same 123-leaf snapshot, payout balance and allowance baseline. Setup, funding and approvals are excluded; each receipt includes the complete business transaction. Both top-up variants start with daily/monthly usage10 and preserve all four usage fields. The changed variant lowers limits to50/5/0. Source content fingerprints, dirty base revision, compiler artifacts, manifests, toolchain and all deployed verifier/runtime hashes are recorded in the catalog.
+
+Prague in this benchmark does not impose the EIP-7825 transaction gas cap. The 120-input partial draw exceeds16,777,216 gas and cannot fit chains enabling that cap; use a smaller batch on those chains. A lower network block gas limit can also make a measured shape unmineable.
 
 | Shape | Capacity | Mean gas (rounded up) | Observed min–max |
 | --- | ---: | ---: | ---: |
-| `shield-1` | 0 | 649,310 | 649,286–649,322 |
-| `shield-2` | 0 | 757,055 | 757,039–757,063 |
-| `shield-10` | 0 | 1,692,143 | 1,692,083–1,692,203 |
-| `transfer-1x2` | 14 | 1,617,512 | 1,617,504–1,617,516 |
-| `transfer-1x14` | 56 | 2,489,070 | 2,489,010–2,489,106 |
-| `transfer-1x56` | 112 | 5,389,175 | 5,389,095–5,389,227 |
-| `transfer-1x112` | 168 | 9,139,674 | 9,139,530–9,139,842 |
-| `withdraw-1x1` | 14 | 1,597,627 | 1,597,571–1,597,715 |
-| `sweep-1x0` | 14 | 1,069,300 | 1,069,284–1,069,308 |
-| `create-credit-1x1` | 10 | 1,627,289 | 1,627,157–1,627,385 |
-| `draw-credit-1-partial` | 1 | 1,581,290 | 1,581,174–1,581,402 |
-| `top-up-credit-1x1` | 10 | 1,666,876 | 1,666,780–1,666,948 |
-| `cancel-credit-1` | 1 | 998,170 | 998,134–998,230 |
+| `create-credit-caller-0x0` | 10 | 1,574,628 | 1,574,576–1,574,696 |
+| `create-credit-1x1` | 10 | 1,671,545 | 1,671,485–1,671,641 |
+| `draw-credit-1-partial` | 1 | 1,588,287 | 1,588,255–1,588,303 |
+| `draw-credit-1-full` | 1 | 1,042,840 | 1,042,812–1,042,884 |
+| `draw-credit-12-partial` | 12 | 3,102,979 | 3,102,871–3,103,171 |
+| `draw-credit-12-full` | 12 | 1,536,687 | 1,536,675–1,536,711 |
+| `draw-credit-50-partial` | 50 | 8,015,357 | 8,015,149–8,015,473 |
+| `draw-credit-50-full` | 50 | 3,216,764 | 3,216,708–3,216,840 |
+| `draw-credit-120-partial` | 120 | 17,458,420 | 17,458,224–17,458,524 |
+| `draw-credit-120-full` | 120 | 6,289,688 | 6,289,576–6,289,768 |
+| `top-up-credit-1x1-unchanged-limits` | 10 | 1,711,318 | 1,711,282–1,711,390 |
+| `top-up-credit-1x1-changed-limits` | 10 | 1,711,366 | 1,711,318–1,711,438 |
+| `cancel-credit-1` | 1 | 985,683 | 985,543–985,795 |
+
+The nine Funds rows remain historical measurements from protocol92ef274, BB5.2.1, Solidity0.8.27 and Osaka; they were not remeasured in this Credit run. Historical Credit rows have been removed.
 
 Reproduce with the authenticated current Protocol artifacts and a matching BB executable:
 
@@ -213,8 +217,14 @@ pnpm build
 BB_BINARY_PATH=/path/to/bb node scripts/benchmark-gas.mjs
 ```
 
-The collector starts and stops its own isolated loopback Anvil node on port18945. It never uses a public RPC or modifies deployment catalogs. It requires a clean Protocol checkout and runs `forge build`. `INVISI_PROTOCOL_DIR`, `GAS_BENCHMARK_PORT` and `GAS_BENCHMARK_OUTPUT` override the source, private port and output file. `GAS_BENCHMARK_CASES` selects comma-separated case IDs; use a separate output file for subsets. `GAS_BENCHMARK_CHECK_ESTIMATES=1` requires prepared estimates to match the recorded deployment/release/shape before independently proving and measuring fresh transactions.
+The collector starts and stops its own isolated loopback Anvil node on port18945. It never uses public RPC or modifies deployment catalogs. It runs `forge build`, fingerprints tracked and untracked executable sources, and rejects changes during the run. A clean commit is not required. `INVISI_PROTOCOL_DIR`, `GAS_BENCHMARK_PORT` and `GAS_BENCHMARK_OUTPUT` override source, private port and output. `GAS_BENCHMARK_CASES` selects comma-separated case IDs; subsets write a `.partial` result without replacing the catalog. Full publication occurs atomically after all measurements and identity checks pass.
 
 Optional output memos accept UTF-8 text or `Uint8Array` and are limited to 256 encoded bytes. Funds/shield outputs use `{ to, amount, memo }`; Credit creation uses `memo`, top-up accepts an optional replacement, and each draw entry can supply its remainder's `memo`. Top-up and partial draw preserve the previous memo when no override is supplied. Use `memo: ""` to clear it. Decryption returns copied raw bytes; use `decodeMemoText(bytes)` explicitly for strict UTF-8 decoding. Opaque bytes never require text or JSON decoding.
 
-Memos are encrypted and authenticated with each delivery. They do not enter financial commitments or nullifiers. Commitment-only disclosures exclude memos; a scoped payload-key disclosure reveals the selected envelope's memo. Financial Credit recovery from a bad child envelope recovers the balance but leaves an unknown child memo absent. Funds envelope version 2 and Credit envelope version 4 are independent of the unified Factory/Protocol version 1 and `/v1` Protocol RPC API. Use runtime-code pins for a deployment that supports these memo formats; historical immutable deployments retain their original wire format.
+Memos are encrypted and authenticated with each delivery. They do not enter financial commitments or nullifiers. Commitment-only disclosures exclude memos; a scoped payload-key disclosure reveals the selected envelope's memo. Financial Credit recovery from a bad child envelope recovers the balance but leaves an unknown child memo absent. Funds envelope version 2 and Credit envelope version 5 are independent of the unified Factory/Protocol version 1 and `/v1` Protocol RPC API. Use runtime-code pins for a deployment that supports these memo formats; historical immutable deployments retain their original wire format.
+
+### Per-Credit spending limits
+
+`prepareCreateCredit` accepts private `singleLimit`, `dailyLimit` and `monthlyLimit` values in token base units. Zero disables a limit. Each Credit input is checked independently, including a draw of its entire balance. Daily and monthly counters use UTC Gregorian periods from the explicit chain timestamp and reset only when that calendar period changes. Owner-authorized top-up can replace any of the three limits; an omitted limit inherits its previous value and zero explicitly disables it. Top-up preserves all four usage fields. Consumption is counted even while a limit is disabled. Reducing a daily or monthly limit below its used counter freezes further draws until that UTC period changes; no top-up resets usage.
+
+Draw preparation binds the chain block timestamp to its proof statement without adding caller-supplied period fields to calldata. Prepare and authorize again if the UTC period changes before submission. Financial remainder recovery requires the confirmed draw block's timestamp, authenticated through the configured chain reader; preparation time and local wall-clock time cannot substitute for it. Credit deliveries use envelope version5 with domain `Invisi.CreditDelivery.v3` and lengths498–754 bytes.

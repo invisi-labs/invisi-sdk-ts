@@ -16,7 +16,16 @@ export interface Note extends ProtocolContext {
 }
 
 /** Deployment-scoped private Credit note, with a shared nonzero random secret. */
-export interface CreditNote extends ProtocolContext {
+export interface CreditPolicy {
+    singleLimit: bigint;
+    dailyLimit: bigint;
+    monthlyLimit: bigint;
+    lastDay: bigint;
+    dailySpent: bigint;
+    lastMonth: bigint;
+    monthlySpent: bigint;
+}
+export interface CreditNote extends ProtocolContext, Partial<CreditPolicy> {
     spenderWalletIdentity: `0x${string}`;
     ownerWalletIdentity: `0x${string}`;
     spenderPayout: bigint;
@@ -45,6 +54,8 @@ export interface CreditDeliveryState {
 
 /** Circuit-bound fields from an authenticated Credit draw event. */
 export interface CreditRemainderRecovery {
+    /** Timestamp of the independently authenticated confirmed draw block. */
+    timestamp: bigint;
     creditNullifier: `0x${string}`;
     remainderCommitment: `0x${string}`;
     recoveryAmount: bigint;

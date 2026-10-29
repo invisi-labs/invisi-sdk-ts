@@ -89,6 +89,13 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
             nonce: BigInt(vectors.credit.nonce),
             expiry: BigInt(vectors.credit.expiry),
             creditSharedKey: BigInt(vectors.credit.creditSharedKey),
+            singleLimit: BigInt(vectors.credit.singleLimit),
+            dailyLimit: BigInt(vectors.credit.dailyLimit),
+            monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+            lastDay: BigInt(vectors.credit.lastDay),
+            dailySpent: BigInt(vectors.credit.dailySpent),
+            lastMonth: BigInt(vectors.credit.lastMonth),
+            monthlySpent: BigInt(vectors.credit.monthlySpent),
         },
         ownerReceivingKeys: {
             viewingPublicKey: core.viewingPublicKey(key),
@@ -130,8 +137,8 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         );
         memo.fill(0);
         const envelope = await pending;
-        expect(envelope[0]).toBe(4);
-        expect(envelope).toHaveLength(658);
+        expect(envelope[0]).toBe(5);
+        expect(envelope).toHaveLength(754);
         const decoded = await core.decryptCreditNote(privateKey, envelope, scoped);
         expect(decoded.note.memo).toEqual(new Uint8Array(256).fill(255));
         const viewer = new core.ViewingCapability(scoped.walletIdentity, privateKey);
@@ -179,6 +186,13 @@ it("decrypts every independently generated text and opaque shared memo vector", 
                 amount: BigInt(vectors.credit.amount),
                 nonce: BigInt(vectors.credit.nonce),
                 creditSharedKey: BigInt(vectors.credit.creditSharedKey),
+                singleLimit: BigInt(vectors.credit.singleLimit),
+                dailyLimit: BigInt(vectors.credit.dailyLimit),
+                monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+                lastDay: BigInt(vectors.credit.lastDay),
+                dailySpent: BigInt(vectors.credit.dailySpent),
+                lastMonth: BigInt(vectors.credit.lastMonth),
+                monthlySpent: BigInt(vectors.credit.monthlySpent),
                 memo,
             });
         }

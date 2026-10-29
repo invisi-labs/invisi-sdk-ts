@@ -106,6 +106,9 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
+    singleLimit?: bigint;
+    dailyLimit?: bigint;
+    monthlyLimit?: bigint;
     memo?: string | Uint8Array;
     tokenAddress: Address;
     spender: string;
@@ -120,6 +123,10 @@ export interface DrawCreditPreparation {
     deadline?: bigint;
 }
 export interface TopUpCreditPreparation {
+    /** Omission inherits the previous limit; zero disables it without clearing usage. */
+    singleLimit?: bigint;
+    dailyLimit?: bigint;
+    monthlyLimit?: bigint;
     memo?: string | Uint8Array;
     tokenAddress: Address;
     credit: Hex;

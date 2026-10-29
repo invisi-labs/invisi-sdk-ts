@@ -15,7 +15,7 @@ const deployment: ProtocolDeployment = {
 };
 const context = { chainId: deployment.chainId, protocolAddress: deployment.protocol.address };
 const block = { number: 10n, hash: h(10), parentHash: h(9), timestamp: 123n };
-const wireBlock = { number: 10, hash: h(10), parentHash: h(9) };
+const wireBlock = { number: 10, hash: h(10), parentHash: h(9), timestamp: 123 };
 const status = () => ({
     apiVersion: "v1",
     protocolVersion: "1",
@@ -45,7 +45,9 @@ function setup(
     }) as unknown as typeof fetch;
     const reader = {
         getBlock: vi.fn(async (n: bigint) =>
-            n === 10n ? block : { ...block, number: n, hash: h(n), parentHash: h(n - 1n) }
+            n === 10n
+                ? block
+                : { ...block, number: n, hash: h(n), parentHash: h(n - 1n), timestamp: 123n }
         ),
         isKnownRoot: vi.fn(async (): Promise<boolean> => true),
     } satisfies ProtocolRpcReader;
@@ -117,9 +119,9 @@ describe("ProtocolRpcClient", () => {
                       blockHash: h(10),
                       outputs: null,
                       creditTransitions: [
-                          { transactionHash: h(2), logIndex: 0 },
-                          { transactionHash: h(2), logIndex: 1 },
-                          { transactionHash: h(3), logIndex: 2 },
+                          { transactionHash: h(2), logIndex: 0, block: wireBlock },
+                          { transactionHash: h(2), logIndex: 1, block: wireBlock },
+                          { transactionHash: h(3), logIndex: 2, block: wireBlock },
                       ],
                   }
         );
@@ -142,9 +144,12 @@ describe("ProtocolRpcClient", () => {
                       blockHash: h(10),
                       checkedBits: 8,
                       candidates: [
-                          { output: { transactionHash: h(2), logIndex: 0 }, fallback: true },
+                          {
+                              output: { transactionHash: h(2), logIndex: 0, block: wireBlock },
+                              fallback: true,
+                          },
                       ],
-                      creditTransitions: [{ transactionHash: h(3), logIndex: 1 }],
+                      creditTransitions: [{ transactionHash: h(3), logIndex: 1, block: wireBlock }],
                   }
         );
         expect(
@@ -176,7 +181,7 @@ describe("ProtocolRpcClient", () => {
                 treeId: 1,
                 leafCount: 1,
                 root: h(root),
-                block: { number: 9, hash: h(9), parentHash: h(8) },
+                block: { number: 9, hash: h(9), parentHash: h(8), timestamp: 123 },
             },
             leafIndex: 0,
             commitment: h(1),
@@ -222,8 +227,18 @@ describe("ProtocolRpcClient", () => {
             { anchor: { ...proof.anchor, root: h(3) } },
             { anchor: { ...proof.anchor, leafCount: 0 } },
             { anchor: { ...proof.anchor, treeId: 2 } },
-            { anchor: { ...proof.anchor, block: { number: 11, hash: h(11), parentHash: h(10) } } },
-            { anchor: { ...proof.anchor, block: { number: 9, hash: h(8), parentHash: h(8) } } },
+            {
+                anchor: {
+                    ...proof.anchor,
+                    block: { number: 11, hash: h(11), parentHash: h(10), timestamp: 123 },
+                },
+            },
+            {
+                anchor: {
+                    ...proof.anchor,
+                    block: { number: 9, hash: h(8), parentHash: h(8), timestamp: 123 },
+                },
+            },
             { siblings: [h(2), ...siblings.slice(1)] },
             { siblings: [h(2n ** 256n - 1n), ...siblings.slice(1)] },
         ]) {
@@ -239,7 +254,7 @@ describe("ProtocolRpcClient", () => {
                     treeId: 1,
                     leafCount: 1,
                     root: h(root),
-                    block: { number: 9, hash: h(9), parentHash: h(8) },
+                    block: { number: 9, hash: h(9), parentHash: h(8), timestamp: 123 },
                 },
             });
         }
@@ -252,7 +267,7 @@ describe("ProtocolRpcClient", () => {
                 treeId: 1,
                 leafCount: 1,
                 root: h(2),
-                block: { number: 11, hash: h(11), parentHash: h(10) },
+                block: { number: 11, hash: h(11), parentHash: h(10), timestamp: 123 },
             },
         ],
     ])("rejects missing or future indexed roots", async (roots) => {
@@ -421,4 +436,32 @@ describe("versioned service URLs", () => {
         expect(requests.map((request) => request.method)).toEqual(["invisi_getStatus"]);
         expect(vi.mocked(fetchMock).mock.calls[0]?.[0]).toBe("https://example.org/v1/chains/31337");
     });
+});
+
+it.each([undefined, -1, 124])(
+    "rejects missing, invalid or forged RPC block timestamp %s",
+    async (timestamp) => {
+        const { client } = setup(() => ({ ...status(), indexedHead: { ...wireBlock, timestamp } }));
+        await expect(client.getStatus(context)).rejects.toThrow();
+    }
+);
+it("authenticates event block timestamps before accepting update candidates", async () => {
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [
+                      {
+                          transactionHash: h(2),
+                          logIndex: 0,
+                          block: { ...wireBlock, timestamp: 124 },
+                      },
+                  ],
+                  creditTransitions: [],
+              }
+    );
+    await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
+        "canonical block mismatch"
+    );
 });

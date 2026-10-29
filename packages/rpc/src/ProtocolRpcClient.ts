@@ -296,7 +296,8 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         if (
             block.number !== number ||
             hash(remote.hash) !== hash(block.hash) ||
-            hash(remote.parentHash) !== hash(block.parentHash)
+            hash(remote.parentHash) !== hash(block.parentHash) ||
+            integer(remote.timestamp) !== block.timestamp
         )
             invalid("RPC canonical block mismatch");
         return block;
@@ -373,6 +374,9 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         for (const value of [...outputs, ...list(result.creditTransitions)]) {
             const ref = object(value);
             integer(ref.logIndex);
+            const eventBlock = await this.canonical(ref.block);
+            if (eventBlock.number < range.fromBlock || eventBlock.number > range.toBlock)
+                invalid("RPC event outside update range");
             transactionHashes.add(hash(ref.transactionHash));
         }
         return { block, transactionHashes: [...transactionHashes] };
@@ -396,7 +400,8 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         const canonical = await this.reader.getBlock(block.number);
         if (
             hash(canonical.hash) !== hash(block.hash) ||
-            hash(canonical.parentHash) !== hash(block.parentHash)
+            hash(canonical.parentHash) !== hash(block.parentHash) ||
+            canonical.timestamp !== block.timestamp
         )
             invalid("Requested membership block is not canonical");
         const roots = list(await this.rpc("invisi_getRoots", [numeric(input.treeId)]))
@@ -410,6 +415,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                 const number = integer(remoteBlock.number);
                 hash(remoteBlock.hash);
                 hash(remoteBlock.parentHash);
+                integer(remoteBlock.timestamp);
                 return { anchor, count, root, number };
             })
             .filter(
@@ -455,7 +461,8 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         if (
             anchorBlock.number !== selected.number ||
             hash(anchorBlock.hash) !== hash(selectedBlock.hash) ||
-            hash(anchorBlock.parentHash) !== hash(selectedBlock.parentHash)
+            hash(anchorBlock.parentHash) !== hash(selectedBlock.parentHash) ||
+            anchorBlock.timestamp !== integer(selectedBlock.timestamp)
         )
             invalid("Membership anchor differs from selected root");
         const path = list(result.siblings).map((v) => BigInt(fieldHash(v)));

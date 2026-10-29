@@ -24,6 +24,13 @@ const note: CreditNote = {
     nonce: 678n,
     expiry: 2000000123n,
     creditSharedKey: 999n,
+    singleLimit: BigInt(vectors.credit.singleLimit),
+    dailyLimit: BigInt(vectors.credit.dailyLimit),
+    monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+    lastDay: BigInt(vectors.credit.lastDay),
+    dailySpent: BigInt(vectors.credit.dailySpent),
+    lastMonth: BigInt(vectors.credit.lastMonth),
+    monthlySpent: BigInt(vectors.credit.monthlySpent),
 };
 const clueKey = hexBytes("0xc69480518ea88f8cb925fbcd8f5100b1ebc46cc4d8cbe19e0478936567e6b211");
 const state: CreditDeliveryState = {
@@ -47,8 +54,8 @@ describe("self-contained Credit delivery state", () => {
                     role,
                 };
             const envelope = await encryptCreditNote(hexBytes(wallet.viewingPublicKey), state, c);
-            expect(envelope).toHaveLength(402);
-            expect(envelope[0]).toBe(4);
+            expect(envelope).toHaveLength(498);
+            expect(envelope[0]).toBe(5);
             expect(
                 await decryptCreditNote(hexBytes(wallet.viewingPrivateKey), envelope, c)
             ).toEqual(state);
@@ -56,7 +63,7 @@ describe("self-contained Credit delivery state", () => {
             // This reference decrypts using Node, independently of production WebCrypto.
             const ecdh = createECDH("secp256k1");
             ecdh.setPrivateKey(hexBytes(wallet.viewingPrivateKey));
-            const domain = Buffer.from("Invisi.CreditDelivery.v2"),
+            const domain = Buffer.from("Invisi.CreditDelivery.v3"),
                 data = Buffer.from(envelope);
             const key = hkdfSync(
                 "sha256",
@@ -81,9 +88,9 @@ describe("self-contained Credit delivery state", () => {
                     word(BigInt(leaf)),
                 ])
             );
-            cipher.setAuthTag(data.subarray(386));
-            const plain = Buffer.concat([cipher.update(data.subarray(62, 386)), cipher.final()]);
-            expect(plain).toHaveLength(324);
+            cipher.setAuthTag(data.subarray(482));
+            const plain = Buffer.concat([cipher.update(data.subarray(62, 482)), cipher.final()]);
+            expect(plain).toHaveLength(420);
             expect(plain.subarray(192, 322)).toEqual(
                 Buffer.concat([
                     state.ownerReceivingKeys.viewingPublicKey,
@@ -137,4 +144,46 @@ describe("self-contained Credit delivery state", () => {
             )
         ).rejects.toThrow();
     });
+});
+
+it("roundtrips full u128 actual usage even when owner limits are disabled or below used counters", async () => {
+    const { computeCreditCommitment, computeCreditSharedKeyHash } =
+        await import("./creditCommitment");
+    const wide = {
+        ...note,
+        singleLimit: 0n,
+        dailyLimit: 1n,
+        monthlyLimit: 0n,
+        dailySpent: (1n << 127n) + 1n,
+        monthlySpent: (1n << 128n) - 1n,
+    };
+    const commitment = await computeCreditCommitment(
+        wide.chainId,
+        wide.spenderWalletIdentity,
+        wide.ownerWalletIdentity,
+        wide.spenderPayout,
+        wide.ownerPayout,
+        wide.tokenAddress,
+        wide.amount,
+        wide.nonce,
+        wide.expiry,
+        await computeCreditSharedKeyHash(wide.creditSharedKey),
+        wide
+    );
+    const c = {
+        ...context,
+        outputCommitment: commitment,
+        walletIdentity: wide.ownerWalletIdentity,
+        role: "owner" as const,
+    };
+    const wideState = { ...state, note: wide };
+    const encrypted = await encryptCreditNote(
+        hexBytes(vectors.owner.viewingPublicKey),
+        wideState,
+        c
+    );
+    expect(encrypted).toHaveLength(498);
+    expect(
+        await decryptCreditNote(hexBytes(vectors.owner.viewingPrivateKey), encrypted, c)
+    ).toEqual(wideState);
 });

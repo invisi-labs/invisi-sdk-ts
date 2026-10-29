@@ -8,6 +8,8 @@ import { getAddress, hexlify, toBeHex } from "ethers";
 
 import {
     FIELD_MODULUS,
+    normalizeCreditPolicy,
+    applyCreditDrawUsage,
     ReceivingAddress,
     computeCreditNullifier,
     computeCreditRecoveryPad,
@@ -169,6 +171,11 @@ export class CreditPreparation<Result> {
                     spenderWalletIdentity: spender.walletIdentity,
                     ownerPayout: BigInt(ownerPayout),
                     spenderPayout: BigInt(spenderPayout),
+                    ...normalizeCreditPolicy({
+                        singleLimit: options.singleLimit ?? 0n,
+                        dailyLimit: options.dailyLimit ?? 0n,
+                        monthlyLimit: options.monthlyLimit ?? 0n,
+                    }),
                     amount: options.amount,
                     ...(options.memo === undefined ? {} : { memo: options.memo }),
                     expiry,
@@ -277,6 +284,9 @@ export class CreditPreparation<Result> {
                 ...old,
                 note: {
                     ...old.note,
+                    singleLimit: options.singleLimit ?? old.note.singleLimit ?? 0n,
+                    dailyLimit: options.dailyLimit ?? old.note.dailyLimit ?? 0n,
+                    monthlyLimit: options.monthlyLimit ?? old.note.monthlyLimit ?? 0n,
                     amount,
                     expiry,
                     nonce: generateNonce(),
@@ -332,6 +342,7 @@ export class CreditPreparation<Result> {
             }
             sources.set(member.source.treeId, member.source.merkleRoot);
             amounts.push(amount);
+            const usage = applyCreditDrawUsage(n, amount, frame.block.timestamp);
             const remaining = n.amount - amount;
             if (remaining === 0n) {
                 remainders.push(word(0n));
@@ -351,6 +362,7 @@ export class CreditPreparation<Result> {
                     ...state,
                     note: {
                         ...n,
+                        ...usage,
                         amount: remaining,
                         ...(options.credits[i]!.memo === undefined
                             ? {}

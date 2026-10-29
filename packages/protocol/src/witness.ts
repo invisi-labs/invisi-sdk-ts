@@ -10,6 +10,8 @@ import type {
 
 import {
     computeCreditCommitment,
+    normalizeCreditPolicy,
+    applyCreditDrawUsage,
     computeCreditNullifier,
     computeCreditSharedKeyHash,
     computeNoteCommitment,
@@ -81,6 +83,8 @@ export interface CreateCreditWitnessParams {
     authorization: AuthorizedStatement;
 }
 export interface DrawCreditWitnessParams {
+    /** Explicit chain timestamp used to prepare this signed statement. */
+    timestamp: bigint;
     params: CreditDrawParams;
     deliveries: readonly Delivery[];
     inputs: readonly CreditMembership[];
@@ -99,6 +103,22 @@ export interface TopUpCreditWitnessParams extends Omit<CreateCreditWitnessParams
 const pad = <T>(values: readonly T[], count: number, zero: () => T): T[] => {
     if (values.length > count) throw new Error("witness capacity exceeded");
     return [...values, ...Array.from({ length: count - values.length }, zero)];
+};
+const policyWitness = (note: CreditNote, usage = true) => {
+    const p = normalizeCreditPolicy(note);
+    return {
+        single_limit: p.singleLimit,
+        daily_limit: p.dailyLimit,
+        monthly_limit: p.monthlyLimit,
+        ...(usage
+            ? {
+                  last_day: p.lastDay,
+                  daily_spent: p.dailySpent,
+                  last_month: p.lastMonth,
+                  monthly_spent: p.monthlySpent,
+              }
+            : {}),
+    };
 };
 const zeros = () => Array<bigint>(16).fill(0n);
 const zeroAuthority = (): WalletAuthorizationWitness => ({
@@ -261,7 +281,8 @@ export class WitnessBuilder {
             note.amount,
             note.nonce,
             note.expiry,
-            await computeCreditSharedKeyHash(note.creditSharedKey)
+            await computeCreditSharedKeyHash(note.creditSharedKey),
+            note
         );
     }
     private async noteInputs(
@@ -369,6 +390,11 @@ export class WitnessBuilder {
                 note.expiry === p.params.expiry,
             "Credit creation mismatch"
         );
+        if (
+            operation === "create-credit" &&
+            [note.lastDay, note.dailySpent, note.lastMonth, note.monthlySpent].some((v) => v !== 0n)
+        )
+            throw new Error("new Credit usage must be zero");
         const authority = await this.authority(
             operation,
             10,
@@ -416,6 +442,7 @@ export class WitnessBuilder {
             spender_payout: note.spenderPayout,
             spender_wallet_identity: BigInt(note.spenderWalletIdentity),
             owner_wallet_identity: BigInt(note.ownerWalletIdentity),
+            ...policyWitness(note, operation === "top-up-credit"),
             credit_amount: note.amount,
             credit_nonce: note.nonce,
             credit_shared_key: note.creditSharedKey,
@@ -463,6 +490,7 @@ export class WitnessBuilder {
                 spender_payout: note.spenderPayout,
                 spender_wallet_identity: BigInt(note.spenderWalletIdentity),
                 owner_wallet_identity: BigInt(note.ownerWalletIdentity),
+                ...policyWitness(note),
                 input_nonce: note.nonce,
                 expiry: note.expiry,
                 credit_shared_key: note.creditSharedKey,
@@ -473,7 +501,7 @@ export class WitnessBuilder {
         );
     }
     async drawCredit(p: DrawCreditWitnessParams): Promise<ProvingRequest> {
-        const c = this.#protocol.context,
+        const c = { ...this.#protocol.context, timestamp: p.timestamp },
             profile = selectCreditDrawCircuit(p.inputs.length),
             capacity = profile.maxSize;
         check(
@@ -492,6 +520,7 @@ export class WitnessBuilder {
             );
         const sourceIndices = await Promise.all(
             notes.map(async (note, i) => {
+                applyCreditDrawUsage(note, p.amounts[i]!, p.timestamp);
                 const leaf = await this.creditLeaf(note);
                 check(
                     note.spenderWalletIdentity === identity &&
@@ -510,6 +539,29 @@ export class WitnessBuilder {
             profile.name as CircuitName,
             {
                 ...authority,
+                ...Object.fromEntries(
+                    Object.entries({
+                        singleLimit: "single_limits",
+                        dailyLimit: "daily_limits",
+                        monthlyLimit: "monthly_limits",
+                        lastDay: "last_days",
+                        dailySpent: "daily_spents",
+                        lastMonth: "last_months",
+                        monthlySpent: "monthly_spents",
+                    }).map(([key, name]) => [
+                        name,
+                        pad(
+                            notes.map(
+                                (note) =>
+                                    normalizeCreditPolicy(note)[
+                                        key as keyof ReturnType<typeof normalizeCreditPolicy>
+                                    ]
+                            ),
+                            capacity,
+                            () => 0n
+                        ),
+                    ])
+                ),
                 spender_wallet_identity: BigInt(identity),
                 owner_payouts: pad(
                     notes.map((note) => note.ownerPayout),
@@ -565,6 +617,10 @@ export class WitnessBuilder {
             "spenderPayout",
             "ownerPayout",
             "creditSharedKey",
+            "lastDay",
+            "dailySpent",
+            "lastMonth",
+            "monthlySpent",
         ] as const)
             check(old[field] === note[field], "Credit role or payout changed");
         check(
@@ -593,6 +649,9 @@ export class WitnessBuilder {
             "credit_top_up",
             {
                 ...base,
+                previous_single_limit: old.singleLimit!,
+                previous_daily_limit: old.dailyLimit!,
+                previous_monthly_limit: old.monthlyLimit!,
                 previous_credit_amount: old.amount,
                 previous_credit_nonce: old.nonce,
                 previous_credit_leaf_index: BigInt(p.previous.leafIndex),

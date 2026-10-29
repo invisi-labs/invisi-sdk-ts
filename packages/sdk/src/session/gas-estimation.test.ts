@@ -18,14 +18,18 @@ it("returns only gasUnits before proving, including on another deployment", asyn
 
 it("keeps complete real receipt evidence internally", () => {
     const profiles = defineGasBenchmarks(referenceProfiles);
-    expect(profiles).toHaveLength(1);
+    expect(profiles).toHaveLength(2);
     expect(profiles[0]!.measurements).toHaveLength(13);
+    expect(profiles[1]!.measurements).toHaveLength(9);
     expect(profiles[0]!.measurements.every((m) => m.samples.length === 3)).toBe(true);
     expect(() => defineGasBenchmarks({})).toThrow(/catalog/);
 });
 
 it("uses measured means for all eight direct operation kinds across deployments", () => {
-    const profile = defineGasBenchmarks(referenceProfiles)[0]!;
+    const profile = {
+        ...defineGasBenchmarks(referenceProfiles)[0]!,
+        measurements: defineGasBenchmarks(referenceProfiles).flatMap((p) => p.measurements),
+    };
     const kinds = new Set<string>();
     for (const measurement of profile.measurements) {
         kinds.add(measurement.shape.kind);
@@ -39,12 +43,17 @@ it("uses measured means for all eight direct operation kinds across deployments"
             shape: measurement.shape,
             circuit: measurement.circuit,
         });
-        const count = BigInt(measurement.samples.length);
-        const expected =
-            (measurement.samples.reduce((sum, sample) => sum + BigInt(sample.gasUsed), 0n) +
-                count -
-                1n) /
-            count;
+        const exact = profile.measurements.filter(
+            (m) =>
+                JSON.stringify(m.shape) === JSON.stringify(measurement.shape) &&
+                JSON.stringify(m.circuit) === JSON.stringify(measurement.circuit)
+        );
+        const expected = exact
+            .map((m) => {
+                const n = BigInt(m.samples.length);
+                return (m.samples.reduce((sum, s) => sum + BigInt(s.gasUsed), 0n) + n - 1n) / n;
+            })
+            .reduce((max, v) => (v > max ? v : max));
         expect(result).toEqual({ gasUnits: expected });
     }
     expect(kinds.size).toBe(8);
@@ -70,14 +79,16 @@ it("provides upward-only references for unmeasured counts and funding paths", ()
     }
 });
 
-it("supports unmeasured Credit draw capacities without inventing receipt records", () => {
+it("supports unmeasured mixed remainder counts within authenticated Credit capacities", () => {
     const profile = defineGasBenchmarks(referenceProfiles)[0]!;
     const measurement = profile.measurements.find((m) => m.shape.kind === "draw-credit")!;
     for (const capacity of [12, 50, 120]) {
         const estimate = estimateShapeGas({
             deployment: profile.deployment,
             shape: { ...measurement.shape, capacity, creditInputs: capacity },
-            circuit: { ...measurement.circuit!, circuitName: `credit_draw_slots${capacity}` },
+            circuit: profile.measurements.find(
+                (m) => m.shape.kind === "draw-credit" && m.shape.capacity === capacity
+            )!.circuit,
         });
         expect(estimate.gasUnits).toBeGreaterThan(0n);
     }
@@ -94,5 +105,53 @@ it("rejects standalone recursive members and unknown operation targets", () => {
     };
     expect(() => estimateShapeGas(request)).toThrow(/complete aggregate/);
     request.shape.target = "unknown";
-    expect(() => estimateShapeGas(request)).toThrow(/No gas reference/);
+    expect(() => estimateShapeGas(request)).toThrow(/No (current Credit )?gas reference/);
+});
+
+it("uses conservative duplicate policy variants for exact and modeled shapes in either order", () => {
+    const profile = defineGasBenchmarks(referenceProfiles)[0]!;
+    const topup = profile.measurements.find((m) => m.shape.kind === "top-up-credit")!;
+    const cheap = { ...topup, samples: topup.samples.map((s) => ({ ...s, gasUsed: "100" })) };
+    const expensive = {
+        ...topup,
+        id: "expensive-policy",
+        samples: topup.samples.map((s) => ({ ...s, gasUsed: "300" })),
+    };
+    for (const measurements of [
+        [cheap, expensive],
+        [expensive, cheap],
+    ]) {
+        const profiles = [{ ...profile, measurements }];
+        const request = {
+            deployment: profile.deployment,
+            shape: { ...topup.shape },
+            circuit: topup.circuit,
+        };
+        expect(estimateShapeGas(request, profiles).gasUnits).toBe(300n);
+        request.shape.funding = "signature";
+        expect(estimateShapeGas(request, profiles).gasUnits).toBe(600n);
+        request.shape.deliveryBytes += 256;
+        const modeled = estimateShapeGas(request, profiles).gasUnits;
+        expect(modeled).toBeGreaterThan(600n);
+        expect(modeled).toBe(
+            estimateShapeGas(request, [{ ...profile, measurements: [expensive] }]).gasUnits
+        );
+    }
+});
+
+it("rejects historical Credit identities and incomplete provenance", () => {
+    const profile = defineGasBenchmarks(referenceProfiles)[0]!;
+    const measurement = profile.measurements[0]!;
+    expect(() =>
+        estimateShapeGas({
+            deployment: profile.deployment,
+            shape: measurement.shape,
+            circuit: { ...measurement.circuit!, artifactSha256: "00".repeat(32) },
+        })
+    ).toThrow(/No current Credit/);
+    for (const field of ["fingerprints", "toolchain"] as const) {
+        const invalid = structuredClone(profile);
+        invalid.source[field] = {} as never;
+        expect(() => defineGasBenchmarks([invalid])).toThrow(/catalog/);
+    }
 });

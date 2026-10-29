@@ -27,7 +27,7 @@ it("checks indexed heads against the supplied provider and rejects a forged bloc
                         chainId: "31337",
                         protocol: { ...deployment.protocol, fromBlock: 0 },
                     },
-                    indexedHead: { number: 1, hash, parentHash: hash },
+                    indexedHead: { number: 1, hash, parentHash: hash, timestamp: 0 },
                     checkedBits: 8,
                     detectionEnabled: true,
                 },

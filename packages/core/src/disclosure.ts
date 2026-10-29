@@ -1,7 +1,11 @@
 import { encodeMemo } from "./memo";
 import { bytesToHex } from "@noble/hashes/utils";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
-import { computeCreditCommitment, computeCreditSharedKeyHash } from "./creditCommitment";
+import {
+    computeCreditCommitment,
+    normalizeCreditPolicy,
+    computeCreditSharedKeyHash,
+} from "./creditCommitment";
 import {
     decryptPrivateTransferNote,
     decryptCreditNote,
@@ -13,10 +17,11 @@ import {
     type CreditNoteDecryptionContext,
 } from "./encryption";
 import { FIELD_MODULUS } from "./random";
-import type { Note, CreditNote } from "./types";
+import type { Note, CreditNote, CreditPolicy } from "./types";
 
 /** A Credit commitment opening excludes encrypted memos and the shared recovery/nullifier secret. */
-export interface CreditOpening extends Omit<CreditNote, "creditSharedKey" | "memo"> {
+export interface CreditOpening
+    extends Omit<CreditNote, "creditSharedKey" | "memo" | keyof CreditPolicy>, CreditPolicy {
     creditSharedKeyHash: `0x${string}`;
 }
 
@@ -58,6 +63,13 @@ const CREDIT_FIELDS = [
     "nonce",
     "expiry",
     "creditSharedKeyHash",
+    "singleLimit",
+    "dailyLimit",
+    "monthlyLimit",
+    "lastDay",
+    "dailySpent",
+    "lastMonth",
+    "monthlySpent",
 ] as const;
 
 function record(value: unknown, fields: readonly string[]): Record<string, unknown> {
@@ -120,6 +132,7 @@ async function creditOpening(note: CreditNote): Promise<CreditOpening> {
     const copied = { ...note };
     return {
         ...context(copied),
+        ...normalizeCreditPolicy(copied),
         spenderWalletIdentity: owner(copied.spenderWalletIdentity, "spender identity"),
         ownerWalletIdentity: owner(copied.ownerWalletIdentity, "owner identity"),
         spenderPayout: number(copied.spenderPayout, 160, "spender payout"),
@@ -143,7 +156,8 @@ async function commitment(note: Note | CreditOpening): Promise<`0x${string}`> {
             note.amount,
             note.nonce,
             note.expiry,
-            note.creditSharedKeyHash
+            note.creditSharedKeyHash,
+            note
         );
     }
     return computeNoteCommitment(
@@ -444,6 +458,19 @@ export class Disclosure {
             amount: BigInt(data.amount!),
             nonce: BigInt(data.nonce!),
             expiry: BigInt(data.expiry!),
+            ...normalizeCreditPolicy(
+                Object.fromEntries(
+                    [
+                        "singleLimit",
+                        "dailyLimit",
+                        "monthlyLimit",
+                        "lastDay",
+                        "dailySpent",
+                        "lastMonth",
+                        "monthlySpent",
+                    ].map((k) => [k, BigInt(data[k]!)])
+                )
+            ),
             creditSharedKeyHash: data.creditSharedKeyHash as `0x${string}`,
         };
         if ((await commitment(note)) !== material.context.outputCommitment)

@@ -1,7 +1,11 @@
 import { encodeMemo } from "./memo";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
-import { computeCreditCommitment, computeCreditSharedKeyHash } from "./creditCommitment";
+import {
+    computeCreditCommitment,
+    normalizeCreditPolicy,
+    computeCreditSharedKeyHash,
+} from "./creditCommitment";
 import { FIELD_MODULUS } from "./random";
 import type {
     CreditNote,
@@ -59,7 +63,7 @@ declare const crypto: {
 };
 const ascii = (value: string) => Uint8Array.from(value, (character) => character.charCodeAt(0));
 const NOTE_DOMAIN = ascii("Invisi.NoteDelivery.v2");
-const CREDIT_DOMAIN = ascii("Invisi.CreditDelivery.v2");
+const CREDIT_DOMAIN = ascii("Invisi.CreditDelivery.v3");
 
 function concat(...parts: Uint8Array[]): Uint8Array {
     const out = new Uint8Array(parts.reduce((size, p) => size + p.length, 0));
@@ -184,7 +188,8 @@ async function creditCommitment(context: NoteEncryptionContext, note: CreditNote
         note.amount,
         note.nonce,
         note.expiry,
-        await computeCreditSharedKeyHash(note.creditSharedKey)
+        await computeCreditSharedKeyHash(note.creditSharedKey),
+        note
     );
     if (BigInt(commitment) !== BigInt(context.outputCommitment))
         throw new Error("credit commitment mismatch");
@@ -389,7 +394,11 @@ export function normalizeCreditDeliveryState(state: CreditDeliveryState): Credit
     const { memo, ...note } = state.note;
     const encodedMemo = encodeMemo(memo);
     return {
-        note: { ...note, ...(encodedMemo.length === 0 ? {} : { memo: encodedMemo }) },
+        note: {
+            ...note,
+            ...normalizeCreditPolicy(note),
+            ...(encodedMemo.length === 0 ? {} : { memo: encodedMemo }),
+        },
         ownerReceivingKeys: receivingKeys(state.ownerReceivingKeys),
         spenderReceivingKeys: receivingKeys(state.spenderReceivingKeys),
     };
@@ -403,7 +412,7 @@ function matchCreditRecipient(
     if (!keys.viewingPublicKey.every((value, index) => value === recipient[index]))
         throw new Error("recipient receiving key mismatch");
 }
-/** Self-contained Credit envelope (402..658 bytes), authenticated for its recipient role. */
+/** Self-contained Credit envelope (498..754 bytes), authenticated for its recipient role. */
 export async function encryptCreditNote(
     viewingKey: NoteBytes,
     state: CreditDeliveryState,
@@ -432,12 +441,19 @@ export async function encryptCreditNote(
             scopedState.ownerReceivingKeys.clueKey,
             scopedState.spenderReceivingKeys.viewingPublicKey,
             scopedState.spenderReceivingKeys.clueKey,
+            encode(scopedNote.singleLimit!, 16),
+            encode(scopedNote.dailyLimit!, 16),
+            encode(scopedNote.monthlyLimit!, 16),
+            encode(scopedNote.lastDay!, 8),
+            encode(scopedNote.dailySpent!, 16),
+            encode(scopedNote.lastMonth!, 8),
+            encode(scopedNote.monthlySpent!, 16),
             encode(BigInt(memo.length), 2),
             memo
         ),
         scopedContext,
         scopedNote.tokenAddress,
-        4,
+        5,
         creditRole(scopedContext.role)
     );
 }
@@ -453,7 +469,7 @@ async function readCredit(
         key,
         envelope,
         authenticatedContext,
-        4,
+        5,
         creditRole(authenticatedContext.role),
         payloadKey
     );
@@ -470,7 +486,14 @@ async function readCredit(
             nonce: decode(plain.slice(120, 152)),
             expiry: decode(plain.slice(152, 160)),
             creditSharedKey: decode(plain.slice(160, 192)),
-            ...readMemo(plain, 322),
+            singleLimit: decode(plain.slice(322, 338)),
+            dailyLimit: decode(plain.slice(338, 354)),
+            monthlyLimit: decode(plain.slice(354, 370)),
+            lastDay: decode(plain.slice(370, 378)),
+            dailySpent: decode(plain.slice(378, 394)),
+            lastMonth: decode(plain.slice(394, 402)),
+            monthlySpent: decode(plain.slice(402, 418)),
+            ...readMemo(plain, 418),
         };
         if (
             BigInt(
@@ -541,7 +564,7 @@ export async function exportPayloadKey(
     credit: boolean
 ): Promise<Uint8Array> {
     const data = envelopeBytes(envelope, credit);
-    if (data[0] !== (credit ? 4 : 2)) throw new Error("unsupported envelope version");
+    if (data[0] !== (credit ? 5 : 2)) throw new Error("unsupported envelope version");
     const localKey = privateKey(key);
     try {
         const aes = await derivedKey(
@@ -560,7 +583,7 @@ export async function exportPayloadKey(
 
 function envelopeBytes(value: NoteBytes, credit: boolean): Uint8Array {
     const length = typeof value === "string" ? (value.length - 2) / 2 : value.length;
-    const minimum = credit ? 402 : 160;
+    const minimum = credit ? 498 : 160;
     if (length < minimum || length > minimum + 256) throw new Error("invalid envelope length");
     return bytes(value, length);
 }

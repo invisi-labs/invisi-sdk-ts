@@ -4,6 +4,7 @@ import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
 import { computeNoteNullifier } from "./nullifier";
 import {
     computeCreditCommitment,
+    applyCreditDrawUsage,
     computeCreditSharedKeyHash,
     computeCreditNullifier,
     recoverCreditRemainder,
@@ -34,6 +35,13 @@ const credit: CreditNote = {
     nonce: 678n,
     expiry: 2000000123n,
     creditSharedKey: 999n,
+    singleLimit: BigInt(vectors.credit.singleLimit),
+    dailyLimit: BigInt(vectors.credit.dailyLimit),
+    monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+    lastDay: BigInt(vectors.credit.lastDay),
+    dailySpent: BigInt(vectors.credit.dailySpent),
+    lastMonth: BigInt(vectors.credit.lastMonth),
+    monthlySpent: BigInt(vectors.credit.monthlySpent),
 };
 const creditLeaf = (n: CreditNote) =>
     computeCreditSharedKeyHash(n.creditSharedKey).then((keyHash) =>
@@ -47,7 +55,8 @@ const creditLeaf = (n: CreditNote) =>
             n.amount,
             n.nonce,
             n.expiry,
-            keyHash
+            keyHash,
+            n
         )
     );
 
@@ -90,11 +99,17 @@ describe("wallet-owned note vectors", () => {
     it("recovers the authenticated remainder without changing wallet roles or payout addresses", async () => {
         const r = vectors.credit.remainder;
         const recovered = await recoverCreditRemainder(context, credit, {
+            timestamp: BigInt(vectors.context.timestamp),
             creditNullifier: r.nullifier as `0x${string}`,
             remainderCommitment: r.remainderCommitment as `0x${string}`,
             recoveryAmount: BigInt(r.recoveryAmount),
         });
-        expect(recovered).toEqual({ ...credit, amount: 70n, nonce: BigInt(r.remainder!.nonce) });
+        expect(recovered).toEqual({
+            ...credit,
+            ...applyCreditDrawUsage(credit, 30n, BigInt(vectors.context.timestamp)),
+            amount: 70n,
+            nonce: BigInt(r.remainder!.nonce),
+        });
     });
 
     it("opens independent Nodecrypto funds and both role-bound Credit envelopes", async () => {

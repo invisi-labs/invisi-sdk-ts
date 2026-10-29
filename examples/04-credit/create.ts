@@ -72,6 +72,9 @@ export async function main(resources: ExampleResources) {
         tokenAddress,
         spender: recipientAddress,
         amount,
+        singleLimit: 30n,
+        dailyLimit: 60n,
+        monthlyLimit: 100n,
         expiry,
         funding: { payer, amount: publicFundingAmount },
     });

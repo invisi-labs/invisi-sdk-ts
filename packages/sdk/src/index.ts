@@ -18,6 +18,7 @@ export type {
     Memo,
     Note,
     CreditNote,
+    CreditPolicy,
     CreditDeliveryState,
     ReceivingKeys,
     WalletAuthorizationProvider,

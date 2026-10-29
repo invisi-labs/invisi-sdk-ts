@@ -20,12 +20,20 @@ const note: core.CreditNote = {
     nonce: BigInt(vectors.credit.nonce),
     expiry: BigInt(vectors.credit.expiry),
     creditSharedKey: BigInt(vectors.credit.creditSharedKey),
+    singleLimit: BigInt(vectors.credit.singleLimit),
+    dailyLimit: BigInt(vectors.credit.dailyLimit),
+    monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+    lastDay: BigInt(vectors.credit.lastDay),
+    dailySpent: BigInt(vectors.credit.dailySpent),
+    lastMonth: BigInt(vectors.credit.lastMonth),
+    monthlySpent: BigInt(vectors.credit.monthlySpent),
 };
 const creditNullifier = vectors.credit.nullifier as `0x${string}`;
 const recovery = {
     creditNullifier,
     remainderCommitment: vectors.credit.remainder.remainderCommitment as `0x${string}`,
     recoveryAmount: BigInt(vectors.credit.remainder.recoveryAmount),
+    timestamp: BigInt(vectors.context.timestamp),
 };
 const remainderAmount = BigInt(vectors.credit.remainder.remainder.amount);
 const remainderNonce = BigInt(vectors.credit.remainder.remainder.nonce);
@@ -40,7 +48,8 @@ const leaf = async (n: core.CreditNote = note) =>
         n.amount,
         n.nonce,
         n.expiry,
-        await core.computeCreditSharedKeyHash(n.creditSharedKey)
+        await core.computeCreditSharedKeyHash(n.creditSharedKey),
+        n
     );
 
 describe("current protocol vectors", () => {
@@ -152,22 +161,39 @@ describe("current protocol vectors", () => {
     it("recovers an authenticated remainder preserving the shared key", async () => {
         expect(await core.recoverCreditRemainder(context, note, recovery)).toEqual({
             ...note,
+            ...core.applyCreditDrawUsage(note, 30n, recovery.timestamp),
             amount: remainderAmount,
             nonce: remainderNonce,
         });
     });
 
-    it("accepts full draw only with zero commitment and recovery", async () => {
-        expect(
-            await core.recoverCreditRemainder(context, note, {
+    it("accepts full draw only within limits and with zero commitment and recovery", async () => {
+        const fullNote = { ...note, amount: 30n };
+        const fullRecovery = {
+            ...recovery,
+            creditNullifier: await core.computeCreditNullifier(
+                context.chainId,
+                note.creditSharedKey,
+                await leaf(fullNote)
+            ),
+        };
+        await expect(
+            core.recoverCreditRemainder(context, note, {
                 ...recovery,
+                remainderCommitment: hex(0n),
+                recoveryAmount: 0n,
+            })
+        ).rejects.toThrow("single limit");
+        expect(
+            await core.recoverCreditRemainder(context, fullNote, {
+                ...fullRecovery,
                 remainderCommitment: hex(0n),
                 recoveryAmount: 0n,
             })
         ).toBeNull();
         await expect(
-            core.recoverCreditRemainder(context, note, {
-                ...recovery,
+            core.recoverCreditRemainder(context, fullNote, {
+                ...fullRecovery,
                 remainderCommitment: hex(0n),
             })
         ).rejects.toThrow();
@@ -206,6 +232,7 @@ describe("current protocol vectors", () => {
         mutableNote.ownerWalletIdentity = hex(1n);
         await expect(pending).resolves.toEqual({
             ...note,
+            ...core.applyCreditDrawUsage(note, 30n, recovery.timestamp),
             amount: remainderAmount,
             nonce: remainderNonce,
         });

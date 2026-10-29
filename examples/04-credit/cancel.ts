@@ -44,6 +44,13 @@ export async function main(resources: ExampleResources) {
             nonce: 456n,
             expiry: 1_900_000_000n,
             creditSharedKey: 789n,
+            singleLimit: 0n,
+            dailyLimit: 0n,
+            monthlyLimit: 0n,
+            lastDay: 0n,
+            dailySpent: 0n,
+            lastMonth: 0n,
+            monthlySpent: 0n,
         },
         // Retain the keys captured for this Credit, including after wallet key rotation.
         ownerReceivingKeys: { viewingPublicKey: owner.viewingPublicKey, clueKey: owner.clueKey },
@@ -60,7 +67,8 @@ export async function main(resources: ExampleResources) {
         state.note.amount,
         state.note.nonce,
         state.note.expiry,
-        keyHash
+        keyHash,
+        state.note
     );
     const creditInputs: CreditInput[] = [
         {

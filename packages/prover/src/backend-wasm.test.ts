@@ -1,11 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { generateProofBundle as proveBrowser, verifyProofBundle as verifyBrowser } from "./wasm";
 import { generateProofBundle, verifyProofBundle } from "./prover";
-import { CANCEL_FIXTURE, USER_FIXTURE, TOP_UP_FIXTURE, SWEEP_FIXTURE } from "./test-fixtures";
+import {
+    LIMITED_DRAW_FIXTURE,
+    LIMITED_TOP_UP_FIXTURE,
+    LIMITED_CREATE_FIXTURE,
+    CANCEL_FIXTURE,
+    USER_FIXTURE,
+    TOP_UP_FIXTURE,
+    SWEEP_FIXTURE,
+} from "./test-fixtures";
 import { ZERO_INPUT_FIXTURE } from "./zero-input-fixture";
 const wasm = process.env.INVISI_TEST_WASM === "1" ? describe : describe.skip;
 wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
     it.each([
+        ["credit_draw_slots1", LIMITED_DRAW_FIXTURE, "evm"],
+        ["credit_top_up", LIMITED_TOP_UP_FIXTURE, "evm"],
+        ["create_credit", LIMITED_CREATE_FIXTURE, "evm"],
         ["credit_cancel", CANCEL_FIXTURE, "evm"],
         ["credit_top_up", TOP_UP_FIXTURE, "evm"],
         ["transact_user_slots14", USER_FIXTURE, "evm"],

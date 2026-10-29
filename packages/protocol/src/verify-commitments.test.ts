@@ -26,6 +26,13 @@ const credit = {
     nonce: BigInt(vectors.credit.nonce),
     expiry: BigInt(vectors.credit.expiry),
     creditSharedKey: BigInt(vectors.credit.creditSharedKey),
+    singleLimit: BigInt(vectors.credit.singleLimit),
+    dailyLimit: BigInt(vectors.credit.dailyLimit),
+    monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+    lastDay: BigInt(vectors.credit.lastDay),
+    dailySpent: BigInt(vectors.credit.dailySpent),
+    lastMonth: BigInt(vectors.credit.lastMonth),
+    monthlySpent: BigInt(vectors.credit.monthlySpent),
     creditCommitment: vectors.credit.commitment as `0x${string}`,
 };
 

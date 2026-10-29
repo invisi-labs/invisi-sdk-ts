@@ -65,7 +65,15 @@ export class Preparation<Result> {
                 throw new Error("canonical wallet checkpoint changed; resync required");
             }
         }
-        return { context: { ...options.protocol.context, now: block.timestamp }, block, deadline };
+        return {
+            context: {
+                ...options.protocol.context,
+                now: block.timestamp,
+                timestamp: block.timestamp,
+            },
+            block,
+            deadline,
+        };
     }
 
     async assertBlock(frame: PreparationFrame): Promise<void> {

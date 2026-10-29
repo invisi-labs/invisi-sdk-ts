@@ -9,6 +9,7 @@ import {
     type TopUpCreditParams,
 } from "./contracts";
 import {
+    creditPeriods,
     computeWalletAuthorizationDigest,
     walletAuthorizationTypedData,
     type WalletOperation,
@@ -46,7 +47,7 @@ export function selectCreditDrawCircuit(count: number) {
     return {
         name: `credit_draw_slots${maxSize}`,
         maxSize,
-        publicInputCount: 6 * maxSize + 12,
+        publicInputCount: 6 * maxSize + 14,
         totalBits: 126 + Math.ceil(Math.log2(maxSize)),
     };
 }
@@ -113,6 +114,7 @@ export function validateCreditDrawRequest(
         deadline: checkDeadline(c, p.deadline),
         deliveries,
         profile,
+        periods: creditPeriods(c.timestamp!),
     };
 }
 export function creditDrawBaseInputs(
@@ -146,6 +148,8 @@ export function creditDrawBaseInputs(
         h >> 128n,
         h & ((1n << 128n) - 1n),
         ...pad(r.recoveryAmounts.map(BigInt), n),
+        r.periods.currentDay,
+        r.periods.currentMonth,
     ].map(word);
 }
 export function validateCancelCreditRequest(c: TransactionContext, p: CancelCreditParams) {

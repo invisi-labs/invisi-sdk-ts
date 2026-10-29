@@ -25,7 +25,9 @@ export async function verifyNoteCommitment(params: VerifyNoteCommitmentParams): 
     return BigInt(expected) === BigInt(params.noteCommitment);
 }
 
-export interface VerifyCreditCommitmentParams {
+export interface VerifyCreditCommitmentParams extends Partial<
+    import("@invisi-labs/core").CreditPolicy
+> {
     chainId: bigint;
     spenderWalletIdentity: `0x${string}`;
     ownerWalletIdentity: `0x${string}`;
@@ -60,7 +62,8 @@ export async function verifyCreditCommitment(
         params.amount,
         params.nonce,
         params.expiry,
-        await computeCreditSharedKeyHash(params.creditSharedKey)
+        await computeCreditSharedKeyHash(params.creditSharedKey),
+        params
     );
     return BigInt(expected) === BigInt(params.creditCommitment);
 }

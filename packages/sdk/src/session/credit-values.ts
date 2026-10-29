@@ -17,6 +17,7 @@ export async function creditLeaf(state: CreditDeliveryState): Promise<Hex> {
         n.amount,
         n.nonce,
         n.expiry,
-        await computeCreditSharedKeyHash(n.creditSharedKey)
+        await computeCreditSharedKeyHash(n.creditSharedKey),
+        n
     );
 }

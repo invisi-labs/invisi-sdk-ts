@@ -24,7 +24,7 @@ const manifestPaths = ["circuits/transact-user-manifest.json", "circuits/credit-
 const manifests = manifestPaths.map(json);
 for (const [i, version, format] of [
     [0, 3, 7],
-    [1, 3, 4],
+    [1, 4, 5],
 ]) {
     assert.equal(manifests[i].version, version, "retired manifest version");
     assert.equal(manifests[i].formatVersion, format, "retired proof format");

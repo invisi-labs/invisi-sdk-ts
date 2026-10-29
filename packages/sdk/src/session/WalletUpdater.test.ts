@@ -1,7 +1,13 @@
 import { expect, it, vi } from "vitest";
 import { Interface, keccak256 } from "ethers";
 import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
-import { ReceivingAddress, ViewingCapability, Wallet, encryptCreditNote } from "@invisi-labs/core";
+import {
+    ReceivingAddress,
+    ViewingCapability,
+    Wallet,
+    encryptCreditNote,
+    applyCreditDrawUsage,
+} from "@invisi-labs/core";
 import {
     Protocol,
     type CanonicalBlock,
@@ -26,7 +32,7 @@ const block = (number = 12n): CanonicalBlock => ({
     number,
     hash: hex(number),
     parentHash: hex(number - 1n),
-    timestamp: 1000n + number,
+    timestamp: BigInt(vectors.context.timestamp) + number,
 });
 async function harness() {
     const tree = await MerkleFixture.create();
@@ -323,7 +329,7 @@ it.each([false, true])(
             logIndex,
         });
         const clue = `0x${clues.vectors[0]!.clue}`;
-        const corrupt = { ciphertext: "0x04" + "11".repeat(401), clue };
+        const corrupt = { ciphertext: "0x05" + "11".repeat(497), clue };
         const parent = vectors.memoVectors.find(
             (v) => v.kind === "credit" && v.role === "owner" && v.name === "binary"
         )!;
@@ -345,6 +351,7 @@ it.each([false, true])(
                       ...parentState,
                       note: {
                           ...parentState.note,
+                          ...applyCreditDrawUsage(parentState.note, 30n, block(13n).timestamp),
                           amount: BigInt(p.remainder.remainder.amount),
                           nonce: BigInt(p.remainder.remainder.nonce),
                           memo: childMemo,
@@ -457,6 +464,8 @@ it.each([false, true])(
         const state = await h.store.readSnapshot(h.session.scope);
         const remainder = state.credits[p.remainder.remainderCommitment + ":owner"]!;
         expect(remainder.state.note.amount).toBe(70n);
+        expect(remainder.state.note.dailySpent).toBe(40n);
+        expect(remainder.state.note.monthlySpent).toBe(50n);
         if (validChild) expect(remainder.state.note.memo).toEqual(childMemo);
         else expect(remainder.state.note).not.toHaveProperty("memo");
         expect(state.credits[p.commitment + ":owner"]!.state.note.memo).toEqual(
@@ -487,7 +496,7 @@ it("orders same-block Credit parents before successors across different trees", 
         logIndex,
     });
     const clue = `0x${clues.vectors[0]!.clue}`;
-    const corrupt = { ciphertext: "0x04" + "11".repeat(401), clue };
+    const corrupt = { ciphertext: "0x05" + "11".repeat(497), clue };
     const created: CanonicalReceipt = {
         block: block(),
         transactionHash: hex(101n),
@@ -582,6 +591,8 @@ it("orders same-block Credit parents before successors across different trees", 
     const state = await h.store.readSnapshot(h.session.scope);
     const remainder = state.credits[p.remainder.remainderCommitment + ":owner"]!;
     expect(remainder.state.note.amount).toBe(70n);
+    expect(remainder.state.note.dailySpent).toBe(40n);
+    expect(remainder.state.note.monthlySpent).toBe(50n);
     expect(remainder.spent).toBe("unspent");
     expect(remainder.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
     expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");

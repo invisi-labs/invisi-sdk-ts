@@ -1,6 +1,6 @@
 import type { Hex, InputSource } from "@invisi-labs/protocol/contracts";
 
-import type { AuthorizedStatement, WalletOperation } from "@invisi-labs/core";
+import { creditPeriods, type AuthorizedStatement, type WalletOperation } from "@invisi-labs/core";
 import {
     WitnessBuilder,
     buildCancelCreditCalldata,
@@ -201,6 +201,7 @@ export async function witnessFor(
         }
         if (credit.draw) {
             return builder.drawCredit({
+                timestamp: plan.preparedAt.timestamp,
                 params: credit.draw,
                 deliveries: credit.deliveries,
                 inputs: credit.inputs,
@@ -341,6 +342,15 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
     const credit = plan.credit;
     if (credit?.topUp && now >= credit.topUp.previousExpiry) return true;
     if (credit?.creation && now >= credit.creation.expiry) return true;
-    if (credit?.draw && credit.draw.expiries.some((expiry) => now >= expiry)) return true;
+    if (credit?.draw) {
+        if (credit.draw.expiries.some((expiry) => now >= expiry)) return true;
+        const prepared = creditPeriods(plan.preparedAt.timestamp),
+            current = creditPeriods(now);
+        if (
+            prepared.currentDay !== current.currentDay ||
+            prepared.currentMonth !== current.currentMonth
+        )
+            return true;
+    }
     return false;
 }

@@ -3,6 +3,9 @@ import { Interface } from "ethers";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import {
     computeCreditCommitment,
+    creditPeriods,
+    normalizeCreditPolicy,
+    type CreditPolicy,
     computeCreditSharedKeyHash,
     type CreditDeliveryState,
 } from "@invisi-labs/core";
@@ -26,7 +29,13 @@ const backend = (): Prover => ({
     }),
     verify: async () => true,
 });
-async function creditFixture(amount = 100n, sameWallet = false, memo?: string | Uint8Array) {
+async function creditFixture(
+    amount = 100n,
+    sameWallet = false,
+    memo?: string | Uint8Array,
+    policy: Partial<CreditPolicy> = {},
+    expiry = 2000003600n
+) {
     const h = await fixture();
     if (sameWallet) h.bob = h.wallet;
     const state: CreditDeliveryState = {
@@ -38,10 +47,11 @@ async function creditFixture(amount = 100n, sameWallet = false, memo?: string | 
             spenderWalletIdentity: h.bob.walletIdentity,
             ownerPayout: BigInt(h.wallet.walletIdentity),
             spenderPayout: BigInt(h.bob.walletIdentity),
+            ...normalizeCreditPolicy(policy),
             amount,
             ...(memo === undefined ? {} : { memo }),
             nonce: 456n,
-            expiry: 2000003600n,
+            expiry,
             creditSharedKey: 789n,
         },
         ownerReceivingKeys: h.wallet.getReceivingAddress().getReceivingKeys(),
@@ -58,7 +68,8 @@ async function creditFixture(amount = 100n, sameWallet = false, memo?: string | 
             n.amount,
             n.nonce,
             n.expiry,
-            await computeCreditSharedKeyHash(n.creditSharedKey)
+            await computeCreditSharedKeyHash(n.creditSharedKey),
+            n
         );
     await h.tree.insert(BigInt(commitment));
     const block = await h.reader.getBlock(12n);
@@ -88,7 +99,7 @@ async function creditFixture(amount = 100n, sameWallet = false, memo?: string | 
         spenderSession: new WalletSession({ ...h.options, wallet: h.bob, prover: backend() }),
     };
 }
-it("creates a privately funded Credit with complete dual 402-byte snapshots and ordinary random change", async () => {
+it("creates a privately funded Credit with complete dual 498-byte snapshots and ordinary random change", async () => {
     const h = await fixture(),
         session = new WalletSession({ ...h.options, prover: backend() }),
         operation = await session.prepareCreateCredit({
@@ -103,7 +114,7 @@ it("creates a privately funded Credit with complete dual 402-byte snapshots and 
     expect(credit.outputs[0]!.state.note.amount).toBe(70n);
     expect(saved.plan.outputs[0]!.note.amount).toBe(30n);
     expect(credit.deliveries.map((delivery) => (delivery.ciphertext.length - 2) / 2)).toEqual([
-        402, 402, 160,
+        498, 498, 160,
     ]);
     const recovered = await h.bob.getViewer().decryptCredit(credit.deliveries[1]!.ciphertext, {
         chainId: h.scope.chainId,
@@ -439,4 +450,171 @@ it("preserves Credit memos by default and applies top-up and per-remainder overr
             else expect(result.note.memo).toEqual(expected);
         }
     }
+});
+
+it("applies private per-input limits before full draws and preserves counters through top-up", async () => {
+    const periods = creditPeriods(2000000000n);
+    const policy = {
+        singleLimit: 40n,
+        dailyLimit: 60n,
+        monthlyLimit: 90n,
+        lastDay: periods.currentDay,
+        dailySpent: 10n,
+        lastMonth: periods.currentMonth,
+        monthlySpent: 20n,
+    };
+    const h = await creditFixture(100n, false, undefined, policy);
+    await expect(
+        h.spenderSession.prepareDrawCredit({
+            tokenAddress: h.context.tokenAddress,
+            credits: [{ credit: h.commitment, amount: 100n }],
+        })
+    ).rejects.toThrow("single limit");
+    const draw = await h.spenderSession.prepareDrawCredit({
+        tokenAddress: h.context.tokenAddress,
+        credits: [{ credit: h.commitment, amount: 30n }],
+    });
+    const scope = { ...h.scope, walletIdentity: h.bob.walletIdentity };
+    const plan = (
+        (await h.store.readSnapshot(scope)).operations[draw.id]!.payload as SavedOperation
+    ).plan;
+    expect(plan.credit!.outputs[0]!.state.note).toMatchObject({
+        ...policy,
+        dailySpent: 40n,
+        monthlySpent: 50n,
+    });
+    expect(plan.statement!.expectedPublicInputs).toHaveLength(20);
+    await draw.abandon();
+    const top = await h.ownerSession.prepareTopUpCredit({
+        tokenAddress: h.context.tokenAddress,
+        credit: h.commitment,
+        additionalAmount: 10n,
+    });
+    const topped = (
+        (await h.store.readSnapshot(h.scope)).operations[top.id]!.payload as SavedOperation
+    ).plan;
+    expect(topped.credit!.outputs[0]!.state.note).toMatchObject({ ...policy, amount: 110n });
+});
+
+it("expires a prepared draw when chain time crosses a UTC period even before its deadline", async () => {
+    const h = await creditFixture(100n, false, undefined, {}, 2000100000n);
+    const draw = await h.spenderSession.prepareDrawCredit({
+        tokenAddress: h.context.tokenAddress,
+        credits: [{ credit: h.commitment, amount: 30n }],
+        deadline: 2000100000n,
+    });
+    const ready = await (await draw.authorize()).prove();
+    const original = await h.reader.getBlock(12n);
+    // The next UTC day is before this Credit's expiry and the explicit deadline.
+    const nextDay = (original.timestamp / 86400n + 1n) * 86400n;
+    h.reader.getBlock = async () => ({ ...original, timestamp: nextDay });
+    await expect(ready.exportTransaction()).rejects.toThrow("expired");
+});
+
+it.skipIf(!process.env.BB_BINARY_PATH).each(["draw", "top-up"] as const)(
+    "proves and independently verifies enabled %s using the production preparation and WitnessBuilder",
+    async (kind) => {
+        const { NativeProver } = await import("@invisi-labs/prover/native");
+        const periods = creditPeriods(2000000000n);
+        const policy = {
+            singleLimit: 40n,
+            dailyLimit: 60n,
+            monthlyLimit: 90n,
+            lastDay: periods.currentDay,
+            dailySpent: 10n,
+            lastMonth: periods.currentMonth,
+            monthlySpent: 20n,
+        };
+        const h = await creditFixture(100n, false, undefined, policy);
+        const session = new WalletSession({
+            ...h.options,
+            wallet: kind === "draw" ? h.bob : h.wallet,
+            prover: new NativeProver({ bbBin: process.env.BB_BINARY_PATH!, threads: 4 }),
+        });
+        const operation =
+            kind === "draw"
+                ? await session.prepareDrawCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      credits: [{ credit: h.commitment, amount: 30n }],
+                  })
+                : await session.prepareTopUpCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      credit: h.commitment,
+                      additionalAmount: 10n,
+                      singleLimit: 10n,
+                      dailyLimit: 5n,
+                      monthlyLimit: 0n,
+                  });
+        const ready = await (await operation.authorize()).prove();
+        expect(ready.status).toBe("ready");
+        const scope = {
+            ...h.scope,
+            walletIdentity: kind === "draw" ? h.bob.walletIdentity : h.wallet.walletIdentity,
+        };
+        const saved = (await h.store.readSnapshot(scope)).operations[ready.id]!
+            .payload as SavedOperation;
+        expect(saved.plan.credit!.outputs[0]!.state.note).toMatchObject(
+            kind === "draw"
+                ? { ...policy, amount: 70n, dailySpent: 40n, monthlySpent: 50n }
+                : { ...policy, singleLimit: 10n, dailyLimit: 5n, monthlyLimit: 0n, amount: 110n }
+        );
+        expect(saved.plan.statement!.expectedPublicInputs).toHaveLength(kind === "draw" ? 20 : 50);
+        expect((await ready.exportTransaction()).data).toMatch(/^0x/);
+    },
+    120000
+);
+
+it("owner top-up replaces limits, treats zero as disable and keeps already-used counters even below the new limit", async () => {
+    const periods = creditPeriods(2000000000n);
+    const policy = {
+        singleLimit: 40n,
+        dailyLimit: 60n,
+        monthlyLimit: 90n,
+        lastDay: periods.currentDay,
+        dailySpent: 10n,
+        lastMonth: periods.currentMonth,
+        monthlySpent: 20n,
+    };
+    const h = await creditFixture(100n, false, undefined, policy);
+    const top = await h.ownerSession.prepareTopUpCredit({
+        tokenAddress: h.context.tokenAddress,
+        credit: h.commitment,
+        additionalAmount: 10n,
+        singleLimit: 10n,
+        dailyLimit: 5n,
+        monthlyLimit: 0n,
+    });
+    const saved = (await h.store.readSnapshot(h.scope)).operations[top.id]!
+        .payload as SavedOperation;
+    expect(saved.plan.credit!.outputs[0]!.state.note).toMatchObject({
+        ...policy,
+        singleLimit: 10n,
+        dailyLimit: 5n,
+        monthlyLimit: 0n,
+        amount: 110n,
+    });
+    expect((await (await top.authorize()).prove()).status).toBe("ready");
+});
+it("disabled limits count consumption so later re-enabling cannot hide prior draws", async () => {
+    const periods = creditPeriods(2000000000n);
+    const h = await creditFixture(100n, false, undefined, {
+        lastDay: periods.currentDay,
+        dailySpent: 10n,
+        lastMonth: periods.currentMonth,
+        monthlySpent: 20n,
+    });
+    const draw = await h.spenderSession.prepareDrawCredit({
+        tokenAddress: h.context.tokenAddress,
+        credits: [{ credit: h.commitment, amount: 30n }],
+    });
+    const scope = { ...h.scope, walletIdentity: h.bob.walletIdentity };
+    const saved = (await h.store.readSnapshot(scope)).operations[draw.id]!
+        .payload as SavedOperation;
+    expect(saved.plan.credit!.outputs[0]!.state.note).toMatchObject({
+        singleLimit: 0n,
+        dailyLimit: 0n,
+        monthlyLimit: 0n,
+        dailySpent: 40n,
+        monthlySpent: 50n,
+    });
 });

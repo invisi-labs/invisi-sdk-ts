@@ -1,6 +1,6 @@
 import { poseidonHash } from "./poseidon";
 import { FIELD_MODULUS } from "./random";
-import type { CreditNote, CreditRemainderRecovery, ProtocolContext } from "./types";
+import type { CreditNote, CreditPolicy, CreditRemainderRecovery, ProtocolContext } from "./types";
 import { assertNoteContext } from "./noteContext";
 import {
     D_CREDIT,
@@ -9,6 +9,84 @@ import {
     D_CREDIT_RECOVERY,
     D_CREDIT_REMAINDER_NONCE,
 } from "./domains";
+
+export const CREDIT_POLICY_FIELDS = [
+    "singleLimit",
+    "dailyLimit",
+    "monthlyLimit",
+    "lastDay",
+    "dailySpent",
+    "lastMonth",
+    "monthlySpent",
+] as const;
+export function normalizeCreditPolicy(value: Partial<CreditPolicy> = {}): CreditPolicy {
+    const policy = Object.fromEntries(
+        CREDIT_POLICY_FIELDS.map((key) => {
+            const n = value[key] ?? 0n;
+            if (typeof n !== "bigint") throw new TypeError(`${key} must be bigint`);
+            uint(
+                n,
+                key === "lastDay" || key === "lastMonth"
+                    ? 64
+                    : key === "dailySpent" || key === "monthlySpent"
+                      ? 128
+                      : 126,
+                key
+            );
+            return [key, n];
+        })
+    ) as unknown as CreditPolicy;
+    for (const [period, spent] of [
+        ["lastDay", "dailySpent"],
+        ["lastMonth", "monthlySpent"],
+    ] as const) {
+        if (policy[period] === 0n && policy[spent] !== 0n)
+            throw new Error("noncanonical Credit usage");
+    }
+    return policy;
+}
+/** UTC Gregorian periods from explicit uint64 chain seconds, without wall-clock defaults. */
+export function creditPeriods(timestamp: bigint): { currentDay: bigint; currentMonth: bigint } {
+    if (typeof timestamp !== "bigint") throw new TypeError("Credit timestamp required");
+    uint(timestamp, 64, "timestamp");
+    const days = timestamp / 86400n,
+        z = days + 719468n,
+        era = z / 146097n,
+        doe = z - era * 146097n;
+    const yoe = (doe - doe / 1460n + doe / 36524n - doe / 146096n) / 365n;
+    let year = yoe + era * 400n;
+    const doy = doe - (365n * yoe + yoe / 4n - yoe / 100n),
+        mp = (5n * doy + 2n) / 153n;
+    const month = mp + (mp < 10n ? 3n : -9n);
+    if (month <= 2n) year++;
+    return { currentDay: days + 1n, currentMonth: (year - 1970n) * 12n + month };
+}
+/** Apply each input's policy before considering whether a remainder exists. */
+export function applyCreditDrawUsage(
+    note: Pick<CreditNote, "amount"> & Partial<CreditPolicy>,
+    amount: bigint,
+    timestamp: bigint
+): CreditPolicy {
+    const policy = normalizeCreditPolicy(note),
+        periods = creditPeriods(timestamp);
+    uint(amount, 126, "draw amount");
+    if (amount === 0n || amount > note.amount) throw new Error("draw amount outside balance");
+    if (policy.singleLimit !== 0n && amount > policy.singleLimit)
+        throw new Error("single limit exceeded");
+    for (const [limit, last, spent, current] of [
+        ["dailyLimit", "lastDay", "dailySpent", "currentDay"],
+        ["monthlyLimit", "lastMonth", "monthlySpent", "currentMonth"],
+    ] as const) {
+        const period = periods[current];
+        if (period < policy[last]) throw new Error("Credit period rollback");
+        policy[spent] = (period === policy[last] ? policy[spent] : 0n) + amount;
+        uint(policy[spent], 128, spent);
+        policy[last] = period;
+        if (policy[limit] !== 0n && policy[spent] > policy[limit])
+            throw new Error(`${limit} exceeded`);
+    }
+    return policy;
+}
 
 export async function computeCreditSharedKeyHash(creditSharedKey: bigint): Promise<`0x${string}`> {
     if (creditSharedKey <= 0n || creditSharedKey >= FIELD_MODULUS)
@@ -26,7 +104,8 @@ export async function computeCreditCommitment(
     amount: bigint,
     nonce: bigint,
     expiry: bigint,
-    creditSharedKeyHash: `0x${string}`
+    creditSharedKeyHash: `0x${string}`,
+    policy: Partial<CreditPolicy> = {}
 ): Promise<`0x${string}`> {
     uint(chainId, 64, "chainId");
     uint(tokenAddress, 160, "tokenAddress");
@@ -67,6 +146,7 @@ export async function computeCreditCommitment(
         nonce,
         expiry,
         BigInt(creditSharedKeyHash),
+        ...CREDIT_POLICY_FIELDS.map((key) => normalizeCreditPolicy(policy)[key]),
     ]);
 }
 
@@ -174,7 +254,8 @@ export async function recoverCreditRemainder(
         scopedNote.amount,
         scopedNote.nonce,
         scopedNote.expiry,
-        await computeCreditSharedKeyHash(scopedNote.creditSharedKey)
+        await computeCreditSharedKeyHash(scopedNote.creditSharedKey),
+        scopedNote
     );
     const expectedNullifier = await computeCreditNullifier(
         scopedContext.chainId,
@@ -186,6 +267,7 @@ export async function recoverCreditRemainder(
     if (commitment === 0n) {
         if (scopedRecovery.recoveryAmount !== 0n)
             throw new Error("full draw requires zero recovery amount");
+        applyCreditDrawUsage(scopedNote, scopedNote.amount, scopedRecovery.timestamp);
         return null;
     }
     const args = [
@@ -201,6 +283,11 @@ export async function recoverCreditRemainder(
     if (amount === 0n || amount >= scopedNote.amount || amount >= 1n << 126n)
         throw new Error("invalid recovered remainder amount");
     if (nonce === scopedNote.nonce) throw new Error("remainder nonce must change");
+    const usage = applyCreditDrawUsage(
+        scopedNote,
+        scopedNote.amount - amount,
+        scopedRecovery.timestamp
+    );
     const expectedCommitment = await computeCreditCommitment(
         scopedContext.chainId,
         scopedNote.spenderWalletIdentity,
@@ -211,9 +298,10 @@ export async function recoverCreditRemainder(
         amount,
         nonce,
         scopedNote.expiry,
-        await computeCreditSharedKeyHash(scopedNote.creditSharedKey)
+        await computeCreditSharedKeyHash(scopedNote.creditSharedKey),
+        usage
     );
     if (BigInt(expectedCommitment) !== commitment)
         throw new Error("recovered credit commitment mismatch");
-    return { ...scopedNote, amount, nonce };
+    return { ...scopedNote, ...usage, amount, nonce };
 }

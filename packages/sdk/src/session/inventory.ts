@@ -106,7 +106,8 @@ export abstract class InventoryProcessor {
                 n.amount,
                 n.nonce,
                 n.expiry,
-                await computeCreditSharedKeyHash(n.creditSharedKey)
+                await computeCreditSharedKeyHash(n.creditSharedKey),
+                n
             )
         );
     }
@@ -160,6 +161,9 @@ export abstract class InventoryProcessor {
         };
         for (const event of logs) {
             if (event.eventName === "CreditDraw") {
+                const block = await this.#options.reader.getBlock(event.blockNumber!);
+                if (block.hash !== event.blockHash)
+                    throw new CanonicalConflict("draw block changed during Credit recovery");
                 const args = event.args!;
                 const params = args.params as {
                     nullifiers: readonly Hex[];
@@ -186,6 +190,7 @@ export abstract class InventoryProcessor {
                             context,
                             previous.state.note,
                             {
+                                timestamp: block.timestamp,
                                 creditNullifier: nullifier,
                                 remainderCommitment: params.remainderCommitments[index]!,
                                 recoveryAmount: BigInt(params.recoveryAmounts[index]!),
