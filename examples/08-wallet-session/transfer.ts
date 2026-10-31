@@ -35,7 +35,6 @@ export async function main(resources: ExampleResources) {
     const invisi = new Invisi({
         protocolRpc,
         provider,
-        signer,
         store,
         prover,
     });
@@ -86,8 +85,10 @@ export async function main(resources: ExampleResources) {
         onProgress: (event) => console.log("Proof phase:", event.phase),
     });
 
-    console.log("6. Delegate sending to the session's ethers signer and record this operation's hash");
-    const transaction = await session.sendTransaction(proved);
+    console.log("6. Export the call, send with ethers and associate the resulting operation hash");
+    const call = await proved.exportTransaction();
+    const transaction = await signer.sendTransaction(call);
+    await proved.trackTransaction(transaction.hash);
     console.log("Transaction hash:", transaction.hash);
     const receipt = await transaction.wait();
     if (!receipt) throw new Error("Transaction receipt is not available");
@@ -96,7 +97,6 @@ export async function main(resources: ExampleResources) {
     const tracked = await session.resume(proved.id);
     const confirmed = await tracked.reconcile();
     if (confirmed.status !== "confirmed") throw new Error("Resume and reconcile this operation");
-    // session.sendTransaction(call, { gasLimit, nonce, ... }) also forwards plain calls to ethers.
-    // The operation overload exports and tracks automatically; the call overload has no operation association.
-    // Neither overload waits, retries, estimates fees itself or replaces ethers' TransactionResponse.
+    // The application owns sending and waiting; Invisi has no constructor signer.
+    // A directly constructed WalletSession may still opt into its separate signer convenience API.
 }

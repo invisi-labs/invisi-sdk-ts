@@ -126,3 +126,5 @@ export type {
 } from "./gas-estimation";
 
 export { defineGasBenchmarks } from "./gas-estimation";
+
+export type { SigningRequest } from "@invisi-labs/core";

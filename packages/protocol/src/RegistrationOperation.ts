@@ -2,7 +2,7 @@ import type { Address, Hex } from "./contracts";
 import { hexlify, Interface, getBytes, verifyTypedData, type Signer } from "ethers";
 
 import { invisiAddressRegistryAbi } from "./contracts";
-import { ReceivingAddress, type Wallet } from "@invisi-labs/core";
+import { ReceivingAddress, createSigningRequest, type Wallet } from "@invisi-labs/core";
 import type { AddressRegistry } from "./AddressRegistry";
 import type { CanonicalBlock, ChainReader, TransactionCall } from "./interfaces";
 import {
@@ -145,6 +145,20 @@ export class RegistrationOperation {
             ...structuredClone(this.#plan.registration),
             update: this.#plan.update,
         };
+    }
+
+    /** Export portable EIP-712 data without invoking a configured signer. */
+    async exportRegistrationAuthorization(options: { signal?: AbortSignal } = {}) {
+        check(this.status === "prepared", "registry operation is not awaiting authorization");
+        options.signal?.throwIfAborted();
+        await this.validateFreshness();
+        options.signal?.throwIfAborted();
+        return createSigningRequest(this.typedData());
+    }
+
+    /** Reuse the registry's EOA/ERC-1271 validation for an independently obtained signature. */
+    async withSignature(signature: string, options: { signal?: AbortSignal } = {}) {
+        return this.authorize({ ...options, signature: signature as Hex });
     }
 
     /** Sign with ethers, or attach externally obtained ERC-1271 signature bytes. */

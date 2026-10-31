@@ -20,7 +20,6 @@ export async function main(resources: ExampleResources) {
     const invisi = new Invisi({
         protocolRpc,
         provider,
-        signer,
     });
     const amount = 100n;
     const recipient = wallet.getAddress();

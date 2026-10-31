@@ -142,50 +142,20 @@ it("composes read-only provider infrastructure lazily without starting synchroni
     expect(Object.isFrozen(provider)).toBe(false);
 });
 
-it("rejects signer/provider chain disagreement before creating signer capabilities", async () => {
-    const { protocol } = setup();
-    const provider = {
-        getNetwork: async () => ({ chainId: 31337n }),
-        getCode: async () => "0x6000",
-        call: async () => word(1),
-    };
-    const signer = { provider: { getNetwork: async () => ({ chainId: 1n }) }, getAddress: vi.fn() };
-    const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
-    await expect(
-        new Invisi({ provider: provider as never, signer: signer as never }).connect({
-            wallet,
-            protocol,
-        })
-    ).rejects.toThrow(/chain mismatch/i);
-    expect(signer.getAddress).not.toHaveBeenCalled();
-});
+it.each(["signer", "fundingSigner"])(
+    "rejects the removed %s constructor option before using it",
+    (key) => {
+        const signer = { getAddress: vi.fn(), signTypedData: vi.fn() };
+        expect(() => new Invisi({ [key]: signer } as never)).toThrow(/signer|signing/i);
+        expect(signer.getAddress).not.toHaveBeenCalled();
+        expect(signer.signTypedData).not.toHaveBeenCalled();
+    }
+);
 
-it("creates signer capabilities internally and preserves explicit overrides", async () => {
-    const { protocol, chainReader } = setup();
-    const provider = {
-        getNetwork: async () => ({ chainId: 31337n }),
-        getCode: async () => "0x6000",
-        call: async () => word(1),
-    };
-    const transaction = { hash: word(7), wait: vi.fn() };
-    const signer = {
-        provider,
-        getAddress: vi.fn(async () => factory),
-        sendTransaction: vi.fn(async () => transaction),
-    };
-    const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
-    const session = await new Invisi({
-        provider: provider as never,
-        signer: signer as never,
-        chainReader,
-    }).connect({ wallet, protocol });
-    expect(session.scope.protocolAddress).toBe(instance);
-    expect(signer.getAddress).toHaveBeenCalled();
-    expect(Object.isFrozen(signer)).toBe(false);
-    const call = { to: instance, data: "0x1234" as const, value: 0n };
-    expect(await session.sendTransaction(call)).toBe(transaction);
-    expect(signer.sendTransaction).toHaveBeenCalledWith({ ...call, chainId: 31337n });
-    expect(transaction.wait).not.toHaveBeenCalled();
+it("does not expose signer defaults in the infrastructure constructor type", () => {
+    expectTypeOf<
+        Extract<keyof import("./Invisi").InvisiOptions, "signer" | "fundingSigner">
+    >().toEqualTypeOf<never>();
 });
 
 it("validates the provider chain even when a custom reader is supplied", async () => {

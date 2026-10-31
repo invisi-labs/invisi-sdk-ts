@@ -48,7 +48,6 @@ export async function main(resources: ExampleResources) {
     const invisi = new Invisi({
         protocolRpc,
         provider,
-        signer,
         prover,
     });
 
@@ -90,7 +89,10 @@ export async function main(resources: ExampleResources) {
     });
 
     console.log("4. For mixed/public funding, request the EVM grant only after the actual proof hash exists");
-    const ready = await proved.authorizeFunding();
+    const request = await proved.exportFundingAuthorization();
+    // Transport request to the funding owner's wallet; this local ethers signer stands in for it.
+    const signature = await signer.signTypedData(request.domain, request.types, request.message);
+    const ready = await proved.withFundingSignature(signature);
 
     console.log("5. Export the public call for the application transaction pipeline");
     const call = await ready.exportTransaction();

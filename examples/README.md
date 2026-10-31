@@ -124,3 +124,7 @@ pnpm build
 Use a fresh Anvil chain. The script deploys a multi-token Protocol, two seeded tokens and an independent receiving-key registry, then records/verifies `../invisi-protocol/deployment/deployment.json`. `INVISI_PROTOCOL_DIR` selects another protocol checkout; `INVISI_DEPLOYMENT_CATALOG` selects a different catalog path. Local verifiers are mocks for integration only. Real assets require authenticated real verifiers and private keys.
 
 Invisi defines no mnemonic or HD path. `00-wallet` uses ethers to obtain an account key and then derives Invisi capabilities from it. Public browser wallet connections expose addresses/signing requests rather than private keys; application-owned account-key access is a distinct integration choice.
+
+## Independent signing boundaries
+
+The transfer, public-funding, and registry examples explicitly export a JSON-safe signing request, sign it with ethers, and attach the resulting signature through `withWalletSignature`, `withFundingSignature`, or `withSignature`. Replace the example signer call with a hardware-wallet, MPC, or remote-device exchange without changing the SDK operation. Keep private note openings and circuit witnesses local; the request contains only EIP-712 commitments. Funding requests for proved operations are exported after `prove()`, while shield and registry do not need a proof. Convenience `authorize` APIs remain available for existing applications.

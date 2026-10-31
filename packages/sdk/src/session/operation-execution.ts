@@ -1,7 +1,10 @@
-import { verifyTypedData } from "ethers";
+import { Signature, SigningKey, getBytes, concat, verifyTypedData } from "ethers";
 import {
     computeWalletAuthorizationDigest,
-    type AuthorizedStatement,
+    AuthorizedStatement,
+    computeWalletIdentity,
+    createSigningRequest,
+    walletAuthorizationTypedData,
     type WalletAuthorizationProvider,
 } from "@invisi-labs/core";
 import type { TokenProtocol } from "@invisi-labs/protocol";
@@ -9,7 +12,9 @@ import type { Prover, ProverOptions } from "@invisi-labs/prover";
 import type {
     FundingAuthorizationVerifier,
     FundingSigner,
+    FundingTypedData,
     OperationPlan,
+    OperationRuntime,
     SavedOperation,
 } from "./operation-types";
 import {
@@ -73,20 +78,116 @@ export async function signOperationFunding(
         throw new Error("funding signer is not the payer");
     const typed = await fundingTypedData(saved);
     const signature = await signer.signTypedData(structuredClone(typed));
+    return verifyFundingSignature(typed, payer, signature, verifier);
+}
+
+/** Export only typed commitments, never private note openings or authorization witnesses. */
+export function walletSigningRequest(plan: OperationPlan) {
+    return createSigningRequest(walletAuthorizationTypedData(authorizationRequest(plan)));
+}
+
+/** Recover the EOA key and build the existing private witness without receiving a private key. */
+export async function acceptWalletSignature(plan: OperationPlan, signature: string) {
+    const request = authorizationRequest(plan);
+    const digest = computeWalletAuthorizationDigest(request);
+    try {
+        const signed = Signature.from(signature);
+        const publicKey = getBytes(SigningKey.recoverPublicKey(digest, signed));
+        const owner = await computeWalletIdentity(publicKey);
+        if (owner.toLowerCase() !== plan.scope.walletIdentity.toLowerCase()) {
+            throw new Error("wallet signature identity mismatch");
+        }
+        return new AuthorizedStatement(plan.scope.walletIdentity, digest, {
+            public_key_x: Array.from(publicKey.slice(1, 33)),
+            public_key_y: Array.from(publicKey.slice(33)),
+            signature: Array.from(getBytes(concat([signed.r, signed.s]))),
+        });
+    } catch {
+        throw new Error("invalid wallet authorization signature");
+    }
+}
+
+/** The remote round trip may outlive the nonce or deadline selected during preparation. */
+export async function fundingSigningRequest(
+    saved: SavedOperation,
+    runtime: Pick<OperationRuntime, "reader" | "options">
+) {
+    const plan = saved.plan;
+    if (plan.fundingMode !== "signature") {
+        throw new Error("operation does not require a funding signature");
+    }
+    if (plan.kind !== "shield" && !saved.proof) {
+        throw new Error("proof must precede funding authorization");
+    }
+    await runtime.options.protocol.validateDeployment(runtime.reader);
+    const block = await runtime.reader.getBlock(await runtime.reader.getLatestBlockNumber());
+    if (block.timestamp > plan.deadline || block.timestamp > (plan.funding.deadline ?? 0n)) {
+        throw new Error("funding authorization expired");
+    }
+    if (
+        (await runtime.reader.getFundingNonce(plan.context, plan.funding.payer!, block)) !==
+        plan.funding.sigNonce
+    ) {
+        throw new Error("funding nonce changed; prepare again");
+    }
+    const request = createSigningRequest(await fundingTypedData(saved));
+    if ((await runtime.reader.getBlock(block.number)).hash !== block.hash) {
+        throw new Error("canonical funding block changed");
+    }
+    return request;
+}
+
+/** Verify against reconstructed operation data, never caller-supplied typed data. */
+export async function acceptFundingSignature(
+    saved: SavedOperation,
+    signature: string,
+    runtime: Pick<OperationRuntime, "reader" | "options">
+) {
+    if (!/^0x(?:[a-fA-F0-9]{2})+$/.test(signature)) {
+        throw new Error("invalid EVM funding signature");
+    }
+    const request = await fundingSigningRequest(saved, runtime);
+    return verifyFundingSignature(
+        request,
+        saved.plan.funding.payer!,
+        signature,
+        runtime.options.fundingVerifier
+    );
+}
+
+async function verifyFundingSignature(
+    request: FundingTypedData,
+    payer: `0x${string}`,
+    signature: string,
+    verifier?: FundingAuthorizationVerifier
+) {
+    if (!/^0x(?:[a-fA-F0-9]{2})+$/.test(signature)) {
+        throw new Error("invalid EVM funding signature");
+    }
+    const types = Object.fromEntries(
+        Object.entries(request.types).map(([name, fields]) => [name, [...fields]])
+    );
+    let validEOA = false;
+    try {
+        validEOA =
+            verifyTypedData(request.domain, types, request.message, signature).toLowerCase() ===
+            payer.toLowerCase();
+        if (validEOA) {
+            // Normalize EIP-2098 and parity-style EOA signatures for Solidity SignatureChecker.
+            signature = Signature.from(signature).serialized;
+        }
+    } catch {
+        validEOA = false;
+    }
     const valid = verifier
         ? await verifier.verifyTypedData({
-              ...structuredClone(typed),
+              ...structuredClone(request),
               address: payer,
-              signature,
+              signature: signature as `0x${string}`,
           })
-        : verifyTypedData(
-              typed.domain,
-              Object.fromEntries(
-                  Object.entries(typed.types).map(([name, fields]) => [name, [...fields]])
-              ),
-              typed.message,
-              signature
-          ).toLowerCase() === payer.toLowerCase();
-    if (valid !== true) throw new Error("invalid EVM funding signature");
-    return signature;
+        : validEOA;
+    if (valid !== true) {
+        throw new Error("invalid EVM funding signature");
+    }
+    return signature as `0x${string}`;
 }

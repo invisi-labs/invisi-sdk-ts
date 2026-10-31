@@ -11,7 +11,7 @@ const signer = new EthereumWallet(fundingPrivateKey, provider);
 const wallet = await Wallet.fromPrivateKey(evmPrivateKey);
 const protocolRpc = new ProtocolRpcClient(protocolRpcUrl);
 const protocol = await Protocol.fromRpc(protocolRpc, provider);
-const invisi = new Invisi({ provider, protocolRpc, signer, store, prover });
+const invisi = new Invisi({ provider, protocolRpc, store, prover });
 const session = await invisi.connect({ wallet, protocol });
 
 await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
@@ -61,6 +61,27 @@ Each funds `NoteInput` contains `{ note, commitment, treeId, leafIndex }`. Expli
 The SDK validates note preimages, wallet identity, deployment/token scope, canonical membership, spent state and the frozen proof statement. Supplying a record does not make it trusted. Chain RPC and Protocol RPC remain infrastructure dependencies; a Store adapter does not.
 
 `PreparedTransaction` is a local immutable operation handle. It supports `preview`, `authorize`, `prove`, `authorizeFunding`, caller-funded shield `ready`, `exportTransaction`, `exportProof` and `exportAggregateMember`. A public wallet may use a separate `WalletAuthorizationProvider` with `authorize(provider)`; a local prover may be supplied with `prove(prover, options)`, and a funding signer with `authorizeFunding(signer)`. Private authorization, public funding and gas payment remain independent.
+
+### External signing tools
+
+The application can keep signing on another device or service. `Invisi` accepts infrastructure only and rejects constructor `signer` / `fundingSigner` options:
+
+```ts
+const request = await prepared.exportFundingAuthorization();
+// Send JSON.stringify(request) to the funding owner's signing tool.
+const signature = await bobSigner.signTypedData(request.domain, request.types, request.message);
+const ready = await prepared.withFundingSignature(signature);
+const call = await ready.exportTransaction();
+await aliceSigner.sendTransaction(call);
+```
+
+`SigningRequest` contains JSON-safe `domain`, `primaryType`, `types`, and `message`. It can make a JSON round trip without a bigint codec and is directly accepted by ethers `signTypedData`. Wallet RPC integrations add their own `EIP712Domain` transport type. The SDK recomputes its frozen request when accepting a signature; it does not trust a returned request object. Funding signatures bind the payer, exact amount, token/output/delivery request hash, deployment, nonce and deadline. Anyone may relay the unchanged authorization; it is not restricted to the example transaction sender.
+
+- Funding: `exportFundingAuthorization()` -> external EIP-712 signature -> `withFundingSignature(signature)`. Shield needs no proof; other operations must prove first. Nonces and deadlines are rechecked after the remote round trip. ERC-1271 verification continues through the configured funding verifier.
+- Private note authorization: `exportWalletAuthorization()` -> external EOA EIP-712 signature -> `withWalletSignature(signature)` -> `prove()`. Only typed commitments leave the application; the recovered public key and signature become a private circuit witness. This path supports EOA authorization, not ERC-1271 circuit signatures. Never publish the returned private-spend signature or its witness.
+- Registry: `exportRegistrationAuthorization()` -> external EIP-712 signature -> `withSignature(signature)`. Existing EOA/ERC-1271 and freshness validation applies to both registration and update.
+
+A request is bound to the original immutable handle. Attaching a signature does not reconstruct that handle after a process restart; application recovery and transport remain separate concerns. Signing tools must display trusted business context for statement/request hashes, and must support the required typed-data format. Existing per-operation `authorize`, `authorizeFunding(signer)` and registry `authorize` remain convenience APIs. The `Invisi` constructor no longer accepts a default signer or funding signer; migrate those integrations to explicit request/signature boundaries and submit with ethers.
 
 One Invisi instance may construct operations for multiple wallets by providing the wallet on every call. This does not permit mixing different owners' funds inputs in one arbitrary spend. Independent requests may be aggregated when the protocol permits it.
 
@@ -138,7 +159,7 @@ Generated ABIs and Solidity parameter types are available through `@invisi-labs/
 
 ## Ethers transaction lifecycle
 
-Operations export only `{ to, data, value }`. The application's ethers signer/provider owns gas estimation, fees, EVM nonce selection, sending, replacements and receipt waiting. Operations expose no transaction submitter, `submit()` or `wait()` wrapper. An `Invisi` signer supplies protocol funding authorization and the optional WalletSession ethers convenience entry point.
+Operations export only `{ to, data, value }`. The application's ethers signer/provider owns gas estimation, fees, EVM nonce selection, sending, replacements and receipt waiting. Operations expose no transaction submitter, `submit()` or `wait()` wrapper. `Invisi` has no default signer: export signing requests for external protocol authorization and submit exported calls directly through ethers.
 
 For a managed operation, `exportTransaction()` performs protocol preflight and persists its exposure before returning calldata. `trackTransaction(hash)` associates an application-owned transaction hash and returns a new uncertain handle; it neither broadcasts nor establishes that the transaction was mined. After ethers waits, `reconcile()` independently authenticates canonical calldata, receipts and consumed inputs before updating notes and reservations. Replacement hashes can be passed explicitly to `reconcile({ transactionHash })`; only matching frozen requests can confirm.
 
@@ -146,7 +167,7 @@ Applications that sign raw EVM transactions can persist the association before b
 
 ### WalletSession convenience sending
 
-A session can delegate directly to the ethers signer configured on `Invisi` or `WalletSessionOptions`. The signer is an EVM gas/funding capability, separate from the Invisi wallet identity and private spending authority.
+A directly constructed `WalletSession` can delegate to an ethers signer explicitly configured in `WalletSessionOptions`. Sessions created through `Invisi.connect()` have no default signer and should export calls for the application to send with ethers. The signer is an EVM gas/funding capability, separate from the Invisi wallet identity and private spending authority.
 
 ```ts
 // Plain call: delegate to ethers without associating a managed operation.

@@ -1,4 +1,4 @@
-import type { Provider, Signer } from "ethers";
+import type { Provider } from "ethers";
 import { ProtocolRpcClient, Invisi, Wallet, Protocol, EncryptedWalletCodec } from "@invisi-labs/sdk";
 import { WasmProver } from "@invisi-labs/prover/wasm";
 import { IndexedDBWalletStore } from "@invisi-labs/sdk/indexeddb";
@@ -7,7 +7,6 @@ import { IndexedDBWalletStore } from "@invisi-labs/sdk/indexeddb";
 export async function connectBrowser(input: {
     evmPrivateKey: string;
     provider: Provider;
-    signer?: Signer;
     storageKey: CryptoKey;
     databaseName: string;
     protocolRpcUrl: string;
@@ -26,7 +25,6 @@ export async function connectBrowser(input: {
         const protocol = await Protocol.fromRpc(protocolRpc, input.provider);
         const invisi = new Invisi({
             provider: input.provider,
-            ...(input.signer ? { signer: input.signer } : {}),
             store,
             protocolRpc,
             prover: new WasmProver({ threads: 1 }),

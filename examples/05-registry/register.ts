@@ -31,13 +31,15 @@ export async function main(resources: ExampleResources) {
     const prepared = await registry.prepareRegistration({
         wallet,
         provider,
-        signer: new EthereumWallet(required("WALLET_ACCOUNT_PRIVATE_KEY")),
         update: false,
     });
     console.log("Local operation review:", prepared.preview());
 
     console.log("3. Sign the registry EIP-712 key snapshot with the owner; relay with ethers");
-    const ready = await prepared.authorize();
+    const request = await prepared.exportRegistrationAuthorization();
+    const ownerSigner = new EthereumWallet(required("WALLET_ACCOUNT_PRIVATE_KEY"));
+    const signature = await ownerSigner.signTypedData(request.domain, request.types, request.message);
+    const ready = await prepared.withSignature(signature);
     const call = await ready.exportTransaction();
     const transaction = await signer.sendTransaction(call);
     const tracked = ready.trackTransaction(transaction.hash);

@@ -1,5 +1,5 @@
 import { computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 import { ProtocolRpcClient, Wallet, Protocol, Invisi, type NoteInput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { required } from "../environment.js";
@@ -70,7 +70,11 @@ export async function main(resources: ExampleResources) {
 
     // prepared.preview() is for local review. Do not send its private amounts to public telemetry.
     console.log("2. Privately authorize the frozen statement when private inputs are present");
-    const authorized = await prepared.authorize();
+    const request = await prepared.exportWalletAuthorization();
+    // Send only typed commitments to the owner's signing tool; keep note openings local.
+    const ownerSigner = new EthereumWallet(required("WALLET_ACCOUNT_PRIVATE_KEY"));
+    const signature = await ownerSigner.signTypedData(request.domain, request.types, request.message);
+    const authorized = await prepared.withWalletSignature(signature);
 
     console.log("3. Produce and independently verify the current release proof; no manual witness packing");
     const proved = await authorized.prove({

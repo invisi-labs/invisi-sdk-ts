@@ -291,3 +291,25 @@ it("accepts canonical EOA recovery for a delegated account even when it has code
     expect((await operation.authorize()).status).toBe("ready");
     expect(h.reader.isValidRegistrationSignature).not.toHaveBeenCalled();
 });
+
+it("exports JSON-safe registry data and attaches a remote signature without a signer", async () => {
+    const h = await fixture();
+    const operation = await h.registry.prepareRegistration({
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        reader: h.reader,
+    });
+    const request = JSON.parse(JSON.stringify(await operation.exportRegistrationAuthorization()));
+    expect(request.message.nonce).toBe("0");
+    const signature = await h.signer.signTypedData(request.domain, request.types, request.message);
+    const ready = await operation.withSignature(signature);
+    expect((await ready.exportTransaction()).to).toBe(context.registryAddress);
+    const wrong = new EthereumWallet(`0x${"02".repeat(32)}`);
+    await expect(
+        operation.withSignature(
+            await wrong.signTypedData(request.domain, request.types, request.message)
+        )
+    ).rejects.toThrow(/signature/);
+    h.setNonce(1n);
+    await expect(operation.withSignature(signature)).rejects.toThrow(/nonce/);
+    await expect(operation.exportRegistrationAuthorization()).rejects.toThrow(/nonce/);
+});

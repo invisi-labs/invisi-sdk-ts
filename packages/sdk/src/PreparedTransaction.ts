@@ -3,6 +3,10 @@ import {
     authorizeOperation,
     proveOperation,
     signOperationFunding,
+    walletSigningRequest,
+    acceptWalletSignature,
+    fundingSigningRequest,
+    acceptFundingSignature,
 } from "./session/operation-execution";
 import {
     MissingCapabilityError,
@@ -113,6 +117,85 @@ export class PreparedTransaction {
             this.#lifecycle.busy = false;
         }
     }
+    /** Public EIP-712 request; signing transport and key custody belong to the caller. */
+    async exportWalletAuthorization(options: { signal?: AbortSignal } = {}) {
+        options.signal?.throwIfAborted();
+        this.current();
+        check(
+            requiresAuthorization(this.#saved.plan),
+            "operation does not require wallet authorization"
+        );
+        check(
+            ["prepared", "authorized"].includes(this.status),
+            "operation is not awaiting wallet authorization"
+        );
+        return walletSigningRequest(this.#saved.plan);
+    }
+
+    /** Attach an external EOA signature, retaining its witness only at the private proving boundary. */
+    async withWalletSignature(
+        signature: string,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<PreparedTransaction> {
+        options.signal?.throwIfAborted();
+        this.current();
+        check(
+            requiresAuthorization(this.#saved.plan),
+            "operation does not require wallet authorization"
+        );
+        check(
+            ["prepared", "authorized"].includes(this.status),
+            "operation is not awaiting wallet authorization"
+        );
+        const authorization = await acceptWalletSignature(this.#saved.plan, signature);
+        return this.stage(
+            "wallet authorization",
+            ["prepared", "authorized"],
+            async () => ({ status: "authorized", authorization }),
+            options.signal
+        );
+    }
+
+    /** Export only after proving when the funding authorization binds an actual proof hash. */
+    async exportFundingAuthorization(options: { signal?: AbortSignal } = {}) {
+        options.signal?.throwIfAborted();
+        this.current();
+        check(
+            this.status === (this.kind === "shield" ? "prepared" : "proved"),
+            "operation is not awaiting funding authorization or proof"
+        );
+        const request = await fundingSigningRequest(this.#saved, this.#runtime);
+        options.signal?.throwIfAborted();
+        this.current();
+        return request;
+    }
+
+    /** Verify an external signature against this handle's own frozen operation. */
+    async withFundingSignature(
+        signature: string,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<PreparedTransaction> {
+        options.signal?.throwIfAborted();
+        this.current();
+        check(
+            this.status === (this.kind === "shield" ? "prepared" : "proved"),
+            "operation is not awaiting funding authorization or proof"
+        );
+        const verified = await acceptFundingSignature(this.#saved, signature, this.#runtime);
+        return this.stage(
+            "funding authorization",
+            this.kind === "shield" ? ["prepared"] : ["proved"],
+            async (saved) => {
+                saved.plan.funding.signature = verified;
+                if (saved.plan.statement?.target !== "noir-recursive") {
+                    saved.call = await this.encode(saved);
+                }
+                return { status: "ready" };
+            },
+            options.signal
+        );
+    }
+
     async authorize(options?: { signal?: AbortSignal }): Promise<PreparedTransaction>;
     async authorize(
         provider: WalletAuthorizationProvider,

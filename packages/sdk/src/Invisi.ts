@@ -12,10 +12,9 @@ import type {
     ExplicitCancelCreditPreparation,
 } from "./explicit-types";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
-import type { Provider, Signer } from "ethers";
+import type { Provider } from "ethers";
 import {
     EthersChainReader,
-    EthersFundingSigner,
     EthersFundingVerifier,
     EthersAddressResolver,
 } from "./integrations/ethers";
@@ -26,10 +25,16 @@ import { WalletSession, type WalletSessionOptions } from "./session";
 /** Compose independent Chain RPC and indexed Protocol RPC with local wallet capabilities. */
 export type InvisiOptions = Omit<
     WalletSessionOptions,
-    "wallet" | "protocol" | "namespace" | "viewing" | "authorization" | "chainReader"
+    | "wallet"
+    | "protocol"
+    | "namespace"
+    | "viewing"
+    | "authorization"
+    | "chainReader"
+    | "signer"
+    | "fundingSigner"
 > & {
     provider?: Provider;
-    signer?: Signer;
     chainReader?: ChainReader;
 };
 
@@ -44,6 +49,11 @@ export class Invisi {
     readonly #options: InvisiOptions;
 
     constructor(options: InvisiOptions = {}) {
+        if ("signer" in options || "fundingSigner" in options) {
+            throw new Error(
+                "Invisi does not accept signer defaults; export a signing request and attach the external signature"
+            );
+        }
         this.#options = {
             ...options,
             ...(options.gasBenchmarks
@@ -67,7 +77,7 @@ export class Invisi {
         }
         const selected = { ...options };
         const combined = { ...this.#options, ...selected };
-        const { provider, signer, ...runtime } = combined;
+        const { provider, ...runtime } = combined;
         const reader =
             combined.chainReader ?? (provider ? new EthersChainReader(provider) : undefined);
         if (!reader) throw new MissingCapabilityError("chain reader");
@@ -77,18 +87,7 @@ export class Invisi {
         if (runtime.protocolRpc instanceof ProtocolRpcClient) {
             runtime.protocolRpc = runtime.protocolRpc.withReader(reader);
         }
-        if (signer) {
-            if (!provider) throw new MissingCapabilityError("provider for signer");
-            if (!signer.provider) throw new Error("signer must be connected to a provider");
-            if ((await signer.provider.getNetwork()).chainId !== selected.protocol.context.chainId)
-                throw new Error("signer-provider deployment chain mismatch");
-        }
         const registry = selected.protocol.deployment.registry;
-        const fundingSigner =
-            combined.fundingSigner ??
-            (signer
-                ? await EthersFundingSigner.create(signer, selected.protocol.context.chainId)
-                : undefined);
         const fundingVerifier =
             combined.fundingVerifier ??
             (provider
@@ -109,8 +108,6 @@ export class Invisi {
         return {
             ...runtime,
             chainReader: reader,
-            ...(signer ? { signer } : {}),
-            ...(fundingSigner ? { fundingSigner } : {}),
             ...(fundingVerifier ? { fundingVerifier } : {}),
             ...(addressResolver ? { addressResolver } : {}),
             protocol: selected.protocol,

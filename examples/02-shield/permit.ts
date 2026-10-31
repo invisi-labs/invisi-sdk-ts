@@ -20,7 +20,6 @@ export async function main(resources: ExampleResources) {
     const invisi = new Invisi({
         protocolRpc,
         provider,
-        signer,
     });
     console.log("1. Read the token's independent permit nonce and authenticate its configured EIP712 domain");
 

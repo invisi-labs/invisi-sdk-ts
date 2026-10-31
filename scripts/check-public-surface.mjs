@@ -162,3 +162,25 @@ for (const name of ["prepareClue", "detectClue", "clueIsValid"]) {
 for (const name of ["detect", "classify"]) {
     assert(!(name in core.Detector.prototype), `local detector method remains: ${name}`);
 }
+
+for (const name of ["PreparedTransaction", "Operation"]) {
+    for (const method of [
+        "exportWalletAuthorization",
+        "withWalletSignature",
+        "exportFundingAuthorization",
+        "withFundingSignature",
+    ]) {
+        assert.equal(
+            typeof sdk[name].prototype[method],
+            "function",
+            `missing external signing API: ${name}.${method}`
+        );
+    }
+}
+for (const method of ["exportRegistrationAuthorization", "withSignature"]) {
+    assert.equal(
+        typeof sdk.RegistrationOperation.prototype[method],
+        "function",
+        `missing registry signing API: ${method}`
+    );
+}
