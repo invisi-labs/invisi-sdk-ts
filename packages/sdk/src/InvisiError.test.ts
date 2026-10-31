@@ -4,8 +4,6 @@ import { fixture } from "./session/operation-fixture";
 
 const methods = [
     "prepareTransfer",
-    "prepareWithdraw",
-    "prepareSweep",
     "prepareShield",
     "prepareCreateCredit",
     "prepareDrawCredit",

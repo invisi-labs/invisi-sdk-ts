@@ -1,3 +1,4 @@
+import { PublicWallet } from "./index";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
@@ -82,10 +83,10 @@ describe("capability wallet objects", () => {
         await ReceivingAddress.parse(wallet.getAddress()).resolve(async () => {
             throw new Error("offline address queried a registry");
         });
-        const publicWallet = Wallet.fromAddress(resolved);
+        const publicWallet = PublicWallet.fromAddress(resolved);
         expect(publicWallet.getAddress()).toBe(wallet.getAddress());
         for (const method of ["getViewer", "getDetector", "exportAuthorization"] as const)
-            expect(() => publicWallet[method]()).toThrow(MissingCapabilityError);
+            expect(publicWallet).not.toHaveProperty(method);
     });
     it("rejects mismatched imported keys and copies authorization witnesses", async () => {
         const raw = await deriveWallet(new Uint8Array(32).fill(1));
@@ -146,13 +147,13 @@ it("exports an isolated detection key for server delegation", () => {
 
 it("creates an address-only wallet from an unregistered short address without granting private capabilities", async () => {
     const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
-    const publicWallet = Wallet.fromAddress(wallet.ownerAddress);
+    const publicWallet = PublicWallet.fromAddress(wallet.ownerAddress);
 
     expect(publicWallet.walletIdentity).toBe(wallet.walletIdentity);
     expect(() => publicWallet.getAddress()).toThrow(MissingCapabilityError);
     expect(publicWallet.ownerAddress).toBe(wallet.ownerAddress);
-    expect(() => publicWallet.getViewer()).toThrow(MissingCapabilityError);
-    expect(() => publicWallet.getDetector()).toThrow(MissingCapabilityError);
+    expect(publicWallet).not.toHaveProperty("getViewer");
+    expect(publicWallet).not.toHaveProperty("getDetector");
     expect(() => publicWallet.viewingPublicKey).toThrow(MissingCapabilityError);
     expect(() => publicWallet.clueKey).toThrow(MissingCapabilityError);
     expect(wallet).not.toHaveProperty("exportViewing");
@@ -160,7 +161,7 @@ it("creates an address-only wallet from an unregistered short address without gr
 });
 
 it("normalizes an EVM-only receiving wallet to the standard checksummed owner", () => {
-    const wallet = Wallet.fromAddress("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf");
+    const wallet = PublicWallet.fromAddress("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf");
     expect(wallet.ownerAddress).toBe("0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf");
     expect(() => wallet.getAddress()).toThrow(MissingCapabilityError);
     expect(wallet.toJSON().address).toBe(wallet.ownerAddress);
@@ -171,7 +172,7 @@ it("normalizes an EVM-only receiving wallet to the standard checksummed owner", 
 it("exposes ownerAddress on public receiving material without a short-address method", async () => {
     const owner = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
     const full = await Wallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
-    const publicWallet = Wallet.fromAddress(owner);
+    const publicWallet = PublicWallet.fromAddress(owner);
     const receiving = publicWallet.getReceivingAddress();
     expect(receiving.ownerAddress).toBe(owner);
     expect(publicWallet).not.toHaveProperty("getShortAddress");
@@ -179,6 +180,22 @@ it("exposes ownerAddress on public receiving material without a short-address me
     const resolved = await receiving.resolve(async () =>
         full.getReceivingAddress().getReceivingKeys()
     );
-    expect(Wallet.fromAddress(resolved).getAddress()).toBe(full.getAddress());
+    expect(PublicWallet.fromAddress(resolved).getAddress()).toBe(full.getAddress());
     expect(resolved.ownerAddress).toBe(owner);
 });
+
+it("separates public and private factories", () => {
+    expect(Wallet).not.toHaveProperty("fromAddress");
+    expect(PublicWallet).not.toHaveProperty("fromPrivateKey");
+});
+
+// Compile-time checks: address-only objects cannot export private capabilities.
+function publicWalletTypeBoundary(wallet: PublicWallet) {
+    // @ts-expect-error PublicWallet deliberately has no viewing capability getter.
+    wallet.getViewer();
+    // @ts-expect-error PublicWallet deliberately has no detection capability getter.
+    wallet.getDetector();
+    // @ts-expect-error PublicWallet deliberately has no spending authorization export.
+    wallet.exportAuthorization();
+}
+void publicWalletTypeBoundary;

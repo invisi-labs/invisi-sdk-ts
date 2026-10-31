@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { Interface } from "ethers";
 import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
 import type { CanonicalReceipt } from "@invisi-labs/protocol";
-import { readProtocolLogs } from "./receipt-logs";
+import { readProtocolLogs } from "../index";
 
 const address = `0x${"11".repeat(20)}` as Hex;
 const word = `0x${"01".repeat(32)}` as Hex;

@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/sdk";
 import { HDNodeWallet, Mnemonic, Wallet as EthereumWallet, hexlify } from "ethers";
 import { Wallet } from "@invisi-labs/sdk";
 
@@ -38,8 +39,8 @@ export async function main() {
     // Either address form can create an address-only wallet without a registry lookup.
     // Sending to the EVM owner address requires registered receiving keys; see 05-registry.
     console.log("6. Create address-only wallets from both address forms");
-    const publicReceivingWallet = Wallet.fromAddress(receivingAddress);
-    const ownerOnlyWallet = Wallet.fromAddress(ownerAddress);
+    const publicReceivingWallet = PublicWallet.fromAddress(receivingAddress);
+    const ownerOnlyWallet = PublicWallet.fromAddress(ownerAddress);
 
     console.log("7. Get only the capabilities needed by another component");
     const viewer = wallet.getViewer();

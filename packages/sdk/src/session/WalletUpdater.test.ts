@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { expect, it, vi } from "vitest";
 import { Interface, keccak256 } from "ethers";
 import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
@@ -91,7 +92,7 @@ async function harness() {
     });
     const store = new MemoryWalletStore();
     const options = {
-        wallet: Wallet.fromAddress(ReceivingAddress.fromIdentity(identity).toString()),
+        wallet: PublicWallet.fromAddress(ReceivingAddress.fromIdentity(identity).toString()),
         protocol,
         store,
         chainReader: reader,

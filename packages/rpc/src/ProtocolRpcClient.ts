@@ -1,6 +1,6 @@
 import type { Hex } from "@invisi-labs/core";
 import { ReceivingAddress } from "@invisi-labs/core";
-import { getBytes } from "ethers";
+import { getAddress, isAddress, getBytes } from "ethers";
 import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
 import { FIELD_MODULUS } from "@invisi-labs/core";
 import { defineDeployment, type ProtocolDeployment } from "./deployment";
@@ -11,6 +11,7 @@ import type {
     ProtocolDataProvider,
     ProtocolUpdateRange,
     RegisteredReceivingAddress,
+    ProtocolOutput,
 } from "./types";
 
 export interface ProtocolRpcReader {
@@ -377,7 +378,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             checkedBits,
         };
     }
-    async getUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
+    private async readUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
         this.context(context);
         if (
             range.fromBlock < this.deployment.protocol.fromBlock ||
@@ -418,8 +419,13 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                       if (typeof c.fallback !== "boolean") invalid("Invalid candidate");
                       return c.output;
                   });
+        return { block, outputs, creditTransitions: list(result.creditTransitions) };
+    }
+
+    async getUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
+        const { block, outputs, creditTransitions } = await this.readUpdates(context, range);
         const transactionHashes = new Set<Hex>();
-        for (const value of [...outputs, ...list(result.creditTransitions)]) {
+        for (const value of [...outputs, ...creditTransitions]) {
             const ref = object(value);
             integer(ref.logIndex);
             const eventBlock = await this.canonical(ref.block);
@@ -429,6 +435,93 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         }
         return { block, transactionHashes: [...transactionHashes] };
     }
+    /** Return ordinary funds candidates directly, without fetching historical transaction receipts. */
+    async getOutputs(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
+        const { block, outputs } = await this.readUpdates(context, range);
+        const parsed: ProtocolOutput[] = [];
+        const positions = new Map<string, string>();
+        const commitments = new Map<Hex, string>();
+        for (const value of outputs) {
+            const output = object(value);
+            const eventBlock = await this.canonical(output.block);
+            if (eventBlock.number < range.fromBlock || eventBlock.number > range.toBlock)
+                invalid("RPC output outside update range");
+            const treeId = integer(output.treeId);
+            if (treeId === 0n) invalid("Invalid output tree");
+            const leafIndex = Number(integer(output.leafIndex, 16));
+            const position = `${treeId}:${leafIndex}`;
+            if (
+                typeof output.token !== "string" ||
+                !isAddress(output.token) ||
+                BigInt(output.token) === 0n
+            )
+                invalid("Invalid output token");
+            if (typeof output.kind !== "string" || !output.kind) invalid("Invalid output kind");
+            if (
+                typeof output.ciphertext !== "string" ||
+                !/^0x(?:[0-9a-f]{2}){160,754}$/i.test(output.ciphertext)
+            )
+                invalid("Invalid output ciphertext");
+            if (typeof output.clue !== "string" || !/^0x[0-9a-f]{136}$/i.test(output.clue))
+                invalid("Invalid output clue");
+            // Credit leaves deliberately have owner/spender envelopes for one position.
+            // This API discovers ordinary funds; Credit transitions use getUpdates().
+            if (
+                ["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(output.kind as string) &&
+                (output.ciphertext as string).slice(0, 4).toLowerCase() === "0x05"
+            )
+                continue;
+            const candidate: ProtocolOutput = {
+                block: {
+                    number: eventBlock.number,
+                    hash: hash(eventBlock.hash),
+                    parentHash: hash(eventBlock.parentHash),
+                    timestamp: eventBlock.timestamp,
+                },
+                treeId,
+                leafIndex,
+                commitment: fieldHash(output.commitment),
+                tokenAddress: getAddress(output.token as string) as `0x${string}`,
+                ciphertext: (output.ciphertext as string).toLowerCase() as Hex,
+                clue: (output.clue as string).toLowerCase() as Hex,
+                transactionHash: hash(output.transactionHash),
+                logIndex: Number(integer(output.logIndex, 32)),
+                kind: output.kind as string,
+            };
+            // Compare validated, normalized fields; exact repeats are harmless.
+            const fingerprint = JSON.stringify(candidate, (_, value) =>
+                typeof value === "bigint" ? value.toString() : value
+            );
+            const previousPosition = positions.get(position);
+            const previousCommitment = commitments.get(candidate.commitment);
+            if (
+                (previousPosition !== undefined && previousPosition !== fingerprint) ||
+                (previousCommitment !== undefined && previousCommitment !== fingerprint)
+            )
+                invalid("Conflicting RPC output data or position");
+            if (previousCommitment !== undefined) continue;
+            positions.set(position, fingerprint);
+            commitments.set(candidate.commitment, fingerprint);
+            parsed.push(candidate);
+        }
+        return { block, outputs: parsed };
+    }
+
+    /** Indexed spent observation; preparation must independently check latest chain state. */
+    async isSpent(
+        context: DeploymentContext,
+        nullifier: Hex,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<boolean> {
+        this.context(context);
+        const value = await this.rpc("invisi_isSpent", [fieldHash(nullifier)], options.signal);
+        if (typeof value !== "boolean") invalid("Invalid spent observation");
+        return value as boolean;
+    }
+
     async getMembership(
         context: DeploymentContext,
         input: { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex },

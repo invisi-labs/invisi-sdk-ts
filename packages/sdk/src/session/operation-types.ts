@@ -1,3 +1,4 @@
+import type { PublicWallet } from "@invisi-labs/core";
 import type { GasBenchmarkProfile } from "../gas-estimation";
 import type { Signer } from "ethers";
 import type {
@@ -73,21 +74,12 @@ export interface PaymentOutput {
 }
 export interface TransferPreparation {
     tokenAddress: Address;
+    /** Explicit subset for managed inventory; detached calls already supply inputs. */
+    commitments?: readonly Hex[];
+    /** Public ERC20 payout. Empty private outputs are allowed when a payout is present. */
+    withdrawal?: { to: Address; amount: bigint };
     outputs: readonly PaymentOutput[];
     funding?: FundingSource;
-    deadline?: bigint;
-    target?: ProofTarget;
-}
-export interface WithdrawalPreparation {
-    tokenAddress: Address;
-    to: Address;
-    amount: bigint;
-    deadline?: bigint;
-    target?: ProofTarget;
-}
-export interface SweepPreparation {
-    tokenAddress: Address;
-    commitments?: readonly Hex[];
     deadline?: bigint;
     target?: ProofTarget;
 }
@@ -163,14 +155,7 @@ export interface OperationPlan {
     version: 1;
     id: string;
     kind:
-        | "transfer"
-        | "withdraw"
-        | "sweep"
-        | "shield"
-        | "create-credit"
-        | "draw-credit"
-        | "top-up-credit"
-        | "cancel-credit";
+        "transfer" | "shield" | "create-credit" | "draw-credit" | "top-up-credit" | "cancel-credit";
     context: TransactionContext;
     scope: WalletScope;
     preparedAt: CanonicalBlock;
@@ -199,7 +184,7 @@ export interface WalletSessionOptions {
     /** Optional ethers gas/funding signer; distinct from the Invisi wallet authority. */
     signer?: Signer;
     viewing?: Pick<ViewingCapability, "walletIdentity" | "decryptNote" | "decryptCredit">;
-    wallet: Wallet;
+    wallet: Wallet | PublicWallet;
     protocol: Protocol;
     namespace?: string;
     store?: WalletStore;

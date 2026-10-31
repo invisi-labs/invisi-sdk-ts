@@ -1,3 +1,4 @@
+import type { PublicWallet } from "@invisi-labs/core";
 import type { CreditDeliveryState, Note, Wallet } from "@invisi-labs/core";
 import type { Protocol } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -6,10 +7,8 @@ import type {
     CreateCreditPreparation,
     DrawCreditPreparation,
     ShieldPreparation,
-    SweepPreparation,
     TopUpCreditPreparation,
     TransferPreparation,
-    WithdrawalPreparation,
 } from "./session/operation-types";
 
 export interface NoteInput {
@@ -26,7 +25,7 @@ export interface CreditInput {
     role: "owner" | "spender";
 }
 export interface TransactionIdentity {
-    wallet: Wallet;
+    wallet: Wallet | PublicWallet;
     protocol: Protocol;
 }
 export interface ExplicitFunds {
@@ -34,10 +33,6 @@ export interface ExplicitFunds {
     changeAddress?: string;
 }
 export type ExplicitTransferPreparation = TransactionIdentity & TransferPreparation & ExplicitFunds;
-export type ExplicitWithdrawalPreparation = TransactionIdentity &
-    WithdrawalPreparation &
-    ExplicitFunds;
-export type ExplicitSweepPreparation = TransactionIdentity & SweepPreparation & ExplicitFunds;
 export type ExplicitShieldPreparation = TransactionIdentity & ShieldPreparation;
 export type ExplicitCreateCreditPreparation = TransactionIdentity &
     CreateCreditPreparation &

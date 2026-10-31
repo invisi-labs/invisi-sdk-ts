@@ -9,7 +9,8 @@ import {
 } from "@invisi-labs/core";
 import vectors from "../../../core/src/testdata/wallet-note-vectors.json";
 import fmd from "../../../core/src/testdata/fmd-rust-vectors.json";
-import { decryptCandidates, extractDeliveryCandidates, type DeliveryEventLog } from "./discovery";
+import { decryptCandidates, type DeliveryEventLog } from "../index";
+import { extractDeliveryCandidates } from "./discovery";
 const context = {
     chainId: BigInt(vectors.context.chainId),
     protocolAddress: vectors.context.protocolAddress as `0x${string}`,

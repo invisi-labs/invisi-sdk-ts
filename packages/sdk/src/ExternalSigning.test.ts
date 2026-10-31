@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, it } from "vitest";
 import { Interface, Signature, Wallet as EthereumWallet, getBytes } from "ethers";
 import { sha256 } from "@noble/hashes/sha256";
@@ -30,7 +31,7 @@ const prover: Prover = {
 for (const managed of [false, true]) {
     async function setup() {
         const h = await fixture();
-        const wallet = Wallet.fromAddress(h.wallet.getAddress());
+        const wallet = PublicWallet.fromAddress(h.wallet.getAddress());
         const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership, prover });
         const session = new WalletSession({ ...h.options, wallet, prover });
         const common = { wallet, protocol: h.protocol, tokenAddress: h.context.tokenAddress };
@@ -230,7 +231,7 @@ it("accepts arbitrary ERC-1271 bytes only through the configured verifier", asyn
         },
     });
     const prepared = await invisi.prepareShield({
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [{ to: h.bob.getAddress(), amount: 30n }],
@@ -253,7 +254,7 @@ it("rejects a delayed external verifier after managed operation recovery", async
     });
     const session = new WalletSession({
         ...h.options,
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         fundingVerifier: {
             verifyTypedData: async () => {
                 started();

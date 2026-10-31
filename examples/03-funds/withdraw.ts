@@ -49,13 +49,13 @@ export async function main(resources: ExampleResources) {
     const amount = 30n;
 
     console.log("1. Prepare the supplied inputs; the SDK selects the circuit and creates independent random change");
-    const prepared = await invisi.prepareWithdraw({
+    const prepared = await invisi.prepareTransfer({
         wallet,
         protocol,
         inputs,
         tokenAddress,
-        to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as const,
-        amount,
+        outputs: [],
+        withdrawal: { to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as const, amount: amount },
     });
     console.log("Local operation review:", prepared.preview());
 

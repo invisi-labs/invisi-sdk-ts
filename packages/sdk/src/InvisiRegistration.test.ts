@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { Interface, Wallet as EthereumWallet, keccak256, type Provider } from "ethers";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
@@ -10,7 +11,7 @@ const abi = new Interface(invisiAddressRegistryAbi);
 async function setup(nonce = 0n) {
     const signer = new EthereumWallet(word(3));
     const local = await Wallet.fromPrivateKey(signer.privateKey);
-    const wallet = Wallet.fromAddress(local.getAddress());
+    const wallet = PublicWallet.fromAddress(local.getAddress());
     const block = { number: 10, hash: word(10), parentHash: word(9), timestamp: 1000 };
     const provider = {
         getNetwork: vi.fn(async () => ({ chainId: 97n })),
@@ -86,7 +87,7 @@ describe("Invisi registry composition", () => {
         expect(request.primaryType).toBe("RegisterReceivingKeys");
         expect(request.message.deadline).toBe("1300");
         await expect(
-            invisi.prepareRegistration({ wallet: Wallet.fromAddress(wallet.ownerAddress) })
+            invisi.prepareRegistration({ wallet: PublicWallet.fromAddress(wallet.ownerAddress) })
         ).rejects.toThrow(/resolved receiving keys/i);
     });
 

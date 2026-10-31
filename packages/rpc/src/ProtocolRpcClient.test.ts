@@ -465,3 +465,186 @@ it("authenticates event block timestamps before accepting update candidates", as
         "canonical block mismatch"
     );
 });
+
+const encryptedOutput = () => ({
+    block: wireBlock,
+    treeId: "1",
+    leafIndex: 3,
+    commitment: h(12),
+    token: "0x2222222222222222222222222222222222222222",
+    ciphertext: "0x" + "01".repeat(160),
+    clue: "0x" + "02".repeat(68),
+    transactionHash: h(22),
+    logIndex: 4,
+    kind: "Transact",
+});
+it("returns canonical encrypted output fields without fetching receipts", async () => {
+    const { client, requests } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [encryptedOutput()],
+                  creditTransitions: [],
+              }
+    );
+    const result = await client.getOutputs(context, { fromBlock: 10n, toBlock: 10n });
+    expect(result.outputs[0]).toMatchObject({
+        treeId: 1n,
+        leafIndex: 3,
+        commitment: h(12),
+        ciphertext: encryptedOutput().ciphertext,
+        block,
+    });
+    expect(requests.map((r) => r.method)).toEqual(["invisi_getStatus", "invisi_getUpdates"]);
+});
+it.each([
+    { treeId: "0" },
+    { leafIndex: 65536 },
+    { token: "invalid" },
+    { ciphertext: "0x12" },
+    { clue: "0x12" },
+    { commitment: h(1n << 255n) },
+    { transactionHash: "0x12" },
+    { kind: "" },
+    { block: { ...wireBlock, number: 9, hash: h(9), parentHash: h(8) } },
+])("rejects malformed indexed outputs %j", async (patch) => {
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [{ ...encryptedOutput(), ...patch }],
+                  creditTransitions: [],
+              }
+    );
+    await expect(
+        client.getOutputs(context, { fromBlock: 10n, toBlock: 10n })
+    ).rejects.toBeInstanceOf(ProtocolRpcError);
+});
+it("ignores identical indexed outputs", async () => {
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [encryptedOutput(), encryptedOutput()],
+                  creditTransitions: [],
+              }
+    );
+    expect(
+        (await client.getOutputs(context, { fromBlock: 10n, toBlock: 10n })).outputs
+    ).toHaveLength(1);
+});
+it.each([true, false, "false"])("validates indexed spent observations %j", async (value) => {
+    const { client } = setup(() => value);
+    if (typeof value === "boolean") expect(await client.isSpent(context, h(1))).toBe(value);
+    else await expect(client.isSpent(context, h(1))).rejects.toThrow(/spent/);
+});
+
+it("supports detected encrypted candidates and empty output pages", async () => {
+    const { client, requests } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  checkedBits: 8,
+                  candidates: [{ fallback: false, output: encryptedOutput() }],
+                  creditTransitions: [],
+              }
+    );
+    const result = await client.getOutputs(context, {
+        fromBlock: 10n,
+        toBlock: 10n,
+        detectionKey: new Uint8Array(32).fill(1),
+    });
+    expect(result.outputs).toHaveLength(1);
+    expect(requests[1]?.method).toBe("invisi_detectOutputs");
+    const empty = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : { blockHash: h(10), outputs: null, creditTransitions: null }
+    );
+    expect(
+        (await empty.client.getOutputs(context, { fromBlock: 10n, toBlock: 10n })).outputs
+    ).toEqual([]);
+});
+
+it.each([
+    { leafIndex: 4 },
+    { treeId: "2" },
+    { commitment: h(13) },
+    { token: "0x3333333333333333333333333333333333333333" },
+    { ciphertext: "0x" + "03".repeat(160) },
+    { clue: "0x" + "04".repeat(68) },
+    { transactionHash: h(23) },
+    { logIndex: 5 },
+    { kind: "Shield" },
+])("rejects conflicting indexed outputs %j", async (patch) => {
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [encryptedOutput(), { ...encryptedOutput(), ...patch }],
+                  creditTransitions: [],
+              }
+    );
+    await expect(client.getOutputs(context, { fromBlock: 10n, toBlock: 10n })).rejects.toThrow(
+        /Conflicting/
+    );
+});
+
+it("deduplicates equivalent hex casing after output normalization", async () => {
+    const output = {
+        ...encryptedOutput(),
+        ciphertext: "0x" + "ab".repeat(160),
+        clue: "0x" + "cd".repeat(68),
+    };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [
+                      output,
+                      {
+                          ...output,
+                          ciphertext: "0x" + "AB".repeat(160),
+                          clue: "0x" + "CD".repeat(68),
+                      },
+                  ],
+                  creditTransitions: [],
+              }
+    );
+    expect(
+        (await client.getOutputs(context, { fromBlock: 10n, toBlock: 10n })).outputs
+    ).toHaveLength(1);
+});
+
+it("does not confuse Credit role envelopes with conflicting funds outputs", async () => {
+    const credit = {
+        ...encryptedOutput(),
+        kind: "CreditCreated",
+        ciphertext: "0x05" + "ab".repeat(753),
+    };
+    const change = {
+        ...encryptedOutput(),
+        kind: "CreditCreated",
+        leafIndex: 4,
+        commitment: h(13),
+        ciphertext: "0x02" + "ab".repeat(159),
+    };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [credit, { ...credit, ciphertext: "0x05" + "cd".repeat(753) }, change],
+                  creditTransitions: [],
+              }
+    );
+    const page = await client.getOutputs(context, { fromBlock: 10n, toBlock: 10n });
+    expect(page.outputs).toHaveLength(1);
+    expect(page.outputs[0]?.commitment).toBe(h(13));
+});

@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { Wallet as EvmWallet, Interface, getBytes } from "ethers";
 
@@ -61,10 +62,10 @@ it("rejects proof metadata and statement changes even when a custom verifier ret
         ...bundle(request),
         publicInputs: [...request.expectedPublicInputs].reverse(),
     });
-    const op = await new WalletSession({ ...h.options, prover: backend }).prepareWithdraw({
+    const op = await new WalletSession({ ...h.options, prover: backend }).prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-        to: signer.address,
-        amount: 100n,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
     await expect((await op.authorize()).prove()).rejects.toThrow(/proof/);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(op.id);
@@ -80,7 +81,7 @@ it("proofs precede EVM funding signatures; public funding needs no private walle
         };
     const session = new WalletSession({
         ...h.options,
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         prover: backend,
         fundingSigner,
     });
@@ -116,10 +117,10 @@ it("fences a stale proving worker after explicit operation recovery", async () =
     };
     const session = new WalletSession({ ...h.options, prover: backend }),
         op = await (
-            await session.prepareWithdraw({
+            await session.prepareTransfer({
                 tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                to: signer.address,
-                amount: 100n,
+                outputs: [],
+                withdrawal: { to: h.bob.ownerAddress, amount: 100n },
             })
         ).authorize(),
         pending = op.prove();
@@ -135,10 +136,10 @@ it("does not release a live authorization after a reverted transaction and relea
         session = new WalletSession({ ...h.options, prover: prover() });
     const ready = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 100n,
+                    outputs: [],
+                    withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
         ).prove(),
@@ -171,10 +172,10 @@ it("confirms only exact canonical calldata and records operation facts without c
         session = new WalletSession({ ...h.options, prover: prover() });
     const ready = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 100n,
+                    outputs: [],
+                    withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
         ).prove(),
@@ -217,7 +218,7 @@ it("requires one explicit caller-funded shield encoding and never broadcasts an 
     const h = await fixture(),
         session = new WalletSession({
             ...h.options,
-            wallet: Wallet.fromAddress(h.wallet.getAddress()),
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         });
     const prepared = await session.prepareShield({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
@@ -252,10 +253,10 @@ it("rejects corrupted canonical paths and incomplete spent-state replies before 
     h.membership.getMembership = membership;
     h.reader.isSpent = async () => [];
     await expect(
-        h.session.prepareWithdraw({
+        h.session.prepareTransfer({
             tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-            to: signer.address,
-            amount: 100n,
+            outputs: [],
+            withdrawal: { to: h.bob.ownerAddress, amount: 100n },
         })
     ).rejects.toThrow(/spent/);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBeUndefined();
@@ -264,14 +265,14 @@ it("derives nullifiers automatically while using an external authorization provi
     const h = await fixture(),
         session = new WalletSession({
             ...h.options,
-            wallet: Wallet.fromAddress(h.wallet.getAddress()),
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             authorization: h.wallet.exportAuthorization(),
             prover: prover(),
         });
-    const prepared = await session.prepareWithdraw({
+    const prepared = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-        to: signer.address,
-        amount: 100n,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
     expect((await (await prepared.authorize()).prove()).status).toBe("ready");
 });
@@ -280,10 +281,10 @@ it("invalidates operation observations and restores locks after a canonical reor
         session = new WalletSession({ ...h.options, prover: prover() });
     const ready = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 100n,
+                    outputs: [],
+                    withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
         ).prove(),
@@ -314,10 +315,10 @@ it("invalidates operation observations and restores locks after a canonical reor
 });
 it("rejects recovered operation context outside the selected session scope", async () => {
     const h = await fixture(),
-        operation = await h.session.prepareWithdraw({
+        operation = await h.session.prepareTransfer({
             tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-            to: signer.address,
-            amount: 100n,
+            outputs: [],
+            withdrawal: { to: h.bob.ownerAddress, amount: 100n },
         });
     await h.store.transaction(h.scope, (state) => {
         const saved = state.operations[operation.id]!.payload as {
@@ -340,11 +341,11 @@ it("exports recursive operations only as public aggregate members and keeps thei
     const session = new WalletSession({ ...h.options, prover: backend }),
         operation = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 100n,
                     target: "noir-recursive",
+                    outputs: [],
+                    withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
         ).prove();
@@ -372,11 +373,11 @@ it("confirms an exported recursive member only when its exact request settled in
     const session = new WalletSession({ ...h.options, prover: backend }),
         operation = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 100n,
                     target: "noir-recursive",
+                    outputs: [],
+                    withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
         ).prove(),
@@ -431,7 +432,7 @@ it("uses an explicitly injected ERC-1271 verifier for a contract payer funding g
         fundingVerifier = { verifyTypedData: vi.fn(async () => true) },
         session = new WalletSession({
             ...h.options,
-            wallet: Wallet.fromAddress(h.wallet.getAddress()),
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             prover: prover(),
             fundingSigner,
             fundingVerifier,
@@ -493,10 +494,10 @@ it("reconciles spent facts at the latest canonical block when confirming an olde
         session = new WalletSession({ ...h.options, prover: prover() }),
         ready = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 100n,
+                    outputs: [],
+                    withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
         ).prove(),
@@ -539,11 +540,11 @@ it.each(["observedThrough"] as const)(
             session = new WalletSession({ ...h.options, prover: prover() }),
             ready = await (
                 await (
-                    await session.prepareWithdraw({
+                    await session.prepareTransfer({
                         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                        to: signer.address,
-                        amount: 100n,
                         deadline: 2000000050n,
+                        outputs: [],
+                        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                     })
                 ).authorize()
             ).prove();
@@ -593,10 +594,10 @@ it("late confirmation updates a previously discovered change note to its current
         session = new WalletSession({ ...h.options, prover: prover() }),
         ready = await (
             await (
-                await session.prepareWithdraw({
+                await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    to: signer.address,
-                    amount: 30n,
+                    outputs: [],
+                    withdrawal: { to: signer.address, amount: 30n },
                 })
             ).authorize()
         ).prove(),
@@ -684,10 +685,10 @@ it("late confirmation updates a previously discovered change note to its current
 it("tracks an application transaction hash without broadcasting and keeps reservations across restart", async () => {
     const h = await fixture();
     const session = new WalletSession({ ...h.options, prover: prover() });
-    const prepared = await session.prepareWithdraw({
+    const prepared = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222",
-        to: signer.address,
-        amount: 100n,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
     const ready = await (await prepared.authorize()).prove();
     const call = await ready.exportTransaction();
@@ -709,10 +710,10 @@ it("tracks an application transaction hash without broadcasting and keeps reserv
 it("reconciles an ethers replacement hash only after independently checking the frozen payload", async () => {
     const h = await fixture();
     const session = new WalletSession({ ...h.options, prover: prover() });
-    const prepared = await session.prepareWithdraw({
+    const prepared = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222",
-        to: signer.address,
-        amount: 100n,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
     const ready = await (await prepared.authorize()).prove();
     const call = await ready.exportTransaction();
@@ -742,10 +743,10 @@ it("reconciles an ethers replacement hash only after independently checking the 
 it("checks protocol facts before export without taking responsibility for EVM fees or broadcasting", async () => {
     const h = await fixture();
     const session = new WalletSession({ ...h.options, prover: prover() });
-    const prepared = await session.prepareWithdraw({
+    const prepared = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222",
-        to: signer.address,
-        amount: 100n,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
     const ready = await (await prepared.authorize()).prove();
     await expect(ready.trackTransaction("invalid hash")).rejects.toThrow(/hash/);

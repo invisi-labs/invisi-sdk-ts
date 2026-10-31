@@ -28,22 +28,20 @@ import type { OperationPlan, SavedOperation } from "./operation-types";
 import { creditReservationKey } from "./state";
 
 export function requiresAuthorization(plan: OperationPlan): boolean {
-    if (plan.kind === "sweep") {
-        if (
-            plan.credit ||
-            !plan.inputs.length ||
-            plan.outputs.length ||
-            !plan.params ||
-            plan.params.outputCommitments.length ||
-            (plan.funding.amount ?? 0n) !== 0n ||
-            BigInt(plan.params.withdrawalAddress) !== BigInt(plan.scope.walletIdentity) ||
-            plan.params.withdrawalAmount !==
-                plan.inputs.reduce((sum, input) => sum + input.note.amount, 0n) ||
-            plan.inputs.some((input) => input.note.walletIdentity !== plan.scope.walletIdentity)
-        )
-            throw new Error("invalid owner-only sweep plan");
-        return false;
-    }
+    // Derive the exemption from the actual frozen transaction, never an API/mode flag.
+    const ownerOnlyFullWithdrawal =
+        !plan.credit &&
+        plan.inputs.length > 0 &&
+        plan.outputs.length === 0 &&
+        plan.params !== undefined &&
+        plan.params.outputCommitments.length === 0 &&
+        (plan.funding.amount ?? 0n) === 0n &&
+        plan.fundingMode === "none" &&
+        BigInt(plan.params.withdrawalAddress) === BigInt(plan.scope.walletIdentity) &&
+        plan.params.withdrawalAmount ===
+            plan.inputs.reduce((sum, input) => sum + input.note.amount, 0n) &&
+        plan.inputs.every((input) => input.note.walletIdentity === plan.scope.walletIdentity);
+    if (ownerOnlyFullWithdrawal) return false;
     return !!plan.credit || plan.inputs.length > 0;
 }
 

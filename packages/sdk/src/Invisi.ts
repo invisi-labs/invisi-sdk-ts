@@ -4,8 +4,6 @@ import { explicitPreparation } from "./explicit-preparation";
 import type { PreparedTransaction } from "./PreparedTransaction";
 import type {
     ExplicitTransferPreparation,
-    ExplicitWithdrawalPreparation,
-    ExplicitSweepPreparation,
     ExplicitShieldPreparation,
     ExplicitCreateCreditPreparation,
     ExplicitDrawCreditPreparation,
@@ -37,7 +35,7 @@ export type InvisiOptions = Omit<
     | "signer"
     | "fundingSigner"
 > & {
-    /** Recipient discovery source; an explicit addressResolver takes precedence. */
+    /** Recipient discovery source; defaults to protocol-rpc. An explicit addressResolver takes precedence. */
     addressLookup?: "chain" | "protocol-rpc";
     provider?: Provider;
     chainReader?: ChainReader;
@@ -88,7 +86,7 @@ export class Invisi {
         }
         const selected = { ...options };
         const combined = { ...this.#options, ...selected };
-        const { provider, addressLookup, ...runtime } = combined;
+        const { provider, addressLookup = "protocol-rpc", ...runtime } = combined;
         if (
             addressLookup !== undefined &&
             addressLookup !== "chain" &&
@@ -191,24 +189,6 @@ export class Invisi {
             const runtime = await this.resolve({ wallet, protocol });
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareTransfer(request);
-        });
-    }
-    async prepareWithdraw(options: ExplicitWithdrawalPreparation): Promise<PreparedTransaction> {
-        return prepareWithErrors("prepareWithdraw", async () => {
-            const { wallet, protocol, ...input } = options;
-            const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
-            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-            return preparation.prepareWithdraw(request);
-        });
-    }
-    async prepareSweep(options: ExplicitSweepPreparation): Promise<PreparedTransaction> {
-        return prepareWithErrors("prepareSweep", async () => {
-            const { wallet, protocol, ...input } = options;
-            const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
-            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-            return preparation.prepareSweep(request);
         });
     }
     async prepareShield(options: ExplicitShieldPreparation): Promise<PreparedTransaction> {

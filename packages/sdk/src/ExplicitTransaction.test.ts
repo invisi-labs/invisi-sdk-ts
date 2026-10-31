@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, it, vi } from "vitest";
 import { Invisi } from "./Invisi";
 import { fixture } from "./session/operation-fixture";
@@ -77,7 +78,7 @@ async function setup() {
 it("authorizes, proves, verifies and exports without any store", async () => {
     const h = await setup();
     const options = {
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -149,12 +150,16 @@ it("uses all explicit inputs even when public funding covers the requested outpu
 it("supports full owner-only sweeps and recursive member export", async () => {
     const h = await setup();
     const identity = {
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
     };
-    const sweep = await h.invisi.prepareSweep(identity);
+    const sweep = await h.invisi.prepareTransfer({
+        ...identity,
+        outputs: [],
+        withdrawal: { to: h.wallet.ownerAddress, amount: 100n },
+    });
     expect(sweep.preview().permissions.walletAuthorization).toBe(false);
     const swept = await sweep.prove();
     expect((await swept.exportTransaction()).to).toBe(h.context.protocolAddress);
@@ -178,7 +183,7 @@ it("supports public shield and signature-funded outputs using independent EVM au
             (await payer.signTypedData(typed.domain, typed.types, typed.message)) as `0x${string}`,
     };
     const identity = {
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
     };
@@ -392,13 +397,13 @@ it("checks explicit note preimages, token scope and canonical paths", async () =
 
 it("cancels local work and fences concurrent or stale handles", async () => {
     const h = await setup();
-    const prepared = await h.invisi.prepareWithdraw({
+    const prepared = await h.invisi.prepareTransfer({
         wallet: h.wallet,
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        to: h.wallet.ownerAddress,
-        amount: 30n,
+        outputs: [],
+        withdrawal: { to: h.wallet.ownerAddress, amount: 30n },
     });
     const controller = new AbortController();
     controller.abort();
@@ -425,12 +430,14 @@ it("cancels local work and fences concurrent or stale handles", async () => {
 
 it("respects explicit sweep subsets rather than creating unsigned change", async () => {
     const h = await setup();
-    const prepared = await h.invisi.prepareSweep({
+    const prepared = await h.invisi.prepareTransfer({
         wallet: h.wallet,
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
         commitments: [h.leaf],
+        outputs: [],
+        withdrawal: { to: h.wallet.ownerAddress, amount: 100n },
     });
     expect(prepared.preview().outputs).toEqual([]);
     expect(prepared.preview().withdrawalAmount).toBe(100n);

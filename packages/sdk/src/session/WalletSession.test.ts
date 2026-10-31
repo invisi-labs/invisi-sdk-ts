@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/core";
 import { expect, expectTypeOf, it } from "vitest";
 import { WalletSession } from "./WalletSession";
@@ -35,11 +36,11 @@ it("reserves inputs atomically between sessions and requires explicit state and 
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     const viewOnly = new WalletSession({
         ...h.options,
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
     });
     await expect(viewOnly.prepareTransfer(input)).rejects.toThrow(/insufficient/i);
-    expect(() => Wallet.fromAddress(h.wallet.getAddress()).exportAuthorization()).toThrow(
-        /authorization/
+    expect(PublicWallet.fromAddress(h.wallet.getAddress())).not.toHaveProperty(
+        "exportAuthorization"
     );
     const { store, ...withoutStore } = h.options;
     await expect(new WalletSession(withoutStore).prepareTransfer(input)).rejects.toThrow(/store/i);
@@ -49,10 +50,10 @@ it("validates explicitly supplied selection strategies without silently changing
         selector = { select: () => [] as `0x${string}`[] },
         session = new WalletSession({ ...h.options, coinSelector: selector });
     await expect(
-        session.prepareWithdraw({
+        session.prepareTransfer({
             tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-            to: h.protocol.context.protocolAddress,
-            amount: 100n,
+            outputs: [],
+            withdrawal: { to: h.protocol.context.protocolAddress, amount: 100n },
         })
     ).rejects.toThrow(/selection|insufficient/);
     expect(Object.keys((await h.store.readSnapshot(h.scope)).reservations)).toHaveLength(0);
@@ -100,21 +101,21 @@ it("shares a deployment scope while selecting, reserving and reporting each toke
         };
     });
     await expect(
-        h.session.prepareWithdraw({
+        h.session.prepareTransfer({
             tokenAddress: h.context.tokenAddress,
-            to: h.context.protocolAddress,
-            amount: 120n,
+            outputs: [],
+            withdrawal: { to: h.context.protocolAddress, amount: 120n },
         })
     ).rejects.toThrow(/insufficient/);
-    const a = await h.session.prepareWithdraw({
+    const a = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        to: h.context.protocolAddress,
-        amount: 100n,
+        outputs: [],
+        withdrawal: { to: h.context.protocolAddress, amount: 100n },
     });
-    const b = await h.session.prepareWithdraw({
+    const b = await h.session.prepareTransfer({
         tokenAddress: otherToken,
-        to: h.context.protocolAddress,
-        amount: 50n,
+        outputs: [],
+        withdrawal: { to: h.context.protocolAddress, amount: 50n },
     });
     expect(a.preview().context.tokenAddress).toBe(h.context.tokenAddress);
     expect(b.preview().context.tokenAddress).toBe(otherToken);

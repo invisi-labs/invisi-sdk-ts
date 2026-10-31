@@ -1,6 +1,7 @@
+import { PublicWallet } from "@invisi-labs/sdk";
 import { computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
 import { JsonRpcProvider } from "ethers";
-import { ProtocolRpcClient, Wallet, Protocol, Invisi, type NoteInput } from "@invisi-labs/sdk";
+import { ProtocolRpcClient, Protocol, Invisi, type NoteInput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { required } from "../environment.js";
 import type { ExampleResources } from "../resources.js";
@@ -13,7 +14,7 @@ export async function main(resources: ExampleResources) {
 
     // The application supplies already decrypted notes and the merchant public receiving address.
     // No merchant EVM private key or owner authorization provider is given to the service.
-    const wallet = Wallet.fromAddress(
+    const wallet = PublicWallet.fromAddress(
         "0iWzVhJux9RQfDcWspp37SrdGwP5Tac7WgqfQU9xh7PMjUUzGjHZzAzP0gY96A7A4rNGdF5WWjTmRAQVj57PMq8sXMfr4tS59kDuE7a4pgsQ5CQCkHkV95JpSVe2r7UDkuEH9LvVsF"
     );
 
@@ -49,12 +50,14 @@ export async function main(resources: ExampleResources) {
     });
 
     console.log("1. Prepare the supplied whole notes for the merchant owner");
-    // Optional commitments select whole notes. The amount and recipient are fixed by those notes.
-    const prepared = await invisi.prepareSweep({
+    // Explicitly pay the complete input value to its owner; this shape needs no spending signature.
+    const prepared = await invisi.prepareTransfer({
         wallet,
         protocol,
         inputs,
         tokenAddress,
+        outputs: [],
+        withdrawal: { to: wallet.ownerAddress, amount: note.amount },
     });
     console.log("Local operation review:", prepared.preview());
 

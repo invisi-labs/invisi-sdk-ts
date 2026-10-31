@@ -53,3 +53,17 @@ export interface RegisteredReceivingAddress {
     nonce: bigint;
     block: CanonicalBlock;
 }
+
+/** Indexed encrypted ordinary funds output; authenticate decryption and verify membership before spending. */
+export interface ProtocolOutput {
+    block: CanonicalBlock;
+    treeId: bigint;
+    leafIndex: number;
+    commitment: Hex;
+    tokenAddress: Address;
+    ciphertext: Hex;
+    clue: Hex;
+    transactionHash: Hex;
+    logIndex: number;
+    kind: string;
+}

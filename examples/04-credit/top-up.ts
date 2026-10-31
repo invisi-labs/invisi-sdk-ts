@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/sdk";
 import { computeCreditSharedKeyHash, computeCreditCommitment } from "@invisi-labs/core";
 import { computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
 import { JsonRpcProvider } from "ethers";
@@ -48,7 +49,7 @@ export async function main(resources: ExampleResources) {
 
     // Reconstruct an EXISTING Credit from its received preimage and original key snapshots.
     // Replace these illustrative values with the selected Credit's actual private fields.
-    const counterparty = Wallet.fromAddress(
+    const counterparty = PublicWallet.fromAddress(
         "0iWzVhJux9RQfDcWspp37SrdGwP5Tac7WgqfQU9xh7PMjUUzGjHZzAzP0gY96A7A4rNGdF5WWjTmRAQVj57PMq8sXMfr4tS59kDuE7a4pgsQ5CQCkHkV95JpSVe2r7UDkuEH9LvVsF"
     );
     const owner = wallet;

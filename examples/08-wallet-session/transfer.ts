@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/sdk";
 import { createRequire } from "node:module";
 import { JsonRpcProvider, getBytes, Wallet as EthereumWallet } from "ethers";
 import { ProtocolRpcClient, Wallet, Protocol, Invisi, EncryptedWalletCodec } from "@invisi-labs/sdk";
@@ -41,7 +42,7 @@ export async function main(resources: ExampleResources) {
     console.log("1. Inject a local authorization provider separately from the public wallet and EVM funding signer");
     const authority = wallet.exportAuthorization();
     const session = await invisi.connect({
-        wallet: Wallet.fromAddress(wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(wallet.getAddress()),
         protocol,
         namespace: "examples",
         viewing: wallet.getViewer(),

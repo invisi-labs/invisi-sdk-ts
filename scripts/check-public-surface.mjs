@@ -196,3 +196,15 @@ for (const method of ["exportRegistrationAuthorization", "withSignature"]) {
         `missing registry signing API: ${method}`
     );
 }
+
+assert.equal(typeof sdk.PublicWallet.fromAddress, "function");
+assert(!("fromAddress" in sdk.Wallet));
+assert(!("fromPrivateKey" in sdk.PublicWallet));
+for (const method of ["getViewer", "getDetector", "exportAuthorization"]) {
+    assert(!(method in sdk.PublicWallet.prototype));
+}
+
+for (const entry of [sdk.Invisi, sdk.WalletSession]) {
+    assert(!("prepareSweep" in entry.prototype));
+    assert(!("prepareWithdraw" in entry.prototype));
+}

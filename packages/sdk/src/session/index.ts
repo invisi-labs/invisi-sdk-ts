@@ -29,8 +29,6 @@ export type {
     TopUpCreditPreparation,
     TransferPreparation,
     WalletSessionOptions,
-    WithdrawalPreparation,
-    SweepPreparation,
 } from "./operation-types";
 export * from "./WalletSession";
 

@@ -1,3 +1,4 @@
+import { Wallet, MissingCapabilityError as WalletCapabilityError } from "@invisi-labs/core";
 import { getAddress } from "ethers";
 import type { CreditInput, NoteInput } from "./explicit-types";
 import { PreparedTransaction } from "./PreparedTransaction";
@@ -64,7 +65,11 @@ export function explicitPreparation(
         options: { ...capabilities, protocol: options.protocol.forToken(tokenAddress) },
         reader: options.chainReader!,
         scope,
-        authorization: () => options.authorization ?? options.wallet.exportAuthorization(),
+        authorization: () => {
+            if (options.authorization) return options.authorization;
+            if (options.wallet instanceof Wallet) return options.wallet.exportAuthorization();
+            throw new WalletCapabilityError("wallet authorization");
+        },
     };
     return new TransactionPreparation<PreparedTransaction>({
         ...runtime,

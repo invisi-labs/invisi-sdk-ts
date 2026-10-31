@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { defineDeployment } from "@invisi-labs/rpc";
 import { expect, expectTypeOf, it, vi } from "vitest";
 import { Invisi, Wallet, Protocol, type ChainReader } from "./index";
@@ -37,7 +38,7 @@ function setup() {
 it("requires explicit chain infrastructure and validates before creating a session", async () => {
     const { protocol, chainReader } = setup();
     const local = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
-    const wallet = Wallet.fromAddress(local.getAddress());
+    const wallet = PublicWallet.fromAddress(local.getAddress());
     await expect(new Invisi().connect({ wallet, protocol })).rejects.toThrow(/reader/i);
     const session = await new Invisi({ chainReader }).connect({
         wallet,
@@ -97,7 +98,7 @@ it("preserves viewing-only permissions without constructing a scanner", async ()
     const local = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const invisi = new Invisi({ chainReader, store: new MemoryWalletStore() });
     const viewing = await invisi.connect({
-        wallet: Wallet.fromAddress(local.getAddress()),
+        wallet: PublicWallet.fromAddress(local.getAddress()),
         protocol,
         viewing: local.getViewer(),
     });
@@ -131,7 +132,7 @@ it("composes read-only provider infrastructure lazily without starting synchroni
     expect(provider.getNetwork).not.toHaveBeenCalled();
     const local = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const session = await invisi.connect({
-        wallet: Wallet.fromAddress(local.getAddress()),
+        wallet: PublicWallet.fromAddress(local.getAddress()),
         protocol,
     });
     expect(session.scope.protocolAddress).toBe(instance);

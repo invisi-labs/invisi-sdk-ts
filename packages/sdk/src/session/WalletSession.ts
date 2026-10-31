@@ -1,3 +1,4 @@
+import { Wallet } from "@invisi-labs/core";
 import { prepareWithErrors } from "../errors";
 import { copyGasBenchmarks } from "../gas-estimation";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -16,8 +17,6 @@ import type {
     TopUpCreditPreparation,
     TransferPreparation,
     WalletSessionOptions,
-    WithdrawalPreparation,
-    SweepPreparation,
 } from "./operation-types";
 import { TransactionPreparation } from "./transaction-preparation";
 import { walletBalance, type WalletScope } from "./state";
@@ -127,7 +126,11 @@ export class WalletSession {
             scope: this.scope,
             store: options.store,
             reader: options.chainReader,
-            authorization: () => options.authorization ?? options.wallet.exportAuthorization(),
+            authorization: () => {
+                if (options.authorization) return options.authorization;
+                if (options.wallet instanceof Wallet) return options.wallet.exportAuthorization();
+                throw new MissingCapabilityError("wallet authorization");
+            },
         };
     }
 
@@ -136,7 +139,10 @@ export class WalletSession {
         const options = this.#options;
         if (!options.store || !options.chainReader || !options.protocolRpc)
             throw new MissingCapabilityError("wallet store, chain reader and Protocol RPC");
-        const viewing = options.viewing ?? options.wallet.getViewer();
+        const viewing =
+            options.viewing ??
+            (options.wallet instanceof Wallet ? options.wallet.getViewer() : undefined);
+        if (!viewing) throw new MissingCapabilityError("viewing");
         const receivingAddress = options.wallet.getReceivingAddress();
         const receivingKeys =
             receivingAddress.kind === "long" ? receivingAddress.getReceivingKeys() : undefined;
@@ -201,16 +207,6 @@ export class WalletSession {
     async prepareTransfer(options: TransferPreparation): Promise<Operation> {
         return prepareWithErrors("prepareTransfer", async () => {
             return this.preparation(options.tokenAddress).prepareTransfer(options);
-        });
-    }
-    async prepareWithdraw(options: WithdrawalPreparation): Promise<Operation> {
-        return prepareWithErrors("prepareWithdraw", async () => {
-            return this.preparation(options.tokenAddress).prepareWithdraw(options);
-        });
-    }
-    async prepareSweep(options: SweepPreparation): Promise<Operation> {
-        return prepareWithErrors("prepareSweep", async () => {
-            return this.preparation(options.tokenAddress).prepareSweep(options);
         });
     }
     async prepareShield(options: ShieldPreparation): Promise<Operation> {

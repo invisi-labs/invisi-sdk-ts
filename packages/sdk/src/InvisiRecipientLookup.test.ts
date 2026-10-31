@@ -1,5 +1,6 @@
+import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import { describe, expect, it, vi } from "vitest";
-import { hexlify, keccak256 } from "ethers";
+import { Interface, type Provider, hexlify, keccak256 } from "ethers";
 import { Invisi, InvisiError, Protocol, ProtocolRpcClient } from "./index";
 import { fixture } from "./session/operation-fixture";
 
@@ -58,13 +59,12 @@ async function setup(result: "registered" | "unregistered" | "failure" = "regist
 
 describe("Invisi recipient lookup selection", () => {
     it.each(["registered", "unregistered", "failure"] as const)(
-        "uses Protocol RPC for %s owners with no direct-chain fallback",
+        "defaults to Protocol RPC for %s owners with no direct-chain fallback",
         async (result) => {
             const { h, reader, protocol, protocolRpc, requests } = await setup(result);
             const invisi = new Invisi({
                 chainReader: reader,
                 protocolRpc,
-                addressLookup: "protocol-rpc",
             });
             const pending = invisi.prepareShield({
                 wallet: h.wallet,
@@ -132,6 +132,41 @@ describe("Invisi recipient lookup selection", () => {
             outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
             funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
         });
+        expect(requests).toEqual([]);
+    });
+    it("allows direct chain lookup instead of the default Protocol RPC", async () => {
+        const { h, reader, protocol, protocolRpc, requests } = await setup("failure");
+        const abi = new Interface(invisiAddressRegistryAbi);
+        const keys = h.bob.getReceivingAddress().getReceivingKeys();
+        const call = vi.fn(async (request: { data: string }) => {
+            const decoded = abi.parseTransaction({ data: request.data })!;
+            return decoded.name === "isRegistered"
+                ? abi.encodeFunctionResult("isRegistered", [true])
+                : abi.encodeFunctionResult("receivingKeysOf", [
+                      [keys.viewingPublicKey, keys.clueKey],
+                      1n,
+                  ]);
+        });
+        const provider = {
+            getNetwork: async () => ({ chainId: protocol.context.chainId }),
+            getCode: async () => "0x6000",
+            getBlock: async () => ({ number: 12, hash: `0x${"12".repeat(32)}` }),
+            call,
+            resolveName: async (name: string) => name,
+        } as unknown as Provider;
+        await new Invisi({
+            provider,
+            chainReader: reader,
+            protocolRpc,
+            addressLookup: "chain",
+        }).prepareShield({
+            wallet: h.wallet,
+            protocol,
+            tokenAddress: h.context.tokenAddress,
+            outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
+            funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
+        });
+        expect(call).toHaveBeenCalledTimes(2);
         expect(requests).toEqual([]);
     });
 });

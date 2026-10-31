@@ -4,6 +4,7 @@ export { Invisi } from "./Invisi";
 export type { InvisiOptions, ConnectionOptions, RegistrationPreparationOptions } from "./Invisi";
 export {
     Wallet,
+    PublicWallet,
     ViewingCapability,
     Detector,
     NullifierCapability,
@@ -59,8 +60,6 @@ export type {
     BalanceSnapshot,
     WalletSessionOptions,
     TransferPreparation,
-    WithdrawalPreparation,
-    SweepPreparation,
     ShieldPreparation,
     CreateCreditPreparation,
     DrawCreditPreparation,
@@ -107,8 +106,6 @@ export type {
     CreditInput,
     TransactionIdentity,
     ExplicitTransferPreparation,
-    ExplicitWithdrawalPreparation,
-    ExplicitSweepPreparation,
     ExplicitShieldPreparation,
     ExplicitCreateCreditPreparation,
     ExplicitDrawCreditPreparation,
@@ -130,3 +127,10 @@ export type {
 export { defineGasBenchmarks } from "./gas-estimation";
 
 export type { SigningRequest } from "@invisi-labs/core";
+
+// Stateless recovery for applications that supply canonical receipts without a wallet store.
+export { readProtocolLogs } from "./session/receipt-logs";
+export { decryptCandidates } from "./session/discovery";
+export type { DeliveryEventLog, DiscoveredNote, DiscoveredCredit } from "./session/discovery";
+
+export type { ProtocolOutput } from "@invisi-labs/rpc";

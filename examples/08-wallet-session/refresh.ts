@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/sdk";
 import { createRequire } from "node:module";
 import { JsonRpcProvider, getBytes } from "ethers";
 import { ProtocolRpcClient, Wallet, Protocol, Invisi, EncryptedWalletCodec } from "@invisi-labs/sdk";
@@ -32,7 +33,7 @@ export async function main(resources: ExampleResources) {
     console.log(
         "1. Connect a public wallet with viewing permission only; it can track funds consumption and prepare owner-only sweeps, but cannot sign"
     );
-    const publicWallet = Wallet.fromAddress(wallet.getAddress());
+    const publicWallet = PublicWallet.fromAddress(wallet.getAddress());
     const session = await invisi.connect({
         wallet: publicWallet,
         protocol,

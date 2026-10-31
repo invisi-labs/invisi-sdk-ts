@@ -23,7 +23,7 @@ export {
 } from "./wallet";
 export type { DecodedAddress, ReceivingKeyLookup } from "./address";
 export { decodeAddress } from "./address";
-export { Wallet } from "./wallet-object";
+export { Wallet, PublicWallet } from "./wallet-object";
 export { Disclosure } from "./disclosure";
 export type {
     CreditOpening,

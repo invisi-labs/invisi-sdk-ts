@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import type { Hex } from "./contracts";
 import {
     Interface,
@@ -55,7 +56,7 @@ async function fixture() {
 it("prepares and signs registry EIP-712 data without a prover in its independent nonce domain", async () => {
     const h = await fixture(),
         operation = await h.registry.prepareRegistration({
-            wallet: Wallet.fromAddress(h.wallet.getAddress()),
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
             signer: h.signer,
         }),
@@ -83,7 +84,7 @@ it("requires explicit write profiles and signing capability, and rechecks regist
         new AddressRegistry(context).prepareRegistration({ wallet: h.wallet, reader: h.reader })
     ).rejects.toThrow(/profile/);
     const publicOnly = await h.registry.prepareRegistration({
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     await expect(publicOnly.authorize()).rejects.toThrow(/capability/);
@@ -295,7 +296,7 @@ it("accepts canonical EOA recovery for a delegated account even when it has code
 it("exports JSON-safe registry data and attaches a remote signature without a signer", async () => {
     const h = await fixture();
     const operation = await h.registry.prepareRegistration({
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     const request = JSON.parse(JSON.stringify(await operation.exportRegistrationAuthorization()));

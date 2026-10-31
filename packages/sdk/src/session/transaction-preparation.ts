@@ -24,8 +24,6 @@ import type {
     ShieldPreparation,
     TopUpCreditPreparation,
     TransferPreparation,
-    WithdrawalPreparation,
-    SweepPreparation,
 } from "./operation-types";
 
 /** Shared preparation engine for managed sessions and explicitly supplied inputs. */
@@ -44,22 +42,36 @@ export class TransactionPreparation<Result> {
     }
     async prepareTransfer(options: TransferPreparation): Promise<Result> {
         const copied = structuredClone(options);
-        const preparation = new Preparation(this.runtime(copied.tokenAddress));
+        const runtime = this.runtime(copied.tokenAddress);
+        if (copied.commitments !== undefined && copied.commitments.length === 0)
+            throw new Error("empty explicit input selection");
+        const preparation = new Preparation({
+            ...runtime,
+            ...(copied.commitments !== undefined ? { inputSelection: copied.commitments } : {}),
+        });
         const frame = await preparation.frame(copied.deadline);
-        if (copied.outputs.length < 1 || copied.outputs.length > 168) {
-            throw new Error("transfer requires 1..168 outputs");
+        if (copied.outputs.length > 168) throw new Error("transfer supports at most 168 outputs");
+        let withdrawalAddress: Hex = ZERO_ADDRESS;
+        let withdrawalAmount = 0n;
+        if (copied.withdrawal !== undefined) {
+            withdrawalAddress = getAddress(copied.withdrawal.to) as Hex;
+            positiveAmount(copied.withdrawal.amount);
+            if (BigInt(withdrawalAddress) === 0n)
+                throw new Error("withdrawal destination must be nonzero");
+            withdrawalAmount = copied.withdrawal.amount;
         }
+        if (copied.outputs.length === 0 && withdrawalAmount === 0n)
+            throw new Error("transfer requires a private output or public withdrawal");
         const total = copied.outputs.reduce(
             (sum, output, index) => sum + positiveOutputAmount(output, index),
-            0n
+            withdrawalAmount
         );
         const funding = await preparation.funding(copied.funding, frame);
         return this.funds(
-            "transfer",
             copied.outputs,
             total,
-            ZERO_ADDRESS,
-            0n,
+            withdrawalAddress,
+            withdrawalAmount,
             frame,
             funding,
             copied.target,
@@ -67,70 +79,7 @@ export class TransactionPreparation<Result> {
         );
     }
 
-    async prepareWithdraw(options: WithdrawalPreparation): Promise<Result> {
-        const copied = structuredClone(options);
-        const preparation = new Preparation(this.runtime(copied.tokenAddress));
-        const frame = await preparation.frame(copied.deadline);
-        const to = getAddress(copied.to) as Hex;
-        positiveAmount(copied.amount);
-        if (BigInt(to) === 0n) {
-            throw new Error("withdrawal destination must be nonzero");
-        }
-        return this.funds(
-            "withdraw",
-            [],
-            copied.amount,
-            to,
-            copied.amount,
-            frame,
-            { funding: {}, fundingMode: "none" },
-            copied.target,
-            preparation
-        );
-    }
-
-    /** Full payout to the note owner; no arbitrary destination, change or spending signature. */
-    async prepareSweep(options: SweepPreparation): Promise<Result> {
-        const copied = structuredClone(options);
-        const runtime = this.runtime(copied.tokenAddress);
-        const state = await runtime.readInventory();
-        const available = Object.values(state.notes).filter(
-            (record) =>
-                record.note.tokenAddress === BigInt(copied.tokenAddress) &&
-                record.spent === "unspent" &&
-                !state.reservations[record.commitment]
-        );
-        const selected = copied.commitments ?? available.map((record) => record.commitment);
-        if (selected.length === 0) throw new Error("empty sweep input selection");
-        if (new Set(selected).size !== selected.length) throw new Error("duplicate sweep inputs");
-        const byId = new Map(available.map((record) => [record.commitment, record]));
-        let amount = 0n;
-        for (const id of selected) {
-            const record = byId.get(id);
-            if (!record) throw new Error("sweep input unavailable");
-            amount += record.note.amount;
-        }
-        positiveAmount(amount);
-        const preparation = new Preparation({
-            ...runtime,
-            inputSelection: selected,
-        });
-        const frame = await preparation.frame(copied.deadline);
-        return this.funds(
-            "sweep",
-            [],
-            amount,
-            this.scope.walletIdentity,
-            amount,
-            frame,
-            { funding: {}, fundingMode: "none" },
-            copied.target,
-            preparation
-        );
-    }
-
     private async funds(
-        kind: "transfer" | "withdraw" | "sweep",
         payments: readonly PaymentOutput[],
         total: bigint,
         withdrawalAddress: `0x${string}`,
@@ -186,7 +135,7 @@ export class TransactionPreparation<Result> {
         return preparation.runtime.complete({
             version: 1,
             id: crypto.randomUUID(),
-            kind,
+            kind: "transfer",
             context,
             scope: this.scope,
             preparedAt: block,
