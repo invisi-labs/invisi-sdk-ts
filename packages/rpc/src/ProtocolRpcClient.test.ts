@@ -648,3 +648,96 @@ it("does not confuse Credit role envelopes with conflicting funds outputs", asyn
     expect(page.outputs).toHaveLength(1);
     expect(page.outputs[0]?.commitment).toBe(h(13));
 });
+
+it("discovers both Credit role envelopes without collapsing a shared commitment", async () => {
+    const credit = {
+        ...encryptedOutput(),
+        kind: "CreditCreated",
+        ciphertext: "0x05" + "ab".repeat(753),
+    };
+    const otherRole = { ...credit, ciphertext: "0x05" + "cd".repeat(753) };
+    const { client, requests } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [
+                      credit,
+                      otherRole,
+                      credit,
+                      { ...encryptedOutput(), leafIndex: 4, commitment: h(13) },
+                  ],
+                  creditTransitions: [],
+              }
+    );
+    const page = await client.getCreditOutputs(context, { fromBlock: 10n, toBlock: 10n });
+    expect(page.outputs).toHaveLength(2);
+    expect(page.outputs.map((output) => output.commitment)).toEqual([h(12), h(12)]);
+    expect(requests.map((request) => request.method)).toEqual([
+        "invisi_getStatus",
+        "invisi_getUpdates",
+    ]);
+});
+it.each([{ treeId: "2" }, { leafIndex: 4 }, { transactionHash: h(99) }, { commitment: h(13) }])(
+    "rejects conflicting Credit envelope metadata %j",
+    async (patch) => {
+        const credit = {
+            ...encryptedOutput(),
+            kind: "CreditDraw",
+            ciphertext: "0x05" + "ab".repeat(753),
+        };
+        const { client } = setup((method) =>
+            method === "invisi_getStatus"
+                ? status()
+                : {
+                      blockHash: h(10),
+                      outputs: [
+                          credit,
+                          { ...credit, ...patch, ciphertext: "0x05" + "cd".repeat(753) },
+                      ],
+                      creditTransitions: [],
+                  }
+        );
+        await expect(
+            client.getCreditOutputs(context, { fromBlock: 10n, toBlock: 10n })
+        ).rejects.toThrow(/Conflicting/);
+    }
+);
+it("rejects more than two distinct Credit role envelopes for one leaf", async () => {
+    const credit = { ...encryptedOutput(), kind: "CreditToppedUp" };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: ["ab", "cd", "ef"].map((byte) => ({
+                      ...credit,
+                      ciphertext: "0x05" + byte.repeat(753),
+                  })),
+                  creditTransitions: [],
+              }
+    );
+    await expect(
+        client.getCreditOutputs(context, { fromBlock: 10n, toBlock: 10n })
+    ).rejects.toThrow(/Credit role/);
+});
+
+it("rejects changed clues for an otherwise identical Credit envelope", async () => {
+    const credit = {
+        ...encryptedOutput(),
+        kind: "CreditCreated",
+        ciphertext: "0x05" + "ab".repeat(753),
+    };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [credit, { ...credit, clue: "0x" + "cd".repeat(68) }],
+                  creditTransitions: [],
+              }
+    );
+    await expect(
+        client.getCreditOutputs(context, { fromBlock: 10n, toBlock: 10n })
+    ).rejects.toThrow(/Conflicting Credit/);
+});

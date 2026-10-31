@@ -14,6 +14,8 @@ export {
     encodeMemo,
     decodeMemoText,
     MAX_MEMO_BYTES,
+    computeCreditNullifier,
+    creditPeriods,
 } from "@invisi-labs/core";
 export type {
     Address,

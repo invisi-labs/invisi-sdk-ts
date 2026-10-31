@@ -54,7 +54,7 @@ export interface RegisteredReceivingAddress {
     block: CanonicalBlock;
 }
 
-/** Indexed encrypted ordinary funds output; authenticate decryption and verify membership before spending. */
+/** Indexed encrypted output; authenticate decryption and verify membership before spending. */
 export interface ProtocolOutput {
     block: CanonicalBlock;
     treeId: bigint;

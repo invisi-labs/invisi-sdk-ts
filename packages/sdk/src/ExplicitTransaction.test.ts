@@ -507,3 +507,95 @@ it.each(["shield", "transfer"] as const)(
         expect(note.memo).toEqual(new Uint8Array([0, 255, 65]));
     }
 );
+
+it("draws Credits from two different owners with one external spender authorization", async () => {
+    const h = await setup();
+    const charlie = await Wallet.fromPrivateKey(new Uint8Array(32).fill(3));
+    const owners = [h.bob, charlie];
+    const creditInputs: import("./explicit-types").CreditInput[] = [];
+    for (const [index, owner] of owners.entries()) {
+        const state: CreditDeliveryState = {
+            note: {
+                chainId: h.context.chainId,
+                protocolAddress: BigInt(h.context.protocolAddress),
+                tokenAddress: BigInt(h.context.tokenAddress),
+                ownerWalletIdentity: owner.walletIdentity,
+                spenderWalletIdentity: h.wallet.walletIdentity,
+                ownerPayout: BigInt(owner.ownerAddress),
+                spenderPayout: BigInt(h.wallet.ownerAddress),
+                amount: 100n,
+                nonce: BigInt(900 + index),
+                expiry: 2000003600n,
+                creditSharedKey: BigInt(800 + index),
+            },
+            ownerReceivingKeys: owner.getReceivingAddress().getReceivingKeys(),
+            spenderReceivingKeys: h.wallet.getReceivingAddress().getReceivingKeys(),
+        };
+        const n = state.note;
+        const commitment = await computeCreditCommitment(
+            n.chainId,
+            n.spenderWalletIdentity,
+            n.ownerWalletIdentity,
+            n.spenderPayout,
+            n.ownerPayout,
+            n.tokenAddress,
+            n.amount,
+            n.nonce,
+            n.expiry,
+            await computeCreditSharedKeyHash(n.creditSharedKey)
+        );
+        await h.tree.insert(BigInt(commitment));
+        creditInputs.push({ state, commitment, treeId: 1n, leafIndex: index + 1, role: "spender" });
+    }
+    const prepared = await h.invisi.prepareDrawCredit({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        creditInputs,
+        credits: creditInputs.map((input, index) => ({
+            credit: input.commitment,
+            amount: BigInt(10 + 10 * index),
+        })),
+    });
+    expect(prepared.preview().permissions.walletAuthorization).toBe(true);
+    await expect(prepared.prove()).rejects.toThrow(/authoriz/);
+    const request = await prepared.exportWalletAuthorization();
+    const spenderSigner = new EvmWallet(`0x${"01".repeat(32)}`);
+    const signature = await spenderSigner.signTypedData(
+        request.domain,
+        request.types,
+        request.message
+    );
+    const ready = await (await prepared.withWalletSignature(signature)).prove();
+    const call = await ready.exportTransaction();
+    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+    expect(decoded.name).toBe("creditDraw");
+    expect(decoded.args[1].spender).toBe(h.wallet.ownerAddress);
+    expect(decoded.args[1].totalAmount).toBe(30n);
+    expect(decoded.args[1].nullifiers).toHaveLength(2);
+    expect(decoded.args[1].remainderCommitments).toHaveLength(2);
+    for (const [index, owner] of owners.entries()) {
+        const context = {
+            chainId: h.context.chainId,
+            protocolAddress: BigInt(h.context.protocolAddress),
+            tokenAddress: BigInt(h.context.tokenAddress),
+            outputCommitment: decoded.args[1].remainderCommitments[index],
+        };
+        const ownerCopy = await owner
+            .getViewer()
+            .decryptCredit(decoded.args[2][index * 2].ciphertext, { ...context, role: "owner" });
+        const spenderCopy = await h.wallet
+            .getViewer()
+            .decryptCredit(decoded.args[2][index * 2 + 1].ciphertext, {
+                ...context,
+                role: "spender",
+            });
+        expect(ownerCopy.note.amount).toBe(BigInt(90 - 10 * index));
+        expect(ownerCopy.note.ownerWalletIdentity).toBe(owner.walletIdentity);
+        expect(spenderCopy).toEqual(ownerCopy);
+        expect(ownerCopy.ownerReceivingKeys).toEqual(creditInputs[index]!.state.ownerReceivingKeys);
+        expect(ownerCopy.spenderReceivingKeys).toEqual(
+            creditInputs[index]!.state.spenderReceivingKeys
+        );
+    }
+});

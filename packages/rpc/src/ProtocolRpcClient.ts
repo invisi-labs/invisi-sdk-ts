@@ -440,8 +440,26 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         context: DeploymentContext,
         range: ProtocolUpdateRange
     ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
+        return this.readOutputCandidates(context, range, false);
+    }
+
+    /** Credit candidates preserve both role envelopes for the same inserted commitment. */
+    async getCreditOutputs(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
+        return this.readOutputCandidates(context, range, true);
+    }
+
+    private async readOutputCandidates(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange,
+        credit: boolean
+    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
         const { block, outputs } = await this.readUpdates(context, range);
         const parsed: ProtocolOutput[] = [];
+        const seenEnvelopes = new Set<string>();
+        const creditEnvelopes = new Map<Hex, Map<Hex, string>>();
         const positions = new Map<string, string>();
         const commitments = new Map<Hex, string>();
         for (const value of outputs) {
@@ -467,13 +485,10 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                 invalid("Invalid output ciphertext");
             if (typeof output.clue !== "string" || !/^0x[0-9a-f]{136}$/i.test(output.clue))
                 invalid("Invalid output clue");
-            // Credit leaves deliberately have owner/spender envelopes for one position.
-            // This API discovers ordinary funds; Credit transitions use getUpdates().
-            if (
+            const isCredit =
                 ["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(output.kind as string) &&
-                (output.ciphertext as string).slice(0, 4).toLowerCase() === "0x05"
-            )
-                continue;
+                (output.ciphertext as string).slice(0, 4).toLowerCase() === "0x05";
+            if (isCredit !== credit) continue;
             const candidate: ProtocolOutput = {
                 block: {
                     number: eventBlock.number,
@@ -495,16 +510,34 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             const fingerprint = JSON.stringify(candidate, (_, value) =>
                 typeof value === "bigint" ? value.toString() : value
             );
+            // Credit owner/spender payloads differ, but their canonical leaf metadata must match.
+            const identity = credit
+                ? JSON.stringify(
+                      { ...candidate, ciphertext: undefined, clue: undefined },
+                      (_, value) => (typeof value === "bigint" ? value.toString() : value)
+                  )
+                : fingerprint;
             const previousPosition = positions.get(position);
             const previousCommitment = commitments.get(candidate.commitment);
             if (
-                (previousPosition !== undefined && previousPosition !== fingerprint) ||
-                (previousCommitment !== undefined && previousCommitment !== fingerprint)
+                (previousPosition !== undefined && previousPosition !== identity) ||
+                (previousCommitment !== undefined && previousCommitment !== identity)
             )
                 invalid("Conflicting RPC output data or position");
-            if (previousCommitment !== undefined) continue;
-            positions.set(position, fingerprint);
-            commitments.set(candidate.commitment, fingerprint);
+            if (seenEnvelopes.has(fingerprint)) continue;
+            if (credit) {
+                const envelopes =
+                    creditEnvelopes.get(candidate.commitment) ?? new Map<Hex, string>();
+                const previous = envelopes.get(candidate.ciphertext);
+                if (previous !== undefined && previous !== fingerprint)
+                    invalid("Conflicting Credit role delivery");
+                if (envelopes.size >= 2) invalid("Too many distinct Credit role envelopes");
+                envelopes.set(candidate.ciphertext, fingerprint);
+                creditEnvelopes.set(candidate.commitment, envelopes);
+            }
+            seenEnvelopes.add(fingerprint);
+            positions.set(position, identity);
+            commitments.set(candidate.commitment, identity);
             parsed.push(candidate);
         }
         return { block, outputs: parsed };
