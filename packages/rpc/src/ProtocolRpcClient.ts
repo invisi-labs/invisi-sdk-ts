@@ -1,4 +1,6 @@
 import type { Hex } from "@invisi-labs/core";
+import { ReceivingAddress } from "@invisi-labs/core";
+import { getBytes } from "ethers";
 import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
 import { FIELD_MODULUS } from "@invisi-labs/core";
 import { defineDeployment, type ProtocolDeployment } from "./deployment";
@@ -8,6 +10,7 @@ import type {
     Membership,
     ProtocolDataProvider,
     ProtocolUpdateRange,
+    RegisteredReceivingAddress,
 } from "./types";
 
 export interface ProtocolRpcReader {
@@ -237,6 +240,51 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         }
         this.#deployment = deployment;
         return deployment;
+    }
+
+    /** Registered keys through the trusted RPC publisher's indexed head.
+     * The block reference describes the read; it is not a proof of contract storage.
+     */
+    async getReceivingAddress(
+        owner: string,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<RegisteredReceivingAddress | null> {
+        let identity: Hex;
+        try {
+            identity = ReceivingAddress.parse(owner).ownerAddress;
+            if (!/^0x[\da-f]{40}$/i.test(owner)) invalid("Expected an EVM owner address");
+        } catch {
+            return invalid("Invalid receiving-address owner");
+        }
+        const registry = this.deployment.registry;
+        if (!registry) invalid("Deployment has no receiving-key registry");
+        const raw = await this.rpc("invisi_getReceivingAddress", [identity], options.signal);
+        if (raw === null) return null;
+        const value = object(raw);
+        if (
+            typeof value.walletIdentity !== "string" ||
+            value.walletIdentity.toLowerCase() !== identity.toLowerCase()
+        )
+            invalid("RPC receiving-address identity mismatch");
+        let receivingAddress: string;
+        try {
+            receivingAddress = ReceivingAddress.from({
+                walletIdentity: identity,
+                viewingPublicKey: getBytes(value.viewingPublicKey as string),
+                clueKey: getBytes(value.clueKey as string),
+            }).toString();
+        } catch {
+            return invalid("Invalid RPC receiving keys");
+        }
+        const reference = object(value.block);
+        const block: CanonicalBlock = {
+            number: integer(reference.number),
+            hash: hash(reference.hash),
+            parentHash: hash(reference.parentHash),
+            timestamp: integer(reference.timestamp),
+        };
+        if (block.number < registry!.fromBlock) invalid("Registry index predates deployment");
+        return { receivingAddress, nonce: integer(value.nonce), block };
     }
 
     private context(context: DeploymentContext) {

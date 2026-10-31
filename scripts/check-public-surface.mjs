@@ -75,8 +75,20 @@ for (const name of [
     "WalletDiscovery",
 ])
     assert(!(name in sdk), `obsolete public API: ${name}`);
-for (const name of ["Wallet", "Invisi", "WalletSession", "Protocol", "AddressRegistry"])
+for (const name of [
+    "Wallet",
+    "Invisi",
+    "WalletSession",
+    "Protocol",
+    "AddressRegistry",
+    "InvisiError",
+])
     assert.equal(typeof sdk[name], "function", `missing public object: ${name}`);
+assert.equal(
+    typeof sdk.Invisi.prototype.prepareRegistration,
+    "function",
+    "missing registry composition entry"
+);
 assert.equal(typeof core.Wallet.fromPrivateKey, "function", "missing account-key factory");
 for (const name of ["fromSeed", "fromPhrase"]) {
     assert(!(name in core.Wallet), `obsolete HD factory: ${name}`);

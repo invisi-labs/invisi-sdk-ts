@@ -46,3 +46,10 @@ export interface ProtocolDataProvider {
     ): Promise<ProtocolDataStatus>;
     getUpdates(context: DeploymentContext, range: ProtocolUpdateRange): Promise<ProtocolUpdates>;
 }
+
+/** Registered public receiving address returned by a trusted indexed RPC read. */
+export interface RegisteredReceivingAddress {
+    receivingAddress: string;
+    nonce: bigint;
+    block: CanonicalBlock;
+}

@@ -1,3 +1,4 @@
+import { resolveRecipient } from "../resolve-recipient";
 import type {
     CreateCreditParams,
     Delivery,
@@ -10,7 +11,6 @@ import {
     FIELD_MODULUS,
     normalizeCreditPolicy,
     applyCreditDrawUsage,
-    ReceivingAddress,
     computeCreditNullifier,
     computeCreditRecoveryPad,
     createClue,
@@ -150,12 +150,16 @@ export class CreditPreparation<Result> {
         positiveAmount(options.amount, 126);
         const frame = await this.#prepare.frame(options.deadline);
         const expiry = this.expiry(options.expiry, frame);
-        const spender = await ReceivingAddress.parse(options.spender).resolve(
-            this.runtime.options.addressResolver
+        const spender = await resolveRecipient(
+            options.spender,
+            this.runtime.options.addressResolver,
+            { field: "spender" }
         );
-        const owner = await this.runtime.options.wallet
-            .getReceivingAddress()
-            .resolve(this.runtime.options.addressResolver);
+        const owner = await resolveRecipient(
+            this.runtime.options.wallet.getReceivingAddress().toString(),
+            this.runtime.options.addressResolver,
+            { field: "wallet" }
+        );
         const ownerPayout = getAddress(owner.walletIdentity) as Hex;
         const spenderPayout = getAddress(spender.walletIdentity) as Hex;
         if (BigInt(ownerPayout) === 0n || BigInt(spenderPayout) === 0n) {

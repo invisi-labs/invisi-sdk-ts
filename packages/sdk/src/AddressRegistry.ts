@@ -1,3 +1,4 @@
+import { prepareWithErrors } from "./errors";
 import type { Provider } from "ethers";
 import { AddressRegistry as Registry, type RegistrationPreparation } from "@invisi-labs/protocol";
 import { EthersChainReader } from "./integrations/ethers";
@@ -9,13 +10,15 @@ export class AddressRegistry extends Registry {
             | RegistrationPreparation
             | (Omit<RegistrationPreparation, "reader"> & { provider: Provider })
     ) {
-        if ("provider" in options) {
-            const { provider, ...preparation } = options;
-            return super.prepareRegistration({
-                ...preparation,
-                reader: new EthersChainReader(provider),
-            });
-        }
-        return super.prepareRegistration(options);
+        return prepareWithErrors("prepareRegistration", async () => {
+            if ("provider" in options) {
+                const { provider, ...preparation } = options;
+                return super.prepareRegistration({
+                    ...preparation,
+                    reader: new EthersChainReader(provider),
+                });
+            }
+            return super.prepareRegistration(options);
+        });
     }
 }

@@ -1,6 +1,5 @@
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
-import { ProtocolRpcClient, Wallet, AddressRegistry } from "@invisi-labs/sdk";
-import { EthersAddressResolver } from "@invisi-labs/sdk/ethers";
+import { ProtocolRpcClient, Wallet, Invisi } from "@invisi-labs/sdk";
 import { required } from "../environment.js";
 import type { ExampleResources } from "../resources.js";
 
@@ -9,28 +8,18 @@ export async function main(resources: ExampleResources) {
     resources.defer(() => provider.destroy());
     const protocolRpc = new ProtocolRpcClient(required("PROTOCOL_RPC_URL"));
 
-    const deployment = await protocolRpc.getDeployment((await provider.getNetwork()).chainId);
-    if (!deployment.registry) throw new Error("The selected deployment has no receiving-key registry");
-
     const wallet = await Wallet.fromPrivateKey(required("WALLET_ACCOUNT_PRIVATE_KEY"));
     const signer = new EthereumWallet(process.env.FUNDING_PRIVATE_KEY ?? required("WALLET_ACCOUNT_PRIVATE_KEY"), provider);
 
-    console.log("1. Select a registry deployment and its trusted runtime profile, independently from the funds protocol");
-    const context = {
-        chainId: deployment.chainId,
-        registryAddress: deployment.registry.address,
-    };
-    const hash = deployment.registry.runtimeCodeHash;
-    const lookup = new EthersAddressResolver(provider, context, hash);
-    const registry = new AddressRegistry(context, {
-        lookup: lookup.lookup,
-        expectedRuntimeCodeHash: hash,
+    console.log("1. Configure chain reads and Protocol RPC discovery on Invisi");
+    const invisi = new Invisi({
+        provider,
+        protocolRpc,
     });
 
     console.log("2. Prepare update using the registry's own nonce, never the EVM funding nonce");
-    const prepared = await registry.prepareRegistration({
+    const prepared = await invisi.prepareRegistration({
         wallet,
-        provider,
         update: true,
     });
     console.log("Local operation review:", prepared.preview());

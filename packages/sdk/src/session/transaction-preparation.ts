@@ -7,7 +7,12 @@ import {
     ZERO_ADDRESS,
 } from "@invisi-labs/protocol";
 import type { ProofTarget } from "@invisi-labs/prover";
-import { positiveAmount, Preparation, type PreparationFrame } from "./prepare-common";
+import {
+    positiveAmount,
+    positiveOutputAmount,
+    Preparation,
+    type PreparationFrame,
+} from "./prepare-common";
 import { CreditPreparation } from "./prepare-credit";
 import type {
     CancelCreditPreparation,
@@ -45,7 +50,7 @@ export class TransactionPreparation<Result> {
             throw new Error("transfer requires 1..168 outputs");
         }
         const total = copied.outputs.reduce(
-            (sum, output) => sum + positiveAmount(output.amount),
+            (sum, output, index) => sum + positiveOutputAmount(output, index),
             0n
         );
         const funding = await preparation.funding(copied.funding, frame);
@@ -144,7 +149,7 @@ export class TransactionPreparation<Result> {
             frame
         );
         const outputs = await Promise.all(
-            payments.map((payment) => preparation.output(payment, context))
+            payments.map((payment, index) => preparation.output(payment, context, false, index))
         );
         const change = selection.amount + (funding.funding.amount ?? 0n) - total;
         if (change > 0n) {
@@ -204,7 +209,9 @@ export class TransactionPreparation<Result> {
             throw new Error("shield requires 1..10 outputs");
         }
         const outputs = await Promise.all(
-            copied.outputs.map((output) => preparation.output(output, frame.context))
+            copied.outputs.map((output, index) =>
+                preparation.output(output, frame.context, false, index)
+            )
         );
         if (
             outputs.reduce((sum, output) => sum + output.note.amount, 0n) !==

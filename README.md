@@ -249,3 +249,43 @@ Memos are encrypted and authenticated with each delivery. They do not enter fina
 `prepareCreateCredit` accepts private `singleLimit`, `dailyLimit` and `monthlyLimit` values in token base units. Zero disables a limit. Each Credit input is checked independently, including a draw of its entire balance. Daily and monthly counters use UTC Gregorian periods from the explicit chain timestamp and reset only when that calendar period changes. Owner-authorized top-up can replace any of the three limits; an omitted limit inherits its previous value and zero explicitly disables it. Top-up preserves all four usage fields. Consumption is counted even while a limit is disabled. Reducing a daily or monthly limit below its used counter freezes further draws until that UTC period changes; no top-up resets usage.
 
 Draw preparation binds the chain block timestamp to its proof statement without adding caller-supplied period fields to calldata. Prepare and authorize again if the UTC period changes before submission. Financial remainder recovery requires the confirmed draw block's timestamp, authenticated through the configured chain reader; preparation time and local wall-clock time cannot substitute for it. Credit deliveries use envelope version5 with domain `Invisi.CreditDelivery.v3` and lengths498–754 bytes.
+
+### Registered recipient lookup
+
+After loading the service deployment with `getDeployment` or `Protocol.fromRpc`, call `protocolRpc.getReceivingAddress(ownerAddress)`. It returns `{ receivingAddress, nonce, block }` or `null` for an unregistered owner. The SDK checks the returned owner, viewing key, clue key, nonce and block encoding, then constructs the full `0i` address. The lookup needs no recipient private key and no ethers resolver in application code.
+
+The service indexes Registry `ReceivingKeysSet` events; `block` is the indexed head, not necessarily the latest chain block. Newly registered/updated keys appear after confirmations and indexing. The client trusts the selected service for registered key data; the block reference alone does not authenticate storage. For independent resolution, use `EthersAddressResolver` with your Chain RPC. There is no silent direct-chain fallback when this explicit RPC query fails.
+
+### Registration through Invisi
+
+Configure `new Invisi({ provider, protocolRpc })`, then call `invisi.prepareRegistration({ wallet })` to register public receiving keys, or pass `update: true` to update an existing registration. Optional `deadline` uses Unix seconds. The method discovers the deployment for the ethers provider's chain, validates the Registry runtime and reads its independent nonce. It needs a full receiving-address wallet, not a private wallet or signer. The currently supported discovery adapter is `ProtocolRpcClient`; custom infrastructure can use the lower-level `AddressRegistry` directly.
+
+Export `prepared.exportRegistrationAuthorization()`, sign the returned request in an external signing tool, and attach it with `prepared.withSignature(signature)`. Export the call and submit using ethers. Preparing never signs or broadcasts. Wallet remains an offline key/capability object, while the existing `AddressRegistry` interface remains available for explicit deployment composition.
+
+### Uniform preparation errors and recipient discovery
+
+All public `prepare*` methods on `Invisi`, `WalletSession`, and the SDK `AddressRegistry` reject with `InvisiError`. Constructor, connection, signing, proving, export and ethers submission errors retain their own contracts. Catch `InvisiError` and inspect `code`; do not branch on English message text. `operation` names the preparation method; `cause` retains the original exception when available. Existing error messages remain readable.
+
+| Code | Meaning |
+| --- | --- |
+| `EVM_ADDRESS_NOT_REGISTERED` | The selected lookup has no registered receiving keys for this `0x` owner at the state it serves. Full `0i` addresses do not require registration. |
+| `RECIPIENT_LOOKUP_FAILED` | Discovery failed or returned invalid keys; registration status is unknown. |
+| `INVALID_RECIPIENT` | The supplied receiving-address encoding is invalid. |
+| `MISSING_CAPABILITY` | Required infrastructure or permissions are absent; inspect `capability`. |
+| `PREPARATION_FAILED` | Other preparation failure; inspect `message` and the original `cause`. |
+
+Recipient errors include `address`, `field` (`to`, `amount`, `changeAddress`, `spender`, or `wallet`) and, for explicit payment outputs, zero-based `outputIndex`. Automatic change and Credit roles do not pretend to be entries in the caller's outputs array. Unknown/internal failures are not guessed into business categories by parsing their messages. A preparation failure never returns a prepared handle; existing preparation atomicity/reservation rules remain unchanged.
+
+Recipient strings accept full `0i` addresses or registered `0x` owners. A full address is validated locally and bypasses registration lookup. Configure `new Invisi({ provider, protocolRpc, addressLookup: "chain" })` for direct registry reads (default), or choose `"protocol-rpc"` for indexed `ReceivingKeysSet` lookup. Indexed registration visibility follows confirmations/indexing; an absent record describes that indexed state, not necessarily the latest chain state. RPC discovery pins are checked against the supplied Protocol deployment, and the application trusts its selected RPC for the keys. An explicit `addressResolver` overrides source selection. There is no automatic fallback to a second source. Public receiving keys are resolved during preparation and frozen into deliveries before signing or export.
+
+```ts
+try {
+    const prepared = await invisi.prepareShield({ wallet, protocol, tokenAddress, outputs, funding });
+} catch (error) {
+    if (error instanceof InvisiError && error.code === "EVM_ADDRESS_NOT_REGISTERED") {
+        console.error("No registered receiving keys for EVM owner:", error.address, error.outputIndex);
+    } else {
+        throw error;
+    }
+}
+```

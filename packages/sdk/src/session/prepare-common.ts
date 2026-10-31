@@ -1,10 +1,11 @@
+import { InvisiError } from "../errors";
+import { resolveRecipient } from "../resolve-recipient";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress, hexlify } from "ethers";
 
 import {
     encodeMemo,
     MissingCapabilityError,
-    ReceivingAddress,
     computeNoteCommitment,
     computeNoteIdentity,
     createClue,
@@ -41,6 +42,24 @@ export function positiveAmount(value: bigint, bits = 128): bigint {
         throw new Error(`amount must be a positive uint${bits}`);
     }
     return value;
+}
+
+/** Preserve the offending payment position even when summing transfer amounts first. */
+export function positiveOutputAmount(payment: PaymentOutput, outputIndex?: number): bigint {
+    try {
+        return positiveAmount(payment.amount);
+    } catch (cause) {
+        throw new InvisiError(
+            "PREPARATION_FAILED",
+            cause instanceof Error ? cause.message : "Invalid output amount",
+            {
+                address: payment.to,
+                field: "amount",
+                ...(outputIndex === undefined ? {} : { outputIndex }),
+                cause,
+            }
+        );
+    }
 }
 
 /** Shared local preparation checks; private witnesses never enter this object's public records. */
@@ -125,48 +144,68 @@ export class Preparation<Result> {
     async output(
         payment: PaymentOutput,
         context: TransactionContext,
-        change = false
+        change = false,
+        outputIndex?: number
     ): Promise<PreparedOutput> {
-        positiveAmount(payment.amount);
-        const recipient = await ReceivingAddress.parse(payment.to).resolve(
-            this.runtime.options.addressResolver
-        );
-        const memo = encodeMemo(payment.memo);
-        const nonce = generateNonce();
-        const identity = await computeNoteIdentity(BigInt(recipient.walletIdentity), nonce);
-        const keys = recipient.getReceivingKeys();
-        const note = {
-            chainId: context.chainId,
-            protocolAddress: BigInt(context.protocolAddress),
-            tokenAddress: BigInt(context.tokenAddress),
-            walletIdentity: recipient.walletIdentity,
-            amount: payment.amount,
-            ...(memo.length === 0 ? {} : { memo }),
-            nonce,
-        };
-        const commitment = await computeNoteCommitment(
-            context.chainId,
-            identity,
-            note.tokenAddress,
-            note.amount
-        );
-        return {
-            note,
-            commitment,
-            identity,
-            address: payment.to,
-            change,
-            delivery: {
-                ciphertext: hexlify(
-                    await encryptPrivateTransferNote(keys.viewingPublicKey, note, {
-                        chainId: context.chainId,
-                        protocolAddress: note.protocolAddress,
-                        outputCommitment: commitment,
-                    })
-                ) as Hex,
-                clue: hexlify(createClue(keys.clueKey)) as Hex,
-            },
-        };
+        try {
+            positiveOutputAmount(payment, outputIndex);
+            const recipient = await resolveRecipient(
+                payment.to,
+                this.runtime.options.addressResolver,
+                {
+                    field: change ? "changeAddress" : "to",
+                    ...(outputIndex === undefined ? {} : { outputIndex }),
+                }
+            );
+            const memo = encodeMemo(payment.memo);
+            const nonce = generateNonce();
+            const identity = await computeNoteIdentity(BigInt(recipient.walletIdentity), nonce);
+            const keys = recipient.getReceivingKeys();
+            const note = {
+                chainId: context.chainId,
+                protocolAddress: BigInt(context.protocolAddress),
+                tokenAddress: BigInt(context.tokenAddress),
+                walletIdentity: recipient.walletIdentity,
+                amount: payment.amount,
+                ...(memo.length === 0 ? {} : { memo }),
+                nonce,
+            };
+            const commitment = await computeNoteCommitment(
+                context.chainId,
+                identity,
+                note.tokenAddress,
+                note.amount
+            );
+            return {
+                note,
+                commitment,
+                identity,
+                address: payment.to,
+                change,
+                delivery: {
+                    ciphertext: hexlify(
+                        await encryptPrivateTransferNote(keys.viewingPublicKey, note, {
+                            chainId: context.chainId,
+                            protocolAddress: note.protocolAddress,
+                            outputCommitment: commitment,
+                        })
+                    ) as Hex,
+                    clue: hexlify(createClue(keys.clueKey)) as Hex,
+                },
+            };
+        } catch (cause) {
+            if (cause instanceof InvisiError) throw cause;
+            throw new InvisiError(
+                "PREPARATION_FAILED",
+                cause instanceof Error ? cause.message : "Output preparation failed",
+                {
+                    address: payment.to,
+                    field: change ? "changeAddress" : "to",
+                    ...(outputIndex === undefined ? {} : { outputIndex }),
+                    cause,
+                }
+            );
+        }
     }
 
     async membership(

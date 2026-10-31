@@ -1,5 +1,7 @@
+export { InvisiError } from "./errors";
+export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
 export { Invisi } from "./Invisi";
-export type { InvisiOptions, ConnectionOptions } from "./Invisi";
+export type { InvisiOptions, ConnectionOptions, RegistrationPreparationOptions } from "./Invisi";
 export {
     Wallet,
     ViewingCapability,
@@ -87,7 +89,7 @@ export type {
 } from "@invisi-labs/prover";
 
 export { ProtocolRpcError } from "@invisi-labs/rpc";
-export type { ProtocolDeployment } from "@invisi-labs/rpc";
+export type { ProtocolDeployment, RegisteredReceivingAddress } from "@invisi-labs/rpc";
 export { ProtocolRpcClient } from "./ProtocolRpcClient";
 export { AddressRegistry } from "./AddressRegistry";
 export type {

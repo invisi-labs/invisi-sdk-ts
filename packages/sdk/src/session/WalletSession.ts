@@ -1,3 +1,4 @@
+import { prepareWithErrors } from "../errors";
 import { copyGasBenchmarks } from "../gas-estimation";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress, type TransactionRequest, type TransactionResponse } from "ethers";
@@ -198,28 +199,44 @@ export class WalletSession {
         });
     }
     async prepareTransfer(options: TransferPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareTransfer(options);
+        return prepareWithErrors("prepareTransfer", async () => {
+            return this.preparation(options.tokenAddress).prepareTransfer(options);
+        });
     }
     async prepareWithdraw(options: WithdrawalPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareWithdraw(options);
+        return prepareWithErrors("prepareWithdraw", async () => {
+            return this.preparation(options.tokenAddress).prepareWithdraw(options);
+        });
     }
     async prepareSweep(options: SweepPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareSweep(options);
+        return prepareWithErrors("prepareSweep", async () => {
+            return this.preparation(options.tokenAddress).prepareSweep(options);
+        });
     }
     async prepareShield(options: ShieldPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareShield(options);
+        return prepareWithErrors("prepareShield", async () => {
+            return this.preparation(options.tokenAddress).prepareShield(options);
+        });
     }
     async prepareCreateCredit(options: CreateCreditPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareCreateCredit(options);
+        return prepareWithErrors("prepareCreateCredit", async () => {
+            return this.preparation(options.tokenAddress).prepareCreateCredit(options);
+        });
     }
     async prepareDrawCredit(options: DrawCreditPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareDrawCredit(options);
+        return prepareWithErrors("prepareDrawCredit", async () => {
+            return this.preparation(options.tokenAddress).prepareDrawCredit(options);
+        });
     }
     async prepareTopUpCredit(options: TopUpCreditPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareTopUpCredit(options);
+        return prepareWithErrors("prepareTopUpCredit", async () => {
+            return this.preparation(options.tokenAddress).prepareTopUpCredit(options);
+        });
     }
     async prepareCancelCredit(options: CancelCreditPreparation): Promise<Operation> {
-        return this.preparation(options.tokenAddress).prepareCancelCredit(options);
+        return prepareWithErrors("prepareCancelCredit", async () => {
+            return this.preparation(options.tokenAddress).prepareCancelCredit(options);
+        });
     }
     async resume(operationId: string): Promise<Operation> {
         const store = this.#options.store;

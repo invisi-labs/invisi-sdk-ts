@@ -1,3 +1,4 @@
+import { prepareWithErrors } from "./errors";
 import { copyGasBenchmarks } from "./gas-estimation";
 import { explicitPreparation } from "./explicit-preparation";
 import type { PreparedTransaction } from "./PreparedTransaction";
@@ -18,7 +19,9 @@ import {
     EthersFundingVerifier,
     EthersAddressResolver,
 } from "./integrations/ethers";
-import { MissingCapabilityError } from "@invisi-labs/core";
+import { MissingCapabilityError, ReceivingAddress } from "@invisi-labs/core";
+import { AddressRegistry } from "./AddressRegistry";
+import type { RegistrationPreparation, RegistrationOperation } from "@invisi-labs/protocol";
 import { Protocol, type ChainReader } from "@invisi-labs/protocol";
 import { WalletSession, type WalletSessionOptions } from "./session";
 
@@ -34,9 +37,17 @@ export type InvisiOptions = Omit<
     | "signer"
     | "fundingSigner"
 > & {
+    /** Recipient discovery source; an explicit addressResolver takes precedence. */
+    addressLookup?: "chain" | "protocol-rpc";
     provider?: Provider;
     chainReader?: ChainReader;
 };
+
+/** Public wallet and registry-specific inputs; signing remains external. */
+export type RegistrationPreparationOptions = Pick<
+    RegistrationPreparation,
+    "wallet" | "update" | "deadline"
+>;
 
 /** Wallet identity and session permissions; shared infrastructure belongs to InvisiOptions. */
 export type ConnectionOptions = Pick<
@@ -77,7 +88,14 @@ export class Invisi {
         }
         const selected = { ...options };
         const combined = { ...this.#options, ...selected };
-        const { provider, ...runtime } = combined;
+        const { provider, addressLookup, ...runtime } = combined;
+        if (
+            addressLookup !== undefined &&
+            addressLookup !== "chain" &&
+            addressLookup !== "protocol-rpc"
+        ) {
+            throw new Error("Invalid recipient address lookup source");
+        }
         const reader =
             combined.chainReader ?? (provider ? new EthersChainReader(provider) : undefined);
         if (!reader) throw new MissingCapabilityError("chain reader");
@@ -93,18 +111,41 @@ export class Invisi {
             (provider
                 ? new EthersFundingVerifier(provider, selected.protocol.context.chainId)
                 : undefined);
-        const addressResolver =
-            combined.addressResolver ??
-            (provider && registry
-                ? new EthersAddressResolver(
-                      provider,
-                      {
-                          chainId: selected.protocol.context.chainId,
-                          registryAddress: registry.address,
-                      },
-                      registry.runtimeCodeHash
-                  ).lookup
-                : undefined);
+        let addressResolver = combined.addressResolver;
+        if (!addressResolver && registry) {
+            if (addressLookup === "protocol-rpc") {
+                const rpc = runtime.protocolRpc;
+                addressResolver = async (identity) => {
+                    if (!(rpc instanceof ProtocolRpcClient)) {
+                        throw new MissingCapabilityError("Protocol RPC recipient discovery");
+                    }
+                    const discovered = await rpc.getDeployment(selected.protocol.context.chainId);
+                    const expected = selected.protocol.deployment;
+                    if (
+                        discovered.protocol.address !== expected.protocol.address ||
+                        discovered.protocol.runtimeCodeHash !== expected.protocol.runtimeCodeHash ||
+                        discovered.protocol.fromBlock !== expected.protocol.fromBlock ||
+                        discovered.registry?.address !== registry.address ||
+                        discovered.registry.runtimeCodeHash !== registry.runtimeCodeHash ||
+                        discovered.registry.fromBlock !== registry.fromBlock
+                    )
+                        throw new Error("Recipient registry deployment pins mismatch");
+                    const registration = await rpc.getReceivingAddress(identity);
+                    return registration
+                        ? ReceivingAddress.parse(registration.receivingAddress).getReceivingKeys()
+                        : null;
+                };
+            } else if (provider) {
+                addressResolver = new EthersAddressResolver(
+                    provider,
+                    {
+                        chainId: selected.protocol.context.chainId,
+                        registryAddress: registry.address,
+                    },
+                    registry.runtimeCodeHash
+                ).lookup;
+            }
+        }
         return {
             ...runtime,
             chainReader: reader,
@@ -114,67 +155,112 @@ export class Invisi {
         };
     }
 
+    /** Discover the selected chain's registry and prepare an independent signing request. */
+    async prepareRegistration(
+        options: RegistrationPreparationOptions
+    ): Promise<RegistrationOperation> {
+        return prepareWithErrors("prepareRegistration", async () => {
+            for (const key of Object.keys(options)) {
+                if (!["wallet", "update", "deadline"].includes(key)) {
+                    throw new Error(`Unknown registration option: ${key}`);
+                }
+            }
+            const selected = { ...options };
+            const { provider, protocolRpc } = this.#options;
+            if (!provider) throw new MissingCapabilityError("ethers provider");
+            if (!(protocolRpc instanceof ProtocolRpcClient)) {
+                throw new MissingCapabilityError("Protocol RPC deployment discovery");
+            }
+            const chainId = (await provider.getNetwork()).chainId;
+            const deployment = await protocolRpc.getDeployment(chainId);
+            if (!deployment.registry) {
+                throw new MissingCapabilityError("receiving-key registry deployment");
+            }
+            const registry = new AddressRegistry(
+                { chainId, registryAddress: deployment.registry.address },
+                { expectedRuntimeCodeHash: deployment.registry.runtimeCodeHash }
+            );
+            return registry.prepareRegistration({ ...selected, provider });
+        });
+    }
+
     async prepareTransfer(options: ExplicitTransferPreparation): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareTransfer(request);
+        return prepareWithErrors("prepareTransfer", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareTransfer(request);
+        });
     }
     async prepareWithdraw(options: ExplicitWithdrawalPreparation): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareWithdraw(request);
+        return prepareWithErrors("prepareWithdraw", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareWithdraw(request);
+        });
     }
     async prepareSweep(options: ExplicitSweepPreparation): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareSweep(request);
+        return prepareWithErrors("prepareSweep", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareSweep(request);
+        });
     }
     async prepareShield(options: ExplicitShieldPreparation): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
-        return preparation.prepareShield(request);
+        return prepareWithErrors("prepareShield", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
+            return preparation.prepareShield(request);
+        });
     }
     async prepareCreateCredit(
         options: ExplicitCreateCreditPreparation
     ): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareCreateCredit(request);
+        return prepareWithErrors("prepareCreateCredit", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareCreateCredit(request);
+        });
     }
     async prepareDrawCredit(options: ExplicitDrawCreditPreparation): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareDrawCredit(request);
+        return prepareWithErrors("prepareDrawCredit", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareDrawCredit(request);
+        });
     }
     async prepareTopUpCredit(
         options: ExplicitTopUpCreditPreparation
     ): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareTopUpCredit(request);
+        return prepareWithErrors("prepareTopUpCredit", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareTopUpCredit(request);
+        });
     }
     async prepareCancelCredit(
         options: ExplicitCancelCreditPreparation
     ): Promise<PreparedTransaction> {
-        const { wallet, protocol, ...input } = options;
-        const request = structuredClone(input);
-        const runtime = await this.resolve({ wallet, protocol });
-        const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-        return preparation.prepareCancelCredit(request);
+        return prepareWithErrors("prepareCancelCredit", async () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            const runtime = await this.resolve({ wallet, protocol });
+            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            return preparation.prepareCancelCredit(request);
+        });
     }
 
     toJSON() {
