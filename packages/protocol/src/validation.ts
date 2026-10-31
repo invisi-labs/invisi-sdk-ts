@@ -1,3 +1,4 @@
+import { MAX_CIPHERTEXT_BYTES, validateDeliveryCiphertext } from "@invisi-labs/core";
 import type { Address, Delivery, FundingParams, Hex, InputSource } from "./contracts";
 import {
     AbiCoder,
@@ -130,9 +131,10 @@ export const pad = (v: readonly bigint[], n: number): bigint[] => [
     ...v,
     ...(Array(n - v.length).fill(0n) as bigint[]),
 ];
-export function normalizeDelivery(
+/** Receipt/transport validation must not reject unrelated future wallet codecs. */
+export function normalizeOpaqueDelivery(
     value: Delivery,
-    options: { credit?: boolean; empty?: boolean } = {}
+    options: { empty?: boolean } = {}
 ): Delivery {
     known(value, ["ciphertext", "clue"], "delivery");
     if (options.empty) {
@@ -140,15 +142,21 @@ export function normalizeDelivery(
             throw new Error("absent output requires an empty delivery");
         return { ciphertext: "0x", clue: "0x" };
     }
-    const ciphertext = envelope(
-        value.ciphertext,
-        options.credit ? 498 : 160,
-        options.credit ? 5 : 2,
-        options.credit ? 754 : 416
-    );
+    const ciphertext = envelope(value.ciphertext, 1, undefined, MAX_CIPHERTEXT_BYTES);
     const clue = envelope(value.clue, 68);
     if (clue.slice(130, 132).toLowerCase() !== "18") throw new Error("clue precision must be 24");
     return { ciphertext, clue };
+}
+
+/** Builders only emit supported wallet codecs; canonical receipt readers use opaque validation. */
+export function normalizeDelivery(
+    value: Delivery,
+    options: { credit?: boolean; empty?: boolean } = {}
+): Delivery {
+    const delivery = normalizeOpaqueDelivery(value, options);
+    if (!options.empty)
+        validateDeliveryCiphertext(delivery.ciphertext, options.credit ? "credit" : "funds");
+    return delivery;
 }
 export const deliveriesHash = (v: readonly Delivery[]) =>
     keccak256(

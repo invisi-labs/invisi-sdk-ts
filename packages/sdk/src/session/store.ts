@@ -24,7 +24,7 @@ export function scopeKey(scope: WalletScope): string {
     return bytesToHex(
         sha256(
             utf8ToBytes(
-                "Invisi.WalletScope.v2:" +
+                "Invisi.WalletScope.v1:" +
                     JSON.stringify([
                         scope.namespace,
                         scope.chainId.toString(),

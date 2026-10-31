@@ -1,4 +1,4 @@
-/** Refresh public-test Credit envelopes using the actual protocol Node implementation. */
+/** Refresh public-test funds and Credit envelopes using the actual protocol Node implementation. */
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve, join } from "node:path";
@@ -60,11 +60,73 @@ for (const [role, code] of [
 vectors.credit.ownerReceivingKeys = state.ownerReceivingKeys;
 vectors.credit.spenderReceivingKeys = state.spenderReceivingKeys;
 vectors.credit.deliverySource = {
-    envelopeVersion: 5,
+    envelopeType: 1,
+    envelopeVersion: 1,
+    header: 129,
     ciphertextBytes: 498,
     protocolClientSha256: createHash("sha256").update(readFileSync(source)).digest("hex"),
     purpose:
         "Independent Node crypto delivery vectors; canonical fixture clue points do not claim FMD detectability.",
 };
+const fundsSource = join(protocol, "scripts/private-transfer-client.mjs");
+const { encryptPrivateTransferNote } = await import(pathToFileURL(fundsSource).href);
+const fundsEnvelope = await encryptPrivateTransferNote(
+    vectors.owner.viewingPublicKey,
+    {
+        walletIdentity: BigInt(vectors.note.walletIdentity),
+        amount: BigInt(vectors.note.amount),
+        nonce: BigInt(vectors.note.nonce),
+    },
+    { ...context, outputCommitment: vectors.note.commitment },
+    {
+        ephemeralPrivateKey: "0x" + "09".repeat(32),
+        salt: Buffer.alloc(16, 7),
+        iv: Buffer.alloc(12, 8),
+    }
+);
+vectors.note.ciphertext = "0x" + fundsEnvelope.toString("hex");
+vectors.note.deliverySource = {
+    envelopeType: 0,
+    envelopeVersion: 1,
+    header: 1,
+    ciphertextBytes: fundsEnvelope.length,
+    protocolClientSha256: createHash("sha256").update(readFileSync(fundsSource)).digest("hex"),
+};
+for (const vector of vectors.memoVectors ?? []) {
+    if (vector.kind !== "funds") {
+        const envelope = await encryptCreditNote(
+            vectors[vector.role].viewingPublicKey,
+            {
+                ...state,
+                note: { ...state.note, memo: Buffer.from(vector.memo.slice(2), "hex") },
+            },
+            context,
+            vector.role === "owner" ? 1 : 2,
+            {
+                ephemeralPrivateKey: "0x" + "09".repeat(32),
+                salt: Buffer.alloc(16, 7),
+                iv: Buffer.alloc(12, 8),
+            }
+        );
+        vector.ciphertext = "0x" + envelope.toString("hex");
+        continue;
+    }
+    const envelope = await encryptPrivateTransferNote(
+        vectors.owner.viewingPublicKey,
+        {
+            walletIdentity: BigInt(vectors.note.walletIdentity),
+            amount: BigInt(vectors.note.amount),
+            nonce: BigInt(vectors.note.nonce),
+            memo: Buffer.from(vector.memo.slice(2), "hex"),
+        },
+        { ...context, outputCommitment: vectors.note.commitment },
+        {
+            ephemeralPrivateKey: "0x" + "09".repeat(32),
+            salt: Buffer.alloc(16, 7),
+            iv: Buffer.alloc(12, 8),
+        }
+    );
+    vector.ciphertext = "0x" + envelope.toString("hex");
+}
 writeFileSync(file, JSON.stringify(vectors, null, 2) + "\n");
 console.log("Refreshed two 498-byte Credit envelopes from the protocol implementation.");

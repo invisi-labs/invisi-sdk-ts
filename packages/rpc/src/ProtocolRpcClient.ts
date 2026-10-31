@@ -1,5 +1,5 @@
 import type { Hex } from "@invisi-labs/core";
-import { ReceivingAddress } from "@invisi-labs/core";
+import { MAX_CIPHERTEXT_BYTES, deliveryCodec, ReceivingAddress } from "@invisi-labs/core";
 import { getAddress, isAddress, getBytes } from "ethers";
 import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
 import { FIELD_MODULUS } from "@invisi-labs/core";
@@ -480,14 +480,24 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             if (typeof output.kind !== "string" || !output.kind) invalid("Invalid output kind");
             if (
                 typeof output.ciphertext !== "string" ||
-                !/^0x(?:[0-9a-f]{2}){160,754}$/i.test(output.ciphertext)
+                !/^0x(?:[0-9a-f]{2})+$/i.test(output.ciphertext) ||
+                (output.ciphertext.length - 2) / 2 > MAX_CIPHERTEXT_BYTES
             )
                 invalid("Invalid output ciphertext");
             if (typeof output.clue !== "string" || !/^0x[0-9a-f]{136}$/i.test(output.clue))
                 invalid("Invalid output clue");
-            const isCredit =
-                ["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(output.kind as string) &&
-                (output.ciphertext as string).slice(0, 4).toLowerCase() === "0x05";
+            let isCredit = false;
+            if (["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(output.kind as string)) {
+                try {
+                    isCredit =
+                        deliveryCodec(
+                            Number.parseInt((output.ciphertext as string).slice(2, 4), 16)
+                        ).kind === "credit";
+                } catch {
+                    // Unknown codecs remain available through readUpdates; do not block known candidates.
+                    continue;
+                }
+            }
             if (isCredit !== credit) continue;
             const candidate: ProtocolOutput = {
                 block: {

@@ -73,9 +73,9 @@ type ReferenceContext = core.NoteDecryptionContext & { role?: "owner" | "spender
 // Independent reference codec uses Node crypto only; production uses WebCrypto.
 function referenceAAD(version: number, c: ReferenceContext, header: Uint8Array) {
     return Buffer.concat([
-        Buffer.from(version === 2 ? "Invisi.NoteDelivery.v2" : "Invisi.CreditDelivery.v3"),
+        Buffer.from(version === 1 ? "Invisi.NoteDelivery.v1" : "Invisi.CreditDelivery.v1"),
         header,
-        Buffer.from([version === 2 ? 0 : c.role === "owner" ? 1 : 2]),
+        Buffer.from([version !== 129 ? 0 : c.role === "owner" ? 1 : 2]),
         bytes(c.chainId, 8),
         bytes(c.protocolAddress, 20),
         bytes(c.tokenAddress, 20),
@@ -88,7 +88,7 @@ function referencePlaintext(envelope: Uint8Array, c: ReferenceContext, privateKe
         ecdh = createECDH("secp256k1");
     ecdh.setPrivateKey(privateKey);
     const domain = Buffer.from(
-        version === 2 ? "Invisi.NoteDelivery.v2" : "Invisi.CreditDelivery.v3"
+        version === 1 ? "Invisi.NoteDelivery.v1" : "Invisi.CreditDelivery.v1"
     );
     const info = Buffer.concat([
         domain,
@@ -115,7 +115,7 @@ function referenceSeal(plain: Uint8Array, version: number, c: ReferenceContext) 
     const ephemeralPublicKey = ecdh.getPublicKey(undefined, "compressed");
     const header = Buffer.concat([Buffer.from([version]), ephemeralPublicKey, salt, iv]);
     const domain = Buffer.from(
-        version === 2 ? "Invisi.NoteDelivery.v2" : "Invisi.CreditDelivery.v3"
+        version === 1 ? "Invisi.NoteDelivery.v1" : "Invisi.CreditDelivery.v1"
     );
     const info = Buffer.concat([domain, ephemeralPublicKey, viewingKey]);
     const derived = hkdfSync("sha256", ecdh.computeSecret(viewingKey), salt, info, 32);
@@ -127,6 +127,7 @@ const notePlaintext = Buffer.concat([
     bytes(BigInt(payment.walletIdentity)),
     bytes(payment.amount, 16),
     bytes(payment.nonce),
+    bytes(0n, 1),
     bytes(0n, 2),
 ]);
 const creditPlaintext = Buffer.concat([
@@ -223,8 +224,8 @@ describe("current authenticated note envelopes", () => {
     it("creates interoperable randomized ordinary envelopes", async () => {
         const a = await core.encryptPrivateTransferNote(viewingKey, payment, noteContext);
         const b = await core.encryptPrivateTransferNote(viewingKey, payment, noteContext);
-        expect(a).toHaveLength(160);
-        expect(a[0]).toBe(2);
+        expect(a).toHaveLength(161);
+        expect(a[0]).toBe(1);
         expect(a).not.toEqual(b);
         expect(referencePlaintext(a, noteContext)).toEqual(notePlaintext);
         expect(await core.decryptPrivateTransferNote(key, a, noteContext)).toEqual(payment);
@@ -233,7 +234,7 @@ describe("current authenticated note envelopes", () => {
         const a = await core.encryptCreditNote(viewingKey, creditState, creditContext);
         const b = await core.encryptCreditNote(viewingKey, creditState, creditContext);
         expect(a).toHaveLength(498);
-        expect(a[0]).toBe(5);
+        expect(a[0]).toBe(129);
         expect(a).not.toEqual(b);
         expect(referencePlaintext(a, creditContext)).toEqual(creditPlaintext);
         expect(await core.decryptCreditNote(key, a, creditContext)).toEqual(creditState);
@@ -395,8 +396,8 @@ describe("current authenticated note envelopes", () => {
     });
     it("rejects authenticated memo length mismatches, trailing data, overflow and missing framing", async () => {
         for (const [plain, version, c, decrypt] of [
-            [notePlaintext, 2, noteContext, core.decryptPrivateTransferNote],
-            [creditPlaintext, 5, creditContext, core.decryptCreditNote],
+            [notePlaintext, 1, noteContext, core.decryptPrivateTransferNote],
+            [creditPlaintext, 129, creditContext, core.decryptCreditNote],
         ] as const) {
             const base = plain.subarray(0, plain.length - 2);
             for (const malformed of [
@@ -423,14 +424,14 @@ describe("current authenticated note envelopes", () => {
         await expect(
             core.decryptPrivateTransferNote(
                 key,
-                referenceSeal(changedNote, 2, noteContext),
+                referenceSeal(changedNote, 1, noteContext),
                 noteContext
             )
         ).rejects.toThrow();
         await expect(
             core.decryptCreditNote(
                 key,
-                referenceSeal(changedCredit, 5, creditContext),
+                referenceSeal(changedCredit, 129, creditContext),
                 creditContext
             )
         ).rejects.toThrow();
@@ -443,14 +444,14 @@ describe("current authenticated note envelopes", () => {
         await expect(
             core.decryptPrivateTransferNote(
                 key,
-                referenceSeal(invalidNote, 2, noteContext),
+                referenceSeal(invalidNote, 1, noteContext),
                 noteContext
             )
         ).rejects.toThrow();
         await expect(
             core.decryptCreditNote(
                 key,
-                referenceSeal(invalidCredit, 5, creditContext),
+                referenceSeal(invalidCredit, 129, creditContext),
                 creditContext
             )
         ).rejects.toThrow();
@@ -476,14 +477,14 @@ describe("current authenticated note envelopes", () => {
         await expect(
             core.decryptPrivateTransferNote(
                 key,
-                referenceSeal(notePlaintext, 2, noteContext),
+                referenceSeal(notePlaintext, 1, noteContext),
                 noteContext
             )
         ).resolves.toEqual(payment);
         await expect(
             core.decryptCreditNote(
                 key,
-                referenceSeal(creditPlaintext, 5, creditContext),
+                referenceSeal(creditPlaintext, 129, creditContext),
                 creditContext
             )
         ).resolves.toEqual(creditState);
@@ -569,7 +570,11 @@ describe("current authenticated note envelopes", () => {
             const changed = Buffer.from(creditPlaintext);
             changed[offset] = changed[offset]! ^ 1;
             await expect(
-                core.decryptCreditNote(key, referenceSeal(changed, 5, creditContext), creditContext)
+                core.decryptCreditNote(
+                    key,
+                    referenceSeal(changed, 129, creditContext),
+                    creditContext
+                )
             ).rejects.toThrow();
         }
         for (const changed of [
@@ -593,7 +598,7 @@ describe("current authenticated note envelopes", () => {
             await expect(
                 core.decryptPrivateTransferNote(
                     key,
-                    referenceSeal(invalid, 2, noteContext),
+                    referenceSeal(invalid, 1, noteContext),
                     noteContext
                 )
             ).rejects.toThrow();
@@ -612,7 +617,11 @@ describe("current authenticated note envelopes", () => {
             const invalid = Buffer.from(creditPlaintext);
             bytes(value, length).copy(invalid, offset);
             await expect(
-                core.decryptCreditNote(key, referenceSeal(invalid, 5, creditContext), creditContext)
+                core.decryptCreditNote(
+                    key,
+                    referenceSeal(invalid, 129, creditContext),
+                    creditContext
+                )
             ).rejects.toThrow();
         }
     });
@@ -693,3 +702,30 @@ describe("current authenticated note envelopes", () => {
 function ownerHex(value: string | number | bigint): `0x${string}` {
     return `0x${BigInt(value).toString(16).padStart(40, "0")}`;
 }
+
+it("rejects authenticated funds-v1 payloads with unknown flags or invalid address framing", async () => {
+    const base = notePlaintext.subarray(0, 80);
+    for (const metadata of [
+        Buffer.from([2, 0, 0]),
+        Buffer.from([128, 0, 0]),
+        Buffer.from([1, 0, 0]),
+        Buffer.concat([Buffer.from([1]), Buffer.alloc(85), Buffer.from([0, 0])]),
+        Buffer.from([0, 0, 1]),
+        Buffer.from([0, 0, 0, 0]),
+    ]) {
+        await expect(
+            core.decryptPrivateTransferNote(
+                key,
+                referenceSeal(Buffer.concat([base, metadata]), 1, noteContext),
+                noteContext
+            )
+        ).rejects.toThrow();
+    }
+});
+
+it("authenticates the type bit even when the modified envelope fits the other codec size", async () => {
+    const envelope = await core.encryptCreditNote(viewingKey, creditState, creditContext);
+    envelope[0] = envelope[0]! ^ 0x80;
+    // 498 bytes also fits the funds codec's size range, so GCM must reject the changed header/domain.
+    await expect(core.decryptPrivateTransferNote(key, envelope, creditContext)).rejects.toThrow();
+});

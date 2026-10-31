@@ -466,15 +466,19 @@ realNativeProof(
 );
 
 it.each(["shield", "transfer"] as const)(
-    "copies per-output memos before async store-free %s preparation",
+    "copies per-output metadata before async store-free %s preparation without inheriting it",
     async (kind) => {
         const h = await setup();
         const memo = new Uint8Array([0, 255, 65]);
+        // Input metadata must not become metadata on new payments or ordinary change.
+        h.inputs[0]!.note.returnAddress = h.bob.getAddress();
         const common = {
             wallet: h.wallet,
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n, memo }],
+            outputs: [
+                { to: h.bob.getAddress(), amount: 30n, memo, returnAddress: h.wallet.getAddress() },
+            ],
         };
         const pending =
             kind === "shield"
@@ -505,6 +509,18 @@ it.each(["shield", "transfer"] as const)(
             outputCommitment: commitment,
         });
         expect(note.memo).toEqual(new Uint8Array([0, 255, 65]));
+        expect(note.returnAddress).toBe(h.wallet.getAddress());
+        if (kind === "transfer") {
+            const change = await h.wallet
+                .getViewer()
+                .decryptNote(decoded.args[1].deliveries[1].ciphertext, {
+                    chainId: h.context.chainId,
+                    protocolAddress: BigInt(h.context.protocolAddress),
+                    tokenAddress: BigInt(h.context.tokenAddress),
+                    outputCommitment: decoded.args[1].params.outputCommitments[1],
+                });
+            expect(change).not.toHaveProperty("returnAddress");
+        }
     }
 );
 
@@ -598,4 +614,23 @@ it("draws Credits from two different owners with one external spender authorizat
             creditInputs[index]!.state.spenderReceivingKeys
         );
     }
+});
+
+it("reports invalid return addresses at the public preparation boundary", async () => {
+    const h = await setup();
+    await expect(
+        h.invisi.prepareTransfer({
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            protocol: h.protocol,
+            tokenAddress: h.context.tokenAddress,
+            inputs: h.inputs,
+            outputs: [
+                { to: h.bob.getAddress(), amount: 30n, returnAddress: h.wallet.ownerAddress },
+            ],
+        })
+    ).rejects.toMatchObject({
+        code: "PREPARATION_FAILED",
+        operation: "prepareTransfer",
+        outputIndex: 0,
+    });
 });

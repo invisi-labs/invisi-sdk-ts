@@ -55,7 +55,7 @@ describe("self-contained Credit delivery state", () => {
                 };
             const envelope = await encryptCreditNote(hexBytes(wallet.viewingPublicKey), state, c);
             expect(envelope).toHaveLength(498);
-            expect(envelope[0]).toBe(5);
+            expect(envelope[0]).toBe(129);
             expect(
                 await decryptCreditNote(hexBytes(wallet.viewingPrivateKey), envelope, c)
             ).toEqual(state);
@@ -63,7 +63,7 @@ describe("self-contained Credit delivery state", () => {
             // This reference decrypts using Node, independently of production WebCrypto.
             const ecdh = createECDH("secp256k1");
             ecdh.setPrivateKey(hexBytes(wallet.viewingPrivateKey));
-            const domain = Buffer.from("Invisi.CreditDelivery.v3"),
+            const domain = Buffer.from("Invisi.CreditDelivery.v1"),
                 data = Buffer.from(envelope);
             const key = hkdfSync(
                 "sha256",

@@ -68,6 +68,8 @@ export interface FundingSource {
     permit?: NonNullable<FundingInput["permit"]>;
 }
 export interface PaymentOutput {
+    /** Optional complete 0i reply address, not inferred from the payer or signer. */
+    returnAddress?: string;
     memo?: string | Uint8Array;
     to: string;
     amount: bigint;

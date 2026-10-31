@@ -1,4 +1,6 @@
 import { encodeMemo } from "./memo";
+import { deliveryCodec, deliveryHeader, validateDeliveryCiphertext } from "./delivery-codec";
+import { decodeAddress, encodeLongAddress } from "./address";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
 import {
@@ -62,8 +64,6 @@ declare const crypto: {
     };
 };
 const ascii = (value: string) => Uint8Array.from(value, (character) => character.charCodeAt(0));
-const NOTE_DOMAIN = ascii("Invisi.NoteDelivery.v2");
-const CREDIT_DOMAIN = ascii("Invisi.CreditDelivery.v3");
 
 function concat(...parts: Uint8Array[]): Uint8Array {
     const out = new Uint8Array(parts.reduce((size, p) => size + p.length, 0));
@@ -256,15 +256,20 @@ async function seal(
     plaintext: Uint8Array,
     context: NoteEncryptionContext,
     tokenAddress: bigint,
-    version: number,
+    headerByte: number,
     role: number
 ): Promise<Uint8Array> {
     const peer = publicKey(viewingKey),
         key = ephemeralKey();
     const salt = random(16),
         iv = random(12),
-        domain = version === 2 ? NOTE_DOMAIN : CREDIT_DOMAIN;
-    const header = concat(new Uint8Array([version]), secp256k1.getPublicKey(key, true), salt, iv);
+        domain = deliveryDomain(headerByte);
+    const header = concat(
+        new Uint8Array([headerByte]),
+        secp256k1.getPublicKey(key, true),
+        salt,
+        iv
+    );
     const additionalData = aad(domain, context, tokenAddress, header, role);
     try {
         const encrypted = await crypto.subtle.encrypt(
@@ -287,13 +292,13 @@ async function open(
     key: NoteBytes,
     envelope: NoteBytes,
     context: NoteDecryptionContext,
-    version: number,
+    headerByte: number,
     role: number,
     payloadKey = false
 ): Promise<Uint8Array> {
-    const data = envelopeBytes(envelope, version !== 2);
-    if (data[0] !== version) throw new Error("unsupported envelope version");
-    const domain = version === 2 ? NOTE_DOMAIN : CREDIT_DOMAIN;
+    const data = envelopeBytes(envelope, deliveryCodec(headerByte).kind === "credit");
+    if (data[0] !== headerByte) throw new Error("unsupported envelope version");
+    const domain = deliveryDomain(headerByte);
     const additionalData = aad(domain, context, context.tokenAddress, data.slice(0, 62), role);
     const localKey = payloadKey ? bytes(key, 32) : privateKey(key);
     try {
@@ -323,13 +328,29 @@ async function open(
         localKey.fill(0);
     }
 }
-/** Funds envelope (160..416 bytes), with fresh ephemeral key, salt and IV. */
+function deliveryDomain(headerByte: number): Uint8Array {
+    return ascii(deliveryCodec(headerByte).domain);
+}
+
+function returnAddressBytes(address?: string): Uint8Array {
+    if (address === undefined) return new Uint8Array();
+    const decoded = decodeAddress(address);
+    if (decoded.kind !== "long") throw new Error("return address requires a complete 0i address");
+    return concat(
+        encode(BigInt(decoded.walletIdentity), 20),
+        decoded.viewingPublicKey,
+        decoded.clueKey
+    );
+}
+
+/** Funds v1 envelope (161..502 bytes), with an optional 85-byte reply address. */
 export async function encryptPrivateTransferNote(
     viewingKey: NoteBytes,
     note: Note,
     context: NoteEncryptionContext
 ): Promise<Uint8Array> {
     const memo = encodeMemo(note.memo);
+    const returnAddress = returnAddressBytes(note.returnAddress);
     const scopedNote = { ...note };
     const scopedContext = { ...context };
     await noteCommitment(scopedContext, scopedNote);
@@ -339,12 +360,14 @@ export async function encryptPrivateTransferNote(
             encode(BigInt(scopedNote.walletIdentity)),
             encode(scopedNote.amount, 16),
             encode(scopedNote.nonce),
+            new Uint8Array([returnAddress.length === 0 ? 0 : 1]),
+            returnAddress,
             encode(BigInt(memo.length), 2),
             memo
         ),
         scopedContext,
         scopedNote.tokenAddress,
-        2,
+        deliveryHeader("funds"),
         0
     );
 }
@@ -356,7 +379,9 @@ async function readNote(
     payloadKey = false
 ): Promise<Note> {
     const authenticatedContext = { ...context };
-    const plain = await open(key, envelope, authenticatedContext, 2, 0, payloadKey);
+    const data = envelopeBytes(envelope, false);
+    const headerByte = data[0]!;
+    const plain = await open(key, data, authenticatedContext, headerByte, 0, payloadKey);
     try {
         const note = {
             chainId: authenticatedContext.chainId,
@@ -365,7 +390,7 @@ async function readNote(
             walletIdentity: hexField(decode(plain.slice(0, 32))),
             amount: decode(plain.slice(32, 48)),
             nonce: decode(plain.slice(48, 80)),
-            ...readMemo(plain, 80),
+            ...readFundsMetadata(plain),
         };
         if (BigInt(note.walletIdentity) !== BigInt(authenticatedContext.walletIdentity))
             throw new Error("recipient wallet identity mismatch");
@@ -453,7 +478,7 @@ export async function encryptCreditNote(
         ),
         scopedContext,
         scopedNote.tokenAddress,
-        5,
+        deliveryHeader("credit"),
         creditRole(scopedContext.role)
     );
 }
@@ -469,7 +494,7 @@ async function readCredit(
         key,
         envelope,
         authenticatedContext,
-        5,
+        deliveryHeader("credit"),
         creditRole(authenticatedContext.role),
         payloadKey
     );
@@ -564,7 +589,7 @@ export async function exportPayloadKey(
     credit: boolean
 ): Promise<Uint8Array> {
     const data = envelopeBytes(envelope, credit);
-    if (data[0] !== (credit ? 5 : 2)) throw new Error("unsupported envelope version");
+
     const localKey = privateKey(key);
     try {
         const aes = await derivedKey(
@@ -572,7 +597,7 @@ export async function exportPayloadKey(
             publicKey(data.slice(1, 34)),
             data.slice(0, 62),
             viewingPublicKey(localKey),
-            credit ? CREDIT_DOMAIN : NOTE_DOMAIN,
+            deliveryDomain(data[0]!),
             true
         );
         return new Uint8Array(await crypto.subtle.exportKey("raw", aes));
@@ -582,10 +607,20 @@ export async function exportPayloadKey(
 }
 
 function envelopeBytes(value: NoteBytes, credit: boolean): Uint8Array {
-    const length = typeof value === "string" ? (value.length - 2) / 2 : value.length;
-    const minimum = credit ? 498 : 160;
-    if (length < minimum || length > minimum + 256) throw new Error("invalid envelope length");
-    return bytes(value, length);
+    return validateDeliveryCiphertext(value, credit ? "credit" : "funds");
+}
+function readFundsMetadata(plain: Uint8Array): { returnAddress?: string; memo?: Uint8Array } {
+    if (plain.length < 83) throw new Error("missing funds metadata flags");
+    const flags = plain[80]!;
+    if ((flags & ~1) !== 0) throw new Error("unsupported funds metadata flags");
+    if (flags === 0) return readMemo(plain, 81);
+    if (plain.length < 168) throw new Error("truncated return address");
+    const returnAddress = encodeLongAddress({
+        walletIdentity: hexField(decode(plain.slice(81, 101))),
+        viewingPublicKey: plain.slice(101, 134),
+        clueKey: plain.slice(134, 166),
+    });
+    return { returnAddress, ...readMemo(plain, 166) };
 }
 function readMemo(plain: Uint8Array, offset: number): { memo?: Uint8Array } {
     if (plain.length < offset + 2) throw new Error("missing memo length");

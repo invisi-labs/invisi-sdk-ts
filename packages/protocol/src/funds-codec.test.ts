@@ -254,7 +254,7 @@ describe("current protocol executable reference vectors", () => {
         expect(() => transactPublicInputs(context, f.params, ["0x"] as never)).toThrow();
         expect(() =>
             transactPublicInputs(context, f.params, [
-                { ...f.deliveries[0], ciphertext: "0x01" + "11".repeat(177) },
+                { ...f.deliveries[0], ciphertext: "0x02" + "11".repeat(177) },
             ])
         ).toThrow();
         expect(() =>

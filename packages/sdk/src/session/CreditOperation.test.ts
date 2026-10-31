@@ -114,7 +114,7 @@ it("creates a privately funded Credit with complete dual 498-byte snapshots and 
     expect(credit.outputs[0]!.state.note.amount).toBe(70n);
     expect(saved.plan.outputs[0]!.note.amount).toBe(30n);
     expect(credit.deliveries.map((delivery) => (delivery.ciphertext.length - 2) / 2)).toEqual([
-        498, 498, 160,
+        498, 498, 161,
     ]);
     const recovered = await h.bob.getViewer().decryptCredit(credit.deliveries[1]!.ciphertext, {
         chainId: h.scope.chainId,

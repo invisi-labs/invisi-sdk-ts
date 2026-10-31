@@ -62,6 +62,7 @@ export async function main(resources: ExampleResources) {
             to: recipientAddress,
             amount,
             memo: "Invoice INV-2026-1042", // Optional UTF-8 text; at most 256 encoded bytes.
+            returnAddress: wallet.getAddress(), // Optional private reply address, not a payer identity claim.
         })),
     });
     console.log("Local operation review:", prepared.preview());

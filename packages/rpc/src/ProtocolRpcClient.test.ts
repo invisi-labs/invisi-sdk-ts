@@ -502,7 +502,8 @@ it.each([
     { treeId: "0" },
     { leafIndex: 65536 },
     { token: "invalid" },
-    { ciphertext: "0x12" },
+    { ciphertext: "0x" },
+    { ciphertext: "0x" + "00".repeat(4097) },
     { clue: "0x12" },
     { commitment: h(1n << 255n) },
     { transactionHash: "0x12" },
@@ -626,21 +627,21 @@ it("does not confuse Credit role envelopes with conflicting funds outputs", asyn
     const credit = {
         ...encryptedOutput(),
         kind: "CreditCreated",
-        ciphertext: "0x05" + "ab".repeat(753),
+        ciphertext: "0x81" + "ab".repeat(753),
     };
     const change = {
         ...encryptedOutput(),
         kind: "CreditCreated",
         leafIndex: 4,
         commitment: h(13),
-        ciphertext: "0x02" + "ab".repeat(159),
+        ciphertext: "0x01" + "ab".repeat(160),
     };
     const { client } = setup((method) =>
         method === "invisi_getStatus"
             ? status()
             : {
                   blockHash: h(10),
-                  outputs: [credit, { ...credit, ciphertext: "0x05" + "cd".repeat(753) }, change],
+                  outputs: [credit, { ...credit, ciphertext: "0x81" + "cd".repeat(753) }, change],
                   creditTransitions: [],
               }
     );
@@ -653,9 +654,9 @@ it("discovers both Credit role envelopes without collapsing a shared commitment"
     const credit = {
         ...encryptedOutput(),
         kind: "CreditCreated",
-        ciphertext: "0x05" + "ab".repeat(753),
+        ciphertext: "0x81" + "ab".repeat(753),
     };
-    const otherRole = { ...credit, ciphertext: "0x05" + "cd".repeat(753) };
+    const otherRole = { ...credit, ciphertext: "0x81" + "cd".repeat(753) };
     const { client, requests } = setup((method) =>
         method === "invisi_getStatus"
             ? status()
@@ -684,7 +685,7 @@ it.each([{ treeId: "2" }, { leafIndex: 4 }, { transactionHash: h(99) }, { commit
         const credit = {
             ...encryptedOutput(),
             kind: "CreditDraw",
-            ciphertext: "0x05" + "ab".repeat(753),
+            ciphertext: "0x81" + "ab".repeat(753),
         };
         const { client } = setup((method) =>
             method === "invisi_getStatus"
@@ -693,7 +694,7 @@ it.each([{ treeId: "2" }, { leafIndex: 4 }, { transactionHash: h(99) }, { commit
                       blockHash: h(10),
                       outputs: [
                           credit,
-                          { ...credit, ...patch, ciphertext: "0x05" + "cd".repeat(753) },
+                          { ...credit, ...patch, ciphertext: "0x81" + "cd".repeat(753) },
                       ],
                       creditTransitions: [],
                   }
@@ -712,7 +713,7 @@ it("rejects more than two distinct Credit role envelopes for one leaf", async ()
                   blockHash: h(10),
                   outputs: ["ab", "cd", "ef"].map((byte) => ({
                       ...credit,
-                      ciphertext: "0x05" + byte.repeat(753),
+                      ciphertext: "0x81" + byte.repeat(753),
                   })),
                   creditTransitions: [],
               }
@@ -726,7 +727,7 @@ it("rejects changed clues for an otherwise identical Credit envelope", async () 
     const credit = {
         ...encryptedOutput(),
         kind: "CreditCreated",
-        ciphertext: "0x05" + "ab".repeat(753),
+        ciphertext: "0x81" + "ab".repeat(753),
     };
     const { client } = setup((method) =>
         method === "invisi_getStatus"

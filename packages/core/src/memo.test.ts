@@ -20,8 +20,8 @@ it("roundtrips copied opaque memo bytes including NUL and invalid UTF-8", async 
     );
     memo.fill(9);
     const envelope = await pending;
-    expect(envelope[0]).toBe(2);
-    expect(envelope).toHaveLength(164);
+    expect(envelope[0]).toBe(1);
+    expect(envelope).toHaveLength(165);
     const decoded = await core.decryptPrivateTransferNote(key, envelope, context);
     expect(decoded.memo).toEqual(new Uint8Array([0, 255, 192, 128]));
     expect(() => core.decodeMemoText(decoded.memo as Uint8Array)).toThrow();
@@ -33,7 +33,7 @@ it("encodes text as UTF-8 and caps encoded text and raw memos at 256 bytes", asy
             { ...note, memo },
             context
         );
-        expect(envelope).toHaveLength(416);
+        expect(envelope).toHaveLength(417);
         const decoded = await core.decryptPrivateTransferNote(key, envelope, context);
         expect(decoded.memo).toBeInstanceOf(Uint8Array);
     }
@@ -49,7 +49,7 @@ it("preserves empty note object semantics and excludes memos from commitment ope
         { ...note, memo: "" },
         context
     );
-    expect(envelope).toHaveLength(160);
+    expect(envelope).toHaveLength(161);
     expect(await core.decryptPrivateTransferNote(key, envelope, context)).not.toHaveProperty(
         "memo"
     );
@@ -137,7 +137,7 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         );
         memo.fill(0);
         const envelope = await pending;
-        expect(envelope[0]).toBe(5);
+        expect(envelope[0]).toBe(129);
         expect(envelope).toHaveLength(754);
         const decoded = await core.decryptCreditNote(privateKey, envelope, scoped);
         expect(decoded.note.memo).toEqual(new Uint8Array(256).fill(255));

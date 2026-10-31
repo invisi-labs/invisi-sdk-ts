@@ -5,6 +5,7 @@ import {
     computeNoteIdentity,
     encryptPrivateTransferNote,
     ViewingCapability,
+    ReceivingAddress,
     viewingPublicKey,
 } from "@invisi-labs/core";
 import vectors from "../../../core/src/testdata/wallet-note-vectors.json";
@@ -52,6 +53,17 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
             walletIdentity,
             amount: 70n,
             nonce: BigInt(i + 1),
+            ...(i === 2
+                ? {
+                      returnAddress: ReceivingAddress.from({
+                          walletIdentity,
+                          viewingPublicKey: viewingPublicKey(key),
+                          clueKey: Uint8Array.from(
+                              Buffer.from(vectors.credit.ownerReceivingKeys.clueKey.slice(2), "hex")
+                          ),
+                      }).toString(),
+                  }
+                : {}),
             ...(memo === undefined ? {} : { memo }),
         };
         const commitment = await computeNoteCommitment(
@@ -67,6 +79,9 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
         });
         segments.push(toBeHex(encrypted.length, 2).slice(2) + hexlify(encrypted).slice(2) + clue);
     }
+    // A contract-valid unknown codec must not hide the three supported outputs in this receipt.
+    segments.push("0001" + "7f" + clue);
+    commitments.push(toBeHex(1234n, 32));
     const log = batch("0x" + segments.join(""), commitments);
     const inserted: DeliveryEventLog = {
         ...meta,
@@ -81,11 +96,13 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
     });
     expect(result.notes.map((n) => n.leafIndex)).toEqual([0, 1, 2]);
     expect(result.notes[0]!.note).not.toHaveProperty("memo");
+    expect(result.notes[0]!.note).not.toHaveProperty("returnAddress");
+    expect(result.notes[2]!.note.returnAddress).toMatch(/^0i/);
     expect(result.notes[1]!.note.memo).toEqual(new TextEncoder().encode("invoice\0paid"));
     expect(result.notes[2]!.note.memo).toEqual(new Uint8Array(256).fill(255));
 });
 it("rejects truncated prefixes, bounds, old versions, truncated clues, trailing bytes and count mismatches", () => {
-    const ciphertext = "02" + "00".repeat(159);
+    const ciphertext = "06" + "00".repeat(160);
     const framed = "00a0" + ciphertext + clue;
     for (const packed of [
         "0x00",

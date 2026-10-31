@@ -2,16 +2,18 @@ import { PublicWallet } from "@invisi-labs/core";
 import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/core";
 import { expect, expectTypeOf, it } from "vitest";
 import { WalletSession } from "./WalletSession";
+import type { SavedOperation } from "./operation-types";
 import { fixture } from "./operation-fixture";
 
 it("prepares private transfer 30 and random ordinary change 70 as an immutable owned plan", async () => {
     const h = await fixture(),
-        payments = [{ to: h.bob.getAddress(), amount: 30n }];
+        payments = [{ to: h.bob.getAddress(), amount: 30n, returnAddress: h.wallet.getAddress() }];
     const pending = h.session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
         outputs: payments,
     });
     payments[0]!.amount = 999n;
+    payments[0]!.returnAddress = h.bob.getAddress();
     const operation = await pending,
         review = operation.preview();
     expect(review.outputs.map((output) => output.amount)).toEqual([30n, 70n]);
@@ -19,6 +21,9 @@ it("prepares private transfer 30 and random ordinary change 70 as an immutable o
     expect(review.capacity).toBe(14);
     const state = await h.store.readSnapshot(h.scope);
     expect(state.reservations[h.leaf]).toBe(operation.id);
+    const saved = state.operations[operation.id]!.payload as SavedOperation;
+    expect(saved.plan.outputs[0]!.note.returnAddress).toBe(h.wallet.getAddress());
+    expect(saved.plan.outputs[1]!.note).not.toHaveProperty("returnAddress");
     expect(JSON.stringify(operation)).not.toContain("nonce");
     expect(JSON.stringify(operation)).not.toContain("amount");
 });

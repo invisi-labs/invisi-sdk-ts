@@ -90,3 +90,10 @@ export type { Hex, Address } from "./primitives";
 export { encodeMemo, decodeMemoText, MAX_MEMO_BYTES, type Memo } from "./memo";
 export { createSigningRequest } from "./signing-request";
 export type { SigningRequest } from "./signing-request";
+
+export {
+    MAX_CIPHERTEXT_BYTES,
+    deliveryCodec,
+    deliveryHeader,
+    validateDeliveryCiphertext,
+} from "./delivery-codec";

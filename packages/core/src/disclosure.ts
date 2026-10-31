@@ -369,8 +369,9 @@ export class Disclosure {
             permitsOwnerSweep: kind === "note",
             revealsNoteConsumption: kind === "note",
             revealsCreditSharedKey: kind === "credit" && method === "payload-key",
-            revealsReceivingKeys: kind === "credit" && method === "payload-key",
+            revealsReceivingKeys: method === "payload-key",
             revealsMemo: method === "payload-key",
+            revealsReturnAddress: kind === "note" && method === "payload-key",
         };
     }
 

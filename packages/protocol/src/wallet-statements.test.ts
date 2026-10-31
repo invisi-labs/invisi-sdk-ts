@@ -27,7 +27,7 @@ const params = {
     deadline: 900n,
 } as const;
 const delivery = {
-    ciphertext: "0x02" + "11".repeat(159),
+    ciphertext: "0x01" + "11".repeat(160),
     clue: "0x" + "22".repeat(64) + "18" + "33".repeat(3),
 } as { ciphertext: `0x${string}`; clue: `0x${string}` };
 

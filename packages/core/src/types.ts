@@ -13,6 +13,8 @@ export interface Note extends ProtocolContext {
     nonce: bigint;
     /** Encrypted metadata, excluded from commitments. Decryption returns copied raw bytes. */
     memo?: Memo;
+    /** Optional complete 0i reply address. Encrypted metadata, not a payer identity claim. */
+    returnAddress?: string;
 }
 
 /** Deployment-scoped private Credit note, with a shared nonzero random secret. */

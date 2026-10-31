@@ -168,6 +168,9 @@ export class Preparation<Result> {
                 walletIdentity: recipient.walletIdentity,
                 amount: payment.amount,
                 ...(memo.length === 0 ? {} : { memo }),
+                ...(payment.returnAddress === undefined
+                    ? {}
+                    : { returnAddress: payment.returnAddress }),
                 nonce,
             };
             const commitment = await computeNoteCommitment(

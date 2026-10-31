@@ -1,3 +1,4 @@
+import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/core";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import { isAddress } from "ethers";
 
@@ -8,7 +9,7 @@ import {
     type Note,
     type ViewingCapability,
 } from "@invisi-labs/core";
-import { normalizeDelivery } from "@invisi-labs/protocol";
+import { normalizeOpaqueDelivery } from "@invisi-labs/protocol";
 
 export interface DiscoveryContext {
     chainId: bigint;
@@ -157,7 +158,7 @@ export function extractDeliveryCandidates(
         check(inserted, "delivery has no matching canonical insertion");
         if (commitment !== undefined)
             check(hash(commitment) === inserted, "delivery commitment conflicts with insertion");
-        const delivery = normalizeDelivery(wire as never, { credit: role !== "funds" });
+        const delivery = normalizeOpaqueDelivery(wire as never);
         check(
             typeof token === "string" && isAddress(token) && BigInt(token) !== 0n,
             "invalid event token"
@@ -200,7 +201,7 @@ export function extractDeliveryCandidates(
         add(log, tree, index(leaves[0]), fields.creditCommitment, "owner", ds[0]);
         add(log, tree, index(leaves[0]), fields.creditCommitment, "spender", ds[1]);
         if (hasChange) add(log, tree, index(leaves[1]), change, "funds", ds[2]);
-        else normalizeDelivery(ds[2] as never, { empty: true });
+        else normalizeOpaqueDelivery(ds[2] as never, { empty: true });
     };
     for (const log of relevant) {
         const a = object(log.args);
@@ -238,7 +239,9 @@ export function extractDeliveryCandidates(
                 const length = Number.parseInt(packed.slice(offset, offset + 4), 16);
                 offset += 4;
                 check(
-                    length >= 160 && length <= 416 && offset + length * 2 + 136 <= packed.length,
+                    length >= 1 &&
+                        length <= MAX_CIPHERTEXT_BYTES &&
+                        offset + length * 2 + 136 <= packed.length,
                     "invalid packed delivery length"
                 );
                 const ciphertext = `0x${packed.slice(offset, offset + length * 2)}`;
@@ -264,8 +267,8 @@ export function extractDeliveryCandidates(
             cs.forEach((c, i) => {
                 if (BigInt(hash(c)) === 0n) {
                     check(integer(leaves[i]) === 0n, "absent remainder has nonzero position");
-                    normalizeDelivery(ds[2 * i] as never, { empty: true });
-                    normalizeDelivery(ds[2 * i + 1] as never, { empty: true });
+                    normalizeOpaqueDelivery(ds[2 * i] as never, { empty: true });
+                    normalizeOpaqueDelivery(ds[2 * i + 1] as never, { empty: true });
                 } else {
                     add(log, tree, index(leaves[i]), c, "owner", ds[2 * i]);
                     add(log, tree, index(leaves[i]), c, "spender", ds[2 * i + 1]);
