@@ -73,6 +73,8 @@ export interface WalletState {
     operations: Record<string, OperationRecord>;
     /** Last canonical block observed while processing known candidates; never a completeness claim. */
     observedThrough?: Checkpoint;
+    /** Completed contiguous RPC discovery ranges; independent of operation reconciliation. */
+    discoveryThrough?: Checkpoint;
     invalidated?: string;
 }
 

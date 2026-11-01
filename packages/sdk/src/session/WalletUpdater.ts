@@ -248,6 +248,7 @@ export class WalletUpdater extends InventoryProcessor {
                     draft.notes = {};
                     draft.credits = {};
                     delete draft.observedThrough;
+                    delete draft.discoveryThrough;
                     delete draft.invalidated;
                 }
                 mergeReceiptRecords(draft, { notes, credits, checkpoint: block });

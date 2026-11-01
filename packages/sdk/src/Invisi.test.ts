@@ -170,7 +170,13 @@ it("validates the provider chain even when a custom reader is supplied", async (
 
 it("separates connection permissions from shared runtime infrastructure", () => {
     expectTypeOf<keyof import("./Invisi").ConnectionOptions>().toEqualTypeOf<
-        "wallet" | "protocol" | "namespace" | "viewing" | "authorization"
+        | "wallet"
+        | "protocol"
+        | "namespace"
+        | "viewing"
+        | "authorization"
+        | "signer"
+        | "fundingSigner"
     >();
 });
 

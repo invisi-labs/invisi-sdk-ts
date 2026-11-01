@@ -1,4 +1,5 @@
 import { Wallet } from "@invisi-labs/core";
+import { walletHistory, type HistoryOptions } from "./history";
 import { prepareWithErrors } from "../errors";
 import { copyGasBenchmarks } from "../gas-estimation";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -35,6 +36,7 @@ export type SessionTransactionOptions = Omit<
 export class WalletSession {
     readonly #options: WalletSessionInfrastructure;
     #updater: WalletUpdater | undefined;
+    readonly #listeners = new Set<() => void>();
     readonly #sending = new Set<string>();
     #refreshQueue: Promise<unknown> = Promise.resolve();
     readonly scope: WalletScope;
@@ -46,8 +48,30 @@ export class WalletSession {
                 "SDK envelope versions are fixed; encode application payload bytes externally"
             );
         }
+        const store = options.store;
         this.#options = {
             ...options,
+            ...(store
+                ? {
+                      store: {
+                          persistent: store.persistent,
+                          readSnapshot: (scope) => store.readSnapshot(scope),
+                          transaction: async (scope, action) => {
+                              const result = await store.transaction(scope, action);
+                              if (scopeKey(scope) === scopeKey(this.scope)) {
+                                  for (const listener of [...this.#listeners]) {
+                                      try {
+                                          listener();
+                                      } catch {
+                                          // UI observers must not turn a committed write into a failure.
+                                      }
+                                  }
+                              }
+                              return result;
+                          },
+                      },
+                  }
+                : {}),
             ...(options.gasBenchmarks
                 ? { gasBenchmarks: copyGasBenchmarks(options.gasBenchmarks) }
                 : {}),
@@ -165,6 +189,27 @@ export class WalletSession {
         return this.#updater;
     }
 
+    /** Local session commits only. Host applications own cross-tab/store subscriptions. */
+    subscribe(listener: () => void): () => void {
+        this.#listeners.add(listener);
+        return () => {
+            this.#listeners.delete(listener);
+        };
+    }
+
+    /** Detached history for wallet UI; construction records do not imply chain success. */
+    async getHistory(options: HistoryOptions = {}) {
+        const tokenAddress = options.tokenAddress
+            ? (getAddress(options.tokenAddress) as Hex)
+            : undefined;
+        const store = this.#options.store;
+        if (!store) throw new MissingCapabilityError("wallet store");
+        return walletHistory(
+            await store.readSnapshot(this.scope),
+            tokenAddress ? { tokenAddress } : {}
+        );
+    }
+
     async balance(tokenAddress: `0x${string}`) {
         const store = this.#options.store;
         if (!store) {
@@ -184,8 +229,8 @@ export class WalletSession {
             ...options,
             ...(options.detectionKey ? { detectionKey: options.detectionKey.slice() } : {}),
         };
-        const task = this.#refreshQueue.then(() =>
-            refreshWallet(
+        const task = this.#refreshQueue.then(async () => {
+            const result = await refreshWallet(
                 {
                     provider,
                     reader,
@@ -194,8 +239,28 @@ export class WalletSession {
                     apply: (batch, settings) => updater.applyUpdates(batch, settings),
                 },
                 request
-            )
-        );
+            );
+            // Advance discovery only after every requested page succeeds. Reconciliation may
+            // observe newer blocks without enumerating any incoming transactions.
+            await this.#options.store!.transaction(this.scope, (state) => {
+                request.signal?.throwIfAborted();
+                if (state.invalidated) throw new Error("wallet requires canonical resync");
+                const previous = state.discoveryThrough;
+                const start = previous
+                    ? previous.number + 1n
+                    : this.protocol.deployment.protocol.fromBlock;
+                if (
+                    request.fromBlock <= start &&
+                    (!previous || result.block.number >= previous.number)
+                ) {
+                    state.discoveryThrough = {
+                        number: result.block.number,
+                        hash: result.block.hash,
+                    };
+                }
+            });
+            return result;
+        });
         this.#refreshQueue = task.catch(() => {});
         return task;
     }

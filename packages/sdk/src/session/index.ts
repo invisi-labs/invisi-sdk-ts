@@ -35,3 +35,10 @@ export type {
 export * from "./WalletSession";
 
 export type { RefreshOptions, RefreshResult } from "./refresh";
+
+export type {
+    WalletHistory,
+    HistoryOptions,
+    OutgoingHistoryEntry,
+    IncomingHistoryEntry,
+} from "./history";

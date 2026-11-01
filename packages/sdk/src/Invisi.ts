@@ -53,7 +53,7 @@ export type RegistrationPreparationOptions = Pick<
 /** Wallet identity and session permissions; shared infrastructure belongs to InvisiOptions. */
 export type ConnectionOptions = Pick<
     WalletSessionOptions,
-    "wallet" | "protocol" | "namespace" | "viewing" | "authorization"
+    "wallet" | "protocol" | "namespace" | "viewing" | "authorization" | "signer" | "fundingSigner"
 >;
 
 /** A neutral composition entry point; every resolved instance owns an independent session. */
@@ -85,7 +85,15 @@ export class Invisi {
     }
     private async resolve(options: ConnectionOptions): Promise<WalletSessionOptions> {
         // Snapshot session permissions before the first network request.
-        const allowed = ["wallet", "protocol", "namespace", "viewing", "authorization"];
+        const allowed = [
+            "wallet",
+            "protocol",
+            "namespace",
+            "viewing",
+            "authorization",
+            "signer",
+            "fundingSigner",
+        ];
         for (const key of Object.keys(options)) {
             if (!allowed.includes(key))
                 throw new Error(

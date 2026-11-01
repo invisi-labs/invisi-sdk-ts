@@ -59,6 +59,10 @@ export type {
 } from "@invisi-labs/protocol";
 export { WalletSession, Operation, walletBalance, DisclosureVerifier } from "./session";
 export type {
+    WalletHistory,
+    HistoryOptions,
+    OutgoingHistoryEntry,
+    IncomingHistoryEntry,
     RefreshOptions,
     RefreshResult,
     WalletStore,
