@@ -137,10 +137,6 @@ for (const name of ["registrationTypedData", "registrationDigest", "buildRegistr
 for (const name of ["buildApproveCalldata", "buildPermitTypedData", "permitTypes"])
     assert(!(name in protocol), `generic Ethereum helper must remain in ethers: ${name}`);
 
-console.log(
-    "Current public surface PASS: capability objects, no obsolete package or compatibility aliases"
-);
-
 for (const name of ["sync", "resync", "startSync", "stopSync", "applyUpdates"]) {
     assert(!(name in sdk.WalletSession.prototype), `wallet session must not scan: ${name}`);
 }
@@ -208,3 +204,22 @@ for (const entry of [sdk.Invisi, sdk.WalletSession]) {
     assert(!("prepareSweep" in entry.prototype));
     assert(!("prepareWithdraw" in entry.prototype));
 }
+
+for (const method of ["authorize", "authorizeFunding"]) {
+    assert(
+        !(method in sdk.PreparedTransaction.prototype),
+        `independent private signing remains: ${method}`
+    );
+}
+assert(!("buildWithdrawalCalldata" in protocol), "retired withdrawal calldata helper remains");
+
+assert(!("authorize" in sdk.RegistrationOperation.prototype), "registry local signing remains");
+assert.equal(
+    typeof sdk.RegistrationOperation.prototype.authorizeDirect,
+    "function",
+    "missing caller registration encoding"
+);
+
+console.log(
+    "Current public surface PASS: capability objects, no obsolete package or compatibility aliases"
+);

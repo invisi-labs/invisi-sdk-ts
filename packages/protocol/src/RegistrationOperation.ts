@@ -1,9 +1,9 @@
 import type { PublicWallet } from "@invisi-labs/core";
 import type { Address, Hex } from "./contracts";
-import { hexlify, Interface, getBytes, verifyTypedData, type Signer } from "ethers";
+import { hexlify, Interface, getBytes, verifyTypedData } from "ethers";
 
 import { invisiAddressRegistryAbi } from "./contracts";
-import { ReceivingAddress, createSigningRequest, type Wallet } from "@invisi-labs/core";
+import { ReceivingAddress, createSigningRequest } from "@invisi-labs/core";
 import type { AddressRegistry } from "./AddressRegistry";
 import type { CanonicalBlock, ChainReader, TransactionCall } from "./interfaces";
 import {
@@ -28,9 +28,8 @@ export interface RegistryReader extends Pick<
 }
 
 export interface RegistrationPreparation {
-    wallet: Wallet | PublicWallet;
+    wallet: PublicWallet;
     reader: RegistryReader;
-    signer?: Signer;
     deadline?: bigint;
     update?: boolean;
 }
@@ -148,7 +147,7 @@ export class RegistrationOperation {
         };
     }
 
-    /** Export portable EIP-712 data without invoking a configured signer. */
+    /** Export portable EIP-712 data for external signing. */
     async exportRegistrationAuthorization(options: { signal?: AbortSignal } = {}) {
         check(this.status === "prepared", "registry operation is not awaiting authorization");
         options.signal?.throwIfAborted();
@@ -157,35 +156,15 @@ export class RegistrationOperation {
         return createSigningRequest(this.typedData());
     }
 
-    /** Reuse the registry's EOA/ERC-1271 validation for an independently obtained signature. */
-    async withSignature(signature: string, options: { signal?: AbortSignal } = {}) {
-        return this.authorize({ ...options, signature: signature as Hex });
-    }
-
-    /** Sign with ethers, or attach externally obtained ERC-1271 signature bytes. */
-    async authorize(
-        options: { signal?: AbortSignal; signature?: Hex } = {}
+    /** Validate and attach an independently obtained EOA or ERC-1271 signature. */
+    async withSignature(
+        signature: string,
+        options: { signal?: AbortSignal } = {}
     ): Promise<RegistrationOperation> {
         check(this.status === "prepared", "registry operation is not awaiting authorization");
         options.signal?.throwIfAborted();
         await this.validateFreshness();
         options.signal?.throwIfAborted();
-        let signature = options.signature;
-        if (signature === undefined) {
-            const signer = this.#runtime.signer;
-            check(signer, "registry signer capability is missing");
-            check(
-                BigInt(await signer.getAddress()) ===
-                    BigInt(this.#plan.registration.walletIdentity),
-                "registry signer does not match wallet owner"
-            );
-            const typed = this.typedData();
-            signature = (await signer.signTypedData(
-                typed.domain,
-                typed.types,
-                typed.message
-            )) as Hex;
-        }
         check(
             /^0x(?:[a-fA-F0-9]{2})+$/.test(signature),
             "registry signature must be nonempty hexadecimal bytes"
@@ -217,7 +196,7 @@ export class RegistrationOperation {
                     this.#runtime.reader,
                     owner,
                     registrationDigest(p.context, p.registration, { update: p.update }),
-                    signature
+                    signature as Hex
                 ),
                 "invalid ERC-1271 registry signature"
             );
@@ -228,7 +207,7 @@ export class RegistrationOperation {
             this.#runtime,
             this.#plan,
             "ready",
-            signature
+            signature as Hex
         );
     }
 

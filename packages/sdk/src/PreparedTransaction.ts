@@ -1,22 +1,15 @@
 import { estimateGasReference } from "./gas-estimation";
 import {
-    authorizeOperation,
     proveOperation,
-    signOperationFunding,
     walletSigningRequest,
     acceptWalletSignature,
     fundingSigningRequest,
     acceptFundingSignature,
 } from "./session/operation-execution";
-import {
-    MissingCapabilityError,
-    type AuthorizedStatement,
-    type WalletAuthorizationProvider,
-} from "@invisi-labs/core";
+import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { Prover, ProofBundle } from "@invisi-labs/prover";
 import type {
-    FundingSigner,
     OperationPlan,
     OperationRuntime,
     OperationAggregateMember,
@@ -36,7 +29,7 @@ function check(ok: unknown, message: string): asserts ok {
     if (!ok) throw new Error(message);
 }
 
-type Runtime = Omit<OperationRuntime, "store">;
+type Runtime = Omit<OperationRuntime, "store" | "authorization">;
 type Lifecycle = { generation: number; busy: boolean };
 /** An immutable, local transaction handle. No wallet inventory, reservations or persistence. */
 export class PreparedTransaction {
@@ -197,38 +190,6 @@ export class PreparedTransaction {
         );
     }
 
-    async authorize(options?: { signal?: AbortSignal }): Promise<PreparedTransaction>;
-    async authorize(
-        provider: WalletAuthorizationProvider,
-        options?: { signal?: AbortSignal }
-    ): Promise<PreparedTransaction>;
-    async authorize(
-        providerOrOptions: WalletAuthorizationProvider | { signal?: AbortSignal } = {},
-        suppliedOptions: { signal?: AbortSignal } = {}
-    ): Promise<PreparedTransaction> {
-        const options = "authorize" in providerOrOptions ? suppliedOptions : providerOrOptions;
-        const provider =
-            "authorize" in providerOrOptions ? providerOrOptions : this.#runtime.authorization();
-        check(
-            requiresAuthorization(this.#saved.plan),
-            "operation does not require wallet authorization"
-        );
-        const selectedProvider = provider;
-        check(
-            provider.walletIdentity === this.#runtime.scope.walletIdentity,
-            "wallet authorization capability mismatch"
-        );
-        return this.stage(
-            "wallet authorization",
-            ["prepared", "authorized"],
-            async (saved) => {
-                const authorization = await authorizeOperation(saved.plan, selectedProvider);
-                return { status: "authorized", authorization };
-            },
-            options.signal
-        );
-    }
-
     async prove(options?: TransactionProveOptions): Promise<PreparedTransaction>;
     async prove(backend: Prover, options?: TransactionProveOptions): Promise<PreparedTransaction>;
     async prove(
@@ -275,46 +236,6 @@ export class PreparedTransaction {
 
     private encode(saved: SavedOperation): Promise<TransactionCall> {
         return encodeOperation(saved);
-    }
-
-    async authorizeFunding(options?: { signal?: AbortSignal }): Promise<PreparedTransaction>;
-    async authorizeFunding(
-        signer: FundingSigner,
-        options?: { signal?: AbortSignal }
-    ): Promise<PreparedTransaction>;
-    async authorizeFunding(
-        signerOrOptions: FundingSigner | { signal?: AbortSignal } = {},
-        suppliedOptions: { signal?: AbortSignal } = {}
-    ): Promise<PreparedTransaction> {
-        const options = "signTypedData" in signerOrOptions ? suppliedOptions : signerOrOptions;
-        const suppliedSigner = "signTypedData" in signerOrOptions ? signerOrOptions : undefined;
-        const p = this.#saved.plan;
-        check(p.fundingMode === "signature", "operation does not require a funding signature");
-        check(p.kind === "shield" || this.#saved.proof, "proof must precede funding authorization");
-        const signer = suppliedSigner ?? this.#runtime.options.fundingSigner;
-        if (!signer) {
-            throw new MissingCapabilityError("EVM funding signer");
-        }
-        check(
-            signer.address.toLowerCase() === p.funding.payer!.toLowerCase(),
-            "funding signer is not the payer"
-        );
-        return this.stage(
-            "funding authorization",
-            p.kind === "shield" ? ["prepared"] : ["proved"],
-            async (saved) => {
-                saved.plan.funding.signature = await signOperationFunding(
-                    saved,
-                    signer,
-                    this.#runtime.options.fundingVerifier
-                );
-                if (saved.plan.statement?.target !== "noir-recursive") {
-                    saved.call = await this.encode(saved);
-                }
-                return { status: "ready" };
-            },
-            options.signal
-        );
     }
 
     /** Shield caller funding needs no wallet signing or proof; this step only encodes its frozen request. */

@@ -1,4 +1,3 @@
-import { Wallet, MissingCapabilityError as WalletCapabilityError } from "@invisi-labs/core";
 import { getAddress } from "ethers";
 import type { CreditInput, NoteInput } from "./explicit-types";
 import { PreparedTransaction } from "./PreparedTransaction";
@@ -57,7 +56,15 @@ export function explicitPreparation(
         namespace: "explicit",
         walletIdentity: options.wallet.walletIdentity,
     };
-    const { store: _store, coinSelector: _selector, ...capabilities } = options;
+    const {
+        store: _store,
+        coinSelector: _selector,
+        authorization: _authorization,
+        viewing: _viewing,
+        signer: _signer,
+        fundingSigner: _fundingSigner,
+        ...capabilities
+    } = options;
 
     if (inputs.some((input) => input.note.tokenAddress !== BigInt(getAddress(tokenAddress))))
         throw new Error("explicit note token mismatch");
@@ -65,11 +72,6 @@ export function explicitPreparation(
         options: { ...capabilities, protocol: options.protocol.forToken(tokenAddress) },
         reader: options.chainReader!,
         scope,
-        authorization: () => {
-            if (options.authorization) return options.authorization;
-            if (options.wallet instanceof Wallet) return options.wallet.exportAuthorization();
-            throw new WalletCapabilityError("wallet authorization");
-        },
     };
     return new TransactionPreparation<PreparedTransaction>({
         ...runtime,

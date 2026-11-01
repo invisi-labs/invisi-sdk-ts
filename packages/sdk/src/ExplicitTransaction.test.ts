@@ -2,6 +2,7 @@ import { fundsV1 } from "@invisi-labs/core";
 import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, it, vi } from "vitest";
 import { Invisi } from "./Invisi";
+import { PreparedTransaction } from "./PreparedTransaction";
 import { fixture } from "./session/operation-fixture";
 
 describe("explicit transactions without a wallet store", () => {
@@ -20,7 +21,7 @@ describe("explicit transactions without a wallet store", () => {
         };
         const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership, store });
         const prepared = await invisi.prepareTransfer({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs,
@@ -64,6 +65,15 @@ function backend(): Prover {
         verify: vi.fn(async () => true),
     };
 }
+async function externallyAuthorize(
+    prepared: PreparedTransaction,
+    signer = new EvmWallet(`0x${"01".repeat(32)}`)
+) {
+    const request = await prepared.exportWalletAuthorization();
+    const signature = await signer.signTypedData(request.domain, request.types, request.message);
+    return prepared.withWalletSignature(signature);
+}
+
 async function setup() {
     const h = await fixture();
     const inputs = Object.values((await h.store.readSnapshot(h.scope)).notes);
@@ -90,7 +100,7 @@ it("authorizes, proves, verifies and exports without any store", async () => {
     options.outputs[0]!.amount = 999n;
     expect(prepared.preview().outputs[0]!.amount).toBe(30n);
     await expect(prepared.prove()).rejects.toThrow(/authoriz/);
-    const authorized = await prepared.authorize(h.wallet.exportAuthorization());
+    const authorized = await externallyAuthorize(prepared);
     const ready = await authorized.prove();
     expect(h.prover.verify).toHaveBeenCalledOnce();
     const call = await ready.exportTransaction();
@@ -100,21 +110,24 @@ it("authorizes, proves, verifies and exports without any store", async () => {
     call.data = "0x00";
     expect((await ready.exportTransaction()).data).not.toBe("0x00");
     expect(JSON.stringify(ready)).not.toMatch(/nonce|amount|signature|proofHex/);
-    await expect(prepared.authorize(h.wallet.exportAuthorization())).rejects.toThrow(/stale/);
+    await expect(externallyAuthorize(prepared)).rejects.toThrow(/stale/);
 });
 
 it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", async () => {
     const h = await setup();
     const options = {
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
         outputs: [{ to: h.bob.getAddress(), amount: 30n }],
     };
-    await expect(h.invisi.prepareTransfer({ ...options, wallet: h.bob })).rejects.toThrow(
-        /identity/
-    );
+    await expect(
+        h.invisi.prepareTransfer({
+            ...options,
+            wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+        })
+    ).rejects.toThrow(/identity/);
     await expect(
         h.invisi.prepareTransfer({ ...options, inputs: [...h.inputs, ...h.inputs] })
     ).rejects.toThrow(/duplicate/);
@@ -124,7 +137,7 @@ it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", 
     });
     await expect(spent.prepareTransfer(options)).rejects.toThrow(/spent/);
     const op = await h.invisi.prepareTransfer(options);
-    const authorized = await op.authorize();
+    const authorized = await externallyAuthorize(op);
     const bad = backend();
     const generate = bad.prove;
     bad.prove = async (request, options) => ({
@@ -137,7 +150,7 @@ it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", 
 it("uses all explicit inputs even when public funding covers the requested output", async () => {
     const h = await setup();
     const op = await h.invisi.prepareTransfer({
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -166,10 +179,10 @@ it("supports full owner-only sweeps and recursive member export", async () => {
     expect((await swept.exportTransaction()).to).toBe(h.context.protocolAddress);
     const recursive = await h.invisi.prepareTransfer({
         ...identity,
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         outputs: [{ to: h.bob.getAddress(), amount: 30n }],
     });
-    const ready = await (await recursive.authorize()).prove({ execution: "aggregate" });
+    const ready = await (await externallyAuthorize(recursive)).prove({ execution: "aggregate" });
     expect(ready.exportAggregateMember().bundle.target).toBe("noir-recursive");
     await expect(ready.exportTransaction()).rejects.toThrow(/recursive/);
 });
@@ -179,14 +192,14 @@ it.each([undefined, "single", "aggregate"] as const)(
     async (execution) => {
         const h = await setup();
         const prepared = await h.invisi.prepareTransfer({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
             outputs: [{ to: h.bob.getAddress(), amount: 30n }],
         });
         const request = await prepared.exportWalletAuthorization();
-        const authorized = await prepared.authorize();
+        const authorized = await externallyAuthorize(prepared);
         expect(await authorized.exportWalletAuthorization()).toEqual(request);
         const ready = await authorized.prove(execution === undefined ? {} : { execution });
         expect(ready.exportProof().target).toBe(
@@ -216,7 +229,7 @@ it.each([
     const h = await setup();
     await expect(
         h.invisi.prepareTransfer({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
@@ -229,13 +242,13 @@ it.each([
 it("rejects aggregation above 14 slots without invoking the prover", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
         outputs: Array.from({ length: 14 }, () => ({ to: h.bob.getAddress(), amount: 1n })),
     });
-    const authorized = await prepared.authorize();
+    const authorized = await externallyAuthorize(prepared);
     await expect(authorized.prove({ execution: "aggregate" })).rejects.toThrow(/14-slot/);
     expect(h.prover.prove).not.toHaveBeenCalled();
     // A failed local proof attempt leaves the detached authorized handle usable.
@@ -248,13 +261,13 @@ it.each(["evm", "noir-recursive", null, "invalid"])(
     async (execution) => {
         const h = await setup();
         const prepared = await h.invisi.prepareTransfer({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
             outputs: [{ to: h.bob.getAddress(), amount: 30n }],
         });
-        const authorized = await prepared.authorize();
+        const authorized = await externallyAuthorize(prepared);
         await expect(authorized.prove({ execution } as any)).rejects.toThrow(/execution/);
         expect(h.prover.prove).not.toHaveBeenCalled();
     }
@@ -288,23 +301,24 @@ it("supports public shield and signature-funded outputs using independent EVM au
         ],
         funding: { payer: signer.address, amount: 30n },
     });
-    await expect(payment.authorizeFunding(signer)).rejects.toThrow(/proof/);
+    await expect(payment.exportFundingAuthorization()).rejects.toThrow(/proof/);
     const proved = await payment.prove();
-    const ready = await proved.authorizeFunding(signer);
+    const fundingRequest = await proved.exportFundingAuthorization();
+    const ready = await proved.withFundingSignature(await signer.signTypedData(fundingRequest));
     expect((await ready.exportTransaction()).data.length).toBeGreaterThan(10);
 });
 
 it("freezes each operation independently when one Invisi serves multiple wallets", async () => {
     const h = await setup();
     const first = await h.invisi.prepareShield({
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [{ to: h.wallet.getAddress(), amount: 1n }],
         funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
     });
     const second = await h.invisi.prepareShield({
-        wallet: h.bob,
+        wallet: PublicWallet.fromAddress(h.bob.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [{ to: h.bob.getAddress(), amount: 2n }],
@@ -355,7 +369,7 @@ it.each([1, 2] as const)(
         );
         await h.tree.insert(BigInt(commitment));
         const identity = {
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
         };
@@ -385,7 +399,7 @@ it.each([1, 2] as const)(
             }),
             await invisi.prepareDrawCredit({
                 ...identity,
-                wallet: h.bob,
+                wallet: PublicWallet.fromAddress(h.bob.getAddress()),
                 creditInputs: [{ ...ownerInput, role: "spender" }],
                 credits: [
                     {
@@ -405,7 +419,7 @@ it.each([1, 2] as const)(
             }),
             await invisi.prepareDrawCredit({
                 ...identity,
-                wallet: h.bob,
+                wallet: PublicWallet.fromAddress(h.bob.getAddress()),
                 creditInputs: [{ ...ownerInput, role: "spender" }],
                 credits: [{ credit: commitment, amount: 30n, payload: new Uint8Array() }],
             }),
@@ -419,7 +433,12 @@ it.each([1, 2] as const)(
             undefined,
         ];
         for (const [i, operation] of operations.entries()) {
-            const ready = await (await operation.authorize()).prove();
+            const ready = await (
+                await externallyAuthorize(
+                    operation,
+                    new EvmWallet(`0x${(i === 3 || i === 5 ? "02" : "01").repeat(32)}`)
+                )
+            ).prove();
             const call = await ready.exportTransaction();
             expect(call.data.length).toBeGreaterThan(10);
             const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
@@ -464,7 +483,7 @@ it.each([1, 2] as const)(
 it("checks explicit note preimages, token scope and canonical paths", async () => {
     const h = await setup();
     const request = {
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -504,32 +523,44 @@ it("checks explicit note preimages, token scope and canonical paths", async () =
 it("cancels local work and fences concurrent or stale handles", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
         outputs: [],
         withdrawal: { to: h.wallet.ownerAddress, amount: 30n },
     });
+    const request = await prepared.exportWalletAuthorization();
+    const signer = new EvmWallet(`0x${"01".repeat(32)}`);
+    const signature = await signer.signTypedData(request.domain, request.types, request.message);
     const controller = new AbortController();
     controller.abort();
-    await expect(prepared.authorize({ signal: controller.signal })).rejects.toThrow();
+    await expect(
+        prepared.withWalletSignature(signature, { signal: controller.signal })
+    ).rejects.toThrow();
+    const authorized = await prepared.withWalletSignature(signature);
     let release!: () => void;
+    let started!: () => void;
     const gate = new Promise<void>((resolve) => {
         release = resolve;
     });
-    const authority = h.wallet.exportAuthorization();
-    const signing = prepared.authorize({
-        walletIdentity: authority.walletIdentity,
-        authorize: async (request) => {
-            await gate;
-            return authority.authorize(request);
-        },
+    const begun = new Promise<void>((resolve) => {
+        started = resolve;
     });
-    await expect(prepared.authorize()).rejects.toThrow(/active worker/);
+    const localBackend = backend();
+    const slowProver: Prover = {
+        ...localBackend,
+        prove: async (request, options) => {
+            started();
+            await gate;
+            return localBackend.prove(request, options);
+        },
+    };
+    const proving = authorized.prove(slowProver);
+    await begun;
+    await expect(authorized.prove()).rejects.toThrow(/active worker/);
     release();
-    const authorized = await signing;
-    const ready = await authorized.prove();
+    const ready = await proving;
     expect((await ready.exportTransaction()).data.length).toBeGreaterThan(10);
     await expect(authorized.prove()).rejects.toThrow(/stale/);
 });
@@ -537,7 +568,7 @@ it("cancels local work and fences concurrent or stale handles", async () => {
 it("respects explicit sweep subsets rather than creating unsigned change", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: h.wallet,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -557,13 +588,13 @@ realNativeProof(
         const { NativeProver } = await import("@invisi-labs/prover/native");
         const prover = new NativeProver({ bbBin: process.env.BB_BINARY_PATH!, threads: 4 });
         const prepared = await h.invisi.prepareTransfer({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
             outputs: [{ to: h.bob.getAddress(), amount: 30n }],
         });
-        const authorized = await prepared.authorize();
+        const authorized = await externallyAuthorize(prepared);
         const ready = await authorized.prove(prover);
         expect(ready.exportProof().proofHex.length).toBeGreaterThan(1000);
         expect((await ready.exportTransaction()).data.length).toBeGreaterThan(1000);
@@ -581,7 +612,7 @@ it.each(["shield", "transfer"] as const)(
             memo: "input metadata must not be inherited",
         });
         const common = {
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [
@@ -606,7 +637,9 @@ it.each(["shield", "transfer"] as const)(
         memo.fill(9);
         const prepared = await pending;
         const ready =
-            kind === "shield" ? await prepared.ready() : await (await prepared.authorize()).prove();
+            kind === "shield"
+                ? await prepared.ready()
+                : await (await externallyAuthorize(prepared)).prove();
         const call = await ready.exportTransaction();
         const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
         const commitment =
@@ -734,7 +767,7 @@ it.each(["shield", "transfer"] as const)(
         const payload = new Uint8Array([255, 99, 0, 128]);
         const expectedPayload = payload.slice();
         const common = {
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [{ to: h.bob.getAddress(), amount: 30n, payload }],
@@ -753,7 +786,9 @@ it.each(["shield", "transfer"] as const)(
         payload.fill(0);
         const prepared = await pending;
         const ready =
-            kind === "shield" ? await prepared.ready() : await (await prepared.authorize()).prove();
+            kind === "shield"
+                ? await prepared.ready()
+                : await (await externallyAuthorize(prepared)).prove();
         const call = await ready.exportTransaction();
         const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
         const delivery = kind === "shield" ? decoded.args[2][0] : decoded.args[1].deliveries[0];
@@ -780,7 +815,7 @@ it("rejects non-byte application payloads from JavaScript callers instead of coe
     for (const payload of ["hello", [1, 2], null]) {
         await expect(
             h.invisi.prepareShield({
-                wallet: h.wallet,
+                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
                 tokenAddress: h.context.tokenAddress,
                 outputs: [

@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { Interface, type Provider, hexlify, keccak256 } from "ethers";
@@ -67,7 +68,7 @@ describe("Invisi recipient lookup selection", () => {
                 protocolRpc,
             });
             const pending = invisi.prepareShield({
-                wallet: h.wallet,
+                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol,
                 tokenAddress: h.context.tokenAddress,
                 outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
@@ -97,7 +98,7 @@ describe("Invisi recipient lookup selection", () => {
             protocolRpc,
             addressLookup: "protocol-rpc",
         }).prepareShield({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [{ to: h.bob.getAddress(), amount: 1n }],
@@ -109,7 +110,7 @@ describe("Invisi recipient lookup selection", () => {
     it("does not require an unused Protocol RPC client for full addresses", async () => {
         const { h, reader, protocol } = await setup();
         await new Invisi({ chainReader: reader, addressLookup: "protocol-rpc" }).prepareShield({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [{ to: h.bob.getAddress(), amount: 1n }],
@@ -126,7 +127,7 @@ describe("Invisi recipient lookup selection", () => {
             addressResolver: async () => h.bob.getReceivingAddress().getReceivingKeys(),
         });
         await invisi.prepareShield({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
@@ -160,7 +161,7 @@ describe("Invisi recipient lookup selection", () => {
             protocolRpc,
             addressLookup: "chain",
         }).prepareShield({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [{ to: h.bob.ownerAddress, amount: 1n }],

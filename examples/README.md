@@ -1,130 +1,127 @@
-# SDK examples
+# Invisi SDK examples
 
-Read the numbered folders in order. Business walkthroughs use direct `Invisi.prepare...` calls and application-selected inputs. They show local review, authorization, proof generation and public calldata export without a Store or WalletSession. The final topic introduces managed wallet state separately.
+Flat, independently readable TypeScript examples using the public SDK and ethers. Comments, logs and documentation are English. Business examples use external signing requests; only category 05 uses a WalletSession and persistent Store.
 
-| Topic | Walkthroughs |
-| --- | --- |
-| [00-wallet](00-wallet/index.ts) | Offline wallet, addresses, viewing and detection capabilities. Run `wallet`. |
-| [01-connect](01-connect/index.ts) | Chain RPC, Protocol RPC and deployment verification. Run `connect`, `chains` or `connect-custom`. |
-| [02-shield](02-shield/index.ts) | Public ERC20 approval and shield; [permit](02-shield/permit.ts) shows EIP2612. Run `shield` or `shield-permit`. |
-| [03-funds](03-funds/transfer.ts) | `transfer`, `withdraw`, `mixed-funding`, `public-split` and whole-note `sweep`. |
-| [04-credit](04-credit/create.ts) | `credit-create`, `credit-draw`, `credit-top-up` and `credit-cancel`. |
-| [05-registry](05-registry/register.ts) | Independent receiving-key registration and update. Run `registry` or `registry-update`. |
-| [06-aggregation](06-aggregation/index.ts) | Four independent recursive members and one public aggregate call. Run `aggregate`. |
-| [07-disclosure](07-disclosure/index.ts) | Scoped offline disclosure and read-only receipt verification. Run `disclosure` or `disclosure-chain`. |
-| [08-wallet-session](08-wallet-session/index.ts) | Encrypted storage, inventory refresh, automatic input selection, reservations and persistent operation recovery. Run `session`, `session-transfer`, `refresh` or `recover`. |
+## Setup
+
+From the workspace root:
 
 ```sh
-pnpm install --frozen-lockfile
+pnpm install
 pnpm build
-pnpm examples --list
 pnpm examples wallet
-pnpm examples disclosure
 ```
 
-Examples are walkthroughs. Build and typecheck validate their API usage; cryptographic and lifecycle tests belong to the SDK packages. Offline smoke runs do not establish live deployment acceptance.
+`wallet` is entirely offline and uses a public test mnemonic. Never fund its accounts. On-chain examples require Node.js 22.13 or newer for `node:sqlite`, a funded EVM testnet, and a matching deployed protocol. Chain 97 is the verified default, not a restriction.
 
-## Connections and local capabilities
+### Customize connections and token
 
-Each chain example constructs its provider, Protocol RPC client and Protocol explicitly:
+Edit [settings.ts](settings.ts):
 
-```ts
-const provider = new JsonRpcProvider(required("CHAIN_RPC_URL"));
-const protocolRpc = new ProtocolRpcClient(required("PROTOCOL_RPC_URL"));
-const protocol = await Protocol.fromRpc(protocolRpc, provider);
-const invisi = new Invisi({ provider, protocolRpc, prover: new NativeProver() });
+- `chainRpcUrl`: your Ethereum JSON-RPC endpoint with historical state access.
+- `protocolRpcUrl`: your trusted Protocol RPC deployment service.
+- `chainId`: expected chain ID, with matching Chain RPC and Protocol RPC deployment.
+- `nativeCurrencySymbol` / `nativeCurrencyDecimals`: native gas-token display and amount precision.
+- `suggestedGasBalance` / `helperGasBalance`: editable starting-balance suggestion and Charlie/Frank top-up target.
+- `tokenAddress`: your funded standard ERC20 test token. The default iUSD is an existing testnet token; no token deployment is required.
+- `bbBin`: path to Barretenberg 6.0.0 for real native proofs.
+
+The checked setup uses a local tunnel at `http://127.0.0.1:18565` to a self-hosted full node. Replace it with your own full/archive RPC; the private infrastructure and Teleport access are not required. A node returning `missing trie node` for historical calls cannot support wallet history verification. Do not skip verification to work around it. Protocol deployment addresses are obtained and validated through Protocol RPC, rather than copied into each example.
+
+Place the BB binary or a symlink at `examples/bin/bb`, or change `bbBin`. This directory is ignored by Git.
+
+### Customize local accounts
+
+Generate ten new local test accounts explicitly:
+
+```sh
+pnpm --filter @invisi-examples/scenarios accounts:init --execute
+pnpm --filter @invisi-examples/scenarios accounts
 ```
 
-`Protocol.fromRpc` selects the provider's chain and verifies deployed bytecode and protocol version. Choose a trusted service; consistency checks do not establish official provenance. `connect-custom` loads a trusted team record from `INVISI_DEPLOYMENT_FILE`. The `chains` command lists supported chains and their indexed status.
+Initialization writes `examples/accounts/accounts.json` with owner-only file permissions and refuses to overwrite an existing file. Accounts are ordered Alice, Bob, Charlie, Dave, Eve, Frank, Grace, Heidi, Ivan and Judy. Public addresses are printed; keys are not.
 
-Chain RPC supplies canonical blocks, receipts, contract reads and transaction submission. Protocol RPC supplies public history, candidates and authenticated paths. Private inputs, signing and proof generation stay local. `new NativeProver()` uses BB6.0.0 from PATH and defaults to four threads; set `bbBin` only for a custom executable path. Shield, connection and disclosure do not require a prover.
+Alternatively, prepare your own local account file:
 
-Only capability-specific settings are needed:
-
-| Variable | Used for |
-| --- | --- |
-| `CHAIN_RPC_URL` | Chain RPC endpoint, such as `http://127.0.0.1:8545`. |
-| `PROTOCOL_RPC_URL` | Protocol RPC service, such as `http://127.0.0.1:8080/v1`. |
-| `WALLET_ACCOUNT_PRIVATE_KEY` | Locally restored Invisi wallet. Not needed by the public-only sweep or deployment-only examples. |
-| `FUNDING_PRIVATE_KEY` | Optional separate public funding account; funding examples otherwise use the wallet account key. |
-| `WALLET_STORAGE_KEY` | AES key for the encrypted database in `08-wallet-session` only. |
-
-Token addresses, amounts and file paths are visible constants. Change them for your deployment. Funding examples can submit an ERC20 approval; shield, registry and managed-session examples also submit their prepared operations. Ordinary funds, Credit and aggregate walkthroughs stop at exported public calldata. No generic transaction client is implemented by the SDK: submit exported calls through ethers in the host application.
-
-Receiving-key registration uses a separate registry nonce and owner EIP-712 signature. Pass an ethers `signer` to `registry.prepareRegistration({ wallet, provider, signer })`, review `prepared.typedData()`, then call `prepared.authorize()` to obtain a ready operation. For ERC-1271 owners, attach the externally obtained signature with `prepared.authorize({ signature })`. Direct owner transactions use `prepared.authorizeDirect()` and must be sent by that owner. The SDK verifies EOA recovery or the contract owner's ERC-1271 result before returning ready. Custom registry readers provide `isValidRegistrationSignature(owner, digest, signature)` for contract owners. No registry proof is required. If a deployment includes a registry profile, connection checks that it matches the Protocol's immutable `addressRegistry` and authenticates both runtime hashes.
-
-Managed and registry operations also export calls for ethers. They associate the returned hash with `trackTransaction(transaction.hash)` and run `reconcile()` after `transaction.wait()`. Operations have no SDK `submit()` or `wait()` method. `WalletSession.sendTransaction(ready)` is a thin alternative: it exports a managed operation, calls the injected ethers signer, records the hash and returns the native ethers response. `sendTransaction(call, options)` forwards a plain call without associating an operation. Cancellation can stop local SDK work; ethers sending and receipt waiting follow the application's own lifecycle. For hash persistence before broadcast, sign the populated request with ethers, track its keccak256 hash, then broadcast its signed bytes. A receipt or replacement returned by ethers is independently verified during reconciliation.
-
-The command-line runner owns resource cleanup through `resources.defer()`. Examples immediately register provider/database cleanup. Framework integrations manage their own lifecycle.
-
-## Direct inputs
-
-Business examples construct `NoteInput` and `CreditInput` directly in TypeScript. No private input JSON file or storage adapter is needed to read the walkthroughs.
-
-A funds input has two parts:
-
-- `note`: the original private fields — chain, Protocol, wallet identity, token, amount and nonce.
-- `commitment`, `treeId`, `leafIndex`: the matching commitment and its canonical insertion position.
-
-The examples explicitly compute the randomized note identity and commitment from those private fields, then build the input object:
-
-```ts
-const identity = await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce);
-const commitment = await computeNoteCommitment(note.chainId, identity, note.tokenAddress, note.amount);
-const inputs: NoteInput[] = [{ note, commitment, treeId: 1n, leafIndex: 0 }];
+```sh
+mkdir -p examples/accounts
+cp -n examples/accounts.example.json examples/accounts/accounts.json
+chmod 600 examples/accounts/accounts.json
 ```
 
-The inline amounts, nonces and positions are illustrative. Before running a private spend, replace them with an actual received note's fields and canonical insertion position. Preserve the original nonce; recomputing a commitment does not insert a note or create spendable funds. The SDK checks membership and spent state against the selected deployment.
+Replace every placeholder with your own test account's EVM address and private key, then derive receiving addresses and viewing keys locally:
 
-Credit examples also show the full `CreditDeliveryState`, both historical receiving-key snapshots, shared-key hash, commitment computation and role-scoped `CreditInput`. Draw uses `spender`; cancel/top-up use `owner`. Preserve the Credit's original keys after wallet key rotation. Top-up extends the existing expiry and must run before it expires; cancellation is also allowed after expiry.
-
-Aggregation constructs four independent input groups explicitly. Its sample positions and nonces must likewise be replaced with real received records. Applications select and reserve these records in their own storage before preparation.
-
-The direct pipeline is:
-
-```ts
-const prepared = await invisi.prepareTransfer({ wallet, protocol, tokenAddress, inputs, outputs });
-console.log(prepared.preview()); // Local review before granting authorization.
-const authorized = await prepared.authorize();
-const proved = await authorized.prove({
-    onProgress(event) { console.log(event.phase); },
-});
-const call = await proved.exportTransaction();
+```sh
+pnpm --filter @invisi-examples/scenarios accounts:receiving
 ```
 
-The SDK verifies input deployment, owner/role, commitment, spent state and membership. All supplied funds inputs are used and any excess becomes independently randomized change. Use `inputs: []` for public-only splitting. Sweep accepts complete notes with a public wallet alone and pays their full value to the bound owner without an owner signature. Credit draws/cancellations also pay their immutable public payout addresses. Recursive members must use disjoint inputs; aggregation checks the groups before proving.
+The receiving-key script verifies existing derived fields before updating them; it never replaces EVM private keys. Keep account names and ordering. `getAccounts()` only reads this local file and creates public receiving wallets. A sender needs the recipient's public receiving address, not the recipient's private key.
 
-The host application owns input reservations, operation records, submission and inventory updates. Persist the exact signed EVM transaction hash before broadcasting, authenticate its canonical receipt and retain reservations across uncertain outcomes. Exporting a proof does not consume inputs, and a timeout does not revoke it. The simple business examples intentionally do not implement a persistence or broadcast subsystem.
+Account files, encrypted SQLite inventory and sidecar files are ignored by Git. The repository contains no funded account keys or wallet databases. These plaintext local accounts and example storage-key derivation are for isolated testnet experiments; integrate your own key management in a real wallet.
 
-## WalletSession
+### Fund the suite
 
-Use a session when the SDK should manage owned inventory and operation persistence:
+Fund Alice and Bob with **the configured chain's native currency before running any on-chain examples**. ERC20 balances cannot pay gas. Charlie and Frank also submit transactions; the preparation script tops them up from Alice to `settings.helperGasBalance`.
 
-- [index.ts](08-wallet-session/index.ts), `session`: construct an encrypted SQLite store, connect a wallet, refresh and inspect known funds.
-- [transfer.ts](08-wallet-session/transfer.ts), `session-transfer`: automatic input selection and reservation, local authorization/proof, session-delegated ethers submission and independent protocol reconciliation.
-- [refresh.ts](08-wallet-session/refresh.ts), `refresh`: continue from an authenticated checkpoint; optional explicit FMD delegation.
-- [recovery.ts](08-wallet-session/recovery.ts), `recover`: reopen operations, reconcile uncertain submissions and rebuild invalidated inventory.
-- [browser.ts](08-wallet-session/browser.ts): IndexedDB and local WASM proving. [react.tsx](08-wallet-session/react.tsx) and [vue.ts](08-wallet-session/vue.ts) add local review and cancellation callbacks.
+| Account | Why it needs native currency | Preparation |
+| --- | --- | --- |
+| Alice (A) | Most transfers, aggregation, session transactions, and funding Charlie/Frank | Fund manually; see `settings.suggestedGasBalance` |
+| Bob (B) | Registry registration/update and credit creation/top-up | Fund manually; see `settings.suggestedGasBalance` |
+| Charlie (C) | Credit creation and cancellation | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
+| Frank (F) | Delegated sweep submission | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
+| Other recipients | Receive only in this suite | No native-token funding required |
 
-SQLite requires Node22.13 or newer. The host owns its storage key, database connection and application namespace. A complete wallet supplies viewing and authorization capabilities; the managed transfer also demonstrates explicit delegation. Session balances summarize locally known notes, not public ERC20 balances or Protocol holdings.
+The defaults use BSC Testnet 97 / tBNB, with a 0.1 starting suggestion and 0.01 helper target. Change all matching settings for another network, such as an ETH testnet. These are preparation amounts, not a gas-cost guarantee. The script prints all four gas balances and stops if Alice or Bob has no native currency. Gas prices and the selected transaction determine actual consumption. Also fund Alice with at least 100 units of the configured ERC20 and Bob with at least 100; adjust explicit example amounts for your token.
+```sh
+pnpm --filter @invisi-examples/scenarios prepare:suite --execute
+```
 
-Refresh consumes Protocol RPC candidates, authenticates complete receipts through Chain RPC, decrypts locally and checks owned membership and nullifiers. Select explicit history ranges; use `reset` only for invalidated history. Neither filtered candidates nor checkpoints prove complete history. FMD delegation is explicit and does not grant decryption or spending permission. Canceling local work cannot revoke an exported proof or broadcast transaction.
+This sends gas to Charlie and Frank if needed, and creates eight 1-token Alice notes plus four each for Bob and Charlie in two shield batches. Every explicit run creates new notes; run once before a fresh full-suite test. Existing account keys and token contracts are retained. Read the script before funding or executing it.
 
-For browser proving, serve Noir WASM and BB workers as bundler assets and configure COOP `same-origin` plus COEP `require-corp`. Preserve historical viewing keys after external key rotation. Application unlock, review and UI flows remain application responsibilities.
+## Run examples
+
+Read each file, then add `--execute` to opt into network access. Without it, on-chain examples stop before reading keys, opening a database or accessing the network. Each payment invocation is a new payment; do not rerun a payment to recover a pending transaction.
+
+```sh
+pnpm --filter @invisi-examples/scenarios example:transparent:1 --execute
+```
+
+| Category | Scripts | Coverage |
+| --- | --- | --- |
+| [00 Wallet](00-wallet/01-wallet.ts) | `example:wallet:1` | ethers mnemonic/private-key import, public wallet, viewer and detector capabilities |
+| [01 Registry](01-address-registry/01-register-bob.ts) | `example:registry:1`, `:2` | Bob registration and update through external EIP-712 requests |
+| [02 Transparent amounts](02-transparent-amount/01-alice-to-bob.ts) | `example:transparent:1`, `:1b`, `:1c`, `:2`, `:3`, `:4` | Full receiving address, registered EVM address, explicit chain lookup, nine recipients, Bob funding authorization, raw memo payload |
+| [03 Hidden amounts](03-hidden-amount/01-cash-to-bob-with-change.ts) | `example:hidden:1`, `:1b`, `:2`, `:3`, `:4`, `:4b`, `:5`, `:6` | Cash/notes, separate funding/spending signatures, change, withdrawal, delegated owner-only sweep, four-member aggregation |
+| [04 Credit](04-credit/01-bob-and-charlie-create.ts) | `example:credit:1` through `:4` | Bob/Charlie create credit for Alice, multi-owner batch draw, top-up with notes/cash/change, cancellation |
+| [05 WalletSession](05-wallet-session/01-restore-session.ts) | `example:session:1` through `:4` | Encrypted SQLite, incremental inventory, outgoing/incoming history, own cash/notes/gas, reopen and reconcile |
+| [06 Disclosure](06-disclosure/01-note-opening.ts) | `example:disclosure:1` through `:3` | Historical funds opening, single-output payload key and memo, credit opening; independent canonical receipt verification |
+
+Run in table order after suite preparation. Within categories, use the script order listed above. Wait for a successful receipt and for Protocol RPC's `indexedHead` to cover that block before the next dependent example. Registration 01 is a first registration; it reports an error if the same owner is already registered. Use update 02 for registered owners.
+
+Discovery helpers return all authenticated candidates; amount selection remains visible in each example. Exact duplicate RPC records are ignored, while conflicting content or tree positions fail. Preparation rechecks current chain state. Do not automatically replace consumed inputs or blindly retry a transaction.
+
+## Sessions and recovery
+
+Category 05 shares `examples/accounts/alice-session.sqlite` and a namespace scoped to the protocol deployment. Example 02 intentionally stops after the actual chain receipt, leaving the persisted operation for example 04 to reopen and independently reconcile. It does not send the payment again. Wait for RPC indexing before reopening; a refresh cannot use an anchor older than the wallet's already observed state.
+
+The sample HKDF storage key is separate from the spending key. A host wallet can supply its own `CryptoKey` to `EncryptedWalletCodec`, adapt a transactional Store, or use IndexedDB. Keep database and key management outside ordinary detached examples. Deleting the Store loses locally recorded outgoing private details; incoming notes can be rediscovered.
+
+## Payloads and disclosure
+
+Example 02-04 uses `fundsV1.encode()` / `decode()` explicitly. SDK envelopes use v1; `decryptNote()` returns raw application payload bytes. The comments show how an application can replace the codec with its own version and data format without injecting a codec into Invisi.
+
+Category 06 discovers historical outputs, including spent ones, and verifies their canonical receipts. It does not print, write or send disclosure material. Full funds openings and single-output payload keys also permit consumption tracking and unsigned full sweep back to the original owner; they are not strictly read-only capabilities. Credit openings expose a shared-key hash, not the recovery key. Verification proves the selected output's content and inclusion, not payer identity, current unspent state or complete wallet history.
+
+## Checks
+
+```sh
+pnpm --filter @invisi-examples/scenarios lint
+pnpm examples wallet
+pnpm lint
+```
+
+Keep SDK behavior tests in the owning packages. These examples use workspace packages and do not publish or install a released SDK version.
 
 ## Local deployment
 
-```sh
-anvil --chain-id 31337
-# In a second terminal, from this repository:
-pnpm deploy:local
-pnpm build
-```
-
-Use a fresh Anvil chain. The script deploys a multi-token Protocol, two seeded tokens and an independent receiving-key registry, then records/verifies `../invisi-protocol/deployment/deployment.json`. `INVISI_PROTOCOL_DIR` selects another protocol checkout; `INVISI_DEPLOYMENT_CATALOG` selects a different catalog path. Local verifiers are mocks for integration only. Real assets require authenticated real verifiers and private keys.
-
-Invisi defines no mnemonic or HD path. `00-wallet` uses ethers to obtain an account key and then derives Invisi capabilities from it. Public browser wallet connections expose addresses/signing requests rather than private keys; application-owned account-key access is a distinct integration choice.
-
-## Independent signing boundaries
-
-The transfer, public-funding, and registry examples explicitly export a JSON-safe signing request, sign it with ethers, and attach the resulting signature through `withWalletSignature`, `withFundingSignature`, or `withSignature`. Replace the example signer call with a hardware-wallet, MPC, or remote-device exchange without changing the SDK operation. Keep private note openings and circuit witnesses local; the request contains only EIP-712 commitments. Funding requests for proved operations are exported after `prove()`, while shield and registry do not need a proof. Convenience `authorize` APIs remain available for existing applications.
+Maintainers can use `pnpm deploy:local` with the sibling protocol repository and a fresh Anvil chain 31337. That tooling creates a separate deployment; changing example settings also requires a matching trusted Protocol RPC and funded accounts. The default walkthrough targets the deployed chain-97 protocol.

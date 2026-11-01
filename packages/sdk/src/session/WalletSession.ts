@@ -271,7 +271,6 @@ export class WalletSession {
             options: runtime.options,
             scope: runtime.scope,
             reader: runtime.reader,
-            authorization: runtime.authorization,
             readInventory: () => runtime.store.readSnapshot(runtime.scope),
             complete: (plan) => Operation.prepare(runtime, plan),
         });

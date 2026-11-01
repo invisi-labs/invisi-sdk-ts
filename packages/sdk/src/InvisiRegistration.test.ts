@@ -150,3 +150,14 @@ describe("Invisi registry composition", () => {
         );
     });
 });
+
+it("rejects a full wallet before preparing registry authorization", async () => {
+    const { invisi, signer } = await setup();
+    const wallet = await Wallet.fromPrivateKey(signer.privateKey);
+    await expect(
+        invisi.prepareRegistration({
+            // @ts-expect-error Registration accepts public identity only.
+            wallet,
+        })
+    ).rejects.toThrow(/PublicWallet|public wallet/i);
+});

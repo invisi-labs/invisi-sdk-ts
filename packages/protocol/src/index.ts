@@ -7,7 +7,6 @@ export * from "./Protocol";
 export * from "./registry";
 export * from "./validation";
 export * from "./verify";
-export * from "./withdrawal";
 export * from "./witness";
 
 export * from "./factory";

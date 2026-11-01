@@ -4,6 +4,7 @@ import { copyGasBenchmarks } from "./gas-estimation";
 import { explicitPreparation } from "./explicit-preparation";
 import type { PreparedTransaction } from "./PreparedTransaction";
 import type {
+    TransactionIdentity,
     ExplicitTransferPreparation,
     ExplicitShieldPreparation,
     ExplicitCreateCreditPreparation,
@@ -18,7 +19,7 @@ import {
     EthersFundingVerifier,
     EthersAddressResolver,
 } from "./integrations/ethers";
-import { MissingCapabilityError, ReceivingAddress } from "@invisi-labs/core";
+import { MissingCapabilityError, PublicWallet, ReceivingAddress } from "@invisi-labs/core";
 import { AddressRegistry } from "./AddressRegistry";
 import type { RegistrationPreparation, RegistrationOperation } from "@invisi-labs/protocol";
 import { Protocol, type ChainReader } from "@invisi-labs/protocol";
@@ -45,10 +46,8 @@ type InvisiInfrastructure = Omit<
 export type InvisiOptions = InvisiInfrastructure;
 
 /** Public wallet and registry-specific inputs; signing remains external. */
-export type RegistrationPreparationOptions = Pick<
-    RegistrationPreparation,
-    "wallet" | "update" | "deadline"
->;
+export type RegistrationPreparationOptions = Pick<RegistrationPreparation, "update" | "deadline"> &
+    Pick<TransactionIdentity, "wallet">;
 
 /** Wallet identity and session permissions; shared infrastructure belongs to InvisiOptions. */
 export type ConnectionOptions = Pick<
@@ -179,6 +178,7 @@ export class Invisi {
                     throw new Error(`Unknown registration option: ${key}`);
                 }
             }
+            this.assertPublicIdentity(options);
             const selected = { ...options };
             const { provider, protocolRpc } = this.#options;
             if (!provider) throw new MissingCapabilityError("ethers provider");
@@ -198,11 +198,32 @@ export class Invisi {
         });
     }
 
+    private assertPublicIdentity(options: Pick<TransactionIdentity, "wallet">): void {
+        const { wallet } = options;
+        if (
+            !(wallet instanceof PublicWallet) ||
+            ["getViewer", "getDetector", "exportAuthorization"].some((key) => key in wallet)
+        ) {
+            throw new Error(
+                "Independent preparation requires a PublicWallet without private capabilities"
+            );
+        }
+        for (const key of ["authorization", "signer", "fundingSigner", "viewing"]) {
+            if (key in options)
+                throw new Error(`Independent preparation does not accept capability: ${key}`);
+        }
+    }
+
+    private resolveExplicit(options: TransactionIdentity): Promise<WalletSessionOptions> {
+        this.assertPublicIdentity(options);
+        return this.resolve({ wallet: options.wallet, protocol: options.protocol });
+    }
+
     async prepareTransfer(options: ExplicitTransferPreparation): Promise<PreparedTransaction> {
         return prepareWithErrors("prepareTransfer", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
+            const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareTransfer(request);
         });
@@ -211,7 +232,7 @@ export class Invisi {
         return prepareWithErrors("prepareShield", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
+            const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
             return preparation.prepareShield(request);
         });
@@ -222,7 +243,7 @@ export class Invisi {
         return prepareWithErrors("prepareCreateCredit", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
+            const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareCreateCredit(request);
         });
@@ -231,7 +252,7 @@ export class Invisi {
         return prepareWithErrors("prepareDrawCredit", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
+            const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareDrawCredit(request);
         });
@@ -242,7 +263,7 @@ export class Invisi {
         return prepareWithErrors("prepareTopUpCredit", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
+            const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareTopUpCredit(request);
         });
@@ -253,7 +274,7 @@ export class Invisi {
         return prepareWithErrors("prepareCancelCredit", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
-            const runtime = await this.resolve({ wallet, protocol });
+            const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareCancelCredit(request);
         });

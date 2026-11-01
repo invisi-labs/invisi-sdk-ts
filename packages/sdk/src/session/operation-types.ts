@@ -234,7 +234,10 @@ export interface OperationAggregateMember extends AggregateMember {
 }
 
 /** Data required while preparing an operation; it does not own persistence or reservations. */
-export interface PreparationRuntime<Result> extends Omit<OperationRuntime, "store"> {
+export interface PreparationRuntime<Result> extends Omit<
+    OperationRuntime,
+    "store" | "authorization"
+> {
     readInventory(): Promise<PreparationInventory>;
     complete(plan: OperationPlan): Promise<Result>;
     explicitInputs?: boolean;

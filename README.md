@@ -7,12 +7,12 @@ import { Invisi, Wallet, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 
 const provider = new JsonRpcProvider(chainRpcUrl);
-const signer = new EthereumWallet(fundingPrivateKey, provider);
+const signer = new EthereumWallet(evmPrivateKey, provider);
 const wallet = await Wallet.fromPrivateKey(evmPrivateKey);
 const protocolRpc = new ProtocolRpcClient(protocolRpcUrl);
 const protocol = await Protocol.fromRpc(protocolRpc, provider);
 const invisi = new Invisi({ provider, protocolRpc, store, prover });
-const session = await invisi.connect({ wallet, protocol });
+const session = await invisi.connect({ wallet, protocol, signer });
 
 await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
 const prepared = await session.prepareTransfer({
@@ -41,7 +41,7 @@ This transfer spends private notes. Explicit public funding adds an EVM funding 
 ```ts
 const invisi = new Invisi({ provider, protocolRpc, prover });
 const prepared = await invisi.prepareTransfer({
-    wallet,
+    wallet: PublicWallet.fromAddress(receivingAddress),
     protocol,
     tokenAddress,
     inputs: applicationSelectedNotes,
@@ -50,17 +50,19 @@ const prepared = await invisi.prepareTransfer({
 
 // Review privately before granting authorization.
 const review = prepared.preview();
-const authorized = await prepared.authorize();
+const request = await prepared.exportWalletAuthorization();
+const signature = await ownerSigner.signTypedData(request.domain, request.types, request.message);
+const authorized = await prepared.withWalletSignature(signature);
 const ready = await authorized.prove({ onProgress });
 const call = await ready.exportTransaction();
 const transaction = await signer.sendTransaction(call);
 ```
 
-Each funds `NoteInput` contains `{ note, commitment, treeId, leafIndex }`. Explicit funds operations consume all supplied inputs; they do not silently select a smaller subset or call an application coin selector. Sweep may explicitly select a subset with `commitments`. Change defaults to the wallet's receiving address; signed operations may supply `changeAddress`. `CreditInput` contains `{ state, commitment, treeId, leafIndex, role }`; provide role-specific records through `creditInputs` and select the credits to use with the normal Credit operation options. Owner and spender inputs remain subject to their actual leaf-bound permissions.
+Each funds `NoteInput` contains `{ note, commitment, treeId, leafIndex }`. Explicit funds operations consume all supplied inputs; they do not silently select a smaller subset or call an application coin selector. Choose a subset by supplying only the selected `NoteInput` records. Change defaults to the wallet's receiving address; signed operations may supply `changeAddress`. `CreditInput` contains `{ state, commitment, treeId, leafIndex, role }`; provide role-specific records through `creditInputs` and select the credits to use with the normal Credit operation options. Owner and spender inputs remain subject to their actual leaf-bound permissions.
 
 The SDK validates note preimages, wallet identity, deployment/token scope, canonical membership, spent state and the frozen proof statement. Supplying a record does not make it trusted. Chain RPC and Protocol RPC remain infrastructure dependencies; a Store adapter does not.
 
-`PreparedTransaction` is a local immutable operation handle. It supports `preview`, `authorize`, `prove`, `authorizeFunding`, caller-funded shield `ready`, `exportTransaction`, `exportProof` and `exportAggregateMember`. A public wallet may use a separate `WalletAuthorizationProvider` with `authorize(provider)`; a local prover may be supplied with `prove(prover, options)`, and a funding signer with `authorizeFunding(signer)`. Private authorization, public funding and gas payment remain independent.
+`PreparedTransaction` is a local immutable operation handle. It supports `preview`, request export and signature attachment, `prove`, caller-funded shield `ready`, `exportTransaction`, `exportProof` and `exportAggregateMember`. Independent preparation accepts only public wallet identity and never automatically extracts private authorization. A prover may be supplied with `prove(prover, options)`. Private note authorization, cash funding and gas payment remain independent. Local signing convenience methods belong to managed Session operations.
 
 ### External signing tools
 
@@ -81,11 +83,11 @@ await aliceSigner.sendTransaction(call);
 - Private note authorization: `exportWalletAuthorization()` -> external EOA EIP-712 signature -> `withWalletSignature(signature)` -> `prove()`. Only typed commitments leave the application; the recovered public key and signature become a private circuit witness. This path supports EOA authorization, not ERC-1271 circuit signatures. Never publish the returned private-spend signature or its witness.
 - Registry: `exportRegistrationAuthorization()` -> external EIP-712 signature -> `withSignature(signature)`. Existing EOA/ERC-1271 and freshness validation applies to both registration and update.
 
-A request is bound to the original immutable handle. Attaching a signature does not reconstruct that handle after a process restart; application recovery and transport remain separate concerns. Signing tools must display trusted business context for statement/request hashes, and must support the required typed-data format. Existing per-operation `authorize`, `authorizeFunding(signer)` and registry `authorize` remain convenience APIs. The `Invisi` constructor no longer accepts a default signer or funding signer; migrate those integrations to explicit request/signature boundaries and submit with ethers.
+A request is bound to the original immutable handle. Attaching a signature does not reconstruct that handle after a process restart; application recovery and transport remain separate concerns. Signing tools must display trusted business context for statement/request hashes, and must support the required typed-data format. Detached `authorize`, `authorizeFunding` and registry `authorize` have been removed. Use external requests and signatures; managed Session operations retain their explicitly injected signing capabilities. Registry `authorizeDirect()` remains a caller-only construction path and does not invoke a signing tool. The `Invisi` constructor no longer accepts a default signer or funding signer; migrate those integrations to explicit request/signature boundaries and submit with ethers.
 
 One Invisi instance may construct operations for multiple wallets by providing the wallet on every call. This does not permit mixing different owners' funds inputs in one arbitrary spend. Independent requests may be aggregated when the protocol permits it.
 
-Applications own input reservations, concurrency across processes, persistence, broadcasting and receipt reconciliation. Detached handles provide no durable recovery or automatic balance updates; keep pending inputs reserved after exporting a proof/request until canonical consumption or genuine expiry is established. The SDK never uploads private notes to Protocol RPC. See [transfer](examples/03-funds/transfer.ts) for explicit NoteInput construction; a private database can supply the same typed inputs.
+Applications own input reservations, concurrency across processes, persistence, broadcasting and receipt reconciliation. Detached handles provide no durable recovery or automatic balance updates; keep pending inputs reserved after exporting a proof/request until canonical consumption or genuine expiry is established. The SDK never uploads private notes to Protocol RPC. See [transfer](examples/03-hidden-amount/03-notes-to-three-with-change.ts) for explicit NoteInput construction; a private database can supply the same typed inputs.
 
 | Component | Responsibility |
 | --- | --- |
@@ -110,13 +112,13 @@ Receiving addresses use a 138-character `0i` full address or the owner's standar
 
 State is scoped by namespace, chain, protocol and wallet identity. Balance snapshots expose known funds, reservations, spent-check block/hash and the candidate observation checkpoint `observedThrough`. Unknown spent state and an unchecked empty wallet return `availableKnown:null`. Candidate updates advance `observedThrough`; they do not establish complete history. Refreshes with no incoming candidates can refresh known spent state, but cannot establish absence of incoming funds. Explicit `session.refresh({ fromBlock, reset: true })` rebuilds inventory while retaining uncertain operations and reservations; subsequent history ranges must not reset it again. Ordinary RPC supplies a trusted canonical data source; this SDK is not a consensus light client.
 
-`Disclosure.fromNote(note)` and `Disclosure.fromCredit(note)` create commitment openings; Credit openings retain only `creditSharedKeyHash`. `wallet.getViewer().discloseNote(ciphertext, context)` and `.discloseCredit(ciphertext, context)` authenticate an existing envelope and disclose only its derived payload key. Default JSON/inspect is redacted; explicit `export()` returns sensitive versioned JSON material and `Disclosure.fromExport(material)` imports it. `getScope()` describes the exposure: complete funds openings or payload keys permit consumption tracking and owner-only full sweep; a Credit payload key unlocks the entire role envelope, including `creditSharedKey` and receiving-key snapshots. Core `verify(output)` requires independently authenticated output data. `DisclosureVerifier` resolves successful canonical receipts and matching insertion/delivery events through a trusted deployment and RPC, with explicit confirmation policy. Results establish output content/inclusion, not payer identity, source of funds, spent state or complete wallet history. See [the disclosure walkthrough](examples/07-disclosure/index.ts) and [read-only chain verification](examples/07-disclosure/verify-on-chain.ts).
+`Disclosure.fromNote(note)` and `Disclosure.fromCredit(note)` create commitment openings; Credit openings retain only `creditSharedKeyHash`. `wallet.getViewer().discloseNote(ciphertext, context)` and `.discloseCredit(ciphertext, context)` authenticate an existing envelope and disclose only its derived payload key. Default JSON/inspect is redacted; explicit `export()` returns sensitive versioned JSON material and `Disclosure.fromExport(material)` imports it. `getScope()` describes the exposure: complete funds openings or payload keys permit consumption tracking and owner-only full sweep; a Credit payload key unlocks the entire role envelope, including `creditSharedKey` and receiving-key snapshots. Core `verify(output)` requires independently authenticated output data. `DisclosureVerifier` resolves successful canonical receipts and matching insertion/delivery events through a trusted deployment and RPC, with explicit confirmation policy. Results establish output content/inclusion, not payer identity, source of funds, spent state or complete wallet history. See [the disclosure walkthrough](examples/06-disclosure/01-note-opening.ts) and [read-only chain verification](examples/06-disclosure/03-credit-opening.ts).
 
 Persistent stores require caller-managed encryption keys. SQLite requires a compatible synchronous driver; the Node examples use `node:sqlite`. IndexedDB uses native CAS transactions. Memory storage is an explicit ephemeral choice. Back up the source EVM account private key, or its mnemonic/passphrase and original wallet derivation path, plus any externally rotated historical viewing keys. Invisi defines its KDF, not an HD path.
 
 An exported or possibly broadcast proof keeps inputs reserved until canonical consumption or actual business expiry. A timeout, local abandonment, changed funding nonce, expired funding signature or currently unknown root does not revoke an exposed proof. Restore an operation by ID and reconcile it before retrying. Cancellation stops local work; it cannot revoke a transaction already sent.
 
-[Numbered English examples](examples/README.md) show complete native/browser flows, public funding and Permit, Credit roles, registration, aggregation, discovery, durable recovery, frameworks and application-owned input records. Applications own review, authentication, key management and commercial policies.
+[Numbered English examples](examples/README.md) show flat ethers integration, public/hidden amounts, separate signing roles, Credit, registration, aggregation, raw payloads, disclosure and durable WalletSession recovery. Customize local test accounts and connection/token/prover settings before executing on-chain examples. Applications own review, authentication, key management and commercial policies.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -196,7 +198,9 @@ const prepared = await invisi.prepareTransfer({ wallet, protocol, tokenAddress, 
 const { gasUnits } = prepared.estimateGas();
 console.log("Reference gas units:", gasUnits);
 // Review the budget before starting expensive proving.
-const ready = await (await prepared.authorize()).prove();
+const request = await prepared.exportWalletAuthorization();
+const signature = await ownerSigner.signTypedData(request.domain, request.types, request.message);
+const ready = await (await prepared.withWalletSignature(signature)).prove();
 const call = await ready.exportTransaction();
 const finalGas = await signer.estimateGas(call);
 ```
@@ -205,7 +209,7 @@ const finalGas = await signer.estimateGas(call);
 
 Exact measured shapes use the largest rounded-up receipt mean among matching records, including private policy variants. Unmeasured shapes use an upward-only workload envelope based on the worst observed sample per matching shape and circuit; duplicate policy variants are grouped before selecting a baseline. Signature funding and Permit each double an unmatched reference when absent from its baseline. Credit references require the current artifact and verification-key identity; historical Credit circuits cannot supply fallback costs. Historical Funds references retain the family-capacity fallback. These coarse references are not guaranteed upper bounds.
 
-All eight direct preparation methods support this API. A recursive member has no standalone transaction cost and throws; estimate the complete aggregate separately. Unknown operation kinds/targets also throw. Custom exact deployment/circuit/shape measurements take priority through `new Invisi({ ..., gasBenchmarks: defineGasBenchmarks(teamCatalog) })`. Validation checks record format, not publisher authenticity. Session construction snapshots custom catalogs. Token behavior, screening, storage/tree occupancy, chain execution rules and deployment modifications can change actual costs. Recheck references when updating contracts or circuit assets.
+All funds and Credit preparation methods support this API. A recursive member has no standalone transaction cost and throws; estimate the complete aggregate separately. Unknown operation kinds/targets also throw. Custom exact deployment/circuit/shape measurements take priority through `new Invisi({ ..., gasBenchmarks: defineGasBenchmarks(teamCatalog) })`. Validation checks record format, not publisher authenticity. Session construction snapshots custom catalogs. Token behavior, screening, storage/tree occupancy, chain execution rules and deployment modifications can change actual costs. Recheck references when updating contracts or circuit assets.
 
 ### Current receipt matrix
 

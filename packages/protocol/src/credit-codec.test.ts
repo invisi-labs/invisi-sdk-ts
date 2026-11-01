@@ -119,83 +119,29 @@ describe("current credit lifecycle reference vectors", () => {
 
 // The supplied proof contains private wallet authorization for the selected public payout.
 describe("wallet-authorized collection and lifecycle boundaries", () => {
-    it("collects complete source balances and rejects wrong witnesses or partial payouts", async () => {
-        const { computeNoteIdentity, computeNoteCommitment, computeNoteNullifier } =
-            await import("@invisi-labs/core");
-        const { buildWithdrawalCalldata } = await import("@invisi-labs/protocol");
-        const note = {
-            chainId: context.chainId,
-            protocolAddress: BigInt(context.protocolAddress),
-            walletIdentity: ("0x" + 23n.toString(16).padStart(40, "0")) as `0x${string}`,
-            tokenAddress: BigInt(context.tokenAddress),
-            amount: 100n,
-            nonce: 42n,
-        };
-        const nonce = note.nonce;
-        const leaf = await computeNoteCommitment(
-            context.chainId,
-            await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce),
-            note.tokenAddress,
-            note.amount
-        );
-        const nullifier = await computeNoteNullifier(context.chainId, nonce, leaf);
+    it("encodes public payouts through the unified transact builder", async () => {
+        const { buildTransactCalldata } = await import("./index");
         const params = {
-            token: "0x2222222222222222222222222222222222222222" as const,
+            token: context.tokenAddress,
             sources: [fixtures.cancel.params.source],
-            nullifiers: [nullifier],
+            nullifiers: [fixtures.cancel.params.nullifier],
             outputCommitments: [],
             withdrawalAddress: context.protocolAddress,
             withdrawalAmount: 100n,
             deadline: 900n,
         };
-        const input = {
-            context,
-            proof: "0x1234" as const,
-            params,
-            sourceNotes: [note],
-        };
-        expect(
-            new Interface(invisiProtocolAbi).parseTransaction({
-                data: (await buildWithdrawalCalldata(input)).data,
-            })!.name
-        ).toBe("transact");
-        // Payout is selected by the proof; it is independent from the wallet identity.
-        expect(
-            new Interface(invisiProtocolAbi).parseTransaction({
-                data: (
-                    await buildWithdrawalCalldata({
-                        ...input,
-                        params: { ...params, withdrawalAddress: context.tokenAddress },
-                    })
-                ).data,
-            })!.name
-        ).toBe("transact");
-        for (const wrong of [
-            { ...note, chainId: note.chainId + 1n },
-            { ...note, protocolAddress: note.protocolAddress + 1n },
-            {
-                ...note,
-                walletIdentity: ("0x" + 24n.toString(16).padStart(40, "0")) as `0x${string}`,
-            },
-            { ...note, tokenAddress: note.tokenAddress + 1n },
-        ]) {
-            await expect(
-                buildWithdrawalCalldata({ ...input, sourceNotes: [wrong] })
-            ).rejects.toThrow();
+        // The proof authorizes the selected payout; low-level encoding does not accept private notes.
+        for (const withdrawalAddress of [context.protocolAddress, context.tokenAddress]) {
+            const call = buildTransactCalldata({
+                context,
+                proof: "0x1234",
+                params: { ...params, withdrawalAddress },
+                deliveries: [],
+            });
+            expect(
+                new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!.name
+            ).toBe("transact");
         }
-        await expect(
-            buildWithdrawalCalldata({ ...input, params: { ...params, withdrawalAmount: 50n } })
-        ).rejects.toThrow();
-        await expect(
-            buildWithdrawalCalldata({
-                ...input,
-                sourceNotes: [{ ...note, nonce: note.nonce + 1n }],
-            })
-        ).rejects.toThrow();
-        await expect(buildWithdrawalCalldata({ ...input, sourceNotes: [] })).rejects.toThrow();
-        expect("buildUnsignedWithdrawalCalldata" in (await import("@invisi-labs/protocol"))).toBe(
-            false
-        );
     });
     it("rejects stale top-ups, decreasing expiry, duplicate credit nullifier and full-draw recovery", () => {
         const top = fixtures.topUp,

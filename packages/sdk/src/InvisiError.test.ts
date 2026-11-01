@@ -1,3 +1,4 @@
+import { PublicWallet } from "@invisi-labs/core";
 import { fundsV1 } from "@invisi-labs/core";
 import { describe, expect, it, vi } from "vitest";
 import { Invisi, InvisiError, WalletSession, AddressRegistry } from "./index";
@@ -66,7 +67,10 @@ describe("public preparation errors", () => {
             }),
         };
         const error = await new Invisi({ chainReader: reader })
-            .prepareShield({ wallet: h.wallet, protocol: h.protocol } as never)
+            .prepareShield({
+                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                protocol: h.protocol,
+            } as never)
             .catch((error: unknown) => error);
         expect(error).toBeInstanceOf(InvisiError);
         expect(error).toMatchObject({
@@ -75,7 +79,7 @@ describe("public preparation errors", () => {
             cause,
         });
         const missing = await new Invisi()
-            .prepareRegistration({ wallet: h.wallet })
+            .prepareRegistration({ wallet: PublicWallet.fromAddress(h.wallet.getAddress()) })
             .catch((error: unknown) => error);
         expect(missing).toMatchObject({
             code: "MISSING_CAPABILITY",
@@ -104,7 +108,7 @@ describe("recipient preparation failures", () => {
             });
             const error = await invisi
                 .prepareShield({
-                    wallet: h.wallet,
+                    wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                     protocol: h.protocol,
                     tokenAddress: h.context.tokenAddress,
                     outputs: [
@@ -141,7 +145,7 @@ describe("recipient preparation failures", () => {
             const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
             for (const method of ["prepareShield", "prepareTransfer"] as const) {
                 const error = await invisi[method]({
-                    wallet: h.wallet,
+                    wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                     protocol: h.protocol,
                     tokenAddress: h.context.tokenAddress,
                     inputs,
@@ -173,7 +177,7 @@ describe("recipient preparation failures", () => {
             chainReader: h.reader,
             addressResolver: lookup,
         }).prepareShield({
-            wallet: h.wallet,
+            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [
@@ -208,7 +212,7 @@ describe("recipient preparation failures", () => {
         const h = await fixture();
         const error = await new Invisi({ chainReader: h.reader, addressResolver: async () => null })
             .prepareCreateCredit({
-                wallet: h.wallet,
+                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
                 tokenAddress: h.context.tokenAddress,
                 inputs: [],

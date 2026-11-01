@@ -1,0 +1,42 @@
+{
+    "alice": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "bob": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "charlie": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "dave": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "eve": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "frank": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "grace": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "heidi": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "ivan": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    },
+    "judy": {
+        "address": "0xYOUR_EVM_ADDRESS",
+        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
+    }
+}

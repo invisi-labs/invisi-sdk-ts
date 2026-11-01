@@ -22,3 +22,7 @@ examples/*.sqlite*
 
 # Application-owned transaction journals
 *.pending.json
+
+# Local example keys, encrypted inventory and native prover binaries
+/examples/accounts
+/examples/bin/
