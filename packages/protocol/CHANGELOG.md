@@ -1,5 +1,15 @@
 # @invisi-labs/protocol
 
+## 1.1.4
+
+### Patch Changes
+
+- Remove the dedicated withdrawal builder in favor of unified transact. Registration accepts external signatures without a configured signer; the caller-only direct registration path remains.
+
+- @invisi-labs/core@1.1.4
+- @invisi-labs/prover@1.1.4
+- @invisi-labs/rpc@1.1.4
+
 ## 1.1.3
 
 ### Patch Changes

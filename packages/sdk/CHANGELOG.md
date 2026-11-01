@@ -1,5 +1,17 @@
 # @invisi-labs/sdk
 
+## 1.1.4
+
+### Patch Changes
+
+- Remove detached local-signing shortcuts and implicit private-wallet authorization; use portable requests and externally supplied signatures. Keep explicit local signing in WalletSession. Replace workspace examples with flat, configurable English walkthroughs and local account setup.
+
+- Add managed wallet sessions with encrypted persistence, incoming and outgoing history, recovery, and explicit signer capabilities. Support external authorization requests, public wallets, unified transfer preparation, registry discovery, multi-owner credit draws, and raw application payloads with explicit decoding. Select single or aggregate execution when proving.
+    - @invisi-labs/core@1.1.4
+    - @invisi-labs/protocol@1.1.4
+    - @invisi-labs/prover@1.1.4
+    - @invisi-labs/rpc@1.1.4
+
 ## 1.1.3
 
 ### Patch Changes
