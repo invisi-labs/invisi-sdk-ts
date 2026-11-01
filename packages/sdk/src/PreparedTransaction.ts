@@ -14,13 +14,14 @@ import {
     type WalletAuthorizationProvider,
 } from "@invisi-labs/core";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
-import type { Prover, ProverOptions, ProofBundle } from "@invisi-labs/prover";
+import type { Prover, ProofBundle } from "@invisi-labs/prover";
 import type {
     FundingSigner,
     OperationPlan,
     OperationRuntime,
     OperationAggregateMember,
     SavedOperation,
+    TransactionProveOptions,
 } from "./session/operation-types";
 import type { OperationStatus } from "./session/state";
 import {
@@ -228,13 +229,13 @@ export class PreparedTransaction {
         );
     }
 
-    async prove(options?: ProverOptions): Promise<PreparedTransaction>;
-    async prove(backend: Prover, options?: ProverOptions): Promise<PreparedTransaction>;
+    async prove(options?: TransactionProveOptions): Promise<PreparedTransaction>;
+    async prove(backend: Prover, options?: TransactionProveOptions): Promise<PreparedTransaction>;
     async prove(
-        backendOrOptions: Prover | ProverOptions = {},
-        suppliedOptions: ProverOptions = {}
+        backendOrOptions: Prover | TransactionProveOptions = {},
+        suppliedOptions: TransactionProveOptions = {}
     ): Promise<PreparedTransaction> {
-        const options = "prove" in backendOrOptions ? suppliedOptions : backendOrOptions;
+        const options = { ...("prove" in backendOrOptions ? suppliedOptions : backendOrOptions) };
         const plan = this.#saved.plan;
         check(plan.kind !== "shield", "shield requires no proof");
         if (requiresAuthorization(plan)) {

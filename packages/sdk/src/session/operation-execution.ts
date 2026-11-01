@@ -7,8 +7,8 @@ import {
     walletAuthorizationTypedData,
     type WalletAuthorizationProvider,
 } from "@invisi-labs/core";
-import type { TokenProtocol } from "@invisi-labs/protocol";
-import type { Prover, ProverOptions } from "@invisi-labs/prover";
+import { WitnessBuilder, type TokenProtocol } from "@invisi-labs/protocol";
+import type { Prover } from "@invisi-labs/prover";
 import type {
     FundingAuthorizationVerifier,
     FundingSigner,
@@ -16,12 +16,14 @@ import type {
     OperationPlan,
     OperationRuntime,
     SavedOperation,
+    TransactionProveOptions,
 } from "./operation-types";
 import {
     authorizationRequest,
     fundingTypedData,
     publicProof,
     witnessFor,
+    statement,
 } from "./operation-protocol";
 import { sameStatement } from "./proof-integrity";
 
@@ -45,19 +47,38 @@ export async function proveOperation(
     plan: OperationPlan,
     authorization: AuthorizedStatement | undefined,
     prover: Prover,
-    options: ProverOptions
+    options: TransactionProveOptions
 ) {
+    if (Object.hasOwn(options, "target")) {
+        throw new Error("prove accepts execution, not a backend target");
+    }
+    const { execution = "single", ...proverOptions } = options;
+    if (execution !== "single" && execution !== "aggregate") {
+        throw new Error("execution must be single or aggregate");
+    }
+    const frozen = statement(plan);
+    if (execution === "aggregate" && (plan.kind !== "transfer" || plan.capacity !== 14)) {
+        throw new Error("aggregate execution requires a 14-slot transfer");
+    }
+    if (plan.kind === "transfer") {
+        // Only the proof backend/key changes; public words and wallet authorization stay fixed.
+        plan.statement = WitnessBuilder.statement(
+            frozen.circuitName,
+            frozen.expectedPublicInputs,
+            execution === "aggregate" ? "noir-recursive" : "evm"
+        );
+    }
     const request = await witnessFor(protocol, plan, authorization);
     if (JSON.stringify({ ...request, witness: undefined }) !== JSON.stringify(plan.statement))
         throw new Error("prepared proof statement changed");
     try {
-        const proof = publicProof(await prover.prove(request, options));
+        const proof = publicProof(await prover.prove(request, proverOptions));
         sameStatement(proof, plan.statement!);
         if (
             (await prover.verify(
                 structuredClone(proof),
                 structuredClone(plan.statement!),
-                options
+                proverOptions
             )) !== true
         )
             throw new Error("proof verification failed");

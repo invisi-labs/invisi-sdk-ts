@@ -341,3 +341,16 @@ Addresses, refund instructions or other business fields belong to application-de
 Custom applications use exactly the same flow: `payload: orderV1.encode(data)`, then `orderV1.decode(note.payload)` outside the SDK. The codec handles only application bytes and never receives financial fields, viewing/spending keys, nonces or Credit recovery secrets from the SDK. Use validated JSON/UTF-8 or any agreed binary format, with any application versioning it needs; no format discriminator is required. Unknown application formats remain copied raw bytes and can be parsed later; no unknown-format fallback or implicit parsing occurs.
 
 `ProtocolRpcClient.getEncryptedOutputs()` returns raw indexed candidates of every type/version. `getOutputs()` and `getCreditOutputs()` select by type only, preserving unknown envelope versions for future SDK upgrades. WalletSession, explicit discovery and disclosure all recover/retain raw payloads without an application registry. Low-level protocol builders still validate transport shape only. No compatibility registry, builder `.payload()` or versioned JavaScript schema objects remain.
+
+### Transfer submission mode
+
+`prepareTransfer()` fixes the transaction inputs, outputs and authorization request without choosing how it will be submitted. After wallet authorization, choose the mode in `authorized.prove({ execution: "aggregate" })`. Omission or `"single"` produces a directly submittable transaction; `"aggregate"` produces a member for a separate aggregate submission.
+
+The public `TransactionProveOptions` extends prover progress/cancellation options with `execution?: TransactionExecution`, where `TransactionExecution` is `"single" | "aggregate"`. This is supported by both detached `PreparedTransaction` and managed `Operation`, including the explicit prover overload of `PreparedTransaction.prove`. Preparation rejects both `target` and `execution` rather than silently ignoring them.
+
+- `single`: use `exportTransaction()` after proof and any funding authorization.
+- `aggregate`: use `exportAggregateMember()`, aggregate exactly 4, 8 or 12 independent members and submit the complete call. Only the 14-slot transfer circuit supports this mode; Credit operations reject it.
+
+Wallet authorization binds the same financial statement in either mode. A signature-funded transfer exports its funding request after proving, using the selected mode's request binding. The mode is frozen once proving succeeds; a ready handle cannot be re-proved to switch modes. Before proving, gas estimates describe the default single path; estimate the complete aggregate call with ethers after aggregation.
+
+The low-level prover retains authenticated backend `ProofTarget` values `evm` and `noir-recursive`. Those identify toolchain formats and circuit keys; the SDK selects them from `execution` and never forwards this business option to prover backends. No circuit, verifier or on-chain encoding change is required.

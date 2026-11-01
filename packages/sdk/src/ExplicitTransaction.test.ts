@@ -167,13 +167,98 @@ it("supports full owner-only sweeps and recursive member export", async () => {
     const recursive = await h.invisi.prepareTransfer({
         ...identity,
         wallet: h.wallet,
-        target: "noir-recursive",
         outputs: [{ to: h.bob.getAddress(), amount: 30n }],
     });
-    const ready = await (await recursive.authorize()).prove();
+    const ready = await (await recursive.authorize()).prove({ execution: "aggregate" });
     expect(ready.exportAggregateMember().bundle.target).toBe("noir-recursive");
     await expect(ready.exportTransaction()).rejects.toThrow(/recursive/);
 });
+
+it.each([undefined, "single", "aggregate"] as const)(
+    "selects the proof backend from execution=%s before proving",
+    async (execution) => {
+        const h = await setup();
+        const prepared = await h.invisi.prepareTransfer({
+            wallet: h.wallet,
+            protocol: h.protocol,
+            tokenAddress: h.context.tokenAddress,
+            inputs: h.inputs,
+            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        });
+        const request = await prepared.exportWalletAuthorization();
+        const authorized = await prepared.authorize();
+        expect(await authorized.exportWalletAuthorization()).toEqual(request);
+        const ready = await authorized.prove(execution === undefined ? {} : { execution });
+        expect(ready.exportProof().target).toBe(
+            execution === "aggregate" ? "noir-recursive" : "evm"
+        );
+        await expect(
+            ready.prove({ execution: execution === "aggregate" ? "single" : "aggregate" })
+        ).rejects.toThrow(/stage/);
+        if (execution === "aggregate") {
+            expect(ready.exportAggregateMember().bundle.target).toBe("noir-recursive");
+            await expect(ready.exportTransaction()).rejects.toThrow(/recursive/);
+        } else {
+            expect((await ready.exportTransaction()).to).toBe(h.context.protocolAddress);
+            expect(() => ready.exportAggregateMember()).toThrow(/recursive/);
+        }
+    }
+);
+
+it.each([
+    { execution: "aggregate" },
+    { execution: "evm" },
+    { execution: "noir-recursive" },
+    { execution: null },
+    { target: "noir-recursive" },
+    { execution: "single", target: "evm" },
+])("rejects invalid execution or retired target options: %j", async (invalid) => {
+    const h = await setup();
+    await expect(
+        h.invisi.prepareTransfer({
+            wallet: h.wallet,
+            protocol: h.protocol,
+            tokenAddress: h.context.tokenAddress,
+            inputs: h.inputs,
+            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            ...invalid,
+        } as any)
+    ).rejects.toThrow(/execution|target/);
+});
+
+it("rejects aggregation above 14 slots without invoking the prover", async () => {
+    const h = await setup();
+    const prepared = await h.invisi.prepareTransfer({
+        wallet: h.wallet,
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: Array.from({ length: 14 }, () => ({ to: h.bob.getAddress(), amount: 1n })),
+    });
+    const authorized = await prepared.authorize();
+    await expect(authorized.prove({ execution: "aggregate" })).rejects.toThrow(/14-slot/);
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    // A failed local proof attempt leaves the detached authorized handle usable.
+    const ready = await authorized.prove();
+    expect(ready.exportProof().target).toBe("evm");
+});
+
+it.each(["evm", "noir-recursive", null, "invalid"])(
+    "rejects invalid prove execution=%s before invoking the backend",
+    async (execution) => {
+        const h = await setup();
+        const prepared = await h.invisi.prepareTransfer({
+            wallet: h.wallet,
+            protocol: h.protocol,
+            tokenAddress: h.context.tokenAddress,
+            inputs: h.inputs,
+            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        });
+        const authorized = await prepared.authorize();
+        await expect(authorized.prove({ execution } as any)).rejects.toThrow(/execution/);
+        expect(h.prover.prove).not.toHaveBeenCalled();
+    }
+);
 
 it("supports public shield and signature-funded outputs using independent EVM authorization", async () => {
     const h = await setup();

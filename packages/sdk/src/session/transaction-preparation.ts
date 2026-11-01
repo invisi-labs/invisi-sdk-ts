@@ -6,7 +6,6 @@ import {
     WitnessBuilder,
     ZERO_ADDRESS,
 } from "@invisi-labs/protocol";
-import type { ProofTarget } from "@invisi-labs/prover";
 import {
     positiveAmount,
     positiveOutputAmount,
@@ -41,6 +40,11 @@ export class TransactionPreparation<Result> {
         return this.context.scope;
     }
     async prepareTransfer(options: TransferPreparation): Promise<Result> {
+        if (Object.hasOwn(options, "target") || Object.hasOwn(options, "execution")) {
+            throw new Error(
+                "prepareTransfer accepts no target or execution; choose execution in prove()"
+            );
+        }
         const copied = structuredClone(options);
         const runtime = this.runtime(copied.tokenAddress);
         if (copied.commitments !== undefined && copied.commitments.length === 0)
@@ -74,7 +78,6 @@ export class TransactionPreparation<Result> {
             withdrawalAmount,
             frame,
             funding,
-            copied.target,
             preparation
         );
     }
@@ -86,7 +89,6 @@ export class TransactionPreparation<Result> {
         withdrawalAmount: bigint,
         frame: PreparationFrame,
         funding: Pick<OperationPlan, "funding" | "fundingMode">,
-        target: ProofTarget | undefined,
         preparation: Preparation<Result>
     ): Promise<Result> {
         if (total >= 1n << 135n) {
@@ -129,7 +131,7 @@ export class TransactionPreparation<Result> {
         const statement = WitnessBuilder.statement(
             `transact_user_slots${normalized.capacity}`,
             transactUserPublicInputs(context, params, deliveries, funding.funding),
-            target ?? "evm"
+            "evm"
         );
         await preparation.assertBlock(frame);
         return preparation.runtime.complete({

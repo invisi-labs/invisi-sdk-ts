@@ -15,7 +15,8 @@ const payer = new EthereumWallet(`0x${"03".repeat(32)}`);
 const outsider = new EthereumWallet(`0x${"04".repeat(32)}`);
 const prover: Prover = {
     prove: async (request) => {
-        const proofHex = `0x${"00".repeat(32)}` as const;
+        const proofHex =
+            `0x${"00".repeat(request.target === "noir-recursive" ? 458 * 32 : 32)}` as const;
         return {
             ...request,
             formatVersion: 1,
@@ -186,32 +187,52 @@ for (const managed of [false, true]) {
             await expect(prepared.withFundingSignature(signature)).rejects.toThrow(/expired/);
         });
 
-        it("exports private-wallet typed data, verifies its external signature, then requires proof before funding", async () => {
-            const h = await setup();
-            const prepared = await h.transfer();
-            await expect(prepared.exportFundingAuthorization()).rejects.toThrow(/proof/);
-            const request = JSON.parse(JSON.stringify(await prepared.exportWalletAuthorization()));
-            expect(request.primaryType).toBe("WalletAuthorization");
-            expect(JSON.stringify(request)).not.toMatch(/privateKey|public_key_x|nonce|witness/);
-            const wrong = await outsider.signTypedData(
-                request.domain,
-                request.types,
-                request.message
-            );
-            await expect(prepared.withWalletSignature(wrong)).rejects.toThrow(/signature|identity/);
-            const signature = await owner.signTypedData(
-                request.domain,
-                request.types,
-                request.message
-            );
-            const authorized = await prepared.withWalletSignature(signature);
-            const proved = await authorized.prove();
-            const funding = await proved.exportFundingAuthorization();
-            expect(funding.primaryType).toBe("FundTransact");
-            const grant = await payer.signTypedData(funding.domain, funding.types, funding.message);
-            const ready = await proved.withFundingSignature(grant);
-            expect((await ready.exportTransaction()).data.length).toBeGreaterThan(100);
-        });
+        it.each(["single", "aggregate"] as const)(
+            "keeps external wallet authorization valid for %s execution and signs funding after proving",
+            async (execution) => {
+                const h = await setup();
+                const prepared = await h.transfer();
+                await expect(prepared.exportFundingAuthorization()).rejects.toThrow(/proof/);
+                const request = JSON.parse(
+                    JSON.stringify(await prepared.exportWalletAuthorization())
+                );
+                expect(request.primaryType).toBe("WalletAuthorization");
+                expect(JSON.stringify(request)).not.toMatch(
+                    /privateKey|public_key_x|nonce|witness/
+                );
+                const wrong = await outsider.signTypedData(
+                    request.domain,
+                    request.types,
+                    request.message
+                );
+                await expect(prepared.withWalletSignature(wrong)).rejects.toThrow(
+                    /signature|identity/
+                );
+                const signature = await owner.signTypedData(
+                    request.domain,
+                    request.types,
+                    request.message
+                );
+                const authorized = await prepared.withWalletSignature(signature);
+                const proved = await authorized.prove({ execution });
+                const funding = await proved.exportFundingAuthorization();
+                expect(funding.primaryType).toBe("FundTransact");
+                const grant = await payer.signTypedData(
+                    funding.domain,
+                    funding.types,
+                    funding.message
+                );
+                const ready = await proved.withFundingSignature(grant);
+                if (execution === "aggregate") {
+                    const member = await ready.exportAggregateMember();
+                    expect(member.bundle.target).toBe("noir-recursive");
+                    expect(member.request.funding.signature).toBe(grant);
+                    await expect(ready.exportTransaction()).rejects.toThrow(/recursive/);
+                } else {
+                    expect((await ready.exportTransaction()).data.length).toBeGreaterThan(100);
+                }
+            }
+        );
     });
 }
 

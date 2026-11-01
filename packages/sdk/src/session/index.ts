@@ -28,6 +28,8 @@ export type {
     ShieldPreparation,
     TopUpCreditPreparation,
     TransferPreparation,
+    TransactionExecution,
+    TransactionProveOptions,
     WalletSessionOptions,
 } from "./operation-types";
 export * from "./WalletSession";

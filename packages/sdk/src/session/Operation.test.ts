@@ -343,12 +343,11 @@ it("exports recursive operations only as public aggregate members and keeps thei
             await (
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    target: "noir-recursive",
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
-        ).prove();
+        ).prove({ execution: "aggregate" });
     await expect(operation.exportTransaction()).rejects.toThrow(/aggregate|recursive/);
     const member = await operation.exportAggregateMember();
     expect(member.bundle.target).toBe("noir-recursive");
@@ -375,12 +374,11 @@ it("confirms an exported recursive member only when its exact request settled in
             await (
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                    target: "noir-recursive",
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
             ).authorize()
-        ).prove(),
+        ).prove({ execution: "aggregate" }),
         member = await operation.exportAggregateMember(),
         requests = Array.from({ length: 4 }, (_, i) => ({
             ...structuredClone(member.request),

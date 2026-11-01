@@ -68,6 +68,8 @@ export type {
     WalletSessionOptions,
     PaymentOutput,
     TransferPreparation,
+    TransactionExecution,
+    TransactionProveOptions,
     ShieldPreparation,
     CreateCreditPreparation,
     DrawCreditPreparation,

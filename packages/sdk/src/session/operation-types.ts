@@ -36,7 +36,7 @@ import type {
     TransactionContext,
     TransactRequestParams,
 } from "@invisi-labs/protocol";
-import type { AggregateMember, ProofBundle, ProofTarget, Prover } from "@invisi-labs/prover";
+import type { AggregateMember, ProofBundle, Prover, ProverOptions } from "@invisi-labs/prover";
 
 import type { StoredCredit, StoredNote, WalletScope, WalletStore, WalletState } from "./state";
 export interface CoinSelector {
@@ -74,6 +74,14 @@ export interface PaymentOutput {
     to: string;
     amount: bigint;
 }
+/** Public submission mode; backend proof targets are selected internally. */
+export type TransactionExecution = "single" | "aggregate";
+
+export interface TransactionProveOptions extends ProverOptions {
+    /** Defaults to single. Aggregate produces a member for a separate aggregate submission. */
+    execution?: TransactionExecution;
+}
+
 export interface TransferPreparation {
     tokenAddress: Address;
     /** Explicit subset for managed inventory; detached calls already supply inputs. */
@@ -83,7 +91,6 @@ export interface TransferPreparation {
     outputs: readonly PaymentOutput[];
     funding?: FundingSource;
     deadline?: bigint;
-    target?: ProofTarget;
 }
 export interface ShieldPreparation {
     tokenAddress: Address;

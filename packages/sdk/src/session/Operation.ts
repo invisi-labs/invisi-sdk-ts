@@ -13,7 +13,7 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
-import type { ProofBundle, ProofStatement, ProverOptions } from "@invisi-labs/prover";
+import type { ProofBundle, ProofStatement } from "@invisi-labs/prover";
 import { sameStatement } from "./proof-integrity";
 import { confirmOperation, reconcileOperation } from "./operation-confirmation";
 import {
@@ -30,6 +30,7 @@ import type {
     OperationPlan,
     OperationRuntime,
     SavedOperation,
+    TransactionProveOptions,
 } from "./operation-types";
 import type { OperationRecord, OperationStatus } from "./state";
 import { scopeKey } from "./store";
@@ -326,7 +327,8 @@ export class Operation {
         );
     }
 
-    async prove(options: ProverOptions = {}): Promise<Operation> {
+    async prove(suppliedOptions: TransactionProveOptions = {}): Promise<Operation> {
+        const options = { ...suppliedOptions };
         const plan = this.#saved.plan;
         check(plan.kind !== "shield", "shield requires no proof");
         if (requiresAuthorization(plan)) {

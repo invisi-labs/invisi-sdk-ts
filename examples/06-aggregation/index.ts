@@ -66,13 +66,13 @@ export async function main(resources: ExampleResources) {
             inputs: inputGroups[i]!,
             tokenAddress: tokens[i % tokens.length]!,
             outputs: [{ to: recipientAddress, amount: 1n }],
-            target: "noir-recursive",
         });
 
         console.log("Local member review:", prepared.preview());
         const authorized = await prepared.authorize();
 
         const proved = await authorized.prove({
+            execution: "aggregate",
             onProgress: (event) => console.log("Proof phase:", event.phase),
         });
 
