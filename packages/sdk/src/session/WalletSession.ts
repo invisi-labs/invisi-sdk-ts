@@ -17,6 +17,7 @@ import type {
     TopUpCreditPreparation,
     TransferPreparation,
     WalletSessionOptions,
+    WalletSessionInfrastructure,
 } from "./operation-types";
 import { TransactionPreparation } from "./transaction-preparation";
 import { walletBalance, type WalletScope } from "./state";
@@ -32,7 +33,7 @@ export type SessionTransactionOptions = Omit<
 
 /** Wallet state and operations, with infrastructure and permissions explicitly injected. */
 export class WalletSession {
-    readonly #options: WalletSessionOptions;
+    readonly #options: WalletSessionInfrastructure;
     #updater: WalletUpdater | undefined;
     readonly #sending = new Set<string>();
     #refreshQueue: Promise<unknown> = Promise.resolve();
@@ -40,6 +41,11 @@ export class WalletSession {
     readonly protocol: Protocol;
 
     constructor(options: WalletSessionOptions) {
+        if ("ciphertextCodecs" in options || "envelopeVersion" in options) {
+            throw new Error(
+                "SDK envelope versions are fixed; encode application payload bytes externally"
+            );
+        }
         this.#options = {
             ...options,
             ...(options.gasBenchmarks
@@ -152,6 +158,7 @@ export class WalletSession {
             store: options.store,
             reader: options.chainReader,
             viewing,
+
             protocolRpc: options.protocolRpc,
             ...(receivingKeys ? { receivingKeys } : {}),
         });

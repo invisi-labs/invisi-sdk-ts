@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/core";
 import { expect, it } from "vitest";
 import { hexlify, toBeHex } from "ethers";
 import {
@@ -53,18 +54,9 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
             walletIdentity,
             amount: 70n,
             nonce: BigInt(i + 1),
-            ...(i === 2
-                ? {
-                      returnAddress: ReceivingAddress.from({
-                          walletIdentity,
-                          viewingPublicKey: viewingPublicKey(key),
-                          clueKey: Uint8Array.from(
-                              Buffer.from(vectors.credit.ownerReceivingKeys.clueKey.slice(2), "hex")
-                          ),
-                      }).toString(),
-                  }
-                : {}),
-            ...(memo === undefined ? {} : { memo }),
+            payload: fundsV1.encode({
+                ...(memo === undefined ? {} : { memo }),
+            }),
         };
         const commitment = await computeNoteCommitment(
             note.chainId,
@@ -95,11 +87,13 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
         confirmedThrough: 12n,
     });
     expect(result.notes.map((n) => n.leafIndex)).toEqual([0, 1, 2]);
-    expect(result.notes[0]!.note).not.toHaveProperty("memo");
-    expect(result.notes[0]!.note).not.toHaveProperty("returnAddress");
-    expect(result.notes[2]!.note.returnAddress).toMatch(/^0i/);
-    expect(result.notes[1]!.note.memo).toEqual(new TextEncoder().encode("invoice\0paid"));
-    expect(result.notes[2]!.note.memo).toEqual(new Uint8Array(256).fill(255));
+    expect(fundsV1.decode(result.notes[0]!.note.payload!).memo).toBeUndefined();
+    expect(fundsV1.decode(result.notes[1]!.note.payload!).memo).toEqual(
+        new TextEncoder().encode("invoice\0paid")
+    );
+    expect(fundsV1.decode(result.notes[2]!.note.payload!).memo).toEqual(
+        new Uint8Array(256).fill(255)
+    );
 });
 it("rejects truncated prefixes, bounds, old versions, truncated clues, trailing bytes and count mismatches", () => {
     const ciphertext = "06" + "00".repeat(160);

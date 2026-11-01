@@ -1,3 +1,4 @@
+import { creditV1 } from "@invisi-labs/sdk";
 import { PublicWallet } from "@invisi-labs/sdk";
 import { computeCreditSharedKeyHash, computeCreditCommitment } from "@invisi-labs/core";
 import { computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
@@ -116,9 +117,9 @@ export async function main(resources: ExampleResources) {
         additionalAmount,
         singleLimit: 30n,
         dailyLimit: 60n,
-        monthlyLimit: 0n, // Explicitly disable the monthly limit; its usage still carries forward.
-        memo: "Allowance renewed", // Omit memo to preserve the previous Credit memo.
+        monthlyLimit: 0n,
         expiry,
+        payload: creditV1.encode({ memo: "Allowance renewed" }),
     });
     console.log("Local operation review:", prepared.preview());
 

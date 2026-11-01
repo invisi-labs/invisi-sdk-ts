@@ -1,4 +1,3 @@
-import { encodeMemo } from "./memo";
 import { bytesToHex } from "@noble/hashes/utils";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
 import {
@@ -51,7 +50,7 @@ export interface DisclosureExport {
 
 export type DisclosureResult =
     | { kind: "note"; note: Readonly<Note> }
-    | { kind: "credit"; note: Readonly<CreditOpening & { memo?: Uint8Array }> };
+    | { kind: "credit"; note: Readonly<CreditOpening & { payload?: Uint8Array }> };
 
 const NOTE_FIELDS = ["walletIdentity", "amount", "nonce"] as const;
 const CREDIT_FIELDS = [
@@ -369,9 +368,9 @@ export class Disclosure {
             permitsOwnerSweep: kind === "note",
             revealsNoteConsumption: kind === "note",
             revealsCreditSharedKey: kind === "credit" && method === "payload-key",
-            revealsReceivingKeys: method === "payload-key",
+            revealsReceivingKeys: kind === "credit" && method === "payload-key",
             revealsMemo: method === "payload-key",
-            revealsReturnAddress: kind === "note" && method === "payload-key",
+            revealsPayload: method === "payload-key",
         };
     }
 
@@ -435,7 +434,9 @@ export class Disclosure {
                 kind: "credit",
                 note: Object.freeze({
                     ...(await creditOpening(state.note)),
-                    ...(state.note.memo === undefined ? {} : { memo: encodeMemo(state.note.memo) }),
+                    ...(state.note.payload === undefined
+                        ? {}
+                        : { payload: structuredClone(state.note.payload) }),
                 }),
             };
         }

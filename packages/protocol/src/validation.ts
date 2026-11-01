@@ -1,4 +1,4 @@
-import { MAX_CIPHERTEXT_BYTES, validateDeliveryCiphertext } from "@invisi-labs/core";
+import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/core";
 import type { Address, Delivery, FundingParams, Hex, InputSource } from "./contracts";
 import {
     AbiCoder,
@@ -148,16 +148,6 @@ export function normalizeOpaqueDelivery(
     return { ciphertext, clue };
 }
 
-/** Builders only emit supported wallet codecs; canonical receipt readers use opaque validation. */
-export function normalizeDelivery(
-    value: Delivery,
-    options: { credit?: boolean; empty?: boolean } = {}
-): Delivery {
-    const delivery = normalizeOpaqueDelivery(value, options);
-    if (!options.empty)
-        validateDeliveryCiphertext(delivery.ciphertext, options.credit ? "credit" : "funds");
-    return delivery;
-}
 export const deliveriesHash = (v: readonly Delivery[]) =>
     keccak256(
         AbiCoder.defaultAbiCoder().encode(

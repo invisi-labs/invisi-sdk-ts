@@ -143,6 +143,7 @@ export class WalletUpdater extends InventoryProcessor {
             const decrypted = await decryptCandidates(logs, {
                 context,
                 viewing,
+
                 confirmedThrough: block.number,
             });
             const notes: StoredNote[] = decrypted.notes.map((record) => ({

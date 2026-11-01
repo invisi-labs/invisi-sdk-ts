@@ -1,3 +1,4 @@
+import { creditV1 } from "@invisi-labs/sdk";
 import { computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 import { ProtocolRpcClient, Wallet, Protocol, Invisi, type Address, type NoteInput } from "@invisi-labs/sdk";
@@ -64,7 +65,6 @@ export async function main(resources: ExampleResources) {
     await approval.wait();
 
     const prepared = await invisi.prepareCreateCredit({
-        memo: "Monthly allowance", // Encrypted in both recipient copies; excluded from the commitment.
         wallet,
         protocol,
         inputs,
@@ -76,6 +76,7 @@ export async function main(resources: ExampleResources) {
         monthlyLimit: 100n,
         expiry,
         funding: { payer, amount: publicFundingAmount },
+        payload: creditV1.encode({ memo: "Monthly allowance" }),
     });
     console.log("Local operation review:", prepared.preview());
 

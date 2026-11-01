@@ -4,7 +4,6 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress, hexlify } from "ethers";
 
 import {
-    encodeMemo,
     MissingCapabilityError,
     computeNoteCommitment,
     computeNoteIdentity,
@@ -42,6 +41,13 @@ export function positiveAmount(value: bigint, bits = 128): bigint {
         throw new Error(`amount must be a positive uint${bits}`);
     }
     return value;
+}
+
+/** Reject non-byte JavaScript inputs before copying; empty bytes explicitly clear metadata. */
+export function copyApplicationPayload(value?: Uint8Array): Uint8Array {
+    if (value === undefined) return new Uint8Array();
+    if (!(value instanceof Uint8Array)) throw new TypeError("payload must be Uint8Array");
+    return Uint8Array.from(value);
 }
 
 /** Preserve the offending payment position even when summing transfer amounts first. */
@@ -157,7 +163,6 @@ export class Preparation<Result> {
                     ...(outputIndex === undefined ? {} : { outputIndex }),
                 }
             );
-            const memo = encodeMemo(payment.memo);
             const nonce = generateNonce();
             const identity = await computeNoteIdentity(BigInt(recipient.walletIdentity), nonce);
             const keys = recipient.getReceivingKeys();
@@ -167,10 +172,7 @@ export class Preparation<Result> {
                 tokenAddress: BigInt(context.tokenAddress),
                 walletIdentity: recipient.walletIdentity,
                 amount: payment.amount,
-                ...(memo.length === 0 ? {} : { memo }),
-                ...(payment.returnAddress === undefined
-                    ? {}
-                    : { returnAddress: payment.returnAddress }),
+                payload: copyApplicationPayload(payment.payload),
                 nonce,
             };
             const commitment = await computeNoteCommitment(

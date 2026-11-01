@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/core";
 import { describe, expect, it, vi } from "vitest";
 import { Invisi, InvisiError, WalletSession, AddressRegistry } from "./index";
 import { fixture } from "./session/operation-fixture";
@@ -132,35 +133,38 @@ describe("recipient preparation failures", () => {
             if (kind === "network") expect(error).toHaveProperty("cause", cause);
         }
     );
-    it.each(["amount", "memo"])("keeps recipient context for invalid output %s", async (field) => {
-        const h = await fixture();
-        const inputs = Object.values((await h.store.readSnapshot(h.scope)).notes);
-        const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
-        for (const method of ["prepareShield", "prepareTransfer"] as const) {
-            const error = await invisi[method]({
-                wallet: h.wallet,
-                protocol: h.protocol,
-                tokenAddress: h.context.tokenAddress,
-                inputs,
-                outputs: [
-                    { to: h.bob.getAddress(), amount: 1n },
-                    {
-                        to: h.bob.getAddress(),
-                        amount: field === "amount" ? 0n : 1n,
-                        ...(field === "memo" ? { memo: "x".repeat(257) } : {}),
-                    },
-                ],
-                funding: { payer: h.wallet.ownerAddress, amount: 2n, authorization: "caller" },
-            }).catch((error: unknown) => error);
-            expect(error).toBeInstanceOf(InvisiError);
-            expect(error).toMatchObject({
-                code: "PREPARATION_FAILED",
-                operation: method,
-                address: h.bob.getAddress(),
-                outputIndex: 1,
-            });
+    it.each(["amount", "payload"])(
+        "keeps recipient context for invalid output %s",
+        async (field) => {
+            const h = await fixture();
+            const inputs = Object.values((await h.store.readSnapshot(h.scope)).notes);
+            const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
+            for (const method of ["prepareShield", "prepareTransfer"] as const) {
+                const error = await invisi[method]({
+                    wallet: h.wallet,
+                    protocol: h.protocol,
+                    tokenAddress: h.context.tokenAddress,
+                    inputs,
+                    outputs: [
+                        { to: h.bob.getAddress(), amount: 1n },
+                        {
+                            to: h.bob.getAddress(),
+                            amount: field === "amount" ? 0n : 1n,
+                            ...(field === "payload" ? { payload: new Uint8Array(3937) } : {}),
+                        },
+                    ],
+                    funding: { payer: h.wallet.ownerAddress, amount: 2n, authorization: "caller" },
+                }).catch((error: unknown) => error);
+                expect(error).toBeInstanceOf(InvisiError);
+                expect(error).toMatchObject({
+                    code: "PREPARATION_FAILED",
+                    operation: method,
+                    address: h.bob.getAddress(),
+                    outputIndex: 1,
+                });
+            }
         }
-    });
+    );
 
     it("resolves a short address once, freezes keys, and never looks up a full address", async () => {
         const h = await fixture();

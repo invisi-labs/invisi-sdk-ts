@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/core";
 import { Interface } from "ethers";
 
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
@@ -49,7 +50,7 @@ async function creditFixture(
             spenderPayout: BigInt(h.bob.walletIdentity),
             ...normalizeCreditPolicy(policy),
             amount,
-            ...(memo === undefined ? {} : { memo }),
+            ...(memo === undefined ? {} : { payload: fundsV1.encode({ memo }) }),
             nonce: 456n,
             expiry,
             creditSharedKey: 789n,
@@ -114,7 +115,7 @@ it("creates a privately funded Credit with complete dual 498-byte snapshots and 
     expect(credit.outputs[0]!.state.note.amount).toBe(70n);
     expect(saved.plan.outputs[0]!.note.amount).toBe(30n);
     expect(credit.deliveries.map((delivery) => (delivery.ciphertext.length - 2) / 2)).toEqual([
-        498, 498, 161,
+        498, 498, 160,
     ]);
     const recovered = await h.bob.getViewer().decryptCredit(credit.deliveries[1]!.ciphertext, {
         chainId: h.scope.chainId,
@@ -123,7 +124,10 @@ it("creates a privately funded Credit with complete dual 498-byte snapshots and 
         outputCommitment: credit.outputs[0]!.commitment,
         role: "spender",
     });
-    expect(recovered).toEqual(credit.outputs[0]!.state);
+    expect(recovered).toEqual({
+        ...credit.outputs[0]!.state,
+        note: { ...credit.outputs[0]!.state.note, payload: new Uint8Array() },
+    });
     const ready = await (await operation.authorize()).prove();
     expect(ready.status).toBe("ready");
     const encoded = (
@@ -402,7 +406,7 @@ it("preserves Credit memos by default and applies top-up and per-remainder overr
             tokenAddress,
             credit: h.commitment,
             additionalAmount: 10n,
-            ...(override === undefined ? {} : { memo: override }),
+            ...(override === undefined ? {} : { payload: fundsV1.encode({ memo: override }) }),
         };
         const topUp = await h.ownerSession.prepareTopUpCredit(request);
         const topPlan = (
@@ -414,9 +418,9 @@ it("preserves Credit memos by default and applies top-up and per-remainder overr
                 : typeof override === "string"
                   ? new TextEncoder().encode(override)
                   : override;
-        if (expected.length === 0)
-            expect(topPlan.credit!.outputs[0]!.state.note).not.toHaveProperty("memo");
-        else expect(topPlan.credit!.outputs[0]!.state.note.memo).toEqual(expected);
+        expect(fundsV1.decode(topPlan.credit!.outputs[0]!.state.note.payload!).memo).toEqual(
+            expected.length === 0 ? undefined : expected
+        );
         await topUp.abandon();
         const draw = await h.spenderSession.prepareDrawCredit({
             tokenAddress,
@@ -424,7 +428,9 @@ it("preserves Credit memos by default and applies top-up and per-remainder overr
                 {
                     credit: h.commitment,
                     amount: 30n,
-                    ...(override === undefined ? {} : { memo: override }),
+                    ...(override === undefined
+                        ? {}
+                        : { payload: fundsV1.encode({ memo: override }) }),
                 },
             ],
         });
@@ -446,8 +452,9 @@ it("preserves Credit memos by default and applies top-up and per-remainder overr
                         outputCommitment: drawPlan.credit!.outputs[0]!.commitment,
                     }
                 );
-            if (expected.length === 0) expect(result.note).not.toHaveProperty("memo");
-            else expect(result.note.memo).toEqual(expected);
+            if (expected.length === 0)
+                expect(fundsV1.decode(result.note.payload!).memo).toBeUndefined();
+            else expect(fundsV1.decode(result.note.payload!).memo).toEqual(expected);
         }
     }
 });
@@ -617,4 +624,33 @@ it("disabled limits count consumption so later re-enabling cannot hide prior dra
         dailySpent: 40n,
         monthlySpent: 50n,
     });
+});
+it("rejects non-byte payload overrides for Credit creation, top-up and draw", async () => {
+    const h = await creditFixture();
+    for (const invalid of ["hello", [1, 2], null]) {
+        const payload = invalid as unknown as Uint8Array;
+        await expect(
+            h.ownerSession.prepareCreateCredit({
+                tokenAddress: h.context.tokenAddress,
+                spender: h.bob.getAddress(),
+                amount: 1n,
+                expiry: 2000003600n,
+                payload,
+            })
+        ).rejects.toMatchObject({ code: "PREPARATION_FAILED" });
+        await expect(
+            h.ownerSession.prepareTopUpCredit({
+                tokenAddress: h.context.tokenAddress,
+                credit: h.commitment,
+                additionalAmount: 1n,
+                payload,
+            })
+        ).rejects.toMatchObject({ code: "PREPARATION_FAILED" });
+        await expect(
+            h.spenderSession.prepareDrawCredit({
+                tokenAddress: h.context.tokenAddress,
+                credits: [{ credit: h.commitment, amount: 1n, payload }],
+            })
+        ).rejects.toMatchObject({ code: "PREPARATION_FAILED" });
+    }
 });

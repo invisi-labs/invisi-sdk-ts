@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/core";
 import vectors from "../../../core/src/testdata/wallet-note-vectors.json";
 import { expect, it } from "vitest";
 import {
@@ -211,7 +212,10 @@ it("reloads raw encrypted memo metadata through the record codec without aliasin
     const memo = new Uint8Array([0, 255, 192, 128]);
     await store.transaction(scope, (draft) => {
         const record = input();
-        draft.notes[leaf(1)] = { ...record, note: { ...record.note, memo } };
+        draft.notes[leaf(1)] = {
+            ...record,
+            note: { ...record.note, payload: fundsV1.encode({ memo }) },
+        };
         const keys = (role: "owner" | "spender") => ({
             viewingPublicKey: Uint8Array.from(
                 Buffer.from(
@@ -248,7 +252,7 @@ it("reloads raw encrypted memo metadata through the record codec without aliasin
                     nonce: 2n,
                     expiry: 2000000000n,
                     creditSharedKey: 3n,
-                    memo,
+                    payload: fundsV1.encode({ memo }),
                 },
                 ownerReceivingKeys: keys("owner"),
                 spenderReceivingKeys: keys("spender"),
@@ -258,16 +262,22 @@ it("reloads raw encrypted memo metadata through the record codec without aliasin
     memo.fill(7);
     const reloaded = new TransactionalWalletStore(records, codec, { persistent: false });
     const snapshot = await reloaded.readSnapshot(scope);
-    expect(snapshot.notes[leaf(1)]!.note.memo).toEqual(new Uint8Array([0, 255, 192, 128]));
-    expect(snapshot.credits[leaf(2) + ":owner"]!.state.note.memo).toEqual(
+    expect(fundsV1.decode(snapshot.notes[leaf(1)]!.note.payload!).memo).toEqual(
         new Uint8Array([0, 255, 192, 128])
     );
-    (snapshot.notes[leaf(1)]!.note.memo as Uint8Array).fill(8);
-    (snapshot.credits[leaf(2) + ":owner"]!.state.note.memo as Uint8Array).fill(8);
+    expect(fundsV1.decode(snapshot.credits[leaf(2) + ":owner"]!.state.note.payload!).memo).toEqual(
+        new Uint8Array([0, 255, 192, 128])
+    );
+    (fundsV1.decode(snapshot.notes[leaf(1)]!.note.payload!).memo as Uint8Array).fill(8);
+    (
+        fundsV1.decode(snapshot.credits[leaf(2) + ":owner"]!.state.note.payload!).memo as Uint8Array
+    ).fill(8);
     expect(
-        (await reloaded.readSnapshot(scope)).credits[leaf(2) + ":owner"]!.state.note.memo
+        fundsV1.decode(
+            (await reloaded.readSnapshot(scope)).credits[leaf(2) + ":owner"]!.state.note.payload!
+        ).memo
     ).toEqual(new Uint8Array([0, 255, 192, 128]));
-    expect((await reloaded.readSnapshot(scope)).notes[leaf(1)]!.note.memo).toEqual(
-        new Uint8Array([0, 255, 192, 128])
-    );
+    expect(
+        fundsV1.decode((await reloaded.readSnapshot(scope)).notes[leaf(1)]!.note.payload!).memo
+    ).toEqual(new Uint8Array([0, 255, 192, 128]));
 });

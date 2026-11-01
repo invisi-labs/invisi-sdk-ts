@@ -20,7 +20,7 @@ import {
     getEIP712Domain,
     known,
     normalizeContext,
-    normalizeDelivery,
+    normalizeOpaqueDelivery,
     normalizeFunding,
     normalizeSources,
     notes,
@@ -70,7 +70,7 @@ export function validateCreateCreditRequest(
         throw new Error("owner must be nonzero and expiry future");
     if (dense(cs, "deliveries").length !== 3) throw new Error("deliveries count mismatch");
     const deliveries = cs.map((v, i) =>
-        normalizeDelivery(v, { credit: i < 2, empty: i === 2 && BigInt(changeCommitment) === 0n })
+        normalizeOpaqueDelivery(v, { empty: i === 2 && BigInt(changeCommitment) === 0n })
     );
     if (ns.length === 0 && f.amount === 0n)
         throw new Error("empty inputs require positive funding");

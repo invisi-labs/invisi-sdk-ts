@@ -97,3 +97,9 @@ export {
     deliveryHeader,
     validateDeliveryCiphertext,
 } from "./delivery-codec";
+
+export { decodeDeliveryHeader } from "./delivery-codec";
+export { fundsV1, creditV1 } from "./payload";
+export type { DeliveryKind } from "./delivery-codec";
+
+export type { FundsDataV1, CreditDataV1 } from "./types";

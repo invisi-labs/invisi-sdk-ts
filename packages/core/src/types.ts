@@ -1,4 +1,8 @@
 import type { Memo } from "./memo";
+/** Built-in funds v1 application fields; other versions define their own schemas. */
+export type FundsDataV1 = { memo?: Memo };
+/** Built-in Credit v1 application fields. */
+export type CreditDataV1 = { memo?: Memo };
 /** Chain and deployed contract context. Addresses are unsigned 160-bit values. */
 export interface ProtocolContext {
     chainId: bigint;
@@ -11,10 +15,8 @@ export interface Note extends ProtocolContext {
     tokenAddress: bigint;
     amount: bigint;
     nonce: bigint;
-    /** Encrypted metadata, excluded from commitments. Decryption returns copied raw bytes. */
-    memo?: Memo;
-    /** Optional complete 0i reply address. Encrypted metadata, not a payer identity claim. */
-    returnAddress?: string;
+    /** Opaque application bytes. Decryption returns a copy without interpreting the application schema. */
+    payload?: Uint8Array;
 }
 
 /** Deployment-scoped private Credit note, with a shared nonzero random secret. */
@@ -35,8 +37,8 @@ export interface CreditNote extends ProtocolContext, Partial<CreditPolicy> {
     tokenAddress: bigint;
     amount: bigint;
     nonce: bigint;
-    /** Encrypted metadata, excluded from commitments. Decryption returns copied raw bytes. */
-    memo?: Memo;
+    /** Opaque application bytes. Decryption returns a copy without interpreting the application schema. */
+    payload?: Uint8Array;
     expiry: bigint;
     creditSharedKey: bigint;
 }

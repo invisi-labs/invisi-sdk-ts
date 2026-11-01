@@ -1,3 +1,4 @@
+import { creditV1 } from "@invisi-labs/sdk";
 import { PublicWallet } from "@invisi-labs/sdk";
 import { computeCreditSharedKeyHash, computeCreditCommitment } from "@invisi-labs/core";
 import { JsonRpcProvider } from "ethers";
@@ -89,7 +90,7 @@ export async function main(resources: ExampleResources) {
         creditInputs,
         tokenAddress,
         // Add more current Credit entries to demonstrate the 12/50/120 batch circuits.
-        credits: [{ credit, amount, memo: "Receipt R-1042" }], // Omit memo to preserve each parent memo.
+        credits: [{ credit, amount, payload: creditV1.encode({ memo: "Receipt R-1042" }) }], // Omit memo to preserve each parent memo.
     });
     console.log("Local operation review:", prepared.preview());
 

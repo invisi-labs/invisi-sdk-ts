@@ -28,7 +28,7 @@ import {
     getEIP712Domain,
     known,
     normalizeContext,
-    normalizeDelivery,
+    normalizeOpaqueDelivery,
     normalizeSources,
     notes,
     pad,
@@ -99,8 +99,8 @@ export function validateCreditDrawRequest(
         throw new Error("deliveries count mismatch");
     const deliveries = cs.map((v, i) =>
         BigInt(remainderCommitments[Math.floor(i / 2)]!) === 0n
-            ? normalizeDelivery(v, { empty: true })
-            : normalizeDelivery(v, { credit: true })
+            ? normalizeOpaqueDelivery(v, { empty: true })
+            : normalizeOpaqueDelivery(v, {})
     );
     return {
         ...ctx,

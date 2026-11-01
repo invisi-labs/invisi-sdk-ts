@@ -1,5 +1,5 @@
 import type { Hex } from "@invisi-labs/core";
-import { MAX_CIPHERTEXT_BYTES, deliveryCodec, ReceivingAddress } from "@invisi-labs/core";
+import { MAX_CIPHERTEXT_BYTES, ReceivingAddress } from "@invisi-labs/core";
 import { getAddress, isAddress, getBytes } from "ethers";
 import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
 import { FIELD_MODULUS } from "@invisi-labs/core";
@@ -435,6 +435,14 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         }
         return { block, transactionHashes: [...transactionHashes] };
     }
+    /** Validated opaque candidates of every kind/version, preserving both Credit role envelopes. */
+    async getEncryptedOutputs(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
+        return this.readOutputCandidates(context, range, "all");
+    }
+
     /** Return ordinary funds candidates directly, without fetching historical transaction receipts. */
     async getOutputs(
         context: DeploymentContext,
@@ -454,7 +462,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
     private async readOutputCandidates(
         context: DeploymentContext,
         range: ProtocolUpdateRange,
-        credit: boolean
+        credit: boolean | "all"
     ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
         const { block, outputs } = await this.readUpdates(context, range);
         const parsed: ProtocolOutput[] = [];
@@ -486,19 +494,14 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                 invalid("Invalid output ciphertext");
             if (typeof output.clue !== "string" || !/^0x[0-9a-f]{136}$/i.test(output.clue))
                 invalid("Invalid output clue");
-            let isCredit = false;
-            if (["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(output.kind as string)) {
-                try {
-                    isCredit =
-                        deliveryCodec(
-                            Number.parseInt((output.ciphertext as string).slice(2, 4), 16)
-                        ).kind === "credit";
-                } catch {
-                    // Unknown codecs remain available through readUpdates; do not block known candidates.
-                    continue;
-                }
-            }
-            if (isCredit !== credit) continue;
+            const creditEvent = ["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(
+                output.kind as string
+            );
+            const isCredit =
+                creditEvent &&
+                (Number.parseInt((output.ciphertext as string).slice(2, 4), 16) & 0x80) !== 0;
+            if (credit !== "all" && isCredit !== credit) continue;
+            const paired = credit === "all" ? creditEvent : isCredit;
             const candidate: ProtocolOutput = {
                 block: {
                     number: eventBlock.number,
@@ -521,7 +524,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                 typeof value === "bigint" ? value.toString() : value
             );
             // Credit owner/spender payloads differ, but their canonical leaf metadata must match.
-            const identity = credit
+            const identity = paired
                 ? JSON.stringify(
                       { ...candidate, ciphertext: undefined, clue: undefined },
                       (_, value) => (typeof value === "bigint" ? value.toString() : value)
@@ -535,7 +538,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             )
                 invalid("Conflicting RPC output data or position");
             if (seenEnvelopes.has(fingerprint)) continue;
-            if (credit) {
+            if (paired) {
                 const envelopes =
                     creditEnvelopes.get(candidate.commitment) ?? new Map<Hex, string>();
                 const previous = envelopes.get(candidate.ciphertext);

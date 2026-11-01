@@ -1,3 +1,4 @@
+import { fundsV1 } from "./payload";
 import { createECDH, createDecipheriv, hkdfSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { encryptCreditNote, decryptCreditNote } from "./encryption";
@@ -15,6 +16,7 @@ const context = {
     tokenAddress: BigInt(vectors.context.tokenAddress),
 };
 const note: CreditNote = {
+    payload: new Uint8Array(),
     ...context,
     ownerWalletIdentity: identity(vectors.credit.ownerWalletIdentity),
     spenderWalletIdentity: identity(vectors.credit.spenderWalletIdentity),

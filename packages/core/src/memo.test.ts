@@ -15,7 +15,7 @@ it("roundtrips copied opaque memo bytes including NUL and invalid UTF-8", async 
     const memo = new Uint8Array([0, 255, 192, 128]);
     const pending = core.encryptPrivateTransferNote(
         core.viewingPublicKey(key),
-        { ...note, memo },
+        { ...note, payload: core.fundsV1.encode({ memo }) },
         context
     );
     memo.fill(9);
@@ -23,37 +23,41 @@ it("roundtrips copied opaque memo bytes including NUL and invalid UTF-8", async 
     expect(envelope[0]).toBe(1);
     expect(envelope).toHaveLength(165);
     const decoded = await core.decryptPrivateTransferNote(key, envelope, context);
-    expect(decoded.memo).toEqual(new Uint8Array([0, 255, 192, 128]));
-    expect(() => core.decodeMemoText(decoded.memo as Uint8Array)).toThrow();
+    expect(core.fundsV1.decode(decoded.payload!).memo).toEqual(new Uint8Array([0, 255, 192, 128]));
+    expect(() =>
+        core.decodeMemoText(core.fundsV1.decode(decoded.payload!).memo as Uint8Array)
+    ).toThrow();
 });
 it("encodes text as UTF-8 and caps encoded text and raw memos at 256 bytes", async () => {
     for (const memo of ["a".repeat(256), "é".repeat(128), new Uint8Array(256)]) {
         const envelope = await core.encryptPrivateTransferNote(
             core.viewingPublicKey(key),
-            { ...note, memo },
+            { ...note, payload: core.fundsV1.encode({ memo }) },
             context
         );
         expect(envelope).toHaveLength(417);
         const decoded = await core.decryptPrivateTransferNote(key, envelope, context);
-        expect(decoded.memo).toBeInstanceOf(Uint8Array);
+        expect(core.fundsV1.decode(decoded.payload!).memo).toBeInstanceOf(Uint8Array);
     }
     for (const memo of ["a".repeat(257), "é".repeat(129), new Uint8Array(257), "\ud800"]) {
-        await expect(
-            core.encryptPrivateTransferNote(core.viewingPublicKey(key), { ...note, memo }, context)
-        ).rejects.toThrow(/memo|surrogate/i);
+        expect(() => core.fundsV1.encode({ memo })).toThrow(/memo|surrogate/i);
     }
 });
 it("preserves empty note object semantics and excludes memos from commitment openings", async () => {
     const envelope = await core.encryptPrivateTransferNote(
         core.viewingPublicKey(key),
-        { ...note, memo: "" },
+        { ...note, payload: core.fundsV1.encode({ memo: "" }) },
         context
     );
     expect(envelope).toHaveLength(161);
-    expect(await core.decryptPrivateTransferNote(key, envelope, context)).not.toHaveProperty(
-        "memo"
-    );
-    const opening = await core.Disclosure.fromNote({ ...note, memo: "private" });
+    expect(
+        core.fundsV1.decode((await core.decryptPrivateTransferNote(key, envelope, context)).payload)
+            .memo
+    ).toBeUndefined();
+    const opening = await core.Disclosure.fromNote({
+        ...note,
+        payload: core.fundsV1.encode({ memo: "private" }),
+    });
     expect(opening.export().data).not.toHaveProperty("memo");
 });
 
@@ -61,17 +65,20 @@ it("reveals raw funds memos only through the selected payload-key disclosure", a
     const memo = new Uint8Array([255, 0, 65]);
     const envelope = await core.encryptPrivateTransferNote(
         core.viewingPublicKey(key),
-        { ...note, memo },
+        { ...note, payload: core.fundsV1.encode({ memo }) },
         context
     );
     const viewer = new core.ViewingCapability(context.walletIdentity, key);
     const output = { ...context, role: "funds" as const, ciphertext: envelope };
     const keyed = await viewer.discloseNote(envelope, output);
     expect(keyed.getScope().revealsMemo).toBe(true);
-    expect((await keyed.verify(output)).note.memo).toEqual(memo);
-    const opening = await core.Disclosure.fromNote({ ...note, memo });
+    expect(core.fundsV1.decode((await keyed.verify(output)).note.payload!).memo).toEqual(memo);
+    const opening = await core.Disclosure.fromNote({
+        ...note,
+        payload: core.fundsV1.encode({ memo }),
+    });
     expect(opening.getScope().revealsMemo).toBe(false);
-    expect((await opening.verify(output)).note).not.toHaveProperty("memo");
+    expect((await opening.verify(output)).note).not.toHaveProperty("payload");
 });
 it("roundtrips copied Credit memos for both recipient roles and scoped disclosure", async () => {
     const address = (value: string) =>
@@ -132,21 +139,28 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         );
         const pending = core.encryptCreditNote(
             publicKey,
-            { ...state, note: { ...state.note, memo } },
+            { ...state, note: { ...state.note, payload: core.creditV1.encode({ memo }) } },
             scoped
         );
         memo.fill(0);
         const envelope = await pending;
         expect(envelope[0]).toBe(129);
-        expect(envelope).toHaveLength(754);
+        expect(envelope).toHaveLength(755);
         const decoded = await core.decryptCreditNote(privateKey, envelope, scoped);
-        expect(decoded.note.memo).toEqual(new Uint8Array(256).fill(255));
-        const viewer = new core.ViewingCapability(scoped.walletIdentity, privateKey);
-        const keyed = await viewer.discloseCredit(envelope, scoped);
-        expect((await keyed.verify({ ...scoped, ciphertext: envelope })).note.memo).toEqual(
+        expect(core.creditV1.decode(decoded.note.payload!).memo).toEqual(
             new Uint8Array(256).fill(255)
         );
-        const opening = await core.Disclosure.fromCredit({ ...state.note, memo: "hidden" });
+        const viewer = new core.ViewingCapability(scoped.walletIdentity, privateKey);
+        const keyed = await viewer.discloseCredit(envelope, scoped);
+        expect(
+            core.creditV1.decode(
+                (await keyed.verify({ ...scoped, ciphertext: envelope })).note.payload!
+            ).memo
+        ).toEqual(new Uint8Array(256).fill(255));
+        const opening = await core.Disclosure.fromCredit({
+            ...state.note,
+            payload: core.creditV1.encode({ memo: "hidden" }),
+        });
         expect(opening.export().data).not.toHaveProperty("memo");
     }
 });
@@ -169,7 +183,7 @@ it("decrypts every independently generated text and opaque shared memo vector", 
             expect(decoded).toMatchObject({
                 amount: BigInt(vectors.note.amount),
                 nonce: BigInt(vectors.note.nonce),
-                memo,
+                payload: core.fundsV1.encode({ memo }),
             });
         } else {
             const decoded = await core.decryptCreditNote(
@@ -193,7 +207,7 @@ it("decrypts every independently generated text and opaque shared memo vector", 
                 dailySpent: BigInt(vectors.credit.dailySpent),
                 lastMonth: BigInt(vectors.credit.lastMonth),
                 monthlySpent: BigInt(vectors.credit.monthlySpent),
-                memo,
+                payload: core.creditV1.encode({ memo }),
             });
         }
     }

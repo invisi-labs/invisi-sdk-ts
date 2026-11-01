@@ -1,3 +1,4 @@
+import type {} from "@invisi-labs/core";
 import type { PublicWallet } from "@invisi-labs/core";
 import type { GasBenchmarkProfile } from "../gas-estimation";
 import type { Signer } from "ethers";
@@ -68,9 +69,8 @@ export interface FundingSource {
     permit?: NonNullable<FundingInput["permit"]>;
 }
 export interface PaymentOutput {
-    /** Optional complete 0i reply address, not inferred from the payer or signer. */
-    returnAddress?: string;
-    memo?: string | Uint8Array;
+    /** Version-specific application data. Omission uses built-in v1 with no data. */
+    payload?: Uint8Array;
     to: string;
     amount: bigint;
 }
@@ -100,10 +100,11 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
+    /** Version-specific application data. Omission uses built-in v1 with no data. */
+    payload?: Uint8Array;
     singleLimit?: bigint;
     dailyLimit?: bigint;
     monthlyLimit?: bigint;
-    memo?: string | Uint8Array;
     tokenAddress: Address;
     spender: string;
     amount: bigint;
@@ -113,15 +114,20 @@ export interface CreateCreditPreparation {
 }
 export interface DrawCreditPreparation {
     tokenAddress: Address;
-    credits: readonly { credit: Hex; amount: bigint; memo?: string | Uint8Array }[];
+    credits: readonly {
+        credit: Hex;
+        amount: bigint;
+        payload?: Uint8Array;
+    }[];
     deadline?: bigint;
 }
 export interface TopUpCreditPreparation {
+    /** Version-specific application data. Omission uses built-in v1 with no data. */
+    payload?: Uint8Array;
     /** Omission inherits the previous limit; zero disables it without clearing usage. */
     singleLimit?: bigint;
     dailyLimit?: bigint;
     monthlyLimit?: bigint;
-    memo?: string | Uint8Array;
     tokenAddress: Address;
     credit: Hex;
     additionalAmount: bigint;
@@ -181,7 +187,9 @@ export interface SavedOperation {
     generation: number;
     claim?: { stage: string; token: string };
 }
-export interface WalletSessionOptions {
+export type WalletSessionOptions = WalletSessionInfrastructure;
+/** Shared runtime fields; public options separately enforce the custom registry requirement. */
+export interface WalletSessionInfrastructure {
     gasBenchmarks?: readonly GasBenchmarkProfile[];
     /** Optional ethers gas/funding signer; distinct from the Invisi wallet authority. */
     signer?: Signer;
@@ -201,7 +209,9 @@ export interface WalletSessionOptions {
     transactionTTL?: bigint;
 }
 export interface OperationRuntime {
-    options: Omit<WalletSessionOptions, "protocol"> & { protocol: TokenProtocol };
+    options: Omit<WalletSessionOptions, "protocol"> & {
+        protocol: TokenProtocol;
+    };
     scope: WalletScope;
     store: WalletStore;
     reader: ChainReader;

@@ -1,3 +1,4 @@
+import { creditV1 } from "@invisi-labs/core";
 import { PublicWallet } from "@invisi-labs/core";
 import { expect, it, vi } from "vitest";
 import { Interface, keccak256 } from "ethers";
@@ -355,7 +356,7 @@ it.each([false, true])(
                           ...applyCreditDrawUsage(parentState.note, 30n, block(13n).timestamp),
                           amount: BigInt(p.remainder.remainder.amount),
                           nonce: BigInt(p.remainder.remainder.nonce),
-                          memo: childMemo,
+                          payload: creditV1.encode({ memo: childMemo }),
                       },
                   },
                   {
@@ -467,11 +468,12 @@ it.each([false, true])(
         expect(remainder.state.note.amount).toBe(70n);
         expect(remainder.state.note.dailySpent).toBe(40n);
         expect(remainder.state.note.monthlySpent).toBe(50n);
-        if (validChild) expect(remainder.state.note.memo).toEqual(childMemo);
-        else expect(remainder.state.note).not.toHaveProperty("memo");
-        expect(state.credits[p.commitment + ":owner"]!.state.note.memo).toEqual(
-            new Uint8Array([0, 255, 128, 0, 17])
-        );
+        if (validChild)
+            expect(creditV1.decode(remainder.state.note.payload!).memo).toEqual(childMemo);
+        else expect(remainder.state.note).not.toHaveProperty("payload");
+        expect(
+            creditV1.decode(state.credits[p.commitment + ":owner"]!.state.note.payload!).memo
+        ).toEqual(new Uint8Array([0, 255, 128, 0, 17]));
         expect(remainder.spent).toBe("unspent");
         expect(remainder.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
         expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");

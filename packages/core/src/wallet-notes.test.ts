@@ -1,3 +1,4 @@
+import { fundsV1 } from "./payload";
 import { describe, it, expect } from "vitest";
 import vectors from "./testdata/wallet-note-vectors.json";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
@@ -123,7 +124,7 @@ describe("wallet-owned note vectors", () => {
                 walletIdentity: note.walletIdentity,
             }
         );
-        expect(recovered).toEqual(note);
+        expect(recovered).toEqual({ ...note, payload: new Uint8Array() });
         for (const role of ["owner", "spender"] as const) {
             expect(
                 await decryptCreditNote(
@@ -140,7 +141,7 @@ describe("wallet-owned note vectors", () => {
                     }
                 )
             ).toEqual({
-                note: credit,
+                note: { ...credit, payload: new Uint8Array() },
                 ...Object.fromEntries(
                     ["owner", "spender"].map((role) => {
                         const keys =

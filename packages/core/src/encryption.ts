@@ -1,13 +1,9 @@
-import { encodeMemo } from "./memo";
-import { deliveryCodec, deliveryHeader, validateDeliveryCiphertext } from "./delivery-codec";
-import { decodeAddress, encodeLongAddress } from "./address";
+import { deliveryHeader, deliveryCodec, validateDeliveryCiphertext } from "./delivery-codec";
+import { normalizeCreditDeliveryState } from "./note-payload";
+export { normalizeCreditDeliveryState } from "./note-payload";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { computeNoteIdentity, computeNoteCommitment } from "./commitment";
-import {
-    computeCreditCommitment,
-    normalizeCreditPolicy,
-    computeCreditSharedKeyHash,
-} from "./creditCommitment";
+import { computeCreditCommitment, computeCreditSharedKeyHash } from "./creditCommitment";
 import { FIELD_MODULUS } from "./random";
 import type {
     CreditNote,
@@ -17,7 +13,6 @@ import type {
     ProtocolContext,
 } from "./types";
 import { assertNoteContext } from "./noteContext";
-import { validateClueKey } from "./fmd";
 
 export type NoteBytes = `0x${string}` | Uint8Array;
 export interface NoteEncryptionContext extends ProtocolContext {
@@ -328,43 +323,31 @@ async function open(
         localKey.fill(0);
     }
 }
+function copyPayload(value: Uint8Array, codec: { minimum: number; maximum: number }): Uint8Array {
+    if (!(value instanceof Uint8Array)) throw new Error("codec encode must return Uint8Array");
+    if (value.length + 78 < codec.minimum || value.length + 78 > codec.maximum)
+        throw new Error("invalid codec payload length");
+    return Uint8Array.from(value);
+}
 function deliveryDomain(headerByte: number): Uint8Array {
     return ascii(deliveryCodec(headerByte).domain);
 }
 
-function returnAddressBytes(address?: string): Uint8Array {
-    if (address === undefined) return new Uint8Array();
-    const decoded = decodeAddress(address);
-    if (decoded.kind !== "long") throw new Error("return address requires a complete 0i address");
-    return concat(
-        encode(BigInt(decoded.walletIdentity), 20),
-        decoded.viewingPublicKey,
-        decoded.clueKey
-    );
-}
-
-/** Funds v1 envelope (161..502 bytes), with an optional 85-byte reply address. */
+/** SDK v1 funds envelope with a fixed financial prefix and opaque application bytes. */
 export async function encryptPrivateTransferNote(
     viewingKey: NoteBytes,
     note: Note,
     context: NoteEncryptionContext
 ): Promise<Uint8Array> {
-    const memo = encodeMemo(note.memo);
-    const returnAddress = returnAddressBytes(note.returnAddress);
-    const scopedNote = { ...note };
-    const scopedContext = { ...context };
+    const scopedNote = structuredClone(note),
+        scopedContext = { ...context };
+    const codec = deliveryCodec(deliveryHeader("funds"));
+    if (codec.kind !== "funds") throw new Error("unexpected envelope kind");
     await noteCommitment(scopedContext, scopedNote);
+    const plaintext = copyPayload(codec.encode(structuredClone(scopedNote)), codec);
     return seal(
         viewingKey,
-        concat(
-            encode(BigInt(scopedNote.walletIdentity)),
-            encode(scopedNote.amount, 16),
-            encode(scopedNote.nonce),
-            new Uint8Array([returnAddress.length === 0 ? 0 : 1]),
-            returnAddress,
-            encode(BigInt(memo.length), 2),
-            memo
-        ),
+        plaintext,
         scopedContext,
         scopedNote.tokenAddress,
         deliveryHeader("funds"),
@@ -377,23 +360,22 @@ async function readNote(
     envelope: NoteBytes,
     context: NoteDecryptionContext,
     payloadKey = false
-): Promise<Note> {
+): Promise<Note & { payload: Uint8Array }> {
     const authenticatedContext = { ...context };
     const data = envelopeBytes(envelope, false);
     const headerByte = data[0]!;
     const plain = await open(key, data, authenticatedContext, headerByte, 0, payloadKey);
     try {
-        const note = {
-            chainId: authenticatedContext.chainId,
-            protocolAddress: authenticatedContext.protocolAddress,
-            tokenAddress: authenticatedContext.tokenAddress,
-            walletIdentity: hexField(decode(plain.slice(0, 32))),
-            amount: decode(plain.slice(32, 48)),
-            nonce: decode(plain.slice(48, 80)),
-            ...readFundsMetadata(plain),
-        };
+        const codec = deliveryCodec(headerByte);
+        if (codec.kind !== "funds") throw new Error("unexpected envelope kind");
+        const note = structuredClone(
+            codec.decode(plain, Object.freeze({ ...authenticatedContext }))
+        );
+
         if (BigInt(note.walletIdentity) !== BigInt(authenticatedContext.walletIdentity))
             throw new Error("recipient wallet identity mismatch");
+        if (note.tokenAddress !== authenticatedContext.tokenAddress)
+            throw new Error("note token context mismatch");
         await noteCommitment(authenticatedContext, note);
         return note;
     } finally {
@@ -405,29 +387,6 @@ function creditRole(role: string): number {
         throw new Error("Credit role must be owner or spender");
     return role === "owner" ? 1 : 2;
 }
-function receivingKeys(keys: ReceivingKeys): ReceivingKeys {
-    if (!keys || typeof keys !== "object") throw new TypeError("receiving keys required");
-    const viewingPublicKey = publicKey(keys.viewingPublicKey),
-        clueKey = bytes(keys.clueKey, 32);
-    validateClueKey(clueKey);
-    return { viewingPublicKey, clueKey };
-}
-/** Copy and validate both public key snapshots without exporting any spending material. */
-export function normalizeCreditDeliveryState(state: CreditDeliveryState): CreditDeliveryState {
-    if (!state || typeof state !== "object" || !state.note || typeof state.note !== "object")
-        throw new TypeError("complete Credit delivery state required");
-    const { memo, ...note } = state.note;
-    const encodedMemo = encodeMemo(memo);
-    return {
-        note: {
-            ...note,
-            ...normalizeCreditPolicy(note),
-            ...(encodedMemo.length === 0 ? {} : { memo: encodedMemo }),
-        },
-        ownerReceivingKeys: receivingKeys(state.ownerReceivingKeys),
-        spenderReceivingKeys: receivingKeys(state.spenderReceivingKeys),
-    };
-}
 function matchCreditRecipient(
     state: CreditDeliveryState,
     role: "owner" | "spender",
@@ -437,7 +396,7 @@ function matchCreditRecipient(
     if (!keys.viewingPublicKey.every((value, index) => value === recipient[index]))
         throw new Error("recipient receiving key mismatch");
 }
-/** Self-contained Credit envelope (498..754 bytes), authenticated for its recipient role. */
+/** SDK v1 Credit envelope with a fixed recovery prefix and opaque application bytes. */
 export async function encryptCreditNote(
     viewingKey: NoteBytes,
     state: CreditDeliveryState,
@@ -446,36 +405,15 @@ export async function encryptCreditNote(
     const scopedState = normalizeCreditDeliveryState(state),
         scopedNote = scopedState.note;
     const scopedContext = { ...context };
-    const memo = encodeMemo(scopedNote.memo);
+    const codec = deliveryCodec(deliveryHeader("credit"));
+    if (codec.kind !== "credit") throw new Error("unexpected envelope kind");
     creditRole(scopedContext.role);
     matchCreditRecipient(scopedState, scopedContext.role, publicKey(viewingKey));
     await creditCommitment(scopedContext, scopedNote);
+    const plaintext = copyPayload(codec.encode(structuredClone(scopedState)), codec);
     return seal(
-        scopedState[scopedContext.role === "owner" ? "ownerReceivingKeys" : "spenderReceivingKeys"]
-            .viewingPublicKey,
-        concat(
-            encode(BigInt(scopedNote.spenderWalletIdentity)),
-            encode(BigInt(scopedNote.ownerWalletIdentity)),
-            encode(scopedNote.spenderPayout, 20),
-            encode(scopedNote.ownerPayout, 20),
-            encode(scopedNote.amount, 16),
-            encode(scopedNote.nonce),
-            encode(scopedNote.expiry, 8),
-            encode(scopedNote.creditSharedKey),
-            scopedState.ownerReceivingKeys.viewingPublicKey,
-            scopedState.ownerReceivingKeys.clueKey,
-            scopedState.spenderReceivingKeys.viewingPublicKey,
-            scopedState.spenderReceivingKeys.clueKey,
-            encode(scopedNote.singleLimit!, 16),
-            encode(scopedNote.dailyLimit!, 16),
-            encode(scopedNote.monthlyLimit!, 16),
-            encode(scopedNote.lastDay!, 8),
-            encode(scopedNote.dailySpent!, 16),
-            encode(scopedNote.lastMonth!, 8),
-            encode(scopedNote.monthlySpent!, 16),
-            encode(BigInt(memo.length), 2),
-            memo
-        ),
+        viewingKey,
+        plaintext,
         scopedContext,
         scopedNote.tokenAddress,
         deliveryHeader("credit"),
@@ -488,38 +426,24 @@ async function readCredit(
     envelope: NoteBytes,
     context: CreditNoteDecryptionContext,
     payloadKey = false
-): Promise<CreditDeliveryState> {
+): Promise<CreditDeliveryState & { note: CreditNote & { payload: Uint8Array } }> {
     const authenticatedContext = { ...context };
+    const data = envelopeBytes(envelope, true);
     const plain = await open(
         key,
-        envelope,
+        data,
         authenticatedContext,
-        deliveryHeader("credit"),
+        data[0]!,
         creditRole(authenticatedContext.role),
         payloadKey
     );
     try {
-        const note = {
-            chainId: authenticatedContext.chainId,
-            protocolAddress: authenticatedContext.protocolAddress,
-            spenderWalletIdentity: hexField(decode(plain.slice(0, 32))),
-            ownerWalletIdentity: hexField(decode(plain.slice(32, 64))),
-            spenderPayout: decode(plain.slice(64, 84)),
-            ownerPayout: decode(plain.slice(84, 104)),
-            tokenAddress: authenticatedContext.tokenAddress,
-            amount: decode(plain.slice(104, 120)),
-            nonce: decode(plain.slice(120, 152)),
-            expiry: decode(plain.slice(152, 160)),
-            creditSharedKey: decode(plain.slice(160, 192)),
-            singleLimit: decode(plain.slice(322, 338)),
-            dailyLimit: decode(plain.slice(338, 354)),
-            monthlyLimit: decode(plain.slice(354, 370)),
-            lastDay: decode(plain.slice(370, 378)),
-            dailySpent: decode(plain.slice(378, 394)),
-            lastMonth: decode(plain.slice(394, 402)),
-            monthlySpent: decode(plain.slice(402, 418)),
-            ...readMemo(plain, 418),
-        };
+        const codec = deliveryCodec(data[0]!);
+        if (codec.kind !== "credit") throw new Error("unexpected envelope kind");
+        const state = normalizeCreditDeliveryState(
+            structuredClone(codec.decode(plain, Object.freeze({ ...authenticatedContext })))
+        );
+        const note = state.note;
         if (
             BigInt(
                 authenticatedContext.role === "owner"
@@ -528,41 +452,35 @@ async function readCredit(
             ) !== BigInt(authenticatedContext.walletIdentity)
         )
             throw new Error("recipient wallet identity mismatch");
-        const state = normalizeCreditDeliveryState({
-            note,
-            ownerReceivingKeys: {
-                viewingPublicKey: plain.slice(192, 225),
-                clueKey: plain.slice(225, 257),
-            },
-            spenderReceivingKeys: {
-                viewingPublicKey: plain.slice(257, 290),
-                clueKey: plain.slice(290, 322),
-            },
-        });
+
         if (!payloadKey)
             matchCreditRecipient(state, authenticatedContext.role, viewingPublicKey(key));
+        if (note.tokenAddress !== authenticatedContext.tokenAddress)
+            throw new Error("Credit token context mismatch");
         await creditCommitment(authenticatedContext, note);
-        return state;
+        return {
+            ...state,
+            note: { ...state.note, payload: Uint8Array.from(state.note.payload ?? []) },
+        };
     } finally {
         plain.fill(0);
     }
 }
 
-/** Authenticated recipient decryption, including the output commitment. */
+/** Authenticated recipient decryption. Application payload bytes are never decoded here. */
 export function decryptPrivateTransferNote(
     key: NoteBytes,
     envelope: NoteBytes,
     context: NoteDecryptionContext
-): Promise<Note> {
+): Promise<Note & { payload: Uint8Array }> {
     return readNote(key, envelope, context);
 }
-
 /** Authenticated Credit decryption, including role and historical receiving keys. */
 export function decryptCreditNote(
     key: NoteBytes,
     envelope: NoteBytes,
     context: CreditNoteDecryptionContext
-): Promise<CreditDeliveryState> {
+): Promise<CreditDeliveryState & { note: CreditNote & { payload: Uint8Array } }> {
     return readCredit(key, envelope, context);
 }
 
@@ -571,7 +489,7 @@ export function decryptNotePayload(
     key: NoteBytes,
     envelope: NoteBytes,
     context: NoteDecryptionContext
-): Promise<Note> {
+): Promise<Note & { payload: Uint8Array }> {
     return readNote(key, envelope, context, true);
 }
 
@@ -579,7 +497,7 @@ export function decryptCreditPayload(
     key: NoteBytes,
     envelope: NoteBytes,
     context: CreditNoteDecryptionContext
-): Promise<CreditDeliveryState> {
+): Promise<CreditDeliveryState & { note: CreditNote & { payload: Uint8Array } }> {
     return readCredit(key, envelope, context, true);
 }
 
@@ -608,24 +526,4 @@ export async function exportPayloadKey(
 
 function envelopeBytes(value: NoteBytes, credit: boolean): Uint8Array {
     return validateDeliveryCiphertext(value, credit ? "credit" : "funds");
-}
-function readFundsMetadata(plain: Uint8Array): { returnAddress?: string; memo?: Uint8Array } {
-    if (plain.length < 83) throw new Error("missing funds metadata flags");
-    const flags = plain[80]!;
-    if ((flags & ~1) !== 0) throw new Error("unsupported funds metadata flags");
-    if (flags === 0) return readMemo(plain, 81);
-    if (plain.length < 168) throw new Error("truncated return address");
-    const returnAddress = encodeLongAddress({
-        walletIdentity: hexField(decode(plain.slice(81, 101))),
-        viewingPublicKey: plain.slice(101, 134),
-        clueKey: plain.slice(134, 166),
-    });
-    return { returnAddress, ...readMemo(plain, 166) };
-}
-function readMemo(plain: Uint8Array, offset: number): { memo?: Uint8Array } {
-    if (plain.length < offset + 2) throw new Error("missing memo length");
-    const length = Number(decode(plain.slice(offset, offset + 2)));
-    if (length > 256 || plain.length !== offset + 2 + length)
-        throw new Error("invalid memo length");
-    return length === 0 ? {} : { memo: plain.slice(offset + 2) };
 }

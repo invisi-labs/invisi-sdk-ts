@@ -742,3 +742,30 @@ it("rejects changed clues for an otherwise identical Credit envelope", async () 
         client.getCreditOutputs(context, { fromBlock: 10n, toBlock: 10n })
     ).rejects.toThrow(/Conflicting Credit/);
 });
+
+it("preserves unregistered versions in raw and typed candidates without a codec registry", async () => {
+    const funds = { ...encryptedOutput(), ciphertext: "0x02" + "ab".repeat(200) };
+    const owner = {
+        ...encryptedOutput(),
+        kind: "CreditCreated",
+        leafIndex: 4,
+        commitment: h(13),
+        ciphertext: "0x82" + "cd".repeat(600),
+    };
+    const spender = { ...owner, ciphertext: "0x82" + "ef".repeat(600) };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  outputs: [funds, owner, spender],
+                  creditTransitions: [],
+              }
+    );
+    const range = { fromBlock: 10n, toBlock: 10n };
+    expect(
+        (await client.getEncryptedOutputs(context, range)).outputs.map((entry) => entry.ciphertext)
+    ).toEqual([funds.ciphertext, owner.ciphertext, spender.ciphertext]);
+    expect((await client.getOutputs(context, range)).outputs).toHaveLength(1);
+    expect((await client.getCreditOutputs(context, range)).outputs).toHaveLength(2);
+});

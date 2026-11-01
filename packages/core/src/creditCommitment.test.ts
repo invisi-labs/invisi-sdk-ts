@@ -354,9 +354,9 @@ function ownerHex(value: string | number | bigint): `0x${string}` {
 it("recovers financial Credit fields without fabricating a child memo from the parent", async () => {
     const result = await core.recoverCreditRemainder(
         context,
-        { ...note, memo: new Uint8Array([255]) },
+        { ...note, payload: core.fundsV1.encode({ memo: new Uint8Array([255]) }) },
         recovery
     );
-    expect(result).not.toHaveProperty("memo");
+    expect(result).not.toHaveProperty("payload");
     expect(result!.amount).toBe(remainderAmount);
 });

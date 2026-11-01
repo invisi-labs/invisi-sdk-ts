@@ -3,6 +3,9 @@ export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
 export { Invisi } from "./Invisi";
 export type { InvisiOptions, ConnectionOptions, RegistrationPreparationOptions } from "./Invisi";
 export {
+    fundsV1,
+    creditV1,
+    decodeDeliveryHeader,
     Wallet,
     PublicWallet,
     ViewingCapability,
@@ -21,6 +24,8 @@ export type {
     Address,
     Hex,
     Memo,
+    FundsDataV1,
+    CreditDataV1,
     Note,
     CreditNote,
     CreditPolicy,
@@ -61,6 +66,7 @@ export type {
     WalletState,
     BalanceSnapshot,
     WalletSessionOptions,
+    PaymentOutput,
     TransferPreparation,
     ShieldPreparation,
     CreateCreditPreparation,

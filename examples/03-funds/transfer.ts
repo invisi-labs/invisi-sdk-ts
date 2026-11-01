@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/sdk";
 import { computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 import { ProtocolRpcClient, Wallet, Protocol, Invisi, type NoteInput } from "@invisi-labs/sdk";
@@ -61,8 +62,7 @@ export async function main(resources: ExampleResources) {
         outputs: Array.from({ length: outputCount }, () => ({
             to: recipientAddress,
             amount,
-            memo: "Invoice INV-2026-1042", // Optional UTF-8 text; at most 256 encoded bytes.
-            returnAddress: wallet.getAddress(), // Optional private reply address, not a payer identity claim.
+            payload: fundsV1.encode({ memo: "Invoice INV-2026-1042" }),
         })),
     });
     console.log("Local operation review:", prepared.preview());

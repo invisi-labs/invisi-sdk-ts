@@ -63,7 +63,7 @@ vectors.credit.deliverySource = {
     envelopeType: 1,
     envelopeVersion: 1,
     header: 129,
-    ciphertextBytes: 498,
+    ciphertextBytes: (vectors.credit.ownerCiphertext.length - 2) / 2,
     protocolClientSha256: createHash("sha256").update(readFileSync(source)).digest("hex"),
     purpose:
         "Independent Node crypto delivery vectors; canonical fixture clue points do not claim FMD detectability.",
@@ -129,4 +129,4 @@ for (const vector of vectors.memoVectors ?? []) {
     vector.ciphertext = "0x" + envelope.toString("hex");
 }
 writeFileSync(file, JSON.stringify(vectors, null, 2) + "\n");
-console.log("Refreshed two 498-byte Credit envelopes from the protocol implementation.");
+console.log("Refreshed funds and Credit payloadLength envelopes from the protocol implementation.");

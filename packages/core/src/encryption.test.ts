@@ -23,6 +23,7 @@ const context = {
     tokenAddress: BigInt(vectors.context.tokenAddress),
 };
 const payment: core.Note = {
+    payload: new Uint8Array(),
     ...context,
     walletIdentity: ownerHex(BigInt(vectors.note.walletIdentity)),
     amount: BigInt(vectors.note.amount),
@@ -34,6 +35,7 @@ const noteContext = {
     walletIdentity: payment.walletIdentity,
 };
 const credit: core.CreditNote = {
+    payload: new Uint8Array(),
     ...context,
     spenderWalletIdentity: ownerHex(BigInt(vectors.credit.spenderWalletIdentity)),
     ownerWalletIdentity: ownerHex(BigInt(vectors.credit.ownerWalletIdentity)),
@@ -127,7 +129,6 @@ const notePlaintext = Buffer.concat([
     bytes(BigInt(payment.walletIdentity)),
     bytes(payment.amount, 16),
     bytes(payment.nonce),
-    bytes(0n, 1),
     bytes(0n, 2),
 ]);
 const creditPlaintext = Buffer.concat([
@@ -224,7 +225,7 @@ describe("current authenticated note envelopes", () => {
     it("creates interoperable randomized ordinary envelopes", async () => {
         const a = await core.encryptPrivateTransferNote(viewingKey, payment, noteContext);
         const b = await core.encryptPrivateTransferNote(viewingKey, payment, noteContext);
-        expect(a).toHaveLength(161);
+        expect(a).toHaveLength(160);
         expect(a[0]).toBe(1);
         expect(a).not.toEqual(b);
         expect(referencePlaintext(a, noteContext)).toEqual(notePlaintext);
@@ -404,7 +405,7 @@ describe("current authenticated note envelopes", () => {
                 base,
                 Buffer.concat([base, bytes(1n, 2)]),
                 Buffer.concat([base, bytes(0n, 2), Buffer.from([1])]),
-                Buffer.concat([base, bytes(257n, 2), Buffer.alloc(257)]),
+                Buffer.concat([base, bytes(4000n, 2), Buffer.alloc(4000)]),
             ]) {
                 await expect(
                     decrypt(
@@ -703,29 +704,9 @@ function ownerHex(value: string | number | bigint): `0x${string}` {
     return `0x${BigInt(value).toString(16).padStart(40, "0")}`;
 }
 
-it("rejects authenticated funds-v1 payloads with unknown flags or invalid address framing", async () => {
-    const base = notePlaintext.subarray(0, 80);
-    for (const metadata of [
-        Buffer.from([2, 0, 0]),
-        Buffer.from([128, 0, 0]),
-        Buffer.from([1, 0, 0]),
-        Buffer.concat([Buffer.from([1]), Buffer.alloc(85), Buffer.from([0, 0])]),
-        Buffer.from([0, 0, 1]),
-        Buffer.from([0, 0, 0, 0]),
-    ]) {
-        await expect(
-            core.decryptPrivateTransferNote(
-                key,
-                referenceSeal(Buffer.concat([base, metadata]), 1, noteContext),
-                noteContext
-            )
-        ).rejects.toThrow();
-    }
-});
-
 it("authenticates the type bit even when the modified envelope fits the other codec size", async () => {
     const envelope = await core.encryptCreditNote(viewingKey, creditState, creditContext);
     envelope[0] = envelope[0]! ^ 0x80;
-    // 498 bytes also fits the funds codec's size range, so GCM must reject the changed header/domain.
+    // 499 bytes also fits the funds codec's size range, so GCM must reject the changed header/domain.
     await expect(core.decryptPrivateTransferNote(key, envelope, creditContext)).rejects.toThrow();
 });

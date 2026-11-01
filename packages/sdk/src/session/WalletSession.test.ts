@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/core";
 import { PublicWallet } from "@invisi-labs/core";
 import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/core";
 import { expect, expectTypeOf, it } from "vitest";
@@ -7,13 +8,19 @@ import { fixture } from "./operation-fixture";
 
 it("prepares private transfer 30 and random ordinary change 70 as an immutable owned plan", async () => {
     const h = await fixture(),
-        payments = [{ to: h.bob.getAddress(), amount: 30n, returnAddress: h.wallet.getAddress() }];
+        payments = [
+            {
+                to: h.bob.getAddress(),
+                amount: 30n,
+                payload: fundsV1.encode({ memo: "original payload" }),
+            },
+        ];
     const pending = h.session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
         outputs: payments,
     });
     payments[0]!.amount = 999n;
-    payments[0]!.returnAddress = h.bob.getAddress();
+    payments[0]!.payload.fill(0);
     const operation = await pending,
         review = operation.preview();
     expect(review.outputs.map((output) => output.amount)).toEqual([30n, 70n]);
@@ -22,8 +29,10 @@ it("prepares private transfer 30 and random ordinary change 70 as an immutable o
     const state = await h.store.readSnapshot(h.scope);
     expect(state.reservations[h.leaf]).toBe(operation.id);
     const saved = state.operations[operation.id]!.payload as SavedOperation;
-    expect(saved.plan.outputs[0]!.note.returnAddress).toBe(h.wallet.getAddress());
-    expect(saved.plan.outputs[1]!.note).not.toHaveProperty("returnAddress");
+    expect(fundsV1.decode(saved.plan.outputs[0]!.note.payload!).memo).toEqual(
+        new TextEncoder().encode("original payload")
+    );
+    expect(saved.plan.outputs[1]!.note.payload).toEqual(new Uint8Array());
     expect(JSON.stringify(operation)).not.toContain("nonce");
     expect(JSON.stringify(operation)).not.toContain("amount");
 });
@@ -179,4 +188,19 @@ it("keeps derivable session capabilities out of the configuration surface", () =
         "membership" | "nullifier" | "detector" | "receivingAddress"
     >;
     expectTypeOf<Removed>().toEqualTypeOf<never>();
+});
+
+it("keeps application bytes independent of the SDK envelope in managed preparations", async () => {
+    const h = await fixture();
+    const session = new WalletSession(h.options);
+    const payload = new Uint8Array([255, 99, 1]);
+    const operation = await session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n, payload }],
+    });
+    const state = await h.store.readSnapshot(h.scope);
+    const saved = state.operations[operation.id]!.payload as SavedOperation;
+    expect(saved.plan.outputs[0]!.delivery.ciphertext.slice(0, 4)).toBe("0x01");
+    expect(saved.plan.outputs[0]!.note.payload).toEqual(payload);
+    expect(saved.plan.outputs[1]!.note.payload).toEqual(new Uint8Array());
 });

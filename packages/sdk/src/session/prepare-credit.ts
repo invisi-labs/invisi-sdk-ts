@@ -43,7 +43,12 @@ import type {
     PreparedCreditOutput,
     TopUpCreditPreparation,
 } from "./operation-types";
-import { Preparation, positiveAmount, type PreparationFrame } from "./prepare-common";
+import {
+    Preparation,
+    positiveAmount,
+    copyApplicationPayload,
+    type PreparationFrame,
+} from "./prepare-common";
 
 const EMPTY: Delivery = { ciphertext: "0x", clue: "0x" };
 
@@ -181,7 +186,7 @@ export class CreditPreparation<Result> {
                         monthlyLimit: options.monthlyLimit ?? 0n,
                     }),
                     amount: options.amount,
-                    ...(options.memo === undefined ? {} : { memo: options.memo }),
+                    payload: copyApplicationPayload(options.payload),
                     expiry,
                     nonce: generateNonce(),
                     creditSharedKey: generateCreditSharedKey(),
@@ -294,7 +299,9 @@ export class CreditPreparation<Result> {
                     amount,
                     expiry,
                     nonce: generateNonce(),
-                    ...(options.memo === undefined ? {} : { memo: options.memo }),
+                    payload: copyApplicationPayload(
+                        options.payload === undefined ? old.note.payload : options.payload
+                    ),
                 },
             },
             frame
@@ -368,9 +375,11 @@ export class CreditPreparation<Result> {
                         ...n,
                         ...usage,
                         amount: remaining,
-                        ...(options.credits[i]!.memo === undefined
-                            ? {}
-                            : { memo: options.credits[i]!.memo! }),
+                        payload: copyApplicationPayload(
+                            options.credits[i]!.payload === undefined
+                                ? n.payload
+                                : options.credits[i]!.payload
+                        ),
                         nonce: await deriveRemainderNonce(...args),
                     },
                 },

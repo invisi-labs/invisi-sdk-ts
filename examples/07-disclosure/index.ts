@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/sdk";
 import { Disclosure, decodeMemoText, Wallet, type CreditNote, type Note } from "@invisi-labs/sdk";
 import { encryptPrivateTransferNote, generateCreditSharedKey, generateNonce } from "@invisi-labs/core";
 
@@ -12,7 +13,7 @@ export async function main() {
         walletIdentity: bob.walletIdentity,
         amount: 30n,
         nonce: generateNonce(),
-        memo: "Invoice INV-1042",
+        payload: fundsV1.encode({ memo: "Invoice INV-1042" }),
     };
 
     console.log("2. Create a commitment opening and explicitly export its sensitive contents");
@@ -43,7 +44,8 @@ export async function main() {
     const decrypted = await importedKey.verify({ ...output, ciphertext });
     console.log("Payload verified; disclosed amount:", decrypted.note.amount);
     // Decryption returns raw bytes. Decode explicitly only when your application expects UTF-8 text.
-    if (decrypted.note.memo instanceof Uint8Array) console.log("Disclosed memo:", decodeMemoText(decrypted.note.memo));
+    const data = fundsV1.decode(decrypted.note.payload!);
+    if (data.memo) console.log("Disclosed memo:", decodeMemoText(data.memo));
 
     console.log("6. Disclose a Credit opening while retaining the shared recovery key");
     const credit: CreditNote = {

@@ -1,7 +1,6 @@
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import {
-    encodeMemo,
     computeCreditCommitment,
     computeCreditNullifier,
     computeCreditSharedKeyHash,
@@ -203,7 +202,7 @@ export abstract class InventoryProcessor {
                         const child = foundByKey.get(
                             params.remainderCommitments[index]! + ":" + previous.role
                         );
-                        const memo = child?.state.note.memo;
+                        const payload = child?.state.note.payload;
                         const record: StoredCredit = {
                             commitment: params.remainderCommitments[index]!,
                             treeId: BigInt(args.outputTreeId as bigint),
@@ -216,7 +215,7 @@ export abstract class InventoryProcessor {
                                 ...clone(previous.state),
                                 note: {
                                     ...remainder,
-                                    ...(memo === undefined ? {} : { memo: encodeMemo(memo) }),
+                                    ...(payload === undefined ? {} : { payload: clone(payload) }),
                                 },
                             },
                             receivingKeySource: { kind: "draw", commitment: previous.commitment },

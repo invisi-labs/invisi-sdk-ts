@@ -1,3 +1,4 @@
+import type { WalletSessionInfrastructure } from "./session/operation-types";
 import { prepareWithErrors } from "./errors";
 import { copyGasBenchmarks } from "./gas-estimation";
 import { explicitPreparation } from "./explicit-preparation";
@@ -24,8 +25,8 @@ import { Protocol, type ChainReader } from "@invisi-labs/protocol";
 import { WalletSession, type WalletSessionOptions } from "./session";
 
 /** Compose independent Chain RPC and indexed Protocol RPC with local wallet capabilities. */
-export type InvisiOptions = Omit<
-    WalletSessionOptions,
+type InvisiInfrastructure = Omit<
+    WalletSessionInfrastructure,
     | "wallet"
     | "protocol"
     | "namespace"
@@ -41,6 +42,8 @@ export type InvisiOptions = Omit<
     chainReader?: ChainReader;
 };
 
+export type InvisiOptions = InvisiInfrastructure;
+
 /** Public wallet and registry-specific inputs; signing remains external. */
 export type RegistrationPreparationOptions = Pick<
     RegistrationPreparation,
@@ -55,9 +58,14 @@ export type ConnectionOptions = Pick<
 
 /** A neutral composition entry point; every resolved instance owns an independent session. */
 export class Invisi {
-    readonly #options: InvisiOptions;
+    readonly #options: InvisiInfrastructure;
 
     constructor(options: InvisiOptions = {}) {
+        if ("ciphertextCodecs" in options || "envelopeVersion" in options) {
+            throw new Error(
+                "SDK envelope versions are fixed; encode application payload bytes externally"
+            );
+        }
         if ("signer" in options || "fundingSigner" in options) {
             throw new Error(
                 "Invisi does not accept signer defaults; export a signing request and attach the external signature"
@@ -150,7 +158,7 @@ export class Invisi {
             ...(fundingVerifier ? { fundingVerifier } : {}),
             ...(addressResolver ? { addressResolver } : {}),
             protocol: selected.protocol,
-        };
+        } as WalletSessionOptions;
     }
 
     /** Discover the selected chain's registry and prepare an independent signing request. */

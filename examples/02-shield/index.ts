@@ -1,3 +1,4 @@
+import { fundsV1 } from "@invisi-labs/sdk";
 import { JsonRpcProvider, Wallet as EthereumWallet, Contract } from "ethers";
 import { ProtocolRpcClient, Wallet, Protocol, Invisi, type Address } from "@invisi-labs/sdk";
 import { required } from "../environment.js";
@@ -40,7 +41,7 @@ export async function main(resources: ExampleResources) {
         outputs: Array.from({ length: count }, () => ({
             to: recipient,
             amount: amount / BigInt(count),
-            memo: new Uint8Array([0x00, 0xff, 0x42]), // Opaque application bytes; UTF-8 is optional.
+            payload: fundsV1.encode({ memo: new Uint8Array([0x00, 0xff, 0x42]) }),
         })),
         funding: { payer, amount, authorization: "caller" },
     });
