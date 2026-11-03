@@ -67,3 +67,41 @@ export interface ProtocolOutput {
     logIndex: number;
     kind: string;
 }
+
+/** Public indexed Credit event data; verify the canonical receipt before using it. */
+export interface ProtocolCreditTransition {
+    block: CanonicalBlock;
+    name: "CreditCreated" | "CreditDraw" | "CreditCancelled" | "CreditToppedUp";
+    transactionHash: Hex;
+    logIndex: number;
+    data: Readonly<Record<string, unknown>>;
+}
+
+/** Availability is independent of EVM execution success; only indexed arrays are complete. */
+export type ProtocolTransactionUpdates = {
+    transactionHash: Hex;
+    /** Observed checkpoint; not_found/pending_index may report a stale, noncanonical fork. */
+    indexedHead: CanonicalBlock | null;
+} & (
+    | {
+          status: "not_found";
+          block: null;
+          receiptStatus: null;
+          outputs: null;
+          creditTransitions: null;
+      }
+    | {
+          status: "pending_index";
+          block: CanonicalBlock;
+          receiptStatus: 0 | 1;
+          outputs: null;
+          creditTransitions: null;
+      }
+    | {
+          status: "indexed";
+          block: CanonicalBlock;
+          receiptStatus: 0 | 1;
+          outputs: readonly ProtocolOutput[];
+          creditTransitions: readonly ProtocolCreditTransition[];
+      }
+);

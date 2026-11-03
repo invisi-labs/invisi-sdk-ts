@@ -12,6 +12,8 @@ import type {
     ProtocolUpdateRange,
     RegisteredReceivingAddress,
     ProtocolOutput,
+    ProtocolTransactionUpdates,
+    ProtocolCreditTransition,
 } from "./types";
 
 export interface ProtocolRpcReader {
@@ -89,6 +91,15 @@ function list(value: unknown): unknown[] {
     if (value === null) return [];
     if (!Array.isArray(value)) return invalid("Expected RPC array or null");
     return value;
+}
+function blockReference(value: unknown): CanonicalBlock {
+    const block = object(value);
+    return {
+        number: integer(block.number),
+        hash: hash(block.hash),
+        parentHash: hash(block.parentHash),
+        timestamp: integer(block.timestamp),
+    };
 }
 function endpoint(options: ProtocolRpcConnectionOptions): URL {
     let url: URL;
@@ -352,6 +363,18 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         return block;
     }
     async getStatus(context: DeploymentContext, options: { signal?: AbortSignal } = {}) {
+        const status = await this.readStatusMetadata(context, options);
+        return {
+            ...status,
+            indexedHead:
+                status.indexedHead === null ? null : await this.canonical(status.indexedHead),
+        };
+    }
+
+    private async readStatusMetadata(
+        context: DeploymentContext,
+        options: { signal?: AbortSignal }
+    ) {
         this.context(context);
         const status = object(await this.rpc("invisi_getStatus", [], options.signal));
         if (status.apiVersion !== "v1" || status.protocolVersion !== "1")
@@ -372,8 +395,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         const checkedBits = Number(integer(status.checkedBits, 8));
         if (checkedBits < 1 || checkedBits > 24) invalid("Invalid detection precision");
         return {
-            indexedHead:
-                status.indexedHead === null ? null : await this.canonical(status.indexedHead),
+            indexedHead: status.indexedHead,
             detectionEnabled: status.detectionEnabled as boolean,
             checkedBits,
         };
@@ -465,6 +487,15 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         credit: boolean | "all"
     ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
         const { block, outputs } = await this.readUpdates(context, range);
+        return this.parseOutputCandidates(block, outputs, range, credit);
+    }
+
+    private async parseOutputCandidates(
+        block: CanonicalBlock,
+        outputs: unknown[],
+        range: Pick<ProtocolUpdateRange, "fromBlock" | "toBlock">,
+        credit: boolean | "all"
+    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
         const parsed: ProtocolOutput[] = [];
         const seenEnvelopes = new Set<string>();
         const creditEnvelopes = new Map<Hex, Map<Hex, string>>();
@@ -554,6 +585,129 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             parsed.push(candidate);
         }
         return { block, outputs: parsed };
+    }
+
+    /** Query one transaction without constructing a range; no automatic polling or receipt trust. */
+    async getTransactionUpdates(
+        context: DeploymentContext,
+        transactionHash: Hex,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<ProtocolTransactionUpdates> {
+        this.context(context);
+        const requestedHash = hash(transactionHash);
+        if (BigInt(requestedHash) === 0n) invalid("Nonzero transaction hash required");
+        await this.readStatusMetadata(context, options);
+        const result = object(
+            await this.rpc("invisi_getTransactionUpdates", [requestedHash], options.signal)
+        );
+        if (hash(result.transactionHash) !== requestedHash)
+            invalid("RPC transaction hash mismatch");
+        const indexedHead =
+            result.indexedHead === null
+                ? null
+                : result.status === "indexed"
+                  ? await this.canonical(result.indexedHead)
+                  : blockReference(result.indexedHead);
+        const common = { transactionHash: requestedHash, indexedHead };
+        if (result.status === "not_found") {
+            if (
+                result.blockNumber !== undefined ||
+                result.blockHash !== undefined ||
+                result.receiptStatus !== undefined ||
+                result.outputs !== null ||
+                result.creditTransitions !== null
+            )
+                invalid("Invalid not_found transaction updates");
+            return {
+                ...common,
+                status: "not_found",
+                block: null,
+                receiptStatus: null,
+                outputs: null,
+                creditTransitions: null,
+            };
+        }
+        if (result.status !== "pending_index" && result.status !== "indexed")
+            invalid("Invalid transaction update status");
+        const number = integer(result.blockNumber);
+        const registryStart = this.deployment.registry?.fromBlock;
+        const start =
+            registryStart !== undefined && registryStart < this.deployment.protocol.fromBlock
+                ? registryStart
+                : this.deployment.protocol.fromBlock;
+        if (number < start) invalid("RPC transaction predates indexed deployment");
+        const block = await this.reader.getBlock(number);
+        if (block.number !== number || hash(block.hash) !== hash(result.blockHash))
+            invalid("RPC transaction block mismatch");
+        const receiptStatus = Number(integer(result.receiptStatus, 1)) as 0 | 1;
+        if (result.status === "pending_index") {
+            if (result.outputs !== null || result.creditTransitions !== null)
+                invalid("Unindexed transaction must not contain updates");
+            return {
+                ...common,
+                status: "pending_index",
+                block,
+                receiptStatus,
+                outputs: null,
+                creditTransitions: null,
+            };
+        }
+        if (
+            indexedHead === null ||
+            indexedHead.number < number ||
+            (indexedHead.number === number && hash(indexedHead.hash) !== hash(block.hash))
+        )
+            invalid("RPC transaction exceeds indexed head");
+        if (!Array.isArray(result.outputs) || !Array.isArray(result.creditTransitions))
+            return invalid("Indexed transaction requires arrays");
+        if (
+            receiptStatus === 0 &&
+            (result.outputs.length > 0 || result.creditTransitions.length > 0)
+        )
+            invalid("Reverted transaction cannot contain updates");
+        for (const value of [...result.outputs, ...result.creditTransitions]) {
+            if (hash(object(value).transactionHash) !== requestedHash)
+                invalid("RPC updates contain a different transaction");
+        }
+        const { outputs } = await this.parseOutputCandidates(
+            block,
+            result.outputs,
+            { fromBlock: number, toBlock: number },
+            "all"
+        );
+        const creditTransitions: ProtocolCreditTransition[] = [];
+        const seen = new Map<number, string>();
+        for (const value of result.creditTransitions) {
+            const event = object(value);
+            const eventBlock = await this.canonical(event.block);
+            if (eventBlock.number !== number || hash(eventBlock.hash) !== hash(block.hash))
+                invalid("RPC Credit transition block mismatch");
+            if (
+                !["CreditCreated", "CreditDraw", "CreditCancelled", "CreditToppedUp"].includes(
+                    event.name as string
+                )
+            )
+                invalid("Invalid Credit transition name");
+            const transition: ProtocolCreditTransition = {
+                block: eventBlock,
+                name: event.name as ProtocolCreditTransition["name"],
+                transactionHash: requestedHash,
+                logIndex: Number(integer(event.logIndex, 32)),
+                data: object(event.data),
+            };
+            const fingerprint = JSON.stringify(transition, (_, value) =>
+                typeof value === "bigint" ? value.toString() : value
+            );
+            const previous = seen.get(transition.logIndex);
+            if (previous !== undefined && previous !== fingerprint)
+                invalid("Conflicting Credit transition");
+            if (previous === undefined) creditTransitions.push(transition);
+            seen.set(transition.logIndex, fingerprint);
+        }
+        const current = await this.reader.getBlock(number);
+        if (current.number !== number || hash(current.hash) !== hash(block.hash))
+            invalid("RPC transaction block changed during query");
+        return { ...common, status: "indexed", block, receiptStatus, outputs, creditTransitions };
     }
 
     /** Indexed spent observation; preparation must independently check latest chain state. */

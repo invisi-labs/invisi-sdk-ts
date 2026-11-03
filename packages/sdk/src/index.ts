@@ -147,4 +147,8 @@ export { readProtocolLogs } from "./session/receipt-logs";
 export { decryptCandidates } from "./session/discovery";
 export type { DeliveryEventLog, DiscoveredNote, DiscoveredCredit } from "./session/discovery";
 
-export type { ProtocolOutput } from "@invisi-labs/rpc";
+export type {
+    ProtocolOutput,
+    ProtocolTransactionUpdates,
+    ProtocolCreditTransition,
+} from "@invisi-labs/rpc";
