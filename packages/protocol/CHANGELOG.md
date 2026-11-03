@@ -1,5 +1,11 @@
 # @invisi-labs/protocol
 
+## 1.1.5
+
+### Patch Changes
+
+- Align the fixed workspace release and internal dependency versions with 1.1.5.
+
 ## 1.1.4
 
 ### Patch Changes

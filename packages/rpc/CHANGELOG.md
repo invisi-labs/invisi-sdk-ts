@@ -1,5 +1,11 @@
 # @invisi-labs/rpc
 
+## 1.1.5
+
+### Patch Changes
+
+- Add getTransactionUpdates with typed availability states, canonical transaction/output checks, Credit transitions and stale-checkpoint handling. Requires Protocol RPC 1.1.4 or newer.
+
 ## 1.1.4
 
 ### Patch Changes

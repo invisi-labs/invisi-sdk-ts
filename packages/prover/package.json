@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/prover",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Runtime-neutral proving interfaces with explicit native and WASM backends",
   "type": "module",
   "main": "./dist/index.cjs",

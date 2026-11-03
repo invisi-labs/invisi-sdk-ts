@@ -1,5 +1,11 @@
 # @invisi-labs/sdk
 
+## 1.1.5
+
+### Patch Changes
+
+- Expose getTransactionUpdates through the ethers-integrated ProtocolRpcClient and export ProtocolTransactionUpdates and ProtocolCreditTransition types.
+
 ## 1.1.4
 
 ### Patch Changes
