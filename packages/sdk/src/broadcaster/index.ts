@@ -224,7 +224,12 @@ export class BroadcasterClient {
     }
     private async call(method: string, params: unknown): Promise<unknown> {
         const id = ++this.requestId;
-        const response = (await this.transport({ jsonrpc: "2.0", id, method, params })) as {
+        const response = (await this.transport({
+            jsonrpc: "2.0",
+            id,
+            method,
+            params: [params],
+        })) as {
             jsonrpc?: string;
             id?: unknown;
             result?: unknown;

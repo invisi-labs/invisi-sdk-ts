@@ -32,7 +32,7 @@ it("discovers a token-compatible service across pages and pins its registered qu
         .mockResolvedValueOnce({ block, broadcasters: [entry(3)] });
     const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
         const req = JSON.parse(init!.body as string);
-        expect(req.params.token.toLowerCase()).toBe(a(200));
+        expect(req.params[0].token.toLowerCase()).toBe(a(200));
         return new Response(
             JSON.stringify({
                 jsonrpc: "2.0",

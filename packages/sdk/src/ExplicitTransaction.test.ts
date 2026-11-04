@@ -947,7 +947,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
                     feeAmount: "10",
                     maxGas: "2000000",
                 });
-            const payload = request.params as {
+            const payload = (request.params as unknown[])[0] as {
                 data: string;
                 quote?: { requestHash: string };
                 idempotencyKey?: string;

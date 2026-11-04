@@ -83,6 +83,56 @@ describe("broadcaster final intents", () => {
         );
         await expect(mixed.fee(signer.address)).rejects.toThrow("JSON-RPC response");
     });
+    it("encodes every operation as one positional query", async () => {
+        const data = calldata();
+        const quote = {
+            token: "0x" + "33".repeat(20),
+            feeRecipient: signer.address,
+            feeAmount: "2",
+            deadline: "9999999999",
+            maxGas: "1000000",
+            requestHash: broadcasterRequestHash(data),
+        };
+        const signature = await signer.signTypedData(
+            broadcasterQuoteDomain(trust),
+            broadcasterQuoteTypes,
+            quote
+        );
+        const requests: { method: string; params: unknown }[] = [];
+        const client = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: signer.address,
+                feeRecipient: signer.address,
+            },
+            async (request) => {
+                requests.push(request);
+                return {
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    error: { code: -32000, message: "Test response" },
+                };
+            }
+        );
+        await expect(client.fee(signer.address, data)).rejects.toThrow("Test response");
+        await expect(client.quote(data, trust)).rejects.toThrow("Test response");
+        await expect(
+            client.submit(data, { quote, signature, context: trust }, "request_positional_01")
+        ).rejects.toThrow("Test response");
+        await expect(client.status("request_positional_01")).rejects.toThrow("Test response");
+        expect(requests.map(({ method, params }) => ({ method, params }))).toEqual([
+            { method: "broadcaster_getFee", params: [{ token: signer.address, data }] },
+            { method: "broadcaster_getQuote", params: [{ data }] },
+            {
+                method: "broadcaster_submitTransaction",
+                params: [{ data, quote, signature, idempotencyKey: "request_positional_01" }],
+            },
+            {
+                method: "broadcaster_getTransactionStatus",
+                params: [{ id: "request_positional_01" }],
+            },
+        ]);
+    });
     it("allows an expired signed quote to recover an exact submission's durable status", async () => {
         const data = calldata();
         const quote = {
@@ -191,7 +241,7 @@ describe("broadcaster final intents", () => {
                 jsonrpc: "2.0",
                 id: 1,
                 method: "broadcaster_getFee",
-                params: { token: signer.address },
+                params: [{ token: signer.address }],
             });
             expect(fetcher.mock.calls[0]?.[1]?.redirect).toBe("error");
         } finally {

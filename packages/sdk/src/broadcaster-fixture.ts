@@ -31,7 +31,7 @@ export function quoteClient(
                     feeAmount: String(amount()),
                     maxGas: "2000000",
                 });
-            const { data } = request.params as { data: string };
+            const { data } = (request.params as unknown[])[0] as { data: string };
             const params = decodeBroadcasterIntent(data).request.params;
             const quote = {
                 token: params.token,
