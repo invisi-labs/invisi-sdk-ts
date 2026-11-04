@@ -30,6 +30,10 @@ const protocolRoot = resolve(process.env.INVISI_PROTOCOL_DIR ?? join(root, "../i
 const output = resolve(
     process.env.GAS_BENCHMARK_OUTPUT ?? join(root, "packages/sdk/src/data/gas-benchmarks.json")
 );
+const broadcasterFee = BigInt(process.env.GAS_BENCHMARK_BROADCASTER_FEE ?? "0");
+if (broadcasterFee < 0n || broadcasterFee >= 1n << 128n)
+    throw Error("Invalid benchmark broadcaster fee");
+const feeRecipient = "0x000000000000000000000000000000000000bEEF";
 const evidenceDir = resolve(
     process.env.GAS_BENCHMARK_EVIDENCE ?? `/tmp/invisi-credit-gas-evidence-${Date.now()}`
 );
@@ -510,7 +514,7 @@ try {
     await (
         await token.connect(bobSigner).transfer(account, await token.balanceOf(bob.ownerAddress))
     ).wait();
-    await (await token.approve(instance, 100n)).wait();
+    await (await token.approve(instance, 100n + broadcasterFee)).wait();
     const baseline = {
         leafCount: tree.size,
         treeId: "1",
@@ -522,7 +526,14 @@ try {
     };
     if (baseline.spenderTokenBalance !== "0") throw Error("Payout baseline must be zero");
     guard();
-    const base = { wallet: PublicWallet.fromAddress(wallet.getAddress()), protocol, tokenAddress },
+    const base = {
+            wallet: PublicWallet.fromAddress(wallet.getAddress()),
+            protocol,
+            tokenAddress,
+            ...(broadcasterFee > 0n
+                ? { fee: { recipient: feeRecipient, amount: broadcasterFee } }
+                : {}),
+        },
         cases = [
             {
                 id: "create-credit-caller-0x0",
@@ -537,7 +548,11 @@ try {
                         singleLimit: 100n,
                         dailyLimit: 200n,
                         monthlyLimit: 300n,
-                        funding: { payer: account, amount: 100n, authorization: "caller" },
+                        funding: {
+                            payer: account,
+                            amount: 100n + broadcasterFee,
+                            authorization: "caller",
+                        },
                     }),
             },
             {
@@ -599,11 +614,13 @@ try {
             },
         ];
     const selected = process.env.GAS_BENCHMARK_CASES?.split(",");
+    if (broadcasterFee > 0n && (!selected || selected.some((id) => id.startsWith("draw-credit"))))
+        throw Error("Paid benchmark requires explicit non-draw cases");
     if (selected?.some((id) => !cases.some((c) => c.id === id)))
         throw Error("Unknown benchmark case");
     const profile = {
         formatVersion: 1,
-        id: `protocol-${revision.slice(0, 7)}-${initialSources.sha256.slice(0, 12)}-prague-credit-real`,
+        id: `protocol-${revision.slice(0, 7)}-${initialSources.sha256.slice(0, 12)}-prague-credit-real${broadcasterFee ? "-accrued-fees" : ""}`,
         deployment: {
             chainId: "31337",
             protocolAddress: instance,
@@ -644,7 +661,7 @@ try {
                 "Solidity0.8.38 optimizer200 Prague; pinned BB6.0.0 real verifiers; every native proof independently verified",
                 `one physical source tree and ${seedCount + 2} existing leaves shared by every sample; top-up has two authenticated source groups; no rollover or screener`,
                 `funding/approvals/${seedCount} genuine Credit seeds/usage-seed draw/payout reset excluded from business gas`,
-                "each round restores identical token balances, exact caller allowance100, note cursor, nullifiers and baseline; spender payout starts zero",
+                `each round restores identical token balances, exact caller allowance${100n + broadcasterFee}, note cursor, nullifiers and baseline; spender payout starts zero; broadcasterFee${broadcasterFee}`,
                 "complete receipt.gasUsed is measured, including verifier/calldata/logging/output insertion; memo0",
                 "Prague local block gas limit500000000; measured transactions may be unmineable under lower network transaction/block limits",
                 "observed three-sample ranges are neither a confidence interval nor a recommended transaction gas limit",
@@ -665,6 +682,15 @@ try {
                 review = prepared.preview();
             const { ready, call, receipt, proof, timings } = await complete(prepared, true);
             if (!proof) throw Error("Credit proof required");
+            if (broadcasterFee > 0n) {
+                if (
+                    (await contract.broadcasterFeeBalance(tokenAddress, feeRecipient)) !==
+                    broadcasterFee
+                )
+                    throw Error("Fee accrual mismatch");
+                if ((await token.balanceOf(feeRecipient)) !== 0n)
+                    throw Error("Fee transferred immediately");
+            }
             const released = credit.entries.find((e) => e.name === proof.circuitName);
             if (
                 !released ||

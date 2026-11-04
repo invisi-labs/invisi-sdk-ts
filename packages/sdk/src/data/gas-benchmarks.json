@@ -1695,5 +1695,456 @@
         ]
       }
     ]
+  },
+  {
+    "formatVersion": 1,
+    "id": "protocol-ac366e6-d7a0ed77df90-prague-credit-real-accrued-fees",
+    "deployment": {
+      "chainId": "31337",
+      "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+      "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+      "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+    },
+    "source": {
+      "protocolCommit": "ac366e6596eeb3a6338f08924d08c98acd0db437",
+      "measuredAt": "2026-11-04T10:44:40.232Z",
+      "chain": "Anvil 31337",
+      "hardfork": "prague",
+      "token": "MockERC20",
+      "verifier": "real",
+      "fingerprints": {
+        "protocolSourceSha256": "d7a0ed77df905273543df1e09392800fab4fddb0b4b517f58b288344c8854828",
+        "dirtyDiffSha256": "55822a53e4bba74c77c372b2d1203c377207f9d873960328b0b3323ae6e3a6c8",
+        "compiledArtifactsSha256": "ec39a548a0114a159e9a2799b7860840f4c9cf93ab6d8dc216ea453e44c4df12",
+        "creditManifestSha256": "b52596e3925972f8ff17ddc0fcf58b721893e79b2dec1415ae2dfad9458f82c8",
+        "userManifestSha256": "2ed48e93112440896326ef18122271ab3bff5981922ec4225f445f75f819618f",
+        "sdkSourceSha256": "0c2e1641763d5b29edb592736c83f7a479b9ec63a318e9d92158360675d797b7"
+      },
+      "toolchain": {
+        "solidity": "0.8.38",
+        "barretenberg": "6.0.0",
+        "noir": "1.0.0-rc.6",
+        "evmVersion": "prague",
+        "optimizerRuns": 200,
+        "anvil": "anvil Version: 1.8.6"
+      },
+      "blockGasLimit": "500000000",
+      "runtimeContracts": {
+        "transact_user_slots14_direct_Verifier": {
+          "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+          "runtimeCodeHash": "0x1d684630e72115dd364e1e153a5753a7d1c61b1dd5be234c464140af2e02ccc0"
+        },
+        "transact_user_slots14-adapter": {
+          "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+          "runtimeCodeHash": "0x876f0e43fc1d24475c0c63ee8c7907427d534b0c604f5985aacd28ee2c6d1b12"
+        },
+        "transact_user_slots56_direct_Verifier": {
+          "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+          "runtimeCodeHash": "0x8b2e89e383b416cc34f62f1ced38e6c997c155ef2ac87c83120a40728bea38d6"
+        },
+        "transact_user_slots56-adapter": {
+          "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+          "runtimeCodeHash": "0x945680c4278b61c07bf07fa7637908e9a38ccd414c9330bf23b3c41119ea0de6"
+        },
+        "transact_user_slots112_direct_Verifier": {
+          "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+          "runtimeCodeHash": "0x88fec07b034ce890865fbc2ca0add383d98dd3d9ff7fbee05bd715939b20f5d9"
+        },
+        "transact_user_slots112-adapter": {
+          "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+          "runtimeCodeHash": "0xac129aa749b7ece8c51ed68f4f0afcc82a1cbd7b2a01f5ff7ff7de1dcde21b1e"
+        },
+        "transact_user_slots168_direct_Verifier": {
+          "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+          "runtimeCodeHash": "0xc200120a53fd2df80c9720e589b1a0a30881d226e027258c420fcf12be455f94"
+        },
+        "transact_user_slots168-adapter": {
+          "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+          "runtimeCodeHash": "0x24b5ea6f436b90b3821bd0ea4872fb205c996fd74f1546bc1086d98b7ec5d87d"
+        },
+        "transact_aggregate_14_4_Verifier": {
+          "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+          "runtimeCodeHash": "0xae41039ded63fa7777c99a2552ba603a3a4d9703d464079dff787dab6893ef24"
+        },
+        "transact_aggregate_14_4-adapter": {
+          "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+          "runtimeCodeHash": "0xd9fa7d3cb2f9da9e582ec05ec230d1a1e82d2ca79be4c9c4a695f30af0227b0e"
+        },
+        "transact_aggregate_14_8_Verifier": {
+          "address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+          "runtimeCodeHash": "0x089f476f56fb1003586b18c0b5a75f9d24c76d4804d84ea202005371eae333de"
+        },
+        "transact_aggregate_14_8-adapter": {
+          "address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+          "runtimeCodeHash": "0x4244317ef4118a3be31336d0253002cb26b2aef30b756656756191863a5f24ff"
+        },
+        "transact_aggregate_14_12_Verifier": {
+          "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+          "runtimeCodeHash": "0xe0cba79e66fdb75dbc082ef0f938b07e4d38acce283b87869fe414083b3e08b0"
+        },
+        "transact_aggregate_14_12-adapter": {
+          "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+          "runtimeCodeHash": "0xeb5203ae5b7d1c93e41d03cdf5b37f3b5bef6d9f9d99beb5f70a5ad6169401aa"
+        },
+        "create_credit_direct_Verifier": {
+          "address": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+          "runtimeCodeHash": "0xbc88c374cc3c0c1e2cdf8663cee4c960f3a3ba4b210e2c520ca111e56461b23a"
+        },
+        "create_credit-adapter": {
+          "address": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+          "runtimeCodeHash": "0xfd39446d56c189fbb35c0906e525433b6b9c63444c97b13990b7dd6f19bd38fc"
+        },
+        "credit_draw_slots1_direct_Verifier": {
+          "address": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
+          "runtimeCodeHash": "0x47be80e72c3a22ea044638f6004de8c3a0264d5a0d17189c01153cdabfd7bab6"
+        },
+        "credit_draw_slots1-adapter": {
+          "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+          "runtimeCodeHash": "0x73a2af387b45cecf383b90f4cebb54b263f621a5038da947944c54f1089ba288"
+        },
+        "credit_draw_slots12_direct_Verifier": {
+          "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+          "runtimeCodeHash": "0x244d9ba22f5c736c2a5c42c466701e2a8ba7ae8108665133541026ea45d56e04"
+        },
+        "credit_draw_slots12-adapter": {
+          "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+          "runtimeCodeHash": "0x63c200eae61218b865f3c8b418bf0887da7a70ebf41f55825e4750c36a1d1914"
+        },
+        "credit_draw_slots50_direct_Verifier": {
+          "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+          "runtimeCodeHash": "0x2ad5eb64bcfae34ef04111dd8f9c1ffc5fc8aa6c1ad3a65d8da78233f3390660"
+        },
+        "credit_draw_slots50-adapter": {
+          "address": "0x59b670e9fA9D0A427751Af201D676719a970857b",
+          "runtimeCodeHash": "0x1716df69f1eb1c1db485bc3ba4a4ed5a1009275c9058a9e96b28ab3431a6c006"
+        },
+        "credit_draw_slots120_direct_Verifier": {
+          "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
+          "runtimeCodeHash": "0x523b6d211618bbd33d708f8198b9f3daafc10e2fa7a6a857db5795ed748a24e4"
+        },
+        "credit_draw_slots120-adapter": {
+          "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44",
+          "runtimeCodeHash": "0x32d875eb4f4c27252fa958971b66e1fdff8c02adb007fea2bf31eee4b851a132"
+        },
+        "credit_cancel_direct_Verifier": {
+          "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+          "runtimeCodeHash": "0x4058133b7ecd31fe06749bfa3107ad0fbcdc9bf72d3b9cbf4dbd2b2f65be6d35"
+        },
+        "credit_cancel-adapter": {
+          "address": "0x4A679253410272dd5232B3Ff7cF5dbB88f295319",
+          "runtimeCodeHash": "0x0f570794fb4b7f15a791c59c760732d9f9408d1e3bea881ba7c5b76b36fb4e9b"
+        },
+        "credit_top_up_direct_Verifier": {
+          "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+          "runtimeCodeHash": "0x7ada3623c851a9cfba7863a75f4fa289d747040f1a822510eefecc53d70180cd"
+        },
+        "credit_top_up-adapter": {
+          "address": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+          "runtimeCodeHash": "0x23bba4eca8306f4bc02ead10449775a359beeed2065ea8c84da4dc6b9e4dfc82"
+        },
+        "PrivateTransferVerifierRegistry": {
+          "address": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
+          "runtimeCodeHash": "0x412c1e0271989f9c4e848cd4337814b35520019b93f851e003d6d1762e18f5bd"
+        },
+        "CrossTreeVerifierRegistry": {
+          "address": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933",
+          "runtimeCodeHash": "0xdfb093d1a1727f71b2db1a30103abacd9d5653c8683873136cb16b661cbdbc4e"
+        },
+        "DualVerifierRouter": {
+          "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
+          "runtimeCodeHash": "0x2f1d2b436a0aa177f8a5e657b2f682b0d94f3b647d29ec9c1b4f72862875b898"
+        },
+        "AtomicBatchOutputLib": {
+          "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+          "runtimeCodeHash": "0x58a53e73bd0cb591e3801d10614dbabbcc1428facae8aa0a42f39cfdcb501a7c"
+        },
+        "FundingLib": {
+          "address": "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB",
+          "runtimeCodeHash": "0x3aba26d8b594868dd55ca7366f5e10a5a0356daf78879d82bbc373f1638794dd"
+        },
+        "PrivateTransferLib": {
+          "address": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042",
+          "runtimeCodeHash": "0xa41745df251bfcc80d13b1f34fb8a1d5e1107e140d69691f747f38b04705c11e"
+        },
+        "CrossTreeTransferLib": {
+          "address": "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9",
+          "runtimeCodeHash": "0x573a9f9e8f652b9e52a294daccd425ff50c14b3722c4ee5e7f8825a4539a053a"
+        },
+        "AggregateTransferLib": {
+          "address": "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8",
+          "runtimeCodeHash": "0x41f728b91891941eb4e03dfcdffb29a6336972f6119726cd54141c43bcaf9a31"
+        },
+        "CreateCreditLib": {
+          "address": "0x851356ae760d987E095750cCeb3bC6014560891C",
+          "runtimeCodeHash": "0x2d7b05e5a44a174f8798fc1a38de33c847753a92dd54ad66ace9f9f061086da0"
+        },
+        "CreditLifecycleLib": {
+          "address": "0xf5059a5D33d5853360D16C683c16e67980206f36",
+          "runtimeCodeHash": "0x7b8e01a83f5dc0f26df00d67f12962fd0983f7bd696b2fd08c4b441c49e72952"
+        },
+        "ShieldLib": {
+          "address": "0x95401dc811bb5740090279Ba06cfA8fcF6113778",
+          "runtimeCodeHash": "0x200304f7a191de8a12c61a64fca16b2c928e46faa25509ff6035aa853fd4e5fa"
+        },
+        "InvisiFactory": {
+          "address": "0x998abeb3E57409262aE5b751f60747921B33613E",
+          "runtimeCodeHash": "0x164647c905d4f147911b87a5911a95160e0d7b24a597d9f3c6f33e8e46e1b1e4"
+        },
+        "InvisiAddressRegistry": {
+          "address": "0x70e0bA845a1A0F2DA3359C97E0285013525FFC49",
+          "runtimeCodeHash": "0x007da3f4e888366ba0eed52cd511c4a369359291387ad19ca37e89eb395fce30"
+        },
+        "InvisiProtocol": {
+          "address": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453"
+        },
+        "MockERC20": {
+          "address": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf",
+          "runtimeCodeHash": "0xf7f676b5c54f6e94f82f0de65a0117468a0d915e8a79d150e74f76bd6d7f708b"
+        }
+      },
+      "assumptions": [
+        "normal CREATE/Factory deployment and fresh registry; EIP170/EIP3860 unchanged; no code/storage injection",
+        "Solidity0.8.38 optimizer200 Prague; pinned BB6.0.0 real verifiers; every native proof independently verified",
+        "one physical source tree and 4 existing leaves shared by every sample; top-up has two authenticated source groups; no rollover or screener",
+        "funding/approvals/2 genuine Credit seeds/usage-seed draw/payout reset excluded from business gas",
+        "each round restores identical token balances, exact caller allowance107, note cursor, nullifiers and baseline; spender payout starts zero; broadcasterFee7",
+        "complete receipt.gasUsed is measured, including verifier/calldata/logging/output insertion; memo0",
+        "Prague local block gas limit500000000; measured transactions may be unmineable under lower network transaction/block limits",
+        "observed three-sample ranges are neither a confidence interval nor a recommended transaction gas limit"
+      ]
+    },
+    "measurements": [
+      {
+        "id": "create-credit-caller-0x0",
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 0,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "caller",
+          "permit": false,
+          "deliveryBytes": 1132
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        },
+        "samples": [
+          {
+            "gasUsed": "1591634",
+            "transactionHash": "0x683ae67ae3175a096fc3cfe8ee7598004cd1102bb4e44c0145367b65bddc474d",
+            "blockNumber": "53",
+            "blockHash": "0x05e3db5196926741740bd3cbcc2cbd6fb6d0ac8c36c8ed6999b5472faf4f01ef",
+            "calldataBytes": 11844
+          },
+          {
+            "gasUsed": "1591658",
+            "transactionHash": "0xc51c35f734e72f6f2bdd8acfac9f543f1d15719a86302bf81e43417dd8756902",
+            "blockNumber": "53",
+            "blockHash": "0xbf301f7600d8bc9b8e343a80f1667ea8ed361110ba150bc0e95fdc29ef1c699f",
+            "calldataBytes": 11844
+          },
+          {
+            "gasUsed": "1591694",
+            "transactionHash": "0x874c7a7a7558cbd50f63c320ba9c34eba744dc5e5fc257bc0c76b74e80e428e5",
+            "blockNumber": "53",
+            "blockHash": "0x75ff8795dc33373921df0e1cf5e2e6c64d8a87f4a48e9073cedd7a2c48add9aa",
+            "calldataBytes": 11844
+          }
+        ]
+      },
+      {
+        "id": "create-credit-1x1",
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 1,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        },
+        "samples": [
+          {
+            "gasUsed": "1631688",
+            "transactionHash": "0x7db45e04fd44519cef5315ac2cc6ee5d299755c8d557026d237862c16643294f",
+            "blockNumber": "53",
+            "blockHash": "0xf72e8ed948547f47e2b76c636e7add19088dfcf205d25050ed465a0cfdc61712",
+            "calldataBytes": 12196
+          },
+          {
+            "gasUsed": "1631904",
+            "transactionHash": "0x7f70f11c93dad516ced3e9345734597158b2559d7da2f1ef0ebfed7511982497",
+            "blockNumber": "53",
+            "blockHash": "0x528887ead64979487ee641e385108e16fb8e8ad293466e95919da74189579773",
+            "calldataBytes": 12196
+          },
+          {
+            "gasUsed": "1631712",
+            "transactionHash": "0x7697c14af393111736b373f1dc60169694b17bd7df650354519738ad85a5ee00",
+            "blockNumber": "53",
+            "blockHash": "0xbde2296facc21ff6f664814f54156a767f8ba0e735fac1f8582abf31e119367f",
+            "calldataBytes": 12196
+          }
+        ]
+      },
+      {
+        "id": "top-up-credit-1x1-unchanged-limits",
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        },
+        "samples": [
+          {
+            "gasUsed": "1672607",
+            "transactionHash": "0x5a7e10cd6ce7c5cc7e2d4f7e22d0a3505da3b584714a77533e3582ecaf99fac1",
+            "blockNumber": "53",
+            "blockHash": "0x8948e58ffbbd95e95215afb549f39ffd9d8ba2094b1b7cb34624a62d5c797d74",
+            "calldataBytes": 12356
+          },
+          {
+            "gasUsed": "1672439",
+            "transactionHash": "0xc6238280becfc596db6211b76e1107998a4c2dd4a245d770e09d279a4dd8f7f5",
+            "blockNumber": "53",
+            "blockHash": "0x71ffe0d4c015085f64ffadadabfcc7a85245d8fe379346733c78a46ce992965d",
+            "calldataBytes": 12356
+          },
+          {
+            "gasUsed": "1672607",
+            "transactionHash": "0x139571b259e10529ef59df0e58f82c39707810ff77cc7d59c839a34ff21be61f",
+            "blockNumber": "53",
+            "blockHash": "0x56273b9d5f91077c2e5c99eb70017f5c7ea472ba039dc758c709c020231d6a27",
+            "calldataBytes": 12356
+          }
+        ]
+      },
+      {
+        "id": "top-up-credit-1x1-changed-limits",
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        },
+        "samples": [
+          {
+            "gasUsed": "1672655",
+            "transactionHash": "0xce1165451522a029eef0c060d2c8556bf4956dd17a9fd9a0cb23df326c56a49f",
+            "blockNumber": "53",
+            "blockHash": "0xb63250a0cbe5572c2ede5a715b616c97b3232361fa68d2db61f0337879a7f488",
+            "calldataBytes": 12356
+          },
+          {
+            "gasUsed": "1672463",
+            "transactionHash": "0xbcc0ee702f9e5a604d5a80e0276126005ac10117aa94eac49c8cc2984ced1054",
+            "blockNumber": "53",
+            "blockHash": "0x7d23340829ee0c0277f260ade53112537e4ced76b8423c79150ced22a77e4970",
+            "calldataBytes": 12356
+          },
+          {
+            "gasUsed": "1672523",
+            "transactionHash": "0x79605206741ab8ed7796de8b243f86b0f8f9bacfbd641527e2423be9e68f574b",
+            "blockNumber": "53",
+            "blockHash": "0x6a7fb7851711c4fb639d2eca90110fe2616ff1be3362374daaffa9f3e0e8d93d",
+            "calldataBytes": 12356
+          }
+        ]
+      },
+      {
+        "id": "cancel-credit-1",
+        "shape": {
+          "kind": "cancel-credit",
+          "target": "evm",
+          "capacity": 1,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 1,
+          "creditInputs": 1,
+          "creditOutputs": 0,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 0
+        },
+        "circuit": {
+          "circuitName": "credit_cancel",
+          "target": "evm",
+          "artifactSha256": "6485609280fe5a3d44ca9f1865b29b44253b3d2cd49770d000e7bb7a3db8e65d",
+          "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
+        },
+        "samples": [
+          {
+            "gasUsed": "1013019",
+            "transactionHash": "0x7bd00637b77431eb6e2ace07a8bafca8217b2668a9cbe973a387f68f3aa1cafb",
+            "blockNumber": "53",
+            "blockHash": "0x7510455d596d4ae2e0982d74b29d387ff0a8e49c7a0444e14d98ddba49d91d3e",
+            "calldataBytes": 9604
+          },
+          {
+            "gasUsed": "1013019",
+            "transactionHash": "0x6a9814bcc82b4c9fa1f4da6e991de1ba66bda79cfbb93aedfe3ccb3f374752ea",
+            "blockNumber": "53",
+            "blockHash": "0x12c98b4b882a5c1da188bda206082e6b002d6e74cdc3d87bf4cdd08081df3333",
+            "calldataBytes": 9604
+          },
+          {
+            "gasUsed": "1012923",
+            "transactionHash": "0xce81e42ef669237068483e63bcd6895c9cfbcecead7e38b94423bf844bca0f11",
+            "blockNumber": "53",
+            "blockHash": "0x344388368c254d4c2324465b7c736cb6d331b8d4c8f359ee8ce32312264b8bed",
+            "calldataBytes": 9604
+          }
+        ]
+      }
+    ]
   }
 ]

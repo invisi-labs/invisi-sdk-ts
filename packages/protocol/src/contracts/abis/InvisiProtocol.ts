@@ -135,6 +135,30 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "function",
+    "name": "broadcasterFeeBalance",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "cancelCredit",
     "inputs": [
       {
@@ -1482,6 +1506,30 @@ export const invisiProtocolAbi = [
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "withdrawBroadcasterFees",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "BatchOutputs",
     "inputs": [
@@ -1618,6 +1666,31 @@ export const invisiProtocolAbi = [
   {
     "type": "event",
     "name": "BroadcasterFee",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BroadcasterFeeWithdrawn",
     "inputs": [
       {
         "name": "token",
@@ -2459,6 +2532,28 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AddressInsufficientBalance",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AddressScreeningFailed",
     "inputs": [
       {
@@ -2513,6 +2608,11 @@ export const invisiProtocolAbi = [
   {
     "type": "error",
     "name": "ExpiryInPast",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailedInnerCall",
     "inputs": []
   },
   {
@@ -2693,6 +2793,11 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
+    "name": "NoBroadcasterFees",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotEmergencyAdmin",
     "inputs": []
   },
@@ -2748,6 +2853,17 @@ export const invisiProtocolAbi = [
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

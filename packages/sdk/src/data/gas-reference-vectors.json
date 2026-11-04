@@ -1,6 +1,6 @@
 {
-  "tsCommit": "d9a87450991240971dd9d396f06371e95d30e405",
-  "catalogSha256": "ad9b51c6e50b4e8e7d14a008962f4ee904de6b42bf99460a563dc1e798c70e41",
+  "tsCommit": "8b8af654c7a1297bd4db3115b7a1aa2272c8fb1e",
+  "catalogSha256": "fc770eafee920ad51af6e7d5304d201f3be4cabb550bc12e8394ed305400ff14",
   "cases": [
     {
       "id": "create-credit-caller-0x0",
@@ -1969,7 +1969,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "1567320"
+      "gasUnits": "1591662"
     },
     {
       "id": "create-credit-caller-0x0-memo",
@@ -2001,7 +2001,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "1640627"
+      "gasUnits": "1665478"
     },
     {
       "id": "create-credit-caller-0x0-signature",
@@ -2033,7 +2033,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "3134688"
+      "gasUnits": "3183388"
     },
     {
       "id": "create-credit-caller-0x0-permit",
@@ -2065,7 +2065,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "3134688"
+      "gasUnits": "3183388"
     },
     {
       "id": "create-credit-1x1",
@@ -2097,7 +2097,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "1607470"
+      "gasUnits": "1631768"
     },
     {
       "id": "create-credit-1x1-memo",
@@ -2129,7 +2129,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "2212307"
+      "gasUnits": "2245817"
     },
     {
       "id": "create-credit-1x1-signature",
@@ -2161,7 +2161,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "3215108"
+      "gasUnits": "3263808"
     },
     {
       "id": "create-credit-1x1-permit",
@@ -2193,7 +2193,7 @@
           "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
         }
       },
-      "gasUnits": "3215108"
+      "gasUnits": "3263808"
     },
     {
       "id": "top-up-credit-1x1-unchanged-limits",
@@ -2225,7 +2225,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "1648261"
+      "gasUnits": "1672551"
     },
     {
       "id": "top-up-credit-1x1-unchanged-limits-memo",
@@ -2257,7 +2257,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "2268355"
+      "gasUnits": "2301898"
     },
     {
       "id": "top-up-credit-1x1-unchanged-limits-signature",
@@ -2289,7 +2289,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "3296562"
+      "gasUnits": "3345310"
     },
     {
       "id": "top-up-credit-1x1-unchanged-limits-permit",
@@ -2321,7 +2321,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "3296562"
+      "gasUnits": "3345310"
     },
     {
       "id": "top-up-credit-1x1-changed-limits",
@@ -2353,7 +2353,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "1648261"
+      "gasUnits": "1672551"
     },
     {
       "id": "top-up-credit-1x1-changed-limits-memo",
@@ -2385,7 +2385,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "2268355"
+      "gasUnits": "2301898"
     },
     {
       "id": "top-up-credit-1x1-changed-limits-signature",
@@ -2417,7 +2417,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "3296562"
+      "gasUnits": "3345310"
     },
     {
       "id": "top-up-credit-1x1-changed-limits-permit",
@@ -2449,7 +2449,7 @@
           "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
         }
       },
-      "gasUnits": "3296562"
+      "gasUnits": "3345310"
     },
     {
       "id": "cancel-credit-1",
@@ -2481,7 +2481,7 @@
           "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
         }
       },
-      "gasUnits": "988761"
+      "gasUnits": "1012987"
     },
     {
       "id": "cancel-credit-1-memo",
@@ -2513,7 +2513,7 @@
           "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
         }
       },
-      "gasUnits": "254118773"
+      "gasUnits": "260345883"
     },
     {
       "id": "cancel-credit-1-signature",
@@ -2545,7 +2545,7 @@
           "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
         }
       },
-      "gasUnits": "1977578"
+      "gasUnits": "2026038"
     },
     {
       "id": "cancel-credit-1-permit",
@@ -2577,7 +2577,647 @@
           "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
         }
       },
-      "gasUnits": "1977578"
+      "gasUnits": "2026038"
+    },
+    {
+      "id": "create-credit-caller-0x0",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 0,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "caller",
+          "permit": false,
+          "deliveryBytes": 1132
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "1591662"
+    },
+    {
+      "id": "create-credit-caller-0x0-memo",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 0,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "caller",
+          "permit": false,
+          "deliveryBytes": 1388
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "1665478"
+    },
+    {
+      "id": "create-credit-caller-0x0-signature",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 0,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "signature",
+          "permit": false,
+          "deliveryBytes": 1132
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "3183388"
+    },
+    {
+      "id": "create-credit-caller-0x0-permit",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 0,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "caller",
+          "permit": true,
+          "deliveryBytes": 1132
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "3183388"
+    },
+    {
+      "id": "create-credit-1x1",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 1,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "1631768"
+    },
+    {
+      "id": "create-credit-1x1-memo",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 1,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1872
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "2245817"
+    },
+    {
+      "id": "create-credit-1x1-signature",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 1,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "signature",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "3263808"
+    },
+    {
+      "id": "create-credit-1x1-permit",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "create-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 1,
+          "creditInputs": 0,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": true,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "create_credit",
+          "target": "evm",
+          "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
+          "vkSha256": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
+        }
+      },
+      "gasUnits": "3263808"
+    },
+    {
+      "id": "top-up-credit-1x1-unchanged-limits",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "1672551"
+    },
+    {
+      "id": "top-up-credit-1x1-unchanged-limits-memo",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1872
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "2301898"
+    },
+    {
+      "id": "top-up-credit-1x1-unchanged-limits-signature",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "signature",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "3345310"
+    },
+    {
+      "id": "top-up-credit-1x1-unchanged-limits-permit",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": true,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "3345310"
+    },
+    {
+      "id": "top-up-credit-1x1-changed-limits",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "1672551"
+    },
+    {
+      "id": "top-up-credit-1x1-changed-limits-memo",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 1872
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "2301898"
+    },
+    {
+      "id": "top-up-credit-1x1-changed-limits-signature",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "signature",
+          "permit": false,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "3345310"
+    },
+    {
+      "id": "top-up-credit-1x1-changed-limits-permit",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "top-up-credit",
+          "target": "evm",
+          "capacity": 10,
+          "noteInputs": 1,
+          "noteOutputs": 1,
+          "sourceTrees": 2,
+          "creditInputs": 1,
+          "creditOutputs": 1,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": true,
+          "deliveryBytes": 1360
+        },
+        "circuit": {
+          "circuitName": "credit_top_up",
+          "target": "evm",
+          "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
+          "vkSha256": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
+        }
+      },
+      "gasUnits": "3345310"
+    },
+    {
+      "id": "cancel-credit-1",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "cancel-credit",
+          "target": "evm",
+          "capacity": 1,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 1,
+          "creditInputs": 1,
+          "creditOutputs": 0,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 0
+        },
+        "circuit": {
+          "circuitName": "credit_cancel",
+          "target": "evm",
+          "artifactSha256": "6485609280fe5a3d44ca9f1865b29b44253b3d2cd49770d000e7bb7a3db8e65d",
+          "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
+        }
+      },
+      "gasUnits": "1012987"
+    },
+    {
+      "id": "cancel-credit-1-memo",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "cancel-credit",
+          "target": "evm",
+          "capacity": 1,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 1,
+          "creditInputs": 1,
+          "creditOutputs": 0,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": false,
+          "deliveryBytes": 256
+        },
+        "circuit": {
+          "circuitName": "credit_cancel",
+          "target": "evm",
+          "artifactSha256": "6485609280fe5a3d44ca9f1865b29b44253b3d2cd49770d000e7bb7a3db8e65d",
+          "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
+        }
+      },
+      "gasUnits": "260345883"
+    },
+    {
+      "id": "cancel-credit-1-signature",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "cancel-credit",
+          "target": "evm",
+          "capacity": 1,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 1,
+          "creditInputs": 1,
+          "creditOutputs": 0,
+          "creditRemainders": 0,
+          "funding": "signature",
+          "permit": false,
+          "deliveryBytes": 0
+        },
+        "circuit": {
+          "circuitName": "credit_cancel",
+          "target": "evm",
+          "artifactSha256": "6485609280fe5a3d44ca9f1865b29b44253b3d2cd49770d000e7bb7a3db8e65d",
+          "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
+        }
+      },
+      "gasUnits": "2026038"
+    },
+    {
+      "id": "cancel-credit-1-permit",
+      "request": {
+        "deployment": {
+          "chainId": "31337",
+          "protocolAddress": "0x6904f5559729Fb830a90C0E1B811A8241A9C3C3f",
+          "runtimeCodeHash": "0x90acf7584a3fe51d87c15987b236600570f19b45e07feb9f5ff26c1692e14453",
+          "tokenAddress": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf"
+        },
+        "shape": {
+          "kind": "cancel-credit",
+          "target": "evm",
+          "capacity": 1,
+          "noteInputs": 0,
+          "noteOutputs": 0,
+          "sourceTrees": 1,
+          "creditInputs": 1,
+          "creditOutputs": 0,
+          "creditRemainders": 0,
+          "funding": "none",
+          "permit": true,
+          "deliveryBytes": 0
+        },
+        "circuit": {
+          "circuitName": "credit_cancel",
+          "target": "evm",
+          "artifactSha256": "6485609280fe5a3d44ca9f1865b29b44253b3d2cd49770d000e7bb7a3db8e65d",
+          "vkSha256": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
+        }
+      },
+      "gasUnits": "2026038"
     }
   ]
 }
