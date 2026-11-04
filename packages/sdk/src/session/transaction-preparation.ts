@@ -27,7 +27,18 @@ import type {
 
 /** Shared preparation engine for managed sessions and explicitly supplied inputs. */
 export class TransactionPreparation<Result> {
-    constructor(readonly context: PreparationRuntime<Result>) {}
+    #intent: import("../broadcaster-preparation").PreparationIntent | undefined;
+    constructor(readonly context: PreparationRuntime<Result>) {
+        const complete = context.complete;
+        this.context = {
+            ...context,
+            complete: (plan) =>
+                complete({
+                    ...plan,
+                    ...(this.#intent ? { intent: structuredClone(this.#intent) } : {}),
+                }),
+        };
+    }
     private runtime(tokenAddress: Hex): PreparationRuntime<Result> {
         if (
             getAddress(tokenAddress) !==
@@ -40,6 +51,7 @@ export class TransactionPreparation<Result> {
         return this.context.scope;
     }
     async prepareTransfer(options: TransferPreparation): Promise<Result> {
+        this.#intent = { kind: "transfer", options: structuredClone(options) };
         if (Object.hasOwn(options, "target") || Object.hasOwn(options, "execution")) {
             throw new Error(
                 "prepareTransfer accepts no target or execution; choose execution in prove()"
@@ -162,6 +174,7 @@ export class TransactionPreparation<Result> {
     }
 
     async prepareShield(options: ShieldPreparation): Promise<Result> {
+        this.#intent = { kind: "shield", options: structuredClone(options) };
         const copied = structuredClone(options);
         const preparation = new Preparation(this.runtime(copied.tokenAddress));
         const frame = await preparation.frame(copied.deadline);
@@ -176,7 +189,7 @@ export class TransactionPreparation<Result> {
         );
         if (
             outputs.reduce((sum, output) => sum + output.note.amount, 0n) !==
-            (funding.funding.amount ?? 0n)
+            (funding.funding.amount ?? 0n) - (copied.fee?.amount ?? 0n)
         ) {
             throw new Error("shield funding must equal output total");
         }
@@ -194,6 +207,8 @@ export class TransactionPreparation<Result> {
             ...funding,
             shieldParams: {
                 token: frame.context.tokenAddress,
+                feeRecipient: copied.fee?.recipient ?? ZERO_ADDRESS,
+                feeAmount: copied.fee?.amount ?? 0n,
                 outputCommitments: outputs.map((output) => output.commitment),
                 deadline: frame.deadline,
             },
@@ -205,24 +220,28 @@ export class TransactionPreparation<Result> {
     }
 
     prepareCreateCredit(options: CreateCreditPreparation): Promise<Result> {
+        this.#intent = { kind: "create-credit", options: structuredClone(options) };
         return new CreditPreparation(this.runtime(options.tokenAddress)).create(
             structuredClone(options)
         );
     }
 
     prepareDrawCredit(options: DrawCreditPreparation): Promise<Result> {
+        this.#intent = undefined;
         return new CreditPreparation(this.runtime(options.tokenAddress)).draw(
             structuredClone(options)
         );
     }
 
     prepareTopUpCredit(options: TopUpCreditPreparation): Promise<Result> {
+        this.#intent = { kind: "top-up-credit", options: structuredClone(options) };
         return new CreditPreparation(this.runtime(options.tokenAddress)).topUp(
             structuredClone(options)
         );
     }
 
     prepareCancelCredit(options: CancelCreditPreparation): Promise<Result> {
+        this.#intent = { kind: "cancel-credit", options: structuredClone(options) };
         return new CreditPreparation(this.runtime(options.tokenAddress)).cancel(
             structuredClone(options)
         );

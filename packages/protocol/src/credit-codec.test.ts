@@ -231,7 +231,7 @@ describe("top-up incremental value requirement", () => {
                     .nullifiers
             ).toHaveLength(1);
             expect(topUpCreditPublicInputs(context, params, top.deliveries, funding)).toHaveLength(
-                50
+                52
             );
             expect(
                 new Interface(invisiProtocolAbi).parseTransaction({

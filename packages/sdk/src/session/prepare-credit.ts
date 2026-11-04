@@ -201,6 +201,7 @@ export class CreditPreparation<Result> {
             output,
             options.amount,
             options.funding,
+            options.fee,
             frame
         );
     }
@@ -210,16 +211,18 @@ export class CreditPreparation<Result> {
         output: PreparedCreditOutput,
         delta: bigint,
         fundingSource: CreateCreditPreparation["funding"],
+        fee: CreateCreditPreparation["fee"],
         frame: PreparationFrame,
         previous?: Awaited<ReturnType<CreditPreparation<Result>["input"]>>
     ): Promise<Result> {
         const funding = await this.#prepare.funding(fundingSource, frame);
         const selected = await this.#prepare.selectFunds(
-            delta - (funding.funding.amount ?? 0n),
+            delta + (fee?.amount ?? 0n) - (funding.funding.amount ?? 0n),
             frame,
             10
         );
-        const change = selected.amount + (funding.funding.amount ?? 0n) - delta;
+        const change =
+            selected.amount + (funding.funding.amount ?? 0n) - delta - (fee?.amount ?? 0n);
         plan.inputs = selected.inputs;
         Object.assign(plan, funding);
         if (change > 0n) {
@@ -238,6 +241,8 @@ export class CreditPreparation<Result> {
         }
         const creation: CreateCreditParams = {
             token: frame.context.tokenAddress,
+            feeRecipient: fee?.recipient ?? "0x0000000000000000000000000000000000000000",
+            feeAmount: fee?.amount ?? 0n,
             sources: selected.sources,
             nullifiers: selected.nullifiers,
             creditCommitment: output.commitment,
@@ -311,6 +316,7 @@ export class CreditPreparation<Result> {
             output,
             options.additionalAmount,
             options.funding,
+            options.fee,
             frame,
             previous
         );
@@ -427,7 +433,11 @@ export class CreditPreparation<Result> {
         const previous = await this.input(options.credit, "owner", frame);
         const n = previous.input.state.note;
         const plan = this.base(frame, "cancel-credit");
+        if ((options.fee?.amount ?? 0n) >= n.amount)
+            throw new Error("fee must be less than the cancellation refund");
         const params = {
+            feeRecipient: options.fee?.recipient ?? "0x0000000000000000000000000000000000000000",
+            feeAmount: options.fee?.amount ?? 0n,
             token: frame.context.tokenAddress,
             source: previous.source,
             nullifier: previous.nullifier,

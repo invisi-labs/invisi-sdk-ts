@@ -95,6 +95,7 @@ export interface TransferPreparation {
     deadline?: bigint;
 }
 export interface ShieldPreparation {
+    fee?: { recipient: Address; amount: bigint };
     tokenAddress: Address;
     outputs: readonly PaymentOutput[];
     funding: FundingSource;
@@ -109,6 +110,7 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
+    fee?: { recipient: Address; amount: bigint };
     /** Version-specific application data. Omission uses built-in v1 with no data. */
     payload?: Uint8Array;
     singleLimit?: bigint;
@@ -131,6 +133,7 @@ export interface DrawCreditPreparation {
     deadline?: bigint;
 }
 export interface TopUpCreditPreparation {
+    fee?: { recipient: Address; amount: bigint };
     /** Version-specific application data. Omission uses built-in v1 with no data. */
     payload?: Uint8Array;
     /** Omission inherits the previous limit; zero disables it without clearing usage. */
@@ -145,6 +148,7 @@ export interface TopUpCreditPreparation {
     deadline?: bigint;
 }
 export interface CancelCreditPreparation {
+    fee?: { recipient: Address; amount: bigint };
     tokenAddress: Address;
     credit: Hex;
     deadline?: bigint;
@@ -169,6 +173,7 @@ export interface CreditPlan {
     amounts?: bigint[];
 }
 export interface OperationPlan {
+    intent?: import("../broadcaster-preparation").PreparationIntent;
     version: 1;
     id: string;
     kind:
@@ -190,6 +195,7 @@ export interface OperationPlan {
 }
 export interface SavedOperation {
     plan: OperationPlan;
+    broadcasterQuote?: import("../broadcaster").SignedBroadcasterQuote;
     proof?: ProofBundle;
     call?: import("@invisi-labs/protocol").TransactionCall;
     externalized?: boolean;

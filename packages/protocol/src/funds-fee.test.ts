@@ -28,11 +28,37 @@ it("appends the same-token fee to the statement and authorization", () => {
         encodeTransactTypedData(context, { ...params, feeAmount: 11n }, []).message
     );
 });
-it("rejects invalid fee pairs and unauthenticated zero-input fees", () => {
+it("rejects invalid fee pairs and invalid funding shapes", () => {
     expect(() =>
         normalizeTransactRequest(context, { ...params, feeRecipient: address("0") }, [])
     ).toThrow(/fee/);
     expect(() =>
         normalizeTransactRequest(context, { ...params, feeAmount: 1n << 128n }, [])
     ).toThrow();
+});
+
+it("binds fees for a pure public-funded hidden-output transaction", () => {
+    const delivery = {
+        ciphertext: ("0x01" + "11".repeat(160)) as `0x${string}`,
+        clue: ("0x" + "22".repeat(64) + "18" + "33".repeat(3)) as `0x${string}`,
+    };
+    const publicOnly = {
+        ...params,
+        sources: [],
+        nullifiers: [],
+        outputCommitments: [word("1"), word("2")],
+        withdrawalAddress: address("0"),
+        withdrawalAmount: 0n,
+        feeAmount: 1n,
+    };
+    const normalized = normalizeTransactRequest(context, publicOnly, [delivery, delivery], {
+        payer: address("3"),
+        amount: 11n,
+    });
+    expect(normalized.inputCount).toBe(0);
+    expect(normalized.feeAmount).toBe(1n);
+    expect(normalized.funding.amount).toBe(11n);
+    expect(() => normalizeTransactRequest(context, publicOnly, [delivery, delivery])).toThrow(
+        /funding/
+    );
 });

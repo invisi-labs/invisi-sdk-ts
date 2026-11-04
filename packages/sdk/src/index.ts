@@ -37,7 +37,8 @@ export type {
     DisclosureExport,
     DisclosureResult,
 } from "@invisi-labs/core";
-export { Protocol, RegistrationOperation } from "@invisi-labs/protocol";
+export { RegistrationOperation } from "@invisi-labs/protocol";
+export { Protocol } from "./Protocol";
 export type {
     ChainReader,
     ProtocolDataProvider,
@@ -160,10 +161,5 @@ export type {
 } from "@invisi-labs/rpc";
 
 export * from "./broadcaster";
-export { prepareWithEstimatedFee } from "./fee-preparation";
-export type {
-    TransferFee,
-    TransferFeeEstimator,
-    FeeEstimateContext,
-    FeePreparationOptions,
-} from "./fee-preparation";
+
+export type { WithBroadcasterOptions, BroadcasterFeeSource } from "./broadcaster-preparation";

@@ -1,6 +1,6 @@
 // AUTO-GENERATED ABI identities, independent of deployment addresses.
 export const protocolAbiSha256 = {
-  "InvisiProtocol": "a82ee96b8f13644a1e97126eeca14e091f3b82102f780ff0bd059bc9e1343bf1",
+  "InvisiProtocol": "359802ada90bea85b1fe173783f532ab0828e383a8c9d4d4cbe072540ecd03b0",
   "InvisiFactory": "380b95c3ba0196c395e7b01d31819b8b674f59b1d15342aecbdf0425bf385765",
   "VerifierRouter": "6aacc1fc3b057137fe0125fe79248ace6d998f45bea51e76fedd31177c3acb90",
   "CreditVerifierRouter": "a1ef114bb1268e2590f390a9c426f8b35bb64ebb22e4f1fa571ddf476cf6cf9f",

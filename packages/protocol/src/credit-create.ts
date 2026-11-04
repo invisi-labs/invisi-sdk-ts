@@ -1,3 +1,4 @@
+import { normalizeFee } from "./fee";
 import type { Address, Hex } from "./contracts";
 import {
     AbiCoder,
@@ -33,7 +34,7 @@ import {
     type TransactionContext,
 } from "./validation";
 const creationTuple = [
-    "(address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32 creditCommitment,bytes32 changeCommitment,address owner,uint256 expiry,uint256 deadline)",
+    "(address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32 creditCommitment,bytes32 changeCommitment,address owner,uint256 expiry,uint256 deadline,address feeRecipient,uint256 feeAmount)",
 ][0]!;
 export const CREATE_CREDIT_FIELDS = [
     "token",
@@ -44,6 +45,8 @@ export const CREATE_CREDIT_FIELDS = [
     "owner",
     "expiry",
     "deadline",
+    "feeRecipient",
+    "feeAmount",
 ] as const;
 /** Public checks cannot establish ownership or conservation: those are enforced by the proof. */
 export function validateCreateCreditRequest(
@@ -76,6 +79,7 @@ export function validateCreateCreditRequest(
         throw new Error("empty inputs require positive funding");
     return {
         ...ctx,
+        ...normalizeFee(p),
         sources,
         nullifiers: ns,
         actualCount: ns.length,
@@ -121,6 +125,8 @@ export function createCreditBaseInputs(
         r.deadline,
         r.funding.amount,
         BigInt(r.funding.payer),
+        BigInt(r.feeRecipient),
+        r.feeAmount,
     ].map(word);
 }
 export function createCreditPublicInputs(
@@ -162,7 +168,7 @@ export function createCreditRequestHash(
             ].map((parameter) => ParamType.from(parameter)),
             [
                 keccak256(new TextEncoder().encode("InvisiCreateCredit")),
-                p,
+                { ...p, ...normalizeFee(p) },
                 deliveriesHash(cs),
                 r.funding.payer,
                 r.funding.amount,
@@ -218,7 +224,7 @@ export function buildCreateCreditCalldata(p: BuildCreateCreditCalldataParams) {
     return {
         data: new Interface(invisiProtocolAbi).encodeFunctionData("createCredit", [
             encodeCreditProof(p.proof),
-            p.params,
+            { ...p.params, ...normalizeFee(p.params) },
             p.deliveries,
             r.funding,
         ]) as Hex,

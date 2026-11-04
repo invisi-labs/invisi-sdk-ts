@@ -29,6 +29,25 @@ describe("explicit transactions without a wallet store", () => {
         });
         expect(prepared.preview().outputs.map((o) => o.amount)).toEqual([30n, 70n]);
         expect(prepared.preview().inputs).toBe(1);
+        const preview = prepared.preview();
+        expect(preview.inputDetails).toEqual([
+            expect.objectContaining({
+                kind: "notes",
+                commitment: inputs[0]!.commitment,
+                amount: 100n,
+                treeId: inputs[0]!.treeId,
+                leafIndex: inputs[0]!.leafIndex,
+            }),
+        ]);
+        expect(preview.funding).toMatchObject({ amount: 0n, authorization: "none" });
+        expect(preview.inputDetails[0]).not.toHaveProperty("noteSecret");
+        expect(preview.inputDetails[0]).not.toHaveProperty("nonce");
+        expect(preview.inputDetails[0]).not.toHaveProperty("path");
+        preview.inputDetails[0]!.amount = 1n;
+        preview.funding.amount = 1n;
+        expect(prepared.preview().inputDetails[0]!.amount).toBe(100n);
+        expect(prepared.preview().funding.amount).toBe(0n);
+
         expect(prepared.estimateGas().gasUnits).toBeGreaterThan(0n);
         expect(store.readSnapshot).not.toHaveBeenCalled();
         expect(store.transaction).not.toHaveBeenCalled();
@@ -966,22 +985,24 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
             });
         }
     );
-    const client = new BroadcasterClient("https://broadcaster.test", trust, transport);
-    const prepared = await h.invisi.prepareTransferWithFee(
+    const client = new BroadcasterClient(
         {
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol: h.protocol,
-            tokenAddress: h.context.tokenAddress,
-            inputs: h.inputs,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            endpoint: "https://broadcaster.test",
+            quoteSigner: trust.signer,
+            feeRecipient: trust.signer,
         },
-        async () => {
-            const fee = await client.fee(h.context.tokenAddress);
-            return { recipient: fee.feeRecipient as `0x${string}`, amount: BigInt(fee.feeAmount) };
-        },
-        { maxFeeAmount: 10n }
+        transport
     );
-    const signed = await client.quote((await prepared.exportBroadcasterIntent()).data);
+    const original = await h.invisi.prepareTransfer({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+    });
+    const prepared = await original.withBroadcaster(client, { maxFeeAmount: 10n });
+    expect(original.preview().feeAmount).toBe(0n);
+    const signed = prepared.broadcasterQuote()!;
     expect(h.prover.prove).not.toHaveBeenCalled();
     const ready = await (await externallyAuthorize(prepared)).prove();
     const status = await client.submit(
@@ -991,4 +1012,228 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
     );
     expect(status.state).toBe("submitted");
     expect(ready.preview().outputs.map((output) => output.amount)).toEqual([30n, 60n]);
+});
+
+it("adds a Shield broadcaster fee to public funding without shrinking its business outputs", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    const original = await h.invisi.prepareShield({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
+    });
+    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    expect(original.preview().fundingAmount).toBe(30n);
+    expect(quoted.preview().fundingAmount).toBe(40n);
+    expect(original.preview().funding).toMatchObject({
+        payer: h.wallet.ownerAddress,
+        amount: 30n,
+        authorization: "caller",
+    });
+    expect(quoted.preview().funding).toMatchObject({
+        payer: h.wallet.ownerAddress,
+        amount: 40n,
+        authorization: "signature",
+    });
+    expect(quoted.preview().funding).not.toHaveProperty("signature");
+
+    expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([30n]);
+    expect(quoted.preview().permissions.fundingAuthorization).toBe(true);
+    const request = await quoted.exportFundingAuthorization();
+    const signer = new EvmWallet(`0x${"01".repeat(32)}`);
+    const ready = await quoted.withFundingSignature(
+        await signer.signTypedData(request.domain, request.types, request.message)
+    );
+    const { broadcasterRequestHash } = await import("./broadcaster");
+    expect(broadcasterRequestHash((await ready.exportTransaction()).data)).toBe(
+        ready.broadcasterQuote()!.quote.requestHash
+    );
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    await expect(
+        original.withBroadcaster(quoteClient(h.context), {
+            maxFeeAmount: 10n,
+            feeSource: "private-inputs",
+        })
+    ).rejects.toThrow(/source/);
+});
+
+it("rejects excessive or unstable broadcaster fees before signing and preserves the original plan", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    const prepared = await h.invisi.prepareTransfer({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+    });
+    await expect(
+        prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 9n })
+    ).rejects.toThrow(/limit/);
+    let amount = 0n;
+    await expect(
+        prepared.withBroadcaster(
+            quoteClient(h.context, () => ++amount),
+            { maxFeeAmount: 10n, maxAttempts: 2 }
+        )
+    ).rejects.toThrow(/stabilize/);
+    expect(prepared.preview().feeAmount).toBe(0n);
+    expect(prepared.broadcasterQuote()).toBeUndefined();
+    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    await expect(
+        (await externallyAuthorize(quoted)).prove({ execution: "aggregate" })
+    ).rejects.toThrow(/direct/);
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect((await externallyAuthorize(prepared)).status).toBe("authorized");
+});
+
+it("requests an app-owned permit once after the gross funding amount stabilizes", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    const permit = {
+        deadline: 2000003600n,
+        v: 27,
+        r: `0x${"11".repeat(32)}` as `0x${string}`,
+        s: `0x${"22".repeat(32)}` as `0x${string}`,
+    };
+    const original = await h.invisi.prepareShield({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller", permit },
+    });
+    await expect(
+        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n })
+    ).rejects.toThrow(/existing permit/);
+    const fundingPermit = vi.fn(async (request: { amount: bigint }) => {
+        expect(request.amount).toBe(40n);
+        return { ...permit, deadline: 2000007200n };
+    });
+    const quoted = await original.withBroadcaster(quoteClient(h.context), {
+        maxFeeAmount: 10n,
+        fundingPermit,
+    });
+    expect(fundingPermit).toHaveBeenCalledOnce();
+    const { decodeBroadcasterIntent } = await import("./broadcaster");
+    expect(
+        decodeBroadcasterIntent((await quoted.exportBroadcasterIntent()).data).request.funding
+            .permit.deadline
+    ).toBe(2000007200n);
+});
+
+it("re-quotes from the original public funding intent without accumulating fees", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    const original = await h.invisi.prepareShield({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
+    });
+    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const replaced = await quoted.withBroadcaster(
+        quoteClient(h.context, () => 5n),
+        { maxFeeAmount: 10n }
+    );
+    expect(original.preview().fundingAmount).toBe(30n);
+    expect(quoted.preview().fundingAmount).toBe(40n);
+    expect(replaced.preview().fundingAmount).toBe(35n);
+    expect(replaced.preview().outputs.map((o) => o.amount)).toEqual([30n]);
+});
+
+it("broadcasts a zero-input funded transfer while preserving its business payment and change", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    const original = await h.invisi.prepareTransfer({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: [],
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
+    });
+    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    expect(quoted.preview().fundingAmount).toBe(110n);
+    expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([30n, 70n]);
+    expect(quoted.preview().permissions.walletAuthorization).toBe(false);
+    await expect(quoted.exportWalletAuthorization()).rejects.toThrow(/does not require/);
+    const proved = await quoted.prove();
+    const request = await proved.exportFundingAuthorization();
+    const signer = new EvmWallet(`0x${"01".repeat(32)}`);
+    const ready = await proved.withFundingSignature(
+        await signer.signTypedData(request.domain, request.types, request.message)
+    );
+    const { broadcasterRequestHash } = await import("./broadcaster");
+    expect(broadcasterRequestHash((await ready.exportTransaction()).data)).toBe(
+        ready.broadcasterQuote()!.quote.requestHash
+    );
+});
+
+it("uses existing private change before increasing mixed public funding", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    const prepared = await h.invisi.prepareTransfer({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [{ to: h.bob.getAddress(), amount: 130n }],
+        funding: { payer: h.wallet.ownerAddress, amount: 50n, authorization: "signature" },
+    });
+    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    expect(quoted.preview().fundingAmount).toBe(50n);
+    expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([130n, 10n]);
+    expect(prepared.preview().outputs.map((o) => o.amount)).toEqual([130n, 20n]);
+    const explicit = await prepared.withBroadcaster(quoteClient(h.context), {
+        maxFeeAmount: 10n,
+        feeSource: "public-funding",
+    });
+    expect(explicit.preview().fundingAmount).toBe(60n);
+});
+
+it("refreshes caller-only zero nonce and deadline when attaching a broadcaster", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    h.reader.getFundingNonce = async () => 7n;
+    const prepared = await h.invisi.prepareShield({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        funding: {
+            payer: h.wallet.ownerAddress,
+            amount: 30n,
+            authorization: "caller",
+            sigNonce: 0n,
+            deadline: 0n,
+        },
+    });
+    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const request = await quoted.exportFundingAuthorization();
+    expect(BigInt(request.message.sigNonce as string)).toBe(7n);
+    expect(BigInt(request.message.deadline as bigint)).toBeGreaterThan(0n);
+});
+
+it("stops fee iteration when rebuilt intent pays at least its recalculated fee", async () => {
+    const h = await setup();
+    const { quoteClient } = await import("./broadcaster-fixture");
+    let calls = 0;
+    const client = quoteClient(h.context, () => [10n, 20n, 10n][calls++] ?? 10n);
+    const prepared = await h.invisi.prepareTransfer({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [{ to: h.bob.getAddress(), amount: 80n }],
+    });
+    const quoted = await prepared.withBroadcaster(client, { maxFeeAmount: 20n });
+    expect(quoted.preview().feeAmount).toBe(20n);
+    expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([80n]);
+    expect(prepared.preview().feeAmount).toBe(0n);
+    expect(calls).toBe(3);
+    expect(h.prover.prove).not.toHaveBeenCalled();
 });

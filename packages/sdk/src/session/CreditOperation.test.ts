@@ -654,3 +654,93 @@ it("rejects non-byte payload overrides for Credit creation, top-up and draw", as
         ).rejects.toMatchObject({ code: "PREPARATION_FAILED" });
     }
 });
+
+it.each(["create-credit", "top-up-credit", "cancel-credit"] as const)(
+    "attaches a fee while preserving %s intent",
+    async (kind) => {
+        const h = await creditFixture();
+        const { quoteClient } = await import("../broadcaster-fixture");
+        const original =
+            kind === "create-credit"
+                ? await h.ownerSession.prepareCreateCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      spender: h.bob.getAddress(),
+                      amount: 30n,
+                      expiry: 2000003600n,
+                  })
+                : kind === "top-up-credit"
+                  ? await h.ownerSession.prepareTopUpCredit({
+                        tokenAddress: h.context.tokenAddress,
+                        credit: h.commitment,
+                        additionalAmount: 30n,
+                    })
+                  : await h.ownerSession.prepareCancelCredit({
+                        tokenAddress: h.context.tokenAddress,
+                        credit: h.commitment,
+                    });
+        const quoted = await original.withBroadcaster(quoteClient(h.context), {
+            maxFeeAmount: 10n,
+        });
+        expect(quoted.preview().feeAmount).toBe(10n);
+        if (kind === "cancel-credit") {
+            expect(original.preview().withdrawalAmount).toBe(100n);
+            expect(quoted.preview().withdrawalAmount).toBe(90n);
+        } else {
+            expect(quoted.preview().creditOutputs?.map((o) => o.amount)).toEqual(
+                original.preview().creditOutputs?.map((o) => o.amount)
+            );
+            expect(quoted.preview().outputs[0]!.amount).toBe(
+                original.preview().outputs[0]!.amount - 10n
+            );
+        }
+        const saved = (await h.store.readSnapshot(h.scope)).operations[quoted.id]!
+            .payload as SavedOperation;
+        expect(saved.broadcasterQuote).toEqual(quoted.broadcasterQuote());
+        expect(saved.proof).toBeUndefined();
+        expect(saved.plan.intent?.kind).toBe(kind);
+        const ready = await (await quoted.authorize()).prove();
+        const { broadcasterRequestHash } = await import("../broadcaster");
+        expect(broadcasterRequestHash((await ready.exportTransaction()).data)).toBe(
+            ready.broadcasterQuote()!.quote.requestHash
+        );
+    }
+);
+
+it("keeps proof-before-funding-signature dependencies for a publicly funded Credit fee", async () => {
+    const h = await creditFixture();
+    const { quoteClient } = await import("../broadcaster-fixture");
+    const original = await h.ownerSession.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        amount: 30n,
+        expiry: 2000003600n,
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
+    });
+    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    expect(quoted.preview().fundingAmount).toBe(40n);
+    expect(quoted.preview().creditOutputs?.[0]?.amount).toBe(30n);
+    await expect(quoted.exportFundingAuthorization()).rejects.toThrow();
+    const proved = await (await quoted.authorize()).prove();
+    const { Wallet } = await import("ethers");
+    const signer = new Wallet(`0x${"01".repeat(32)}`);
+    const request = await proved.exportFundingAuthorization();
+    const ready = await proved.withFundingSignature(
+        await signer.signTypedData(request.domain, request.types, request.message)
+    );
+    const { broadcasterRequestHash } = await import("../broadcaster");
+    expect(broadcasterRequestHash((await ready.exportTransaction()).data)).toBe(
+        ready.broadcasterQuote()!.quote.requestHash
+    );
+});
+
+it("excludes Credit draw from broadcaster attachment", async () => {
+    const h = await creditFixture();
+    const { quoteClient } = await import("../broadcaster-fixture");
+    const draw = await h.spenderSession.prepareDrawCredit({
+        tokenAddress: h.context.tokenAddress,
+        credits: [{ credit: h.commitment, amount: 10n }],
+    });
+    await expect(
+        draw.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n })
+    ).rejects.toThrow(/supported/);
+});

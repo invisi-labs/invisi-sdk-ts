@@ -63,10 +63,7 @@ export function assertUserStatement(values: readonly string[], capacity: number)
     check((w[at + 5] === 0n) === (w[at + 6] === 0n), "Invalid funding context");
     check(m > 0 || w[at + 3]! > 0n, "Missing transaction output");
     if (n === 0)
-        check(
-            m >= 2 && w[at + 5]! > 0n && w[at + 3] === 0n && w[at + 8] === 0n,
-            "Invalid pure funding context"
-        );
+        check(m >= 2 && w[at + 5]! > 0n && w[at + 3] === 0n, "Invalid pure funding context");
     const digest = BigInt(
         computeWalletAuthorizationDigest({
             context: { chainId: w[0]!, protocolAddress: w[1]! },

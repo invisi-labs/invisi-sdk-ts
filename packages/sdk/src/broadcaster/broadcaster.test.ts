@@ -39,27 +39,48 @@ function calldata(proof = "0x1234", signature = "0x") {
 }
 describe("broadcaster final intents", () => {
     it("rejects mismatched JSON-RPC ids and preserves RPC error codes", async () => {
-        const wrong = new BroadcasterClient("https://example.org", trust, async () => ({
-            jsonrpc: "2.0",
-            id: 999,
-            result: {},
-        }));
+        const wrong = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: trust.signer,
+                feeRecipient: trust.signer,
+            },
+            async () => ({
+                jsonrpc: "2.0",
+                id: 999,
+                result: {},
+            })
+        );
         await expect(wrong.fee(signer.address)).rejects.toThrow("JSON-RPC response");
-        const failed = new BroadcasterClient("https://example.org", trust, async (request) => ({
-            jsonrpc: "2.0",
-            id: request.id,
-            error: { code: -32001, message: "Unknown request" },
-        }));
+        const failed = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: trust.signer,
+                feeRecipient: trust.signer,
+            },
+            async (request) => ({
+                jsonrpc: "2.0",
+                id: request.id,
+                error: { code: -32001, message: "Unknown request" },
+            })
+        );
         await expect(failed.status("unknown")).rejects.toMatchObject({
             code: -32001,
             message: "Unknown request",
         });
-        const mixed = new BroadcasterClient("https://example.org", trust, async (request) => ({
-            jsonrpc: "2.0",
-            id: request.id,
-            result: {},
-            error: { code: -32000, message: "Rejected" },
-        }));
+        const mixed = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: trust.signer,
+                feeRecipient: trust.signer,
+            },
+            async (request) => ({
+                jsonrpc: "2.0",
+                id: request.id,
+                result: {},
+                error: { code: -32000, message: "Rejected" },
+            })
+        );
         await expect(mixed.fee(signer.address)).rejects.toThrow("JSON-RPC response");
     });
     it("allows an expired signed quote to recover an exact submission's durable status", async () => {
@@ -81,12 +102,22 @@ describe("broadcaster final intents", () => {
             ),
         };
         const id = "request_expired_retry_001";
-        const client = new BroadcasterClient("https://example.org", trust, async (request) => ({
-            jsonrpc: "2.0",
-            id: request.id,
-            result: { id, state: "uncertain" },
-        }));
-        await expect(client.submit(data, signed, id)).resolves.toEqual({ id, state: "uncertain" });
+        const client = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: trust.signer,
+                feeRecipient: trust.signer,
+            },
+            async (request) => ({
+                jsonrpc: "2.0",
+                id: request.id,
+                result: { id, state: "uncertain" },
+            })
+        );
+        await expect(client.submit(data, { ...signed, context: trust }, id)).resolves.toEqual({
+            id,
+            state: "uncertain",
+        });
         expect(() => verifyBroadcasterQuote(signed, trust, data)).toThrow();
     });
     it("hashes actual ABI calldata independently of proof and funding signature", () => {
@@ -120,9 +151,23 @@ describe("broadcaster final intents", () => {
         ).toThrow();
     });
     it("requires HTTPS and verifies quote transport responses", async () => {
-        expect(() => new BroadcasterClient("http://example.org", trust)).toThrow("HTTPS");
-        const client = new BroadcasterClient("https://example.org", trust, async () => ({}));
-        await expect(client.quote(calldata())).rejects.toThrow();
+        expect(
+            () =>
+                new BroadcasterClient({
+                    endpoint: "http://example.org",
+                    quoteSigner: trust.signer,
+                    feeRecipient: trust.signer,
+                })
+        ).toThrow("HTTPS");
+        const client = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: trust.signer,
+                feeRecipient: trust.signer,
+            },
+            async () => ({})
+        );
+        await expect(client.quote(calldata(), trust)).rejects.toThrow();
     });
     it("preserves registered endpoint paths and refuses redirects", async () => {
         const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -135,7 +180,11 @@ describe("broadcaster final intents", () => {
             )
         );
         try {
-            const client = new BroadcasterClient("https://example.org/api/broadcaster", trust);
+            const client = new BroadcasterClient({
+                endpoint: "https://example.org/api/broadcaster",
+                quoteSigner: trust.signer,
+                feeRecipient: trust.signer,
+            });
             await client.fee(signer.address);
             expect(String(fetcher.mock.calls[0]?.[0])).toBe("https://example.org/api/broadcaster");
             expect(JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string)).toEqual({
@@ -150,3 +199,83 @@ describe("broadcaster final intents", () => {
         }
     });
 });
+
+it.each(["shield", "createCredit", "topUpCredit", "cancelCredit"])(
+    "binds %s intent and omits only proof and funding signature",
+    (method) => {
+        const zero = ZeroHash;
+        const token = "0x" + "33".repeat(20);
+        const source = { treeId: 1n, merkleRoot: zero };
+        const fee = { feeRecipient: signer.address, feeAmount: 2n };
+        const creation = {
+            token,
+            sources: [source],
+            nullifiers: ["0x" + "44".repeat(32)],
+            creditCommitment: zero,
+            changeCommitment: zero,
+            owner: signer.address,
+            expiry: 9999999999n,
+            deadline: 9999999999n,
+            ...fee,
+        };
+        const build = (proof: string, signature: string, feeAmount = 2n) => {
+            const funding = {
+                payer: signer.address,
+                amount: 102n,
+                sigNonce: 1n,
+                deadline: 9999999999n,
+                signature,
+                permit: { deadline: 0n, v: 0, r: zero, s: zero },
+            };
+            const params = { ...creation, feeAmount };
+            const args =
+                method === "shield"
+                    ? [
+                          {
+                              token,
+                              outputCommitments: [zero],
+                              deadline: 9999999999n,
+                              ...fee,
+                              feeAmount,
+                          },
+                          [{ identity: zero, amount: 100n }],
+                          [],
+                          funding,
+                      ]
+                    : method === "createCredit"
+                      ? [proof, params, [], funding]
+                      : method === "topUpCredit"
+                        ? [
+                              proof,
+                              {
+                                  creation: params,
+                                  creditSource: source,
+                                  creditNullifier: zero,
+                                  previousExpiry: 9999999998n,
+                              },
+                              [],
+                              funding,
+                          ]
+                        : [
+                              proof,
+                              {
+                                  token,
+                                  source,
+                                  nullifier: zero,
+                                  owner: signer.address,
+                                  amount: 100n,
+                                  deadline: 9999999999n,
+                                  ...fee,
+                                  feeAmount,
+                              },
+                          ];
+            return broadcasterTransactInterface.encodeFunctionData(method, args);
+        };
+        expect(broadcasterRequestHash(build("0x1234", "0x11"))).toBe(
+            broadcasterRequestHash(build("0xabcd", "0x22"))
+        );
+        expect(broadcasterRequestHash(build("0x1234", "0x11"))).not.toBe(
+            broadcasterRequestHash(build("0x1234", "0x11", 3n))
+        );
+    }
+);

@@ -139,19 +139,42 @@ it("rejects empty transfers and invalid public payouts", async () => {
     ).rejects.toThrow(/nonzero/);
 });
 
-it("stabilizes a fee before persisting one operation and reserving its inputs", async () => {
+it("atomically replaces one managed reservation after a firm quote and fences the old handle", async () => {
     const h = await fixture();
-    const operation = await h.session.prepareTransferWithFee(
-        {
-            tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
-        },
-        () => ({ recipient: h.bob.ownerAddress, amount: 10n }),
-        { maxFeeAmount: 10n }
-    );
+    const { quoteClient } = await import("../broadcaster-fixture");
+    const original = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+    });
+    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    expect(original.preview().feeAmount).toBe(0n);
+    expect(quoted.id).toBe(original.id);
+    expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([30n, 60n]);
     const snapshot = await h.store.readSnapshot(h.scope);
-    expect(Object.keys(snapshot.operations)).toEqual([operation.id]);
-    expect(snapshot.reservations[h.leaf]).toBe(operation.id);
-    expect(operation.preview().outputs.map((output) => output.amount)).toEqual([30n, 60n]);
-    expect(operation.preview().feeAmount).toBe(10n);
+    expect(Object.keys(snapshot.operations)).toEqual([quoted.id]);
+    expect(snapshot.reservations[h.leaf]).toBe(quoted.id);
+    await expect(original.authorize()).rejects.toThrow(/stale/);
+});
+
+it("retains managed reservations on quote failure and commits only one competing attachment", async () => {
+    const h = await fixture();
+    const { quoteClient } = await import("../broadcaster-fixture");
+    const original = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+    });
+    const before = await h.store.readSnapshot(h.scope);
+    await expect(
+        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 9n })
+    ).rejects.toThrow(/limit/);
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+    const attempts = await Promise.allSettled([
+        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n }),
+        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n }),
+    ]);
+    expect(attempts.filter((value) => value.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((value) => value.status === "rejected")).toHaveLength(1);
+    const snapshot = await h.store.readSnapshot(h.scope);
+    expect(Object.keys(snapshot.operations)).toEqual([original.id]);
+    expect(snapshot.reservations[h.leaf]).toBe(original.id);
 });

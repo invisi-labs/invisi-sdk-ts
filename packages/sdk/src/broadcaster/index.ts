@@ -22,6 +22,7 @@ export interface BroadcasterQuote {
 export interface SignedBroadcasterQuote {
     quote: BroadcasterQuote;
     signature: string;
+    context?: { chainId: bigint; protocol: string };
 }
 export interface BroadcasterTrust {
     chainId: bigint;
@@ -36,51 +37,70 @@ export function broadcasterQuoteDomain(trust: BroadcasterTrust) {
         verifyingContract: getAddress(trust.protocol),
     };
 }
-const transactAbi = invisiProtocolAbi.filter(
+const supportedMethods = ["transact", "shield", "createCredit", "topUpCredit", "cancelCredit"];
+const intentAbi = invisiProtocolAbi.filter(
     (item) =>
-        item.type === "function" && item.name === "transact" && item.inputs[1]?.type === "tuple"
+        item.type === "function" &&
+        supportedMethods.includes(item.name) &&
+        (item.name !== "transact" || item.inputs[1]?.type === "tuple")
 );
-export const broadcasterTransactInterface = new Interface(transactAbi);
-/** Decode only canonical single-request transact calldata; aggregates are deliberately unsupported. */
+export const broadcasterTransactInterface = new Interface(intentAbi);
+/** Decode a canonical supported direct public intent. Draw, registry and aggregates are excluded. */
 export function decodeBroadcasterIntent(data: string) {
-    const fragment = broadcasterTransactInterface.getFunction("transact");
-    if (!fragment) throw new Error("transact ABI unavailable");
-    const decoded = broadcasterTransactInterface.decodeFunctionData(fragment, data);
+    const parsed = broadcasterTransactInterface.parseTransaction({ data });
+    if (!parsed || !supportedMethods.includes(parsed.name))
+        throw new Error("unsupported broadcaster method");
+    const fragment = parsed.fragment;
+    const decoded = parsed.args;
     if (
         broadcasterTransactInterface.encodeFunctionData(fragment, decoded).toLowerCase() !==
         data.toLowerCase()
     )
-        throw new Error("noncanonical transact calldata");
-    return { fragment, proof: decoded[0] as string, request: decoded[1] };
+        throw new Error("noncanonical broadcaster calldata");
+    const method = parsed.name;
+    const raw = method === "transact" ? decoded[1] : undefined;
+    const params =
+        raw?.params ??
+        (method === "shield"
+            ? decoded[0]
+            : method === "topUpCredit"
+              ? decoded[1].creation
+              : decoded[1]);
+    const funding =
+        raw?.funding ??
+        (method === "shield"
+            ? decoded[3]
+            : ["createCredit", "topUpCredit"].includes(method)
+              ? decoded[3]
+              : undefined);
+    const deliveries =
+        raw?.deliveries ??
+        (method === "shield"
+            ? decoded[2]
+            : ["createCredit", "topUpCredit"].includes(method)
+              ? decoded[2]
+              : []);
+    return {
+        fragment,
+        method,
+        args: decoded,
+        proof: method === "shield" ? "0x" : (decoded[0] as string),
+        request: { params, funding, deliveries },
+    };
 }
-/** Final intent binds every request field including permit, except the funding signature and proof. */
+/** Domain-separated final public intent: omit only proof bytes and funding.signature. */
 export function broadcasterRequestHash(data: string): string {
-    const { fragment, request } = decodeBroadcasterIntent(data);
-    const params = fragment.inputs[1]!.components![0]!;
-    const deliveries = fragment.inputs[1]!.components![1]!;
-    const funding = request.funding;
+    const { fragment, method, args } = decodeBroadcasterIntent(data);
+    const copy = (value: unknown): unknown => (Array.isArray(value) ? value.map(copy) : value);
+    const canonical = copy(args) as unknown[];
+    if (method !== "shield") canonical[0] = "0x";
+    if (method === "transact") ((canonical[1] as unknown[])[2] as unknown[])[4] = "0x";
+    else if (method !== "cancelCredit") (canonical[3] as unknown[])[4] = "0x";
+    const calldata = broadcasterTransactInterface.encodeFunctionData(fragment, canonical);
     return keccak256(
         AbiCoder.defaultAbiCoder().encode(
-            [
-                "string",
-                params,
-                deliveries,
-                "address",
-                "uint256",
-                "uint256",
-                "uint256",
-                "tuple(uint256 deadline,uint8 v,bytes32 r,bytes32 s)",
-            ],
-            [
-                "InvisiBroadcasterIntentV1",
-                request.params,
-                request.deliveries,
-                funding.payer,
-                funding.amount,
-                funding.sigNonce,
-                funding.deadline,
-                funding.permit,
-            ]
+            ["string", "string", "bytes"],
+            ["InvisiBroadcasterIntentV1", method, calldata]
         )
     );
 }
@@ -141,15 +161,29 @@ export type BroadcasterTransport = (request: {
     method: string;
     params: unknown;
 }) => Promise<unknown>;
+export interface BroadcasterConfiguration {
+    endpoint: string;
+    quoteSigner: string;
+    feeRecipient: string;
+}
 export class BroadcasterClient {
+    readonly configuration: Readonly<BroadcasterConfiguration>;
+    readonly url: string;
     readonly transport: BroadcasterTransport;
     private requestId = 0;
-    constructor(
-        readonly url: string,
-        readonly trust: BroadcasterTrust,
-        transport?: BroadcasterTransport
-    ) {
-        const base = new URL(url);
+    constructor(configuration: BroadcasterConfiguration, transport?: BroadcasterTransport) {
+        this.configuration = Object.freeze({
+            endpoint: configuration.endpoint,
+            quoteSigner: getAddress(configuration.quoteSigner),
+            feeRecipient: getAddress(configuration.feeRecipient),
+        });
+        if (
+            BigInt(this.configuration.quoteSigner) === 0n ||
+            BigInt(this.configuration.feeRecipient) === 0n
+        )
+            throw new Error("invalid broadcaster configuration");
+        this.url = configuration.endpoint;
+        const base = new URL(this.url);
         if (base.protocol !== "https:" || base.username || base.password)
             throw new Error("broadcaster requires HTTPS");
 
@@ -213,24 +247,67 @@ export class BroadcasterClient {
         }
         return response.result;
     }
-    async fee(token: string): Promise<{ feeRecipient: string; feeAmount: string; maxGas: string }> {
-        return (await this.call("broadcaster_getFee", { token: getAddress(token) })) as never;
+    async fee(
+        token: string,
+        data?: string
+    ): Promise<{ feeRecipient: string; feeAmount: string; maxGas: string }> {
+        const fee = (await this.call("broadcaster_getFee", {
+            token: getAddress(token),
+            ...(data ? { data } : {}),
+        })) as {
+            feeRecipient: string;
+            feeAmount: string;
+            maxGas: string;
+        };
+        if (
+            !fee ||
+            getAddress(fee.feeRecipient) !== this.configuration.feeRecipient ||
+            !/^\d+$/.test(fee.feeAmount) ||
+            BigInt(fee.feeAmount) <= 0n ||
+            BigInt(fee.feeAmount) >= 1n << 128n ||
+            !/^\d+$/.test(fee.maxGas) ||
+            BigInt(fee.maxGas) <= 0n
+        )
+            throw new Error("invalid broadcaster fee");
+        return fee;
     }
-    async quote(data: string): Promise<SignedBroadcasterQuote> {
+    async quote(
+        data: string,
+        context: { chainId: bigint; protocol: string }
+    ): Promise<SignedBroadcasterQuote> {
         const signed = (await this.call("broadcaster_getQuote", {
             data,
         })) as SignedBroadcasterQuote;
-        verifyBroadcasterQuote(signed, this.trust, data);
-        return signed;
+        verifyBroadcasterQuote(
+            signed,
+            { ...context, signer: this.configuration.quoteSigner },
+            data
+        );
+        if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
+            throw new Error("unregistered fee recipient");
+        return { quote: signed.quote, signature: signed.signature, context: { ...context } };
     }
     async submit(
         data: string,
         signed: SignedBroadcasterQuote,
         idempotencyKey: string
     ): Promise<BroadcasterStatus> {
-        verifyBroadcasterQuote(signed, this.trust, data, 0n);
+        if (!signed.context) throw new Error("missing verified quote context");
+        verifyBroadcasterQuote(
+            signed,
+            { ...signed.context, signer: this.configuration.quoteSigner },
+            data,
+            0n
+        );
+        if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
+            throw new Error("unregistered fee recipient");
         return checkedStatus(
-            await this.call("broadcaster_submitTransaction", { data, ...signed, idempotencyKey }),
+            await this.call("broadcaster_submitTransaction", {
+                data,
+                quote: signed.quote,
+                signature: signed.signature,
+                idempotencyKey,
+            }),
             idempotencyKey
         );
     }

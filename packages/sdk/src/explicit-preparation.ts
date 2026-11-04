@@ -73,11 +73,24 @@ export function explicitPreparation(
         reader: options.chainReader!,
         scope,
     };
+    const reprepare = (intent: import("./broadcaster-preparation").PreparationIntent) =>
+        import("./broadcaster-preparation").then(({ prepareIntent }) =>
+            prepareIntent(
+                {
+                    ...runtime,
+                    explicitInputs: true,
+                    ...(data.changeAddress ? { changeAddress: data.changeAddress } : {}),
+                    readInventory: async () => structuredClone(inventory),
+                    complete: async (plan) => plan,
+                },
+                intent
+            )
+        );
     return new TransactionPreparation<PreparedTransaction>({
         ...runtime,
         explicitInputs: true,
         ...(data.changeAddress ? { changeAddress: data.changeAddress } : {}),
         readInventory: async () => structuredClone(inventory),
-        complete: async (plan) => PreparedTransaction.prepare(runtime, plan),
+        complete: async (plan) => PreparedTransaction.prepare({ ...runtime, reprepare }, plan),
     });
 }

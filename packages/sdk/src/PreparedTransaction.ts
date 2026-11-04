@@ -30,7 +30,11 @@ function check(ok: unknown, message: string): asserts ok {
     if (!ok) throw new Error(message);
 }
 
-type Runtime = Omit<OperationRuntime, "store" | "authorization">;
+type Runtime = Omit<OperationRuntime, "store" | "authorization"> & {
+    reprepare?: (
+        intent: import("./broadcaster-preparation").PreparationIntent
+    ) => Promise<OperationPlan>;
+};
 type Lifecycle = { generation: number; busy: boolean };
 /** An immutable, local transaction handle. No wallet inventory, reservations or persistence. */
 export class PreparedTransaction {
@@ -57,6 +61,34 @@ export class PreparedTransaction {
         return new PreparedTransaction(
             runtime,
             { plan: structuredClone(plan), generation: 0 },
+            "prepared",
+            { generation: 0, busy: false }
+        );
+    }
+    broadcasterQuote() {
+        return this.#saved.broadcasterQuote
+            ? structuredClone(this.#saved.broadcasterQuote)
+            : undefined;
+    }
+    async withBroadcaster(
+        client: import("./broadcaster").BroadcasterClient,
+        options: import("./broadcaster-preparation").WithBroadcasterOptions
+    ): Promise<PreparedTransaction> {
+        this.current();
+        check(
+            this.status === "prepared" && this.#runtime.reprepare,
+            "broadcaster must attach to an unsigned prepared transaction"
+        );
+        const { prepareBroadcasterPlan } = await import("./broadcaster-preparation");
+        const selected = await prepareBroadcasterPlan(
+            this.#saved.plan,
+            this.#runtime.reprepare,
+            client,
+            options
+        );
+        return new PreparedTransaction(
+            this.#runtime,
+            { plan: selected.plan, broadcasterQuote: selected.quote, generation: 0 },
             "prepared",
             { generation: 0, busy: false }
         );
@@ -207,6 +239,10 @@ export class PreparedTransaction {
         suppliedOptions: TransactionProveOptions = {}
     ): Promise<PreparedTransaction> {
         const options = { ...("prove" in backendOrOptions ? suppliedOptions : backendOrOptions) };
+        check(
+            !this.#saved.broadcasterQuote || options.execution !== "aggregate",
+            "a broadcaster quote requires direct execution"
+        );
         const plan = this.#saved.plan;
         check(plan.kind !== "shield", "shield requires no proof");
         if (requiresAuthorization(plan)) {

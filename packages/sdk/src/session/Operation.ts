@@ -145,6 +145,71 @@ export class Operation {
         );
         return exportBroadcasterIntent(this.#saved.plan);
     }
+    broadcasterQuote() {
+        return this.#saved.broadcasterQuote
+            ? structuredClone(this.#saved.broadcasterQuote)
+            : undefined;
+    }
+    async withBroadcaster(
+        client: import("../broadcaster").BroadcasterClient,
+        options: import("../broadcaster-preparation").WithBroadcasterOptions
+    ): Promise<Operation> {
+        check(this.status === "prepared", "broadcaster must attach before signing");
+        const { prepareIntent, prepareBroadcasterPlan } =
+            await import("../broadcaster-preparation");
+        const runtime = this.#runtime;
+        const reprepare = (intent: import("../broadcaster-preparation").PreparationIntent) =>
+            prepareIntent(
+                {
+                    options: runtime.options,
+                    scope: runtime.scope,
+                    reader: runtime.reader,
+                    readInventory: async () => {
+                        const state = await runtime.store.readSnapshot(runtime.scope);
+                        for (const [key, owner] of Object.entries(state.reservations))
+                            if (owner === this.id) delete state.reservations[key];
+                        return state;
+                    },
+                    complete: async (plan) => plan,
+                },
+                intent
+            );
+        const selected = await prepareBroadcasterPlan(this.#saved.plan, reprepare, client, options);
+        const saved = await runtime.store.transaction(runtime.scope, (state) => {
+            const record = state.operations[this.id];
+            const old = record?.payload as SavedOperation;
+            check(
+                record?.status === "prepared" &&
+                    old?.generation === this.#saved.generation &&
+                    !old.claim &&
+                    !old.externalized,
+                "stale operation or active worker"
+            );
+            check(!state.invalidated, "wallet state requires canonical resync");
+            const nextPlan = { ...selected.plan, id: this.id };
+            const facts = inputFacts(nextPlan);
+            for (const fact of facts)
+                check(
+                    state[fact.kind][fact.key]?.spent === "unspent" &&
+                        (!state.reservations[fact.reservationKey] ||
+                            state.reservations[fact.reservationKey] === this.id),
+                    "input unavailable or already reserved"
+                );
+            for (const [key, owner] of Object.entries(state.reservations))
+                if (owner === this.id) delete state.reservations[key];
+            for (const fact of facts) state.reservations[fact.reservationKey] = this.id;
+            const next: SavedOperation = {
+                plan: nextPlan,
+                broadcasterQuote: selected.quote,
+                generation: old.generation + 1,
+            };
+            record.payload = next;
+            record.inputs = facts.map((fact) => fact.reservationKey);
+            record.deadline = nextPlan.deadline;
+            return structuredClone(next);
+        });
+        return new Operation(runtime, saved, "prepared");
+    }
     get id(): string {
         return this.#saved.plan.id;
     }
@@ -338,6 +403,10 @@ export class Operation {
 
     async prove(suppliedOptions: TransactionProveOptions = {}): Promise<Operation> {
         const options = { ...suppliedOptions };
+        check(
+            !this.#saved.broadcasterQuote || options.execution !== "aggregate",
+            "a broadcaster quote requires direct execution"
+        );
         const plan = this.#saved.plan;
         check(plan.kind !== "shield", "shield requires no proof");
         if (requiresAuthorization(plan)) {

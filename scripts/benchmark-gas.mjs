@@ -11,7 +11,7 @@ import {
     BenchmarkMerkleTree,
 } from "./benchmark-gas-source.mjs";
 const root = resolve(import.meta.dirname, ".."),
-    require = createRequire(join(root, "examples/package.json"));
+    require = createRequire(join(root, "packages/sdk/package.json"));
 const {
     JsonRpcProvider,
     Contract,
@@ -23,7 +23,7 @@ const {
     MaxUint256,
     Wallet: EvmWallet,
 } = require("ethers");
-const { Invisi, Protocol, Wallet } = require("@invisi-labs/sdk");
+const { Invisi, Protocol, Wallet, PublicWallet } = require("@invisi-labs/sdk");
 const { poseidonHash } = require("@invisi-labs/core");
 const { NativeProver } = require("@invisi-labs/prover/native");
 const protocolRoot = resolve(process.env.INVISI_PROTOCOL_DIR ?? join(root, "../invisi-protocol"));
@@ -330,7 +330,6 @@ try {
     };
     const invisi = new Invisi({
         provider,
-        signer,
         prover,
         protocolRpc: { getMembership: membership },
     });
@@ -353,11 +352,24 @@ try {
     async function complete(prepared, record = false) {
         const review = prepared.preview(),
             started = performance.now();
-        let ready = review.permissions.walletAuthorization ? await prepared.authorize() : prepared;
+        let ready = prepared;
+        if (review.permissions.walletAuthorization) {
+            const request = await prepared.exportWalletAuthorization();
+            const author =
+                review.kind === "draw-credit" ? new EvmWallet("0x" + "02".repeat(32)) : signer;
+            ready = await prepared.withWalletSignature(
+                await author.signTypedData(request.domain, request.types, request.message)
+            );
+        }
         const authorized = performance.now();
         ready = review.permissions.proof ? await ready.prove() : await ready.ready();
         const proved = performance.now();
-        if (review.permissions.fundingAuthorization) ready = await ready.authorizeFunding();
+        if (review.permissions.fundingAuthorization) {
+            const request = await ready.exportFundingAuthorization();
+            ready = await ready.withFundingSignature(
+                await signer.signTypedData(request.domain, request.types, request.message)
+            );
+        }
         const call = await ready.exportTransaction(),
             proof = review.permissions.proof ? ready.exportProof() : null;
         const receipt = await (
@@ -380,7 +392,7 @@ try {
         expiry = now + 365n * 86400n;
     const shield = await complete(
         await invisi.prepareShield({
-            wallet,
+            wallet: PublicWallet.fromAddress(wallet.getAddress()),
             protocol,
             tokenAddress,
             outputs: [{ to: wallet.getAddress(), amount: 1000n }],
@@ -401,7 +413,7 @@ try {
     const fresh = [];
     async function createSeed() {
         return invisi.prepareCreateCredit({
-            wallet,
+            wallet: PublicWallet.fromAddress(wallet.getAddress()),
             protocol,
             tokenAddress,
             inputs: [],
@@ -431,12 +443,24 @@ try {
             role: "owner",
         };
     }
+    const selectedSeedCases = process.env.GAS_BENCHMARK_CASES?.split(",");
+    const seedCount = selectedSeedCases
+        ? Math.max(
+              1,
+              ...selectedSeedCases.map((id) => Number(/^draw-credit-(\d+)-/.exec(id)?.[1] ?? 0))
+          ) + 1
+        : 121;
     // Prove small seed circuits in bounded batches; settlement remains sequential normal transactions.
-    for (let offset = 0; offset < 121; offset += 3) {
+    for (let offset = 0; offset < seedCount; offset += 3) {
         const batch = await Promise.all(
-            Array.from({ length: Math.min(3, 121 - offset) }, async () => {
+            Array.from({ length: Math.min(3, seedCount - offset) }, async () => {
                 const p = await createSeed();
-                return (await p.authorize()).prove();
+                const request = await p.exportWalletAuthorization();
+                return (
+                    await p.withWalletSignature(
+                        await signer.signTypedData(request.domain, request.types, request.message)
+                    )
+                ).prove();
             })
         );
         for (const ready of batch) {
@@ -450,12 +474,12 @@ try {
             fresh.push(await readCredit(receipt));
         }
         guard();
-        console.log(`Seed Credits ${fresh.length}/121`);
+        console.log(`Seed Credits ${fresh.length}/${seedCount}`);
     }
     const usageSeed = fresh.pop();
     const consumed = await complete(
         await invisi.prepareDrawCredit({
-            wallet: bob,
+            wallet: PublicWallet.fromAddress(bob.getAddress()),
             protocol,
             tokenAddress,
             creditInputs: [{ ...usageSeed, role: "spender" }],
@@ -498,7 +522,7 @@ try {
     };
     if (baseline.spenderTokenBalance !== "0") throw Error("Payout baseline must be zero");
     guard();
-    const base = { wallet, protocol, tokenAddress },
+    const base = { wallet: PublicWallet.fromAddress(wallet.getAddress()), protocol, tokenAddress },
         cases = [
             {
                 id: "create-credit-caller-0x0",
@@ -537,7 +561,7 @@ try {
                     prepare: (deadline) =>
                         invisi.prepareDrawCredit({
                             ...base,
-                            wallet: bob,
+                            wallet: PublicWallet.fromAddress(bob.getAddress()),
                             creditInputs: fresh
                                 .slice(0, count)
                                 .map((c) => ({ ...c, role: "spender" })),
@@ -618,8 +642,8 @@ try {
             assumptions: [
                 "normal CREATE/Factory deployment and fresh registry; EIP170/EIP3860 unchanged; no code/storage injection",
                 "Solidity0.8.38 optimizer200 Prague; pinned BB6.0.0 real verifiers; every native proof independently verified",
-                "one physical source tree and 123 existing leaves shared by every sample; top-up has two authenticated source groups; no rollover or screener",
-                "funding/approvals/121 genuine Credit seeds/usage-seed draw/payout reset excluded from business gas",
+                `one physical source tree and ${seedCount + 2} existing leaves shared by every sample; top-up has two authenticated source groups; no rollover or screener`,
+                `funding/approvals/${seedCount} genuine Credit seeds/usage-seed draw/payout reset excluded from business gas`,
                 "each round restores identical token balances, exact caller allowance100, note cursor, nullifiers and baseline; spender payout starts zero",
                 "complete receipt.gasUsed is measured, including verifier/calldata/logging/output insertion; memo0",
                 "Prague local block gas limit500000000; measured transactions may be unmineable under lower network transaction/block limits",

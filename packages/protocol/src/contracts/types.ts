@@ -32,6 +32,8 @@ export interface ShieldParams {
     token: Address;
     outputCommitments: readonly Hex[];
     deadline: bigint;
+    feeRecipient?: Address;
+    feeAmount?: bigint;
 }
 export interface ShieldOutput {
     identity: Hex;
@@ -66,6 +68,8 @@ export interface CreateCreditParams {
     owner: Address;
     expiry: bigint;
     deadline: bigint;
+    feeRecipient?: Address;
+    feeAmount?: bigint;
 }
 export interface CreditDrawParams {
     token: Address;
@@ -85,6 +89,8 @@ export interface CancelCreditParams {
     owner: Address;
     amount: bigint;
     deadline: bigint;
+    feeRecipient?: Address;
+    feeAmount?: bigint;
 }
 export interface TopUpCreditParams {
     creation: CreateCreditParams;

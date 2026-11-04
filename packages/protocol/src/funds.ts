@@ -1,3 +1,4 @@
+import { normalizeFee } from "./fee";
 import type { Address, Hex } from "./contracts";
 import { AbiCoder, getAddress, Interface, keccak256, ParamType, TypedDataEncoder } from "ethers";
 
@@ -81,7 +82,6 @@ export function normalizeTransactRequest(
         p.feeRecipient ?? "0x0000000000000000000000000000000000000000"
     ) as Hex;
     if ((feeAmount === 0n) !== (BigInt(feeRecipient) === 0n)) throw new Error("invalid fee");
-    if (ns.length === 0 && feeAmount !== 0n) throw new Error("zero-input fee is not authorized");
     if (
         (withdrawalAmount === 0n) !== (BigInt(withdrawalAddress) === 0n) ||
         (os.length === 0 && withdrawalAmount === 0n)
@@ -314,7 +314,7 @@ export async function validateShieldRequest(p: BuildShieldCalldataParams) {
     normalizeContext(p.context);
     if ((getAddress(p.params.token) as Hex) !== (getAddress(p.context.tokenAddress) as Hex))
         throw new Error("request token mismatch");
-    known(p.params, ["token", "outputCommitments", "deadline"]);
+    known(p.params, ["token", "outputCommitments", "deadline", "feeRecipient", "feeAmount"]);
     checkDeadline(p.context, p.params.deadline);
     const outputs = dense(p.outputs, "outputs"),
         commitments = notes(p.params.outputCommitments, "outputCommitments"),
@@ -345,7 +345,8 @@ export async function validateShieldRequest(p: BuildShieldCalldataParams) {
             throw new Error("output commitment mismatch");
         total += o.amount;
     }
-    if (total !== f.amount) throw new Error("funding must equal output total");
+    if (total + normalizeFee(p.params).feeAmount !== f.amount)
+        throw new Error("funding must equal output total plus fee");
     return f;
 }
 export function shieldFundingRequestHash(
@@ -363,13 +364,13 @@ export function shieldFundingRequestHash(
         AbiCoder.defaultAbiCoder().encode(
             [
                 "bytes32",
-                "(address token,bytes32[] outputCommitments,uint256 deadline)",
+                "(address token,bytes32[] outputCommitments,uint256 deadline,address feeRecipient,uint256 feeAmount)",
                 "bytes32",
                 "bytes32",
             ].map((parameter) => ParamType.from(parameter)),
             [
                 keccak256(new TextEncoder().encode("InvisiShield")),
-                params,
+                { ...params, ...normalizeFee(params) },
                 outputHash,
                 deliveriesHash(cs),
             ]
@@ -396,7 +397,7 @@ export async function buildShieldCalldata(p: BuildShieldCalldataParams) {
     validateFundingSubmission(f, p.caller, p.context.now);
     return {
         data: new Interface(invisiProtocolAbi).encodeFunctionData("shield", [
-            p.params,
+            { ...p.params, ...normalizeFee(p.params) },
             p.outputs,
             p.deliveries,
             f,

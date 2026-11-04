@@ -79,6 +79,8 @@ const creation = {
         owner,
         expiry: 1000n,
         deadline: 900n,
+        feeRecipient: zeroFunding.payer,
+        feeAmount: 0n,
     },
     creditDeliveries = [creditDelivery, creditDelivery, empty];
 fixtures.create = {
@@ -103,6 +105,8 @@ const cancel = {
     owner,
     amount: 50n,
     deadline: 900n,
+    feeRecipient: zeroFunding.payer,
+    feeAmount: 0n,
 };
 fixtures.cancel = {
     params: cancel,
@@ -162,6 +166,8 @@ const output = { identity: w(3), amount: 100n },
             await n.noteCommitment(context, { walletIdentity: 1n, amount: 100n, nonce: 1n }),
         ],
         deadline: 900n,
+        feeRecipient: zeroFunding.payer,
+        feeAmount: 0n,
     };
 shieldParams.outputCommitments = [
     w(await n.poseidon2([3n, context.chainId, 3n, BigInt(context.tokenAddress), 100n])),
@@ -170,7 +176,7 @@ const shieldHash = keccak256(
     AbiCoder.defaultAbiCoder().encode(
         [
             "bytes32",
-            "tuple(address token,bytes32[] outputCommitments,uint256 deadline)",
+            "tuple(address token,bytes32[] outputCommitments,uint256 deadline,address feeRecipient,uint256 feeAmount)",
             "bytes32",
             "bytes32",
         ],

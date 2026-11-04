@@ -1,10 +1,3 @@
-import {
-    prepareWithEstimatedFee,
-    type TransferFeeEstimator,
-    type FeePreparationOptions,
-} from "../fee-preparation";
-import { estimateGasReference } from "../gas-estimation";
-import { operationPreview } from "./operation-preview";
 import { Wallet } from "@invisi-labs/core";
 import { walletHistory, type HistoryOptions } from "./history";
 import { prepareWithErrors } from "../errors";
@@ -285,39 +278,6 @@ export class WalletSession {
     async prepareTransfer(options: TransferPreparation): Promise<Operation> {
         return prepareWithErrors("prepareTransfer", async () => {
             return this.preparation(options.tokenAddress).prepareTransfer(options);
-        });
-    }
-    async prepareTransferWithFee(
-        options: Omit<TransferPreparation, "fee">,
-        estimate: TransferFeeEstimator,
-        limits: FeePreparationOptions
-    ): Promise<Operation> {
-        return prepareWithErrors("prepareTransferWithFee", async () => {
-            const request = structuredClone(options);
-            const runtime = this.runtime(request.tokenAddress);
-            // Draft iterations do not persist operations or reserve wallet inputs.
-            const draft = new TransactionPreparation({
-                options: runtime.options,
-                scope: runtime.scope,
-                reader: runtime.reader,
-                readInventory: () => runtime.store.readSnapshot(runtime.scope),
-                complete: async (plan: OperationPlan) => ({
-                    plan,
-                    preview: () => operationPreview(plan, "prepared"),
-                    estimateGas: () =>
-                        estimateGasReference(
-                            plan,
-                            runtime.options.protocol,
-                            runtime.options.gasBenchmarks
-                        ),
-                }),
-            });
-            const selected = await prepareWithEstimatedFee(
-                (fee) => draft.prepareTransfer({ ...request, ...(fee ? { fee } : {}) }),
-                estimate,
-                limits
-            );
-            return Operation.prepare(runtime, selected.plan);
         });
     }
     async prepareShield(options: ShieldPreparation): Promise<Operation> {

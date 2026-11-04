@@ -1,3 +1,4 @@
+import { normalizeFee } from "./fee";
 import type { Address, Hex } from "./contracts";
 import { AbiCoder, getAddress, Interface, keccak256, ParamType } from "ethers";
 
@@ -153,7 +154,16 @@ export function creditDrawBaseInputs(
     ].map(word);
 }
 export function validateCancelCreditRequest(c: TransactionContext, p: CancelCreditParams) {
-    known(p, ["token", "source", "nullifier", "owner", "amount", "deadline"]);
+    known(p, [
+        "token",
+        "source",
+        "nullifier",
+        "owner",
+        "amount",
+        "deadline",
+        "feeRecipient",
+        "feeAmount",
+    ]);
     if ((getAddress(p.token) as Hex) !== (getAddress(c.tokenAddress) as Hex))
         throw new Error("request token mismatch");
     const ctx = normalizeContext(c),
@@ -162,8 +172,11 @@ export function validateCancelCreditRequest(c: TransactionContext, p: CancelCred
         owner = getAddress(p.owner) as Hex,
         amount = uint(p.amount, 126, "amount");
     if (BigInt(owner) === 0n || amount === 0n) throw new Error("owner and amount must be positive");
+    const fee = normalizeFee(p);
+    if (fee.feeAmount >= amount) throw new Error("fee must leave a positive owner refund");
     return {
         ...ctx,
+        ...fee,
         source,
         nullifier,
         owner,
@@ -183,6 +196,8 @@ export function cancelCreditBaseInputs(c: TransactionContext, p: CancelCreditPar
         BigInt(r.nullifier),
         r.amount,
         r.deadline,
+        BigInt(r.feeRecipient),
+        r.feeAmount,
     ].map(word);
 }
 export function validateTopUpCreditRequest(
@@ -219,10 +234,10 @@ export function topUpCreditBaseInputs(
     ];
 }
 const cancelTuple = [
-    "(address token,(uint256 treeId,bytes32 merkleRoot) source,bytes32 nullifier,address owner,uint256 amount,uint256 deadline)",
+    "(address token,(uint256 treeId,bytes32 merkleRoot) source,bytes32 nullifier,address owner,uint256 amount,uint256 deadline,address feeRecipient,uint256 feeAmount)",
 ][0]!;
 const topTuple = [
-    "((address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32 creditCommitment,bytes32 changeCommitment,address owner,uint256 expiry,uint256 deadline) creation,(uint256 treeId,bytes32 merkleRoot) creditSource,bytes32 creditNullifier,uint256 previousExpiry)",
+    "((address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32 creditCommitment,bytes32 changeCommitment,address owner,uint256 expiry,uint256 deadline,address feeRecipient,uint256 feeAmount) creation,(uint256 treeId,bytes32 merkleRoot) creditSource,bytes32 creditNullifier,uint256 previousExpiry)",
 ][0]!;
 const hashContext = {
     chainId: 0n,
@@ -234,7 +249,10 @@ export function cancelCreditRequestHash(p: CancelCreditParams) {
     return keccak256(
         AbiCoder.defaultAbiCoder().encode(
             [{ type: "bytes32" }, cancelTuple].map((parameter) => ParamType.from(parameter)),
-            [keccak256(new TextEncoder().encode("InvisiCancelCredit")), p]
+            [
+                keccak256(new TextEncoder().encode("InvisiCancelCredit")),
+                { ...p, ...normalizeFee(p) },
+            ]
         ) as Hex
     ) as Hex;
 }
@@ -260,7 +278,7 @@ export function topUpCreditRequestHash(
             ].map((parameter) => ParamType.from(parameter)),
             [
                 keccak256(new TextEncoder().encode("InvisiTopUpCredit")),
-                p,
+                { ...p, creation: { ...p.creation, ...normalizeFee(p.creation) } },
                 deliveriesHash(cs),
                 r.creation.funding.payer,
                 r.creation.funding.amount,
@@ -393,7 +411,7 @@ export function buildCancelCreditCalldata(p: BuildCancelCreditCalldataParams) {
     return {
         data: new Interface(invisiProtocolAbi).encodeFunctionData("cancelCredit", [
             encodeCreditProof(p.proof),
-            p.params,
+            { ...p.params, ...normalizeFee(p.params) },
         ]) as Hex,
     };
 }
@@ -411,7 +429,7 @@ export function buildTopUpCreditCalldata(p: BuildTopUpCreditCalldataParams) {
     return {
         data: new Interface(invisiProtocolAbi).encodeFunctionData("topUpCredit", [
             encodeCreditProof(p.proof),
-            p.params,
+            { ...p.params, creation: { ...p.params.creation, ...normalizeFee(p.params.creation) } },
             p.deliveries,
             r.creation.funding,
         ]) as Hex,

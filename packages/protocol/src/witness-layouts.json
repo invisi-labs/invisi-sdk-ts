@@ -1,9 +1,9 @@
 {
   "transact_user_slots14": {
-    "artifactSha256": "7da6074f0904d129badc5bd4a482e2e778473a2fd0bffd493fae43b5b5c09f31",
+    "artifactSha256": "67afd8a7b9b906097e6a3e4262cb0e180757e5ac68648c1998fad48e0d8f09d0",
     "keys": {
-      "evm": "99bd8694396a609d60f0a82b5405159120e49771fa534b343b4eefb2270ee4cd",
-      "noir-recursive": "7295406ef7278e18d5e4a0f2553ddfc840cdd25f3dda618f615fa8016e3fb589"
+      "evm": "95d42117d98b561fe700a6b169375607f515baebfb8e252932520bf0046de7cc",
+      "noir-recursive": "037c51ff1b8a13283d656ac911b0d99f4cd8fc372b0b147efbfb9fd8afb2a52f"
     },
     "publicInputCount": 59,
     "public": [
@@ -122,9 +122,9 @@
     ]
   },
   "transact_user_slots56": {
-    "artifactSha256": "c033b123100cf391af21a8a304a6b4b7d8c123cd565730920a6c0ff6e2ec5302",
+    "artifactSha256": "d65c2e856e6a3f1d7883f399db3a76db4e29b7bb446128ee38ca576932839a2b",
     "keys": {
-      "evm": "7a6541667e604a379dbc3eb3bcef77d5bcc4ec28fc117120fdcf5392803ae6da"
+      "evm": "b18cc411ba56d01c23d12ac83d15396487fe7aa9dc9a43a6a11e990d8a6e8aef"
     },
     "publicInputCount": 185,
     "public": [
@@ -243,9 +243,9 @@
     ]
   },
   "transact_user_slots112": {
-    "artifactSha256": "b21422667c9a7aa230944d088d7da660121bd941e3fd11f63d694ca924276fe3",
+    "artifactSha256": "377d5e6e1e67ea8238e4d42633251349fc17c42e56f296461e0d8afdbb3ae742",
     "keys": {
-      "evm": "05237e35b6172681b19c6c5f6ccbe0a45d5a7af7aa43ce98aec9fe8c6cd24723"
+      "evm": "bc5332db1a916906c4532dd10dfe7bb5e56edf26168d3a9d12d336798399e75b"
     },
     "publicInputCount": 353,
     "public": [
@@ -364,9 +364,9 @@
     ]
   },
   "transact_user_slots168": {
-    "artifactSha256": "67cd25bf122525f8dda1e9c31b46dc51b4636e7d0cb4db17bbda001976caa298",
+    "artifactSha256": "09c0d1c312bdb5698c3c436b36db8c6681d1e0a39c5f9b2cecf409111d78196f",
     "keys": {
-      "evm": "be0577277d44c8bb548128b04d3cf00b4c75153de3372bd9d9195a16c89812a3"
+      "evm": "5e69afe04fb55706878c537c9274f2bd2d277a5aa98686d02f50f34a7b44338a"
     },
     "publicInputCount": 521,
     "public": [
@@ -557,11 +557,11 @@
     ]
   },
   "create_credit": {
-    "artifactSha256": "3ed6cfdee4f5fd840f023580f76c208768777fea79737f2511377e5c55be0230",
+    "artifactSha256": "16a41fd585d5f925e4e93fd6a308e1ca8c90ea287778871cb0d214f0d0e223ce",
     "keys": {
-      "evm": "56f663c6053be0d158a271022d200c732597efd3a2e0be48fe94549d0b1795e0"
+      "evm": "e8d3dc1f6922dbe1a0aa6016e65664be28d7005180ee943a4b237ac5518971bb"
     },
-    "publicInputCount": 46,
+    "publicInputCount": 48,
     "public": [
       {
         "name": "chain_id",
@@ -645,6 +645,16 @@
       },
       {
         "name": "deposit_payer",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
         "count": 1,
         "array": false
       },
@@ -1206,11 +1216,11 @@
     ]
   },
   "credit_cancel": {
-    "artifactSha256": "b4459c2cf756d096e37291cf4d7cd129866b6d420b6d03c928f383b057112ccb",
+    "artifactSha256": "6485609280fe5a3d44ca9f1865b29b44253b3d2cd49770d000e7bb7a3db8e65d",
     "keys": {
-      "evm": "fc8ad196ef15f3328afcc8f01d867a3ebefd15451c2813948442fab1923b73b2"
+      "evm": "d74cf842d204cdf271c06a69482ddff11568e89630346b634d486205bec4bd9e"
     },
-    "publicInputCount": 11,
+    "publicInputCount": 13,
     "public": [
       {
         "name": "chain_id",
@@ -1258,6 +1268,16 @@
         "array": false
       },
       {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
+        "count": 1,
+        "array": false
+      },
+      {
         "name": "auth_digest_high",
         "count": 1,
         "array": false
@@ -1290,11 +1310,11 @@
     ]
   },
   "credit_top_up": {
-    "artifactSha256": "2ffebd5753ec1b0c050204d4f97498765fe61ea01a793a9b2466c2f97536345c",
+    "artifactSha256": "3004eea1c26ec8e33f8fc9ee171a3b6af250682efb607f7003ae58f8327998ab",
     "keys": {
-      "evm": "40b02a9d2e7eb7b49daaac4b7760328537b7982fd5a225cc065bb74cd5ef44b3"
+      "evm": "b7f378a871a27649c3f7fd1af554c8f87d99bcf0780b21972e910212ed4e5a0d"
     },
-    "publicInputCount": 50,
+    "publicInputCount": 52,
     "public": [
       {
         "name": "chain_id",
@@ -1378,6 +1398,16 @@
       },
       {
         "name": "deposit_payer",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
         "count": 1,
         "array": false
       },

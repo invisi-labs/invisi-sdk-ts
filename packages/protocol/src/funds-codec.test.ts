@@ -95,7 +95,7 @@ describe("current protocol executable reference vectors", () => {
                 [...f.deliveries.slice(0, 2), fixtures.transact1.deliveries[0]],
                 f.funding
             )
-        ).toHaveLength(46);
+        ).toHaveLength(48);
         expect(() =>
             createCreditPublicInputs(context, withChange, f.deliveries, f.funding)
         ).toThrow();

@@ -188,6 +188,16 @@ export const invisiProtocolAbi = [
             "name": "deadline",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -271,6 +281,16 @@ export const invisiProtocolAbi = [
           },
           {
             "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -799,6 +819,16 @@ export const invisiProtocolAbi = [
             "name": "deadline",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       },
@@ -967,6 +997,16 @@ export const invisiProtocolAbi = [
               },
               {
                 "name": "deadline",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "feeRecipient",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "feeAmount",
                 "type": "uint256",
                 "internalType": "uint256"
               }
@@ -1950,6 +1990,16 @@ export const invisiProtocolAbi = [
               },
               {
                 "name": "deadline",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "feeRecipient",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "feeAmount",
                 "type": "uint256",
                 "internalType": "uint256"
               }
