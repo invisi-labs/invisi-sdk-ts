@@ -138,3 +138,20 @@ it("rejects empty transfers and invalid public payouts", async () => {
         })
     ).rejects.toThrow(/nonzero/);
 });
+
+it("stabilizes a fee before persisting one operation and reserving its inputs", async () => {
+    const h = await fixture();
+    const operation = await h.session.prepareTransferWithFee(
+        {
+            tokenAddress: h.context.tokenAddress,
+            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        },
+        () => ({ recipient: h.bob.ownerAddress, amount: 10n }),
+        { maxFeeAmount: 10n }
+    );
+    const snapshot = await h.store.readSnapshot(h.scope);
+    expect(Object.keys(snapshot.operations)).toEqual([operation.id]);
+    expect(snapshot.reservations[h.leaf]).toBe(operation.id);
+    expect(operation.preview().outputs.map((output) => output.amount)).toEqual([30n, 60n]);
+    expect(operation.preview().feeAmount).toBe(10n);
+});

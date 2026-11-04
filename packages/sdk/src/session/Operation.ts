@@ -18,6 +18,7 @@ import { sameStatement } from "./proof-integrity";
 import { confirmOperation, reconcileOperation } from "./operation-confirmation";
 import {
     encodeOperation,
+    exportBroadcasterIntent,
     inputFacts,
     operationExpired,
     operationSources,
@@ -136,6 +137,14 @@ export class Operation {
         return result;
     }
 
+    /** Public non-sendable intent for a firm quote before wallet authorization. */
+    async exportBroadcasterIntent() {
+        check(
+            ["prepared", "authorized"].includes(this.status),
+            "quote intent requires a prepared operation"
+        );
+        return exportBroadcasterIntent(this.#saved.plan);
+    }
     get id(): string {
         return this.#saved.plan.id;
     }

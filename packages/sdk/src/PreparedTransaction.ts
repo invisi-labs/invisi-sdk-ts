@@ -19,6 +19,7 @@ import type {
 import type { OperationStatus } from "./session/state";
 import {
     encodeOperation,
+    exportBroadcasterIntent,
     publicProof,
     requiresAuthorization,
     statement,
@@ -75,6 +76,15 @@ export class PreparedTransaction {
     }
     preview() {
         return operationPreview(this.#saved.plan, this.status);
+    }
+    /** Obtain a firm quote before signing. This intent contains no private inputs or witness. */
+    async exportBroadcasterIntent() {
+        this.current();
+        check(
+            ["prepared", "authorized"].includes(this.status),
+            "quote intent requires a prepared transaction"
+        );
+        return exportBroadcasterIntent(this.#saved.plan);
     }
     private current() {
         check(

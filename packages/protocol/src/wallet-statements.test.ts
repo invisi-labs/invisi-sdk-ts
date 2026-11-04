@@ -69,7 +69,7 @@ it("binds complete Delivery bytes into the private WalletAuthorization statement
             })
         )
     );
-    expect(transactUserPublicInputs(context, params, [delivery])).toHaveLength(57);
+    expect(transactUserPublicInputs(context, params, [delivery])).toHaveLength(59);
     const hash = keccak256(
         AbiCoder.defaultAbiCoder().encode(
             ["(bytes ciphertext,bytes clue)[]"].map((parameter) => ParamType.from(parameter)),

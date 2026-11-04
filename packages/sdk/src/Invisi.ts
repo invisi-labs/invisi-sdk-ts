@@ -1,3 +1,8 @@
+import {
+    prepareWithEstimatedFee,
+    type TransferFeeEstimator,
+    type FeePreparationOptions,
+} from "./fee-preparation";
 import type { WalletSessionInfrastructure } from "./session/operation-types";
 import { prepareWithErrors } from "./errors";
 import { copyGasBenchmarks } from "./gas-estimation";
@@ -226,6 +231,22 @@ export class Invisi {
             const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareTransfer(request);
+        });
+    }
+    async prepareTransferWithFee(
+        options: Omit<ExplicitTransferPreparation, "fee">,
+        estimate: TransferFeeEstimator,
+        limits: FeePreparationOptions
+    ): Promise<PreparedTransaction> {
+        return prepareWithErrors("prepareTransferWithFee", () => {
+            const { wallet, protocol, ...input } = options;
+            const request = structuredClone(input);
+            return prepareWithEstimatedFee(
+                (fee) =>
+                    this.prepareTransfer({ ...request, wallet, protocol, ...(fee ? { fee } : {}) }),
+                estimate,
+                limits
+            );
         });
     }
     async prepareShield(options: ExplicitShieldPreparation): Promise<PreparedTransaction> {

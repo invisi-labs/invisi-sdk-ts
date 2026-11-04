@@ -38,6 +38,14 @@ function selectedProfile() {
         ...(profile.registry
             ? { registry: { ...profile.registry, fromBlock: String(profile.registry.fromBlock) } }
             : {}),
+        ...(profile.broadcasterRegistry
+            ? {
+                  broadcasterRegistry: {
+                      ...profile.broadcasterRegistry,
+                      fromBlock: String(profile.broadcasterRegistry.fromBlock),
+                  },
+              }
+            : {}),
     };
 }
 
@@ -54,6 +62,12 @@ if (mode === "--check") {
         throw new Error("Protocol runtime mismatch");
     if ((await runtimeHash(profile.registry.address)) !== profile.registry.runtimeCodeHash)
         throw new Error("Registry runtime mismatch");
+    if (
+        profile.broadcasterRegistry &&
+        (await runtimeHash(profile.broadcasterRegistry.address)) !==
+            profile.broadcasterRegistry.runtimeCodeHash
+    )
+        throw new Error("Broadcaster registry runtime mismatch");
     const { Contract } = require("ethers");
     const instance = new Contract(
         profile.protocol.address,
@@ -63,7 +77,7 @@ if (mode === "--check") {
     if (getAddress(await instance.addressRegistry()) !== getAddress(profile.registry.address))
         throw new Error("Protocol registry binding mismatch");
     console.log(
-        "Local Protocol and registry deployment profiles match the running chain (mock verifiers)."
+        "Local Protocol and configured registry deployment profiles match the running chain (mock verifiers)."
     );
     provider.destroy();
     process.exit(0);
@@ -107,21 +121,38 @@ const broadcast = JSON.parse(
 );
 if (addresses.chainId !== 31337 || getAddress(addresses.factoryOwner) !== account)
     throw new Error("Invalid local deployment record");
-const registryAddress = getAddress(addresses.registry);
-const registryTransaction = broadcast.transactions.find(
-    (tx) =>
-        tx.contractName === "InvisiAddressRegistry" &&
-        tx.contractAddress?.toLowerCase() === registryAddress.toLowerCase()
+const { contractDeployment } = await import(
+    pathToFileURL(resolve(protocolRoot, "scripts/deployment-catalog.mjs")).href
 );
-if (!registryTransaction) throw new Error("Missing registry deployment transaction");
-const registryReceipt = await provider.getTransactionReceipt(registryTransaction.hash);
-if (!registryReceipt || registryReceipt.status !== 1)
-    throw new Error("Registry deployment reverted");
-const registry = {
-    address: registryAddress,
-    runtimeCodeHash: await runtimeHash(registryAddress),
-    fromBlock: registryReceipt.blockNumber.toString(),
-};
+if (
+    broadcast.chain === undefined ||
+    BigInt(broadcast.chain) !== 31337n ||
+    broadcast.pending?.length
+)
+    throw new Error("Invalid or pending local deployment broadcast");
+async function createdContract(name, address) {
+    const expected = getAddress(address);
+    const transactions = broadcast.transactions.filter(
+        (tx) => tx.contractName === name && ["CREATE", "CREATE2"].includes(tx.transactionType)
+    );
+    if (
+        transactions.length !== 1 ||
+        transactions[0].transactionType !== "CREATE" ||
+        getAddress(transactions[0].contractAddress) !== expected
+    )
+        throw new Error(`Missing or mismatched ${name} deployment transaction`);
+    const transaction = transactions[0];
+    const receipt = await provider.getTransactionReceipt(transaction.hash);
+    if (!receipt?.contractAddress || getAddress(receipt.contractAddress) !== expected)
+        throw new Error(`${name} creation receipt mismatch`);
+    const record = await contractDeployment(provider, expected, transaction.hash);
+    return { ...record, fromBlock: String(record.fromBlock) };
+}
+const registry = await createdContract("InvisiAddressRegistry", addresses.registry);
+const broadcasterRegistry = await createdContract(
+    "BroadcasterRegistry",
+    addresses.broadcasterRegistry
+);
 const protocolAddress = getAddress(addresses.protocolAddress);
 const factoryAddress = getAddress(addresses.factory);
 const deploymentTx = broadcast.transactions.find(
@@ -131,24 +162,14 @@ const deploymentTx = broadcast.transactions.find(
         tx.function?.startsWith("deploy(")
 );
 if (!deploymentTx) throw new Error("Missing Protocol deployment transaction");
-const deploymentReceipt = await provider.getTransactionReceipt(deploymentTx.hash);
-if (!deploymentReceipt || deploymentReceipt.status !== 1)
-    throw new Error("Protocol deployment reverted");
-const fromBlock = deploymentReceipt.blockNumber;
-if (
-    (await provider.getCode(protocolAddress, fromBlock)) === "0x" ||
-    (fromBlock > 0 && (await provider.getCode(protocolAddress, fromBlock - 1)) !== "0x")
-)
-    throw new Error("Protocol deployment block does not match its creation");
+const protocol = await contractDeployment(provider, protocolAddress, deploymentTx.hash);
+if ([protocol.address, registry.address].includes(broadcasterRegistry.address))
+    throw new Error("Registry event sources must have distinct addresses");
 const deployment = {
     chainId: "31337",
-    protocol: {
-        address: protocolAddress,
-        runtimeCodeHash: await runtimeHash(protocolAddress),
-        fromBlock: fromBlock.toString(),
-    },
-
+    protocol: { ...protocol, fromBlock: String(protocol.fromBlock) },
     registry,
+    broadcasterRegistry,
 };
 if (mode === "--record") {
     const { writeDeployment } = await import(
@@ -158,6 +179,10 @@ if (mode === "--record") {
         name: "Anvil",
         protocol: { ...deployment.protocol, fromBlock: Number(deployment.protocol.fromBlock) },
         registry: { ...registry, fromBlock: Number(registry.fromBlock) },
+        broadcasterRegistry: {
+            ...broadcasterRegistry,
+            fromBlock: Number(broadcasterRegistry.fromBlock),
+        },
     });
     console.log(
         "Recorded controlled local protocol deployment. Initialize or update the Protocol RPC service configuration before using it."

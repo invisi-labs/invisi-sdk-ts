@@ -66,9 +66,15 @@ export class TransactionPreparation<Result> {
         }
         if (copied.outputs.length === 0 && withdrawalAmount === 0n)
             throw new Error("transfer requires a private output or public withdrawal");
+        const feeRecipient = copied.fee ? (getAddress(copied.fee.recipient) as Hex) : ZERO_ADDRESS;
+        const feeAmount = copied.fee?.amount ?? 0n;
+        if (copied.fee) {
+            positiveAmount(feeAmount);
+            if (BigInt(feeRecipient) === 0n) throw new Error("fee recipient must be nonzero");
+        }
         const total = copied.outputs.reduce(
             (sum, output, index) => sum + positiveOutputAmount(output, index),
-            withdrawalAmount
+            withdrawalAmount + feeAmount
         );
         const funding = await preparation.funding(copied.funding, frame);
         return this.funds(
@@ -76,6 +82,7 @@ export class TransactionPreparation<Result> {
             total,
             withdrawalAddress,
             withdrawalAmount,
+            { recipient: feeRecipient, amount: feeAmount },
             frame,
             funding,
             preparation
@@ -87,6 +94,7 @@ export class TransactionPreparation<Result> {
         total: bigint,
         withdrawalAddress: `0x${string}`,
         withdrawalAmount: bigint,
+        fee: { recipient: Hex; amount: bigint },
         frame: PreparationFrame,
         funding: Pick<OperationPlan, "funding" | "fundingMode">,
         preparation: Preparation<Result>
@@ -125,6 +133,8 @@ export class TransactionPreparation<Result> {
             withdrawalAddress,
             withdrawalAmount,
             deadline,
+            feeRecipient: fee.recipient,
+            feeAmount: fee.amount,
         };
         const deliveries = outputs.map((output) => output.delivery);
         const normalized = normalizeTransactRequest(context, params, deliveries, funding.funding);

@@ -55,6 +55,8 @@ it("encodes a single source in the canonical two-argument direct request", () =>
             withdrawalAddress: params.withdrawalAddress,
             withdrawalAmount: 0n,
             deadline: 100n,
+            feeRecipient: "0x0000000000000000000000000000000000000000",
+            feeAmount: 0n,
         },
         deliveries,
         funding: EMPTY_FUNDING,

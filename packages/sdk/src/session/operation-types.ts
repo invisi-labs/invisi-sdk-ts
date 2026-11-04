@@ -88,6 +88,8 @@ export interface TransferPreparation {
     commitments?: readonly Hex[];
     /** Public ERC20 payout. Empty private outputs are allowed when a payout is present. */
     withdrawal?: { to: Address; amount: bigint };
+    /** Immediate public fee paid from this operation's token. */
+    fee?: { recipient: Address; amount: bigint };
     outputs: readonly PaymentOutput[];
     funding?: FundingSource;
     deadline?: bigint;

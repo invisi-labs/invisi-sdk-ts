@@ -41,6 +41,15 @@ describe("deployment profiles", () => {
         ).toEqual(deployment);
     });
 
+    it("snapshots optional broadcaster registry metadata", () => {
+        const source = { ...record, broadcasterRegistry: { ...record.registry } };
+        const deployment = defineDeployment(source);
+        source.broadcasterRegistry.fromBlock = "0";
+        expect(deployment.broadcasterRegistry?.fromBlock).toBe(10n);
+        expect(Object.isFrozen(deployment.broadcasterRegistry)).toBe(true);
+        expect(() => defineDeployment({ ...record, broadcasterRegistry: null })).toThrow();
+    });
+
     it.each([
         null,
         {

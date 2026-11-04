@@ -1,8 +1,11 @@
+import { Interface } from "ethers";
+import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import type { Hex, InputSource } from "@invisi-labs/protocol/contracts";
 
 import { creditPeriods, type AuthorizedStatement, type WalletOperation } from "@invisi-labs/core";
 import {
     WitnessBuilder,
+    normalizeTransactRequest,
     buildCancelCreditCalldata,
     buildCreateCreditCalldata,
     buildCreditDrawCalldata,
@@ -35,6 +38,8 @@ export function requiresAuthorization(plan: OperationPlan): boolean {
         plan.outputs.length === 0 &&
         plan.params !== undefined &&
         plan.params.outputCommitments.length === 0 &&
+        (plan.params.feeAmount ?? 0n) === 0n &&
+        BigInt(plan.params.feeRecipient ?? 0n) === 0n &&
         (plan.funding.amount ?? 0n) === 0n &&
         plan.fundingMode === "none" &&
         BigInt(plan.params.withdrawalAddress) === BigInt(plan.scope.walletIdentity) &&
@@ -351,4 +356,40 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
             return true;
     }
     return false;
+}
+
+/** Public frozen request for quote signing. Empty proof/signature make this deliberately non-sendable. */
+export function exportBroadcasterIntent(plan: OperationPlan) {
+    if (plan.kind !== "transfer" || !plan.params || plan.statement?.target !== "evm")
+        throw new Error("broadcaster intent requires a direct transfer");
+    statement(plan);
+    const deliveries = plan.outputs.map((output) => output.delivery);
+    const normalized = normalizeTransactRequest(
+        plan.context,
+        plan.params,
+        deliveries,
+        plan.funding
+    );
+    const params = {
+        token: normalized.tokenAddress,
+        sources: normalized.sources,
+        nullifiers: normalized.nullifiers,
+        outputCommitments: normalized.outputCommitments,
+        withdrawalAddress: normalized.withdrawalAddress,
+        withdrawalAmount: normalized.withdrawalAmount,
+        deadline: normalized.deadline,
+        feeRecipient: normalized.feeRecipient,
+        feeAmount: normalized.feeAmount,
+    };
+    const abi = invisiProtocolAbi.filter(
+        (item) =>
+            item.type === "function" && item.name === "transact" && item.inputs[1]?.type === "tuple"
+    );
+    return {
+        sendable: false as const,
+        data: new Interface(abi).encodeFunctionData("transact", [
+            "0x",
+            { params, deliveries, funding: { ...normalized.funding, signature: "0x" } },
+        ]) as Hex,
+    };
 }

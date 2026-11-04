@@ -14,10 +14,10 @@ describe("current authenticated release", () => {
     it("publishes the authenticated recursive key fields and hash required by outer witnesses", async () => {
         const key = getCircuitKey("transact_user_slots14", "noir-recursive");
         expect(key.vkSha256).toBe(
-            "148957e28e6339a8ce1121851fb7a232e31f4c5b741e415733b8d627f4b62649"
+            "7295406ef7278e18d5e4a0f2553ddfc840cdd25f3dda618f615fa8016e3fb589"
         );
         expect(key.vkHash).toBe(
-            "0x204a7bd867a375fe5d4bae522876e301ab62ae51ff6b83091639ef983d4aa8b3"
+            "0x26055cfa8071845b10db4d811ddc3615d81b1badbd7f603586286ffac97f4e2a"
         );
         expect(key.vkFields).toHaveLength(115);
         expect(key.vkFields!.join("").replaceAll("0x", "")).toBe(key.vkHex.slice(2));
@@ -27,7 +27,7 @@ describe("current authenticated release", () => {
             ...key.vkFields!.map(BigInt),
             BigInt(key.vkHash!),
         ]);
-        expect(pin).toBe("0x054fe43ede9309e4196d7de8ca89fe426e12b696f263d431fc4920f7726203e4");
+        expect(pin).toBe("0x19e1b9c95c9456853c6ce9d2a7d51dd3ec7e6289b571d877cc0fcecac3f0b6e9");
         expect(pin).toBe(key.innerVkCommitment);
         for (const count of [4, 8, 12])
             expect(

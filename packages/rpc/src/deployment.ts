@@ -13,6 +13,7 @@ export interface ProtocolDeployment {
     readonly chainId: bigint;
     readonly protocol: Readonly<ContractDeployment>;
     readonly registry?: Readonly<ContractDeployment>;
+    readonly broadcasterRegistry?: Readonly<ContractDeployment>;
 }
 
 function record(value: unknown, keys: readonly string[], name: string): Record<string, unknown> {
@@ -65,12 +66,19 @@ function contract(value: unknown): Readonly<ContractDeployment> {
 
 /** Validate and snapshot an object or JSON record. This does not authenticate its source. */
 export function defineDeployment(value: unknown): Readonly<ProtocolDeployment> {
-    const input = record(value, ["chainId", "protocol", "registry"], "deployment");
+    const input = record(
+        value,
+        ["chainId", "protocol", "registry", "broadcasterRegistry"],
+        "deployment"
+    );
     const chainId = integer(input.chainId, "chainId");
     if (chainId === 0n) throw new Error("deployment chainId must be nonzero");
     return Object.freeze({
         chainId,
         protocol: contract(input.protocol),
         ...(input.registry === undefined ? {} : { registry: contract(input.registry) }),
+        ...(input.broadcasterRegistry === undefined
+            ? {}
+            : { broadcasterRegistry: contract(input.broadcasterRegistry) }),
     });
 }

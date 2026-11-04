@@ -12,6 +12,7 @@ const contracts = [
     ["VerifierRouter", "verifierRouterAbi"],
     ["CreditVerifierRouter", "creditVerifierRouterAbi"],
     ["InvisiAddressRegistry", "invisiAddressRegistryAbi"],
+    ["BroadcasterRegistry", "broadcasterRegistryAbi"],
 ];
 // Read every artifact before writing, so a missing current router cannot leave a mixed sync.
 const rows = contracts.map(([name, variable]) => {

@@ -105,6 +105,12 @@ export { ProtocolRpcError } from "@invisi-labs/rpc";
 export type { ProtocolDeployment, RegisteredReceivingAddress } from "@invisi-labs/rpc";
 export { ProtocolRpcClient } from "./ProtocolRpcClient";
 export { AddressRegistry } from "./AddressRegistry";
+export { BroadcasterRegistry } from "./BroadcasterRegistry";
+export type {
+    BroadcasterRegistryOptions,
+    BroadcasterRegistration,
+    RegisteredBroadcaster,
+} from "./BroadcasterRegistry";
 export type {
     ProtocolRpcClientOptions,
     ProtocolRpcReader,
@@ -152,3 +158,12 @@ export type {
     ProtocolTransactionUpdates,
     ProtocolCreditTransition,
 } from "@invisi-labs/rpc";
+
+export * from "./broadcaster";
+export { prepareWithEstimatedFee } from "./fee-preparation";
+export type {
+    TransferFee,
+    TransferFeeEstimator,
+    FeeEstimateContext,
+    FeePreparationOptions,
+} from "./fee-preparation";

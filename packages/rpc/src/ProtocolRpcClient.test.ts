@@ -393,6 +393,28 @@ describe("RPC deployment discovery", () => {
         await expect(client.getDeployment(31337n)).rejects.toThrow(/pins mismatch/);
         expect(loaded.registry?.runtimeCodeHash).toBe(h(7));
     });
+    it("pins broadcaster registry metadata across discovery and cloned readers", async () => {
+        let changed = false;
+        const { client, reader } = setup(
+            () => ({
+                ...wire(),
+                deployment: {
+                    ...wire().deployment,
+                    broadcasterRegistry: {
+                        ...wire().deployment.registry,
+                        runtimeCodeHash: h(changed ? 9 : 8),
+                    },
+                },
+            }),
+            { deployment: undefined }
+        );
+        const loaded = await client.getDeployment(31337n);
+        expect(loaded.broadcasterRegistry?.runtimeCodeHash).toBe(h(8));
+        const clone = client.withReader(reader);
+        changed = true;
+        await expect(client.getDeployment(31337n)).rejects.toThrow(/pins mismatch/);
+        await expect(clone.getDeployment(31337n)).rejects.toThrow(/pins mismatch/);
+    });
     it("accepts a service matching independent application pins", async () => {
         const { client } = setup(() => ({
             ...wire(),

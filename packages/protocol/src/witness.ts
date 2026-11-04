@@ -320,6 +320,7 @@ export class WitnessBuilder {
             !p.authorization &&
             n.outputCount === 0 &&
             n.depositAmount === 0n &&
+            n.feeAmount === 0n &&
             BigInt(p.params.withdrawalAddress) === BigInt(identity);
         const authority =
             identity && !unsignedSweep

@@ -47,10 +47,10 @@ describe("onchain statement binding", () => {
             "inner verification key"
         );
         const changed = [...inputs];
-        changed[56] = zero;
+        changed[58] = zero;
         expect(() => assertPublicInputs(name, changed)).toThrow("Authorization digest");
         const duplicate = [...inputs];
-        duplicate.splice(57, 57, ...aggregate.members[0]!);
+        duplicate.splice(59, 59, ...aggregate.members[0]!);
         expect(() => assertPublicInputs(name, duplicate)).toThrow("Duplicate aggregate");
     });
 

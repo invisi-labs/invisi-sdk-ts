@@ -368,3 +368,7 @@ The low-level prover retains authenticated backend `ProofTarget` values `evm` an
 `checkedThrough` is the independently persisted discovery cursor, advanced only when every page of a contiguous `refresh` range succeeds. It is not the latest block observed by operation reconciliation, and does not prove service completeness. Refresh from that cursor block again (or deployment on first use) so canonical checks can detect reorgs. Reset invalidated inventory before reconciliation. An indexer behind a chain observation may reject refresh; wait for it to catch up rather than skipping blocks.
 
 `session.subscribe(listener)` returns an unsubscribe function and reports successful local session storage commits, without private event payloads. Read history/balance on demand and handle asynchronous UI errors. The host owns cross-tab/store subscriptions and RPC refresh scheduling. The Store adapter and its encryption key remain application-owned. Local construction history survives reopening the same encrypted Store; the private key alone cannot reconstruct outgoing private details after that Store is lost. ERC20 approvals and replacement-transaction tracking remain the responsibility of the host's ethers activity layer.
+
+## Broadcaster service
+
+The optional Node service lives in the separate `../invisi-protocol-broadcaster` repository. This SDK provides the browser-safe client, quote verification and fee preparation APIs. Applications may also submit directly with ethers.

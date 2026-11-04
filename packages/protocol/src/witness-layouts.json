@@ -1,11 +1,11 @@
 {
   "transact_user_slots14": {
-    "artifactSha256": "486a749ae3944ae83a7ff2d298e7469b18737d88553a7d99c4782f22f7332996",
+    "artifactSha256": "7da6074f0904d129badc5bd4a482e2e778473a2fd0bffd493fae43b5b5c09f31",
     "keys": {
-      "evm": "7b3e65d5201246e733a1816489d80acb219a98e8606e1b81e6d48ff0c1fd537a",
-      "noir-recursive": "148957e28e6339a8ce1121851fb7a232e31f4c5b741e415733b8d627f4b62649"
+      "evm": "99bd8694396a609d60f0a82b5405159120e49771fa534b343b4eefb2270ee4cd",
+      "noir-recursive": "7295406ef7278e18d5e4a0f2553ddfc840cdd25f3dda618f615fa8016e3fb589"
     },
-    "publicInputCount": 57,
+    "publicInputCount": 59,
     "public": [
       {
         "name": "chain_id",
@@ -84,6 +84,16 @@
       },
       {
         "name": "deposit_payer",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
         "count": 1,
         "array": false
       },
@@ -112,11 +122,11 @@
     ]
   },
   "transact_user_slots56": {
-    "artifactSha256": "169db2ff23c15adb14756edf9bb99bbd343df807b3e1c7f1f510070897e653cf",
+    "artifactSha256": "c033b123100cf391af21a8a304a6b4b7d8c123cd565730920a6c0ff6e2ec5302",
     "keys": {
-      "evm": "cbf54de94bff266bf846f9722c0f3ffa1fb7a0f9f478466f193de0e9123ce7f5"
+      "evm": "7a6541667e604a379dbc3eb3bcef77d5bcc4ec28fc117120fdcf5392803ae6da"
     },
-    "publicInputCount": 183,
+    "publicInputCount": 185,
     "public": [
       {
         "name": "chain_id",
@@ -195,6 +205,16 @@
       },
       {
         "name": "deposit_payer",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
         "count": 1,
         "array": false
       },
@@ -223,11 +243,11 @@
     ]
   },
   "transact_user_slots112": {
-    "artifactSha256": "221bbbd6ff0c7d7dec74677e52484f082b3e176bb0fa47f3236064e396d73739",
+    "artifactSha256": "b21422667c9a7aa230944d088d7da660121bd941e3fd11f63d694ca924276fe3",
     "keys": {
-      "evm": "67b2d361b023f193ecdb5a9aefbe2840349ee5ce848ab4101416734f3a7e91e9"
+      "evm": "05237e35b6172681b19c6c5f6ccbe0a45d5a7af7aa43ce98aec9fe8c6cd24723"
     },
-    "publicInputCount": 351,
+    "publicInputCount": 353,
     "public": [
       {
         "name": "chain_id",
@@ -306,6 +326,16 @@
       },
       {
         "name": "deposit_payer",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
         "count": 1,
         "array": false
       },
@@ -334,11 +364,11 @@
     ]
   },
   "transact_user_slots168": {
-    "artifactSha256": "d479253eaaacc973806a84e142e2362d873bba0f150ce050d32b8d9b2947adc8",
+    "artifactSha256": "67cd25bf122525f8dda1e9c31b46dc51b4636e7d0cb4db17bbda001976caa298",
     "keys": {
-      "evm": "c50e72b0718c6393f82f5a67e248ba093d0db56ece42bbf092da93e9369c2624"
+      "evm": "be0577277d44c8bb548128b04d3cf00b4c75153de3372bd9d9195a16c89812a3"
     },
-    "publicInputCount": 519,
+    "publicInputCount": 521,
     "public": [
       {
         "name": "chain_id",
@@ -421,6 +451,16 @@
         "array": false
       },
       {
+        "name": "fee_recipient",
+        "count": 1,
+        "array": false
+      },
+      {
+        "name": "fee_amount",
+        "count": 1,
+        "array": false
+      },
+      {
         "name": "auth_digest_high",
         "count": 1,
         "array": false
@@ -445,11 +485,11 @@
     ]
   },
   "transact_aggregate_14_4": {
-    "artifactSha256": "4fe7c63fb80cba35af4c4525fbabcfb75033286e681afbdcb3fb043c03456246",
+    "artifactSha256": "4cd3f3d0dbcac9a48fec728450fd73a247321f655da02bd08db789e07b47527b",
     "keys": {
-      "evm": "664d4ff0de6b8c876ce990ea368d7a59cee411463c24dd5621d64c8949554674"
+      "evm": "6654b125cb96d5f4dd263c82cb34b0862bf63ff761fe5feab834f10283a0265d"
     },
-    "publicInputCount": 229,
+    "publicInputCount": 237,
     "public": [
       {
         "name": "statements",
@@ -469,11 +509,11 @@
     ]
   },
   "transact_aggregate_14_8": {
-    "artifactSha256": "0a266ad4bb4c6dce42b1e851fcbb34b1becae1edd6bf6af82d7b9ed7184576df",
+    "artifactSha256": "b36ff5370043782364d41dbe00443970292b0240429f241c974ae6c9b10debfe",
     "keys": {
-      "evm": "042139122d0eee8beeaa9c18397276fa5a2872218495fa16ca438fbdd80fa3e1"
+      "evm": "2ad5b8b24109edf24197e97fbad35519d7d18558df19183ca3f91c4089ce4421"
     },
-    "publicInputCount": 457,
+    "publicInputCount": 473,
     "public": [
       {
         "name": "statements",
@@ -493,11 +533,11 @@
     ]
   },
   "transact_aggregate_14_12": {
-    "artifactSha256": "738849e83eb4a78eb69cb6e20a86f6f27ba3784d04a83abd338f84de5c20d7d2",
+    "artifactSha256": "1191a92a333d826d4c4bd6a2e701a7751beb609904f8b928e3816f276d6fda67",
     "keys": {
-      "evm": "539928b264aea4d07a41e772d5d5a7b7666a6883decb985c27ca7422e7f8ea1f"
+      "evm": "a8b06d969e97f53624fae05d08aa548182ad09db24fe60159fae61d243c0cb9d"
     },
-    "publicInputCount": 685,
+    "publicInputCount": 709,
     "public": [
       {
         "name": "statements",

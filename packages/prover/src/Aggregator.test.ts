@@ -21,8 +21,8 @@ async function members() {
                     words: words.slice(0, -2),
                 })
             );
-            words[55] = digest >> 128n;
-            words[56] = digest & ((1n << 128n) - 1n);
+            words[57] = digest >> 128n;
+            words[58] = digest & ((1n << 128n) - 1n);
             const bundle = await makeProofBundle(
                     "transact_user_slots14",
                     "noir-recursive",
@@ -63,7 +63,7 @@ it("verifies every recursive member before packing the authenticated outer witne
         };
     const result = await new Aggregator({ prover: backend }).aggregate(items);
     expect(result.circuitName).toBe("transact_aggregate_14_4");
-    expect(result.publicInputs).toHaveLength(229);
+    expect(result.publicInputs).toHaveLength(237);
     expect(backend.verify).toHaveBeenCalledTimes(5);
     expect(backend.prove).toHaveBeenCalledOnce();
     expect(JSON.stringify(new Aggregator({ prover: backend }))).not.toContain("proof");

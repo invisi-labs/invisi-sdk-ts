@@ -20,12 +20,26 @@ describe("public preparation errors", () => {
             Object.getOwnPropertyNames(Invisi.prototype)
                 .filter((name) => name.startsWith("prepare"))
                 .sort()
-        ).toEqual([...methods, registration].sort());
+        ).toEqual([...methods, "prepareTransferWithFee", registration].sort());
         expect(
             Object.getOwnPropertyNames(WalletSession.prototype)
                 .filter((name) => name.startsWith("prepare"))
                 .sort()
-        ).toEqual([...methods].sort());
+        ).toEqual([...methods, "prepareTransferWithFee"].sort());
+    });
+    it("normalizes bounded fee preparation errors at both public boundaries", async () => {
+        const h = await fixture();
+        const estimate = () => ({ recipient: h.bob.ownerAddress, amount: 1n });
+        for (const api of [new Invisi(), h.session]) {
+            const error = await api
+                .prepareTransferWithFee(undefined as never, estimate, { maxFeeAmount: 1n })
+                .catch((cause: unknown) => cause);
+            expect(error).toBeInstanceOf(InvisiError);
+            expect(error).toMatchObject({
+                code: "PREPARATION_FAILED",
+                operation: "prepareTransferWithFee",
+            });
+        }
     });
     it.each([...methods, registration])(
         "normalizes synchronous input failures in Invisi.%s",

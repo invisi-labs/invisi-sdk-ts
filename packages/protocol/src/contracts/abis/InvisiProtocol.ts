@@ -1091,9 +1091,9 @@ export const invisiProtocolAbi = [
         "internalType": "bytes"
       },
       {
-        "name": "requests",
-        "type": "tuple[]",
-        "internalType": "struct IInvisiProtocol.TransactRequest[]",
+        "name": "r",
+        "type": "tuple",
+        "internalType": "struct IInvisiProtocol.TransactRequest",
         "components": [
           {
             "name": "params",
@@ -1144,6 +1144,16 @@ export const invisiProtocolAbi = [
               },
               {
                 "name": "deadline",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "feeRecipient",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "feeAmount",
                 "type": "uint256",
                 "internalType": "uint256"
               }
@@ -1241,9 +1251,9 @@ export const invisiProtocolAbi = [
         "internalType": "bytes"
       },
       {
-        "name": "r",
-        "type": "tuple",
-        "internalType": "struct IInvisiProtocol.TransactRequest",
+        "name": "requests",
+        "type": "tuple[]",
+        "internalType": "struct IInvisiProtocol.TransactRequest[]",
         "components": [
           {
             "name": "params",
@@ -1294,6 +1304,16 @@ export const invisiProtocolAbi = [
               },
               {
                 "name": "deadline",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "feeRecipient",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "feeAmount",
                 "type": "uint256",
                 "internalType": "uint256"
               }
@@ -1551,6 +1571,31 @@ export const invisiProtocolAbi = [
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BroadcasterFee",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false

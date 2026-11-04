@@ -64,6 +64,8 @@ export function normalizeTransactRequest(
         "withdrawalAddress",
         "withdrawalAmount",
         "deadline",
+        "feeRecipient",
+        "feeAmount",
     ]);
     const ns = notes(p.nullifiers, "nullifiers"),
         os = notes(p.outputCommitments, "outputCommitments"),
@@ -74,6 +76,12 @@ export function normalizeTransactRequest(
     const withdrawalAmount = uint(p.withdrawalAmount, 128, "withdrawalAmount"),
         withdrawalAddress = getAddress(p.withdrawalAddress) as Hex,
         f = normalizeFunding(funding);
+    const feeAmount = uint(p.feeAmount ?? 0n, 128, "feeAmount");
+    const feeRecipient = getAddress(
+        p.feeRecipient ?? "0x0000000000000000000000000000000000000000"
+    ) as Hex;
+    if ((feeAmount === 0n) !== (BigInt(feeRecipient) === 0n)) throw new Error("invalid fee");
+    if (ns.length === 0 && feeAmount !== 0n) throw new Error("zero-input fee is not authorized");
     if (
         (withdrawalAmount === 0n) !== (BigInt(withdrawalAddress) === 0n) ||
         (os.length === 0 && withdrawalAmount === 0n)
@@ -103,6 +111,8 @@ export function normalizeTransactRequest(
         deliveriesHash: deliveriesHash(deliveries),
         withdrawalAddress,
         withdrawalAmount,
+        feeRecipient,
+        feeAmount,
         deadline: checkDeadline(c, p.deadline),
         depositAmount: f.amount,
         depositPayer: f.payer,
@@ -134,6 +144,8 @@ export function transactPublicInputs(
         r.deadline,
         r.depositAmount,
         BigInt(r.depositPayer),
+        BigInt(r.feeRecipient),
+        r.feeAmount,
     ].map(word);
 }
 export function encodeTransactTypedData(
@@ -151,10 +163,10 @@ export function encodeTransactTypedData(
     });
 }
 const singleTuple = [
-    "(address token,bytes32 merkleRoot,bytes32[] nullifiers,bytes32[] outputCommitments,uint256 inputTreeId,address withdrawalAddress,uint256 withdrawalAmount,uint256 deadline)",
+    "(address token,bytes32 merkleRoot,bytes32[] nullifiers,bytes32[] outputCommitments,uint256 inputTreeId,address withdrawalAddress,uint256 withdrawalAmount,uint256 deadline,address feeRecipient,uint256 feeAmount)",
 ][0]!;
 const crossTuple = [
-    "(address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32[] outputCommitments,address withdrawalAddress,uint256 withdrawalAmount,uint256 deadline)",
+    "(address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32[] outputCommitments,address withdrawalAddress,uint256 withdrawalAmount,uint256 deadline,address feeRecipient,uint256 feeAmount)",
 ][0]!;
 export function transactFundingRequestHash(
     proof: Hex,
@@ -170,6 +182,8 @@ export function transactFundingRequestHash(
         withdrawalAddress: p.withdrawalAddress,
         withdrawalAmount: p.withdrawalAmount,
         deadline: p.deadline,
+        feeRecipient: p.feeRecipient ?? "0x0000000000000000000000000000000000000000",
+        feeAmount: p.feeAmount ?? 0n,
     };
     return p.sources.length > 1
         ? (keccak256(
@@ -180,7 +194,7 @@ export function transactFundingRequestHash(
                   [
                       keccak256(new TextEncoder().encode("InvisiCrossTreeTransact")),
                       keccak256(proof),
-                      p,
+                      { ...p, feeRecipient: single.feeRecipient, feeAmount: single.feeAmount },
                       deliveriesHash(cs),
                   ]
               ) as Hex
@@ -237,6 +251,8 @@ export function buildTransactCalldata(p: BuildTransactCalldataParams) {
             withdrawalAddress: r.withdrawalAddress,
             withdrawalAmount: r.withdrawalAmount,
             deadline: r.deadline,
+            feeRecipient: r.feeRecipient,
+            feeAmount: r.feeAmount,
         },
         deliveries: p.deliveries,
         funding: r.funding,
@@ -260,7 +276,7 @@ export interface BuildTransactAggregateCalldataParams {
 export function buildTransactAggregateCalldata(p: BuildTransactAggregateCalldataParams) {
     if (![4, 8, 12].includes(dense(p.requests, "requests").length))
         throw new Error("aggregate requires 4, 8 or 12 requests");
-    for (const request of p.requests) {
+    const requests = p.requests.map((request) => {
         const r = normalizeTransactRequest(
             { ...p.context, tokenAddress: request.params.token },
             request.params,
@@ -269,7 +285,11 @@ export function buildTransactAggregateCalldata(p: BuildTransactAggregateCalldata
         );
         if (r.capacity !== 14) throw new Error("aggregate supports only capacity 14");
         validateFundingSubmission(r.funding, p.caller, p.context.now);
-    }
+        return {
+            ...request,
+            params: { ...request.params, feeRecipient: r.feeRecipient, feeAmount: r.feeAmount },
+        };
+    });
     return {
         data: new Interface(
             invisiProtocolAbi.filter(
@@ -278,7 +298,7 @@ export function buildTransactAggregateCalldata(p: BuildTransactAggregateCalldata
                     item.name === "transact" &&
                     item.inputs[1]?.type === "tuple[]"
             )
-        ).encodeFunctionData("transact", [p.proof, p.requests]) as Hex,
+        ).encodeFunctionData("transact", [p.proof, requests]) as Hex,
         capacity: 14 as const,
     };
 }
@@ -429,7 +449,7 @@ export function aggregateMemberRequestHash(c: TransactionContext, r: AggregateMe
         ) as Hex
     ) as Hex;
 }
-/** Router adapter business words (56 per member), not the aggregate circuit statement. */
+/** Router adapter business words (58 per member), not the aggregate circuit statement. */
 export function aggregatePublicInputs(
     c: TransactionContext,
     requests: readonly AggregateMemberInput[]

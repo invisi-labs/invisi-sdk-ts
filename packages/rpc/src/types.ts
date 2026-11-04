@@ -105,3 +105,27 @@ export type ProtocolTransactionUpdates = {
           creditTransitions: readonly ProtocolCreditTransition[];
       }
 );
+
+/** Public operator metadata from the selected registry's indexed state; not an endorsement. */
+export interface RegisteredBroadcaster {
+    block: CanonicalBlock;
+    operator: Address;
+    /** Raw contract declaration; the contact client must validate URL safety before use. */
+    endpoint: string;
+    metadataURI: string;
+    quoteSigner: Address;
+    feeRecipient: Address;
+    enabled: boolean;
+}
+export interface BroadcasterQuery {
+    enabled?: boolean;
+    after?: Address;
+    limit?: number;
+    block?: CanonicalBlock;
+    signal?: AbortSignal;
+}
+export interface BroadcasterPage {
+    block: CanonicalBlock;
+    broadcasters: readonly RegisteredBroadcaster[];
+    next?: Address;
+}

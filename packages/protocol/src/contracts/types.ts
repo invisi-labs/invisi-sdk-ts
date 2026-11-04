@@ -49,6 +49,8 @@ export interface CrossTreeTransactParams {
     withdrawalAddress: Address;
     withdrawalAmount: bigint;
     deadline: bigint;
+    feeRecipient?: Address;
+    feeAmount?: bigint;
 }
 export interface TransactRequest {
     params: CrossTreeTransactParams;

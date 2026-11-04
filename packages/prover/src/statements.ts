@@ -12,7 +12,7 @@ function uint(value: bigint, bits: number): bigint {
 
 /** Check the exact statement reconstructed by the current onchain adapter. */
 export function assertUserStatement(values: readonly string[], capacity: number): void {
-    check(values.length === 15 + 3 * capacity, "User statement width mismatch");
+    check(values.length === 17 + 3 * capacity, "User statement width mismatch");
     const w = values.map(BigInt),
         n = Number(w[3]),
         m = Number(w[4]),
@@ -56,11 +56,17 @@ export function assertUserStatement(values: readonly string[], capacity: number)
     uint(w[at + 4]!, 64);
     uint(w[at + 5]!, 128);
     uint(w[at + 6]!, 160);
+    uint(w[at + 7]!, 160);
+    uint(w[at + 8]!, 128);
+    check((w[at + 7] === 0n) === (w[at + 8] === 0n), "Invalid fee context");
     check((w[at + 2] === 0n) === (w[at + 3] === 0n), "Invalid withdrawal context");
     check((w[at + 5] === 0n) === (w[at + 6] === 0n), "Invalid funding context");
     check(m > 0 || w[at + 3]! > 0n, "Missing transaction output");
     if (n === 0)
-        check(m >= 2 && w[at + 5]! > 0n && w[at + 3] === 0n, "Invalid pure funding context");
+        check(
+            m >= 2 && w[at + 5]! > 0n && w[at + 3] === 0n && w[at + 8] === 0n,
+            "Invalid pure funding context"
+        );
     const digest = BigInt(
         computeWalletAuthorizationDigest({
             context: { chainId: w[0]!, protocolAddress: w[1]! },
@@ -70,7 +76,7 @@ export function assertUserStatement(values: readonly string[], capacity: number)
         })
     );
     check(
-        w[at + 7] === digest >> 128n && w[at + 8] === (digest & ((1n << 128n) - 1n)),
+        w[at + 9] === digest >> 128n && w[at + 10] === (digest & ((1n << 128n) - 1n)),
         "Authorization digest does not match statement"
     );
 }
@@ -85,7 +91,7 @@ export function assertAggregateStatement(values: readonly Hex[], count: number, 
         commitments = new Set<string>(),
         context = values.slice(0, 3).map(BigInt);
     for (let i = 0; i < count; i++) {
-        const member = values.slice(57 * i, 57 * (i + 1));
+        const member = values.slice(59 * i, 59 * (i + 1));
         assertUserStatement(member, 14);
         check(
             member.slice(0, 3).every((v, j) => BigInt(v) === context[j]),

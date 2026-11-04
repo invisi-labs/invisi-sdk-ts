@@ -24,6 +24,8 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
         })),
         capacity: p.capacity,
         deadline: p.deadline,
+        feeRecipient: p.params?.feeRecipient,
+        feeAmount: p.params?.feeAmount ?? 0n,
         fundingAmount: p.funding.amount ?? 0n,
         fundingPayer: p.funding.payer,
         withdrawalAmount:

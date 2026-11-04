@@ -159,7 +159,7 @@ describe("current protocol executable reference vectors", () => {
             })
         ).toBe(f.memberRequestHash);
         const publicInputs = transactUserPublicInputs(context, f.params, f.deliveries);
-        expect(publicInputs).toHaveLength(57);
+        expect(publicInputs).toHaveLength(59);
         expect(publicInputs.slice(-2)).toEqual([
             "0x" + (BigInt(f.digest) >> 128n).toString(16).padStart(64, "0"),
             "0x" + (BigInt(f.digest) & ((1n << 128n) - 1n)).toString(16).padStart(64, "0"),
@@ -274,7 +274,7 @@ describe("current protocol executable reference vectors", () => {
             };
         for (const n of [4, 8, 12]) {
             const requests = Array(n).fill(member);
-            expect(aggregatePublicInputs(context, requests)).toHaveLength(56 * n);
+            expect(aggregatePublicInputs(context, requests)).toHaveLength(58 * n);
             expect(
                 new Interface(invisiProtocolAbi).parseTransaction({
                     data: buildTransactAggregateCalldata({
@@ -385,7 +385,7 @@ describe("canonical direct source requirements", () => {
                 context,
                 Array(4).fill({ params: f.params, deliveries: f.deliveries })
             )
-        ).toHaveLength(224);
+        ).toHaveLength(232);
     });
 });
 

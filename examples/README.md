@@ -125,3 +125,7 @@ Keep SDK behavior tests in the owning packages. These examples use workspace pac
 ## Local deployment
 
 Maintainers can use `pnpm deploy:local` with the sibling protocol repository and a fresh Anvil chain 31337. That tooling creates a separate deployment; changing example settings also requires a matching trusted Protocol RPC and funded accounts. The default walkthrough targets the deployed chain-97 protocol.
+
+### Optional paid broadcasting
+
+`03-hidden-amount/07-optional-broadcaster.ts` prepares a same-token public fee before wallet authorization, proves locally, verifies the operator's signed final quote, and submits public calldata over HTTPS. Configure the URL, trusted quote signer and fee limit in `settings.ts`. The service receives no private notes or witness. Its fixed preliminary fee must stabilize within four preparations; insufficient notes and an excessive fee fail before signing. Add `--self-send` to omit the fee and use ethers `sendTransaction` and `wait` directly. Existing examples retain ordinary self-submission. Do not run against a deployment until its fee-enabled ABI and current circuit release are installed.
