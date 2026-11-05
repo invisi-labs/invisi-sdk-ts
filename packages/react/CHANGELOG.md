@@ -1,5 +1,13 @@
 # @invisi-labs/react
 
+## 1.1.6
+
+### Patch Changes
+
+- Finalize context-bound NoteOutput creation, optional funds delivery, and EVM receiving-key resolution during preparation.
+- Align broadcaster discovery, quoting and fee-funded transaction preparation with the current contracts.
+- Refresh authenticated proof metadata, gas references, and wallet update batching.
+
 ## 1.1.5
 
 ### Patch Changes
