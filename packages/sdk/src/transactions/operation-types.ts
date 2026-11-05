@@ -1,7 +1,4 @@
-import type { NoteOutput } from "../NoteOutput";
 import type { PublicWallet } from "@invisi-labs/core";
-import type { GasBenchmarkProfile } from "../gas-estimation";
-import type { Provider } from "ethers";
 import type {
     Address,
     CancelCreditParams,
@@ -14,6 +11,9 @@ import type {
     TopUpCreditParams,
     TransactRequest,
 } from "@invisi-labs/protocol/contracts";
+import type { Provider } from "ethers";
+import type { GasBenchmarkProfile } from "../gas/gas-estimation";
+import type { NoteOutput } from "../notes/NoteOutput";
 
 import type { AuthorizedStatement, CreditDeliveryState, Note, Wallet } from "@invisi-labs/core";
 import type {
@@ -30,7 +30,7 @@ import type {
 } from "@invisi-labs/protocol";
 import type { AggregateMember, ProofBundle, Prover, ProverOptions } from "@invisi-labs/prover";
 
-import type { CreditRecord, NoteRecord, WalletScope, Checkpoint } from "./records";
+import type { Checkpoint, CreditRecord, NoteRecord, WalletScope } from "./records";
 export interface CoinSelector {
     select(
         candidates: readonly NoteRecord[],
@@ -88,8 +88,8 @@ export interface ShieldPreparation {
     deadline?: bigint;
 }
 export interface PreparedOutput {
-    context: import("../NoteOutput").NoteOutputContext;
-    recipient: import("../NoteOutput").NoteOutputRecipient;
+    context: import("../notes/NoteOutput").NoteOutputContext;
+    recipient: import("../notes/NoteOutput").NoteOutputRecipient;
     amount: bigint;
     note?: Note;
     commitment: Hex;
@@ -164,7 +164,7 @@ export interface CreditPlan {
     amounts?: bigint[];
 }
 export interface OperationPlan {
-    intent?: import("../broadcaster-preparation").PreparationIntent;
+    intent?: import("../broadcaster/broadcaster-preparation").PreparationIntent;
     version: 1;
     id: string;
     kind:
@@ -186,7 +186,7 @@ export interface OperationPlan {
 }
 export interface SavedOperation {
     plan: OperationPlan;
-    broadcasterQuote?: import("../broadcaster").SignedBroadcasterQuote;
+    broadcasterQuote?: import("../broadcaster/index").SignedBroadcasterQuote;
     proof?: ProofBundle;
     call?: import("@invisi-labs/protocol").TransactionCall;
     externalized?: boolean;
@@ -233,7 +233,7 @@ export interface PreparationInventory {
     reservations: Record<string, string>;
     invalidated?: string;
     observedThrough?: Checkpoint;
-    notes: Record<string, import("./selection").SelectableNote>;
+    notes: Record<string, import("./preparation/selection").SelectableNote>;
     credits: Record<
         string,
         Pick<CreditRecord, "state" | "commitment" | "treeId" | "leafIndex" | "role" | "spent">

@@ -5,19 +5,17 @@ export default defineConfig({
         alias: [
             {
                 find: "@invisi-labs/sdk/session-support",
-                replacement: fileURLToPath(
-                    new URL("../sdk/src/session-support.ts", import.meta.url)
-                ),
+                replacement: fileURLToPath(new URL("./src/session-support.ts", import.meta.url)),
             },
             {
                 find: "@invisi-labs/sdk/ethers",
                 replacement: fileURLToPath(
-                    new URL("../sdk/src/integrations/ethers.ts", import.meta.url)
+                    new URL("./src/integrations/ethers.ts", import.meta.url)
                 ),
             },
             {
                 find: "@invisi-labs/sdk",
-                replacement: fileURLToPath(new URL("../sdk/src/index.ts", import.meta.url)),
+                replacement: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
             },
             {
                 find: "@invisi-labs/session",

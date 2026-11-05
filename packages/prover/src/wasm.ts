@@ -1,8 +1,8 @@
-import { loadCircuitBrowser } from "./circuits-browser";
-import { generateWitness } from "./witness";
-import { proveWithWasm, verifyWithWasm, type WasmOptions } from "./backend-wasm";
-import { getCircuitKey } from "./proof-data";
-import type { CircuitName, ProofBundle, ProofTarget, Hex } from "./circuit-types";
+import { proveWithWasm, verifyWithWasm, type WasmOptions } from "./backends/backend-wasm";
+import type { CircuitName, Hex, ProofBundle, ProofTarget } from "./circuits/circuit-types";
+import { loadCircuitBrowser } from "./circuits/circuits-browser";
+import { getCircuitKey } from "./proofs/proof-data";
+import { generateWitness } from "./witness/witness";
 export interface ProveBrowserParams extends WasmOptions {
     circuitName: CircuitName;
     inputs: Record<string, unknown>;
@@ -22,28 +22,28 @@ export async function generateProofBundle(params: ProveBrowserParams): Promise<P
 export async function generateProof(params: ProveBrowserParams): Promise<Hex> {
     return (await generateProofBundle(params)).proofHex;
 }
-export { verifyWithWasm as verifyProofBundle, proveWithWasm } from "./backend-wasm";
-export type { WasmOptions } from "./backend-wasm";
-export { loadCircuitBrowser, loadVerificationKeyBrowser } from "./circuits-browser";
-export { generateWitness } from "./witness";
-export {
-    getCircuitMetadata,
-    getCircuitKey,
-    assertProofBundle,
-    aggregateCircuitPublicInputs,
-} from "./proof-data";
-export { CIRCUIT_NAMES } from "./circuit-types";
+export { proveWithWasm, verifyWithWasm as verifyProofBundle } from "./backends/backend-wasm";
+export type { WasmOptions } from "./backends/backend-wasm";
+export { CIRCUIT_NAMES } from "./circuits/circuit-types";
 export type {
+    CircuitMetadata,
     CircuitName,
     CompiledCircuit,
-    ProofTarget,
-    ProofBundle,
-    CircuitMetadata,
     Hex,
-} from "./circuit-types";
+    ProofBundle,
+    ProofTarget,
+} from "./circuits/circuit-types";
+export { loadCircuitBrowser, loadVerificationKeyBrowser } from "./circuits/circuits-browser";
+export {
+    aggregateCircuitPublicInputs,
+    assertProofBundle,
+    getCircuitKey,
+    getCircuitMetadata,
+} from "./proofs/proof-data";
+export { generateWitness } from "./witness/witness";
 
-import { BackendProver } from "./backend-service";
-import type { ProvingRequest, ProverOptions } from "./interfaces";
+import { BackendProver } from "./backends/backend-service";
+import type { ProverOptions, ProvingRequest } from "./interfaces";
 /** Explicit in-process WASM proving. Cancellation discards results between phases. */
 export class WasmProver extends BackendProver {
     readonly #options: WasmOptions;

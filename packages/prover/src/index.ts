@@ -1,13 +1,19 @@
 /** No backend, circuit loading, filesystem or WASM initialization at this entrypoint. */
+export type {
+    CircuitMetadata,
+    CircuitName,
+    Hex,
+    ProofBundle,
+    ProofTarget,
+} from "./circuits/circuit-types";
 export { LocalWitness } from "./interfaces";
 export type {
-    LocalWitnessAccess,
-    Prover,
-    ProvingRequest,
-    ProofStatement,
-    ProverOptions,
-    ProverProgress,
     AggregateMember,
     AggregatorCapability,
+    LocalWitnessAccess,
+    ProofStatement,
+    Prover,
+    ProverOptions,
+    ProverProgress,
+    ProvingRequest,
 } from "./interfaces";
-export type { CircuitName, ProofTarget, ProofBundle, CircuitMetadata, Hex } from "./circuit-types";

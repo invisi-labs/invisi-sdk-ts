@@ -6,7 +6,7 @@ import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs
 import { Protocol, type ChainReader, type ProtocolDataProvider } from "@invisi-labs/protocol";
 import { MerkleFixture } from "./merkle-fixture";
 import { MemoryWalletStore, type WalletScope } from "../packages/session/src/index";
-import { WalletSession } from "../packages/session/src/WalletSession";
+import { WalletSession } from "../packages/session/src/wallet/WalletSession";
 const word = (n: bigint) => ("0x" + n.toString(16).padStart(64, "0")) as Hex;
 const context = {
     chainId: 31337n,

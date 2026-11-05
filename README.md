@@ -165,6 +165,24 @@ pnpm lint
 
 Review and commit the generated ABI, circuit, verification-key and witness-layout artifacts with the matching SDK changes. Synchronization retains the pinned version and hash checks.
 
+## Source modules
+
+Published package names and subpath imports are stable. Inside each package, source and tests live together by capability:
+
+| Package | Source modules |
+| --- | --- |
+| `core` | `wallet`, `address`, `notes`, `crypto`, `delivery`, `fmd`, `disclosure` |
+| `protocol` | `client`, `funds`, `credit`, `authorization`, `registry`, `factory`, `fees`, `verification` |
+| `sdk` | `client`, `protocol`, `notes`, `transactions`, `broadcaster`, `gas`, `discovery`, `disclosure` |
+| `session` | `wallet`, `operations`, `sync`, `inventory`, `history`, `storage` |
+| `rpc` | `client`, `deployment`, `queries`, `transport`, `validation` |
+| `prover` | `backends`, `circuits`, `proofs`, `aggregation`, `witness`, `testing` |
+| `react` / `vue` | Small framework entry and operation hook |
+
+SDK transaction modules separate preparation, signing, proving and execution. Protocol witness assembly separates shared ownership/Merkle checks from each funds or Credit operation. Delivery separates envelope cryptography from note validation and payload handling. Session workers and broadcaster reservations remain in `session`; the stateless SDK has no store dependency.
+
+Root `index.ts` files and configured subpath entries define the supported public API. Applications should import those entries rather than source directories. Generated contracts remain under `protocol/src/contracts`, and authenticated circuit assets remain under `prover/circuits`; they are updated through synchronization tools. Generated witness fixtures stay in `prover/src/testing`.
+
 ## Source formatting
 
 Run `pnpm format` to format handwritten sources, tests, examples and scripts, or `pnpm format:check` to check them without changes. `pnpm lint` and CI include the formatting check. The pinned formatter uses four spaces, double quotes, semicolons and a preferred width of 100 columns (140 in examples to keep walkthrough messages on one line). Complex control flow should also be organized into readable steps.

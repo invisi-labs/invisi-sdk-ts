@@ -1,4 +1,4 @@
-import type { CircuitName, ProofTarget, Hex, ProofBundle } from "./circuit-types";
+import type { CircuitName, Hex, ProofBundle, ProofTarget } from "./circuits/circuit-types";
 function clone(value: unknown): unknown {
     if (Array.isArray(value)) return value.map(clone);
     if (value instanceof Uint8Array) return Uint8Array.from(value);

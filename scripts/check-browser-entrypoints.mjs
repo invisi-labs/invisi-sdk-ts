@@ -73,10 +73,7 @@ console.log(
     `Browser entry PASS: ${eager} eager bytes; neutral prover ${prover.outputFiles[0].contents.length} bytes; no native inputs`
 );
 const storage = await build({
-    entryPoints: [
-        "packages/session/src/index.ts",
-        "packages/session/src/integrations/indexeddb.ts",
-    ],
+    entryPoints: ["packages/session/src/index.ts", "packages/session/src/storage/indexeddb.ts"],
     bundle: true,
     platform: "browser",
     format: "esm",

@@ -21,7 +21,7 @@ export default defineConfig({
             },
             {
                 find: "@invisi-labs/session",
-                replacement: fileURLToPath(new URL("../session/src/index.ts", import.meta.url)),
+                replacement: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
             },
         ],
     },

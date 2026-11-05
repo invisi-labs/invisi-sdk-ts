@@ -1,151 +1,155 @@
-export { NoteOutput } from "./NoteOutput";
-export type { NoteOutputContext, NoteOutputOptions, NoteOutputRecipient } from "./NoteOutput";
-export { InvisiError } from "./errors";
-export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
-export { Invisi } from "./Invisi";
-export type { InvisiOptions, RegistrationPreparationOptions } from "./Invisi";
 export {
-    fundsV1,
-    creditV1,
-    decodeDeliveryHeader,
-    Wallet,
+    Detector,
+    Disclosure,
+    MAX_MEMO_BYTES,
+    MissingCapabilityError,
+    NullifierCapability,
     PublicWallet,
     ViewingCapability,
-    Detector,
-    NullifierCapability,
+    Wallet,
     WalletAuthorization,
-    MissingCapabilityError,
-    Disclosure,
-    encodeMemo,
-    decodeMemoText,
-    MAX_MEMO_BYTES,
     computeCreditNullifier,
     creditPeriods,
+    creditV1,
+    decodeDeliveryHeader,
+    decodeMemoText,
+    encodeMemo,
+    fundsV1,
 } from "@invisi-labs/core";
 export type {
     Address,
+    CreditDataV1,
+    CreditDeliveryState,
+    CreditNote,
+    CreditOpening,
+    CreditPolicy,
+    DisclosureExport,
+    DisclosureOutput,
+    DisclosureResult,
+    FundsDataV1,
     Hex,
     Memo,
-    FundsDataV1,
-    CreditDataV1,
     Note,
-    CreditNote,
-    CreditPolicy,
-    CreditDeliveryState,
     ReceivingKeys,
     WalletAuthorizationProvider,
-    CreditOpening,
-    DisclosureOutput,
-    DisclosureExport,
-    DisclosureResult,
 } from "@invisi-labs/core";
 export { RegistrationOperation } from "@invisi-labs/protocol";
-export { Protocol } from "./Protocol";
 export type {
-    ChainReader,
-    ProtocolDataProvider,
-    ProtocolDataStatus,
-    ProtocolUpdates,
-    ProtocolUpdateRange,
-    TransactionCall,
+    AddressRegistryOptions,
     CanonicalBlock,
     CanonicalReceipt,
+    ChainReader,
+    FactoryReader,
     Membership,
-    RegistryReader,
+    ProtocolDataProvider,
+    ProtocolDataStatus,
     ProtocolOptions,
+    ProtocolUpdateRange,
+    ProtocolUpdates,
+    RegistryContext,
+    RegistryReader,
     TokenProtocol,
     TokenProtocolOptions,
-    FactoryReader,
-    AddressRegistryOptions,
-    RegistryContext,
+    TransactionCall,
     TransactionContext,
 } from "@invisi-labs/protocol";
-export { DisclosureVerifier } from "./transactions/DisclosureVerifier";
 export type {
-    DisclosureReference,
-    DisclosureReader,
-    DisclosureVerifierOptions,
-    DisclosureEvidence,
-    VerifiedDisclosure,
-} from "./transactions/DisclosureVerifier";
-export type {
-    FundingAuthorizationVerifier,
-    FundingSigner,
-    FundingTypedData,
-    FundingSource,
-    TransactionExecution,
-    TransactionProveOptions,
-    OperationAggregateMember,
-    TransferPreparation,
-    ShieldPreparation,
-    CreateCreditPreparation,
-    DrawCreditPreparation,
-    TopUpCreditPreparation,
-    CancelCreditPreparation,
-} from "./transactions/operation-types";
-export type {
-    Prover,
-    ProverOptions,
+    AggregateMember,
+    AggregatorCapability,
     ProofBundle,
     ProofStatement,
-    AggregatorCapability,
-    AggregateMember,
+    Prover,
+    ProverOptions,
 } from "@invisi-labs/prover";
+export { Invisi } from "./client/Invisi";
+export type { InvisiOptions, RegistrationPreparationOptions } from "./client/Invisi";
+export { DisclosureVerifier } from "./disclosure/DisclosureVerifier";
+export type {
+    DisclosureEvidence,
+    DisclosureReader,
+    DisclosureReference,
+    DisclosureVerifierOptions,
+    VerifiedDisclosure,
+} from "./disclosure/DisclosureVerifier";
+export { InvisiError } from "./errors";
+export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
+export { NoteOutput } from "./notes/NoteOutput";
+export type { NoteOutputContext, NoteOutputOptions, NoteOutputRecipient } from "./notes/NoteOutput";
+export { Protocol } from "./protocol/Protocol";
+export type {
+    CancelCreditPreparation,
+    CreateCreditPreparation,
+    DrawCreditPreparation,
+    FundingAuthorizationVerifier,
+    FundingSigner,
+    FundingSource,
+    FundingTypedData,
+    OperationAggregateMember,
+    ShieldPreparation,
+    TopUpCreditPreparation,
+    TransactionExecution,
+    TransactionProveOptions,
+    TransferPreparation,
+} from "./transactions/operation-types";
 
-export { ProtocolRpcError, MAX_UPDATE_BLOCKS } from "@invisi-labs/rpc";
-export type { ProtocolDeployment, RegisteredReceivingAddress } from "@invisi-labs/rpc";
-export { ProtocolRpcClient } from "./ProtocolRpcClient";
-export { AddressRegistry } from "./AddressRegistry";
-export { BroadcasterRegistry } from "./BroadcasterRegistry";
+export { MAX_UPDATE_BLOCKS, ProtocolRpcError } from "@invisi-labs/rpc";
 export type {
-    BroadcasterRegistryOptions,
-    BroadcasterRegistration,
-    RegisteredBroadcaster,
-} from "./BroadcasterRegistry";
-export type {
-    ProtocolRpcClientOptions,
-    ProtocolRpcReader,
-    ProtocolRpcConnectionOptions,
+    ProtocolDeployment,
     ProtocolRpcChain,
+    ProtocolRpcClientOptions,
+    ProtocolRpcConnectionOptions,
+    ProtocolRpcReader,
+    RegisteredReceivingAddress,
 } from "@invisi-labs/rpc";
-
-export { PreparedTransaction } from "./PreparedTransaction";
+export { AddressRegistry } from "./protocol/AddressRegistry";
+export { BroadcasterRegistry } from "./protocol/BroadcasterRegistry";
 export type {
-    NoteInput,
+    BroadcasterRegistration,
+    BroadcasterRegistryOptions,
+    RegisteredBroadcaster,
+} from "./protocol/BroadcasterRegistry";
+export { ProtocolRpcClient } from "./protocol/ProtocolRpcClient";
+
+export { PreparedTransaction } from "./transactions/execution/PreparedTransaction";
+export type {
     CreditInput,
-    TransactionIdentity,
-    ExplicitTransferPreparation,
-    ExplicitShieldPreparation,
+    ExplicitCancelCreditPreparation,
     ExplicitCreateCreditPreparation,
     ExplicitDrawCreditPreparation,
+    ExplicitShieldPreparation,
     ExplicitTopUpCreditPreparation,
-    ExplicitCancelCreditPreparation,
-} from "./explicit-types";
+    ExplicitTransferPreparation,
+    NoteInput,
+    TransactionIdentity,
+} from "./transactions/explicit-types";
 
 export type {
-    GasBenchmarkProfile,
-    GasBenchmarkShape,
-    GasBenchmarkDeployment,
     GasBenchmarkCircuit,
+    GasBenchmarkDeployment,
+    GasBenchmarkProfile,
     GasBenchmarkSample,
+    GasBenchmarkShape,
     GasReference,
-} from "./gas-estimation";
+} from "./gas/gas-estimation";
 
-export { defineGasBenchmarks } from "./gas-estimation";
+export { defineGasBenchmarks } from "./gas/gas-estimation";
 
 export type { SigningRequest } from "@invisi-labs/core";
 
 // Stateless recovery for applications that supply canonical receipts without a wallet store.
-export { readProtocolLogs } from "./transactions/receipt-logs";
-export { decryptCandidates } from "./transactions/discovery";
-export type { DeliveryEventLog, DiscoveredNote, DiscoveredCredit } from "./transactions/discovery";
+export { decryptCandidates } from "./discovery/discovery";
+export type { DeliveryEventLog, DiscoveredCredit, DiscoveredNote } from "./discovery/discovery";
+export { readProtocolLogs } from "./discovery/receipt-logs";
 
 export type {
+    ProtocolCreditTransition,
     ProtocolOutput,
     ProtocolTransactionUpdates,
-    ProtocolCreditTransition,
 } from "@invisi-labs/rpc";
 
-export * from "./broadcaster";
+export * from "./broadcaster/index";
 
-export type { WithBroadcasterOptions, BroadcasterFeeSource } from "./broadcaster-preparation";
+export type {
+    BroadcasterFeeSource,
+    WithBroadcasterOptions,
+} from "./broadcaster/broadcaster-preparation";

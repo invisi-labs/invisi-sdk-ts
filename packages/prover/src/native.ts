@@ -1,37 +1,40 @@
-export { generateProof, generateProofBundle, verifyProofBundle } from "./prover";
-export type { ProveParams, Backend } from "./prover";
-export { checkBBAvailable, proveWithBB, verifyWithBB } from "./backend-bb";
-export type { NativeOptions } from "./backend-bb";
-export { proveWithWasm, verifyWithWasm } from "./backend-wasm";
-export type { WasmOptions } from "./backend-wasm";
-export {
-    loadCircuit,
-    getCircuitPath,
-    getVerificationKeyPath,
-    loadVerificationKey,
-    CIRCUIT_NAMES,
-} from "./circuits";
-export {
-    getCircuitMetadata,
-    getCircuitKey,
-    assertProofBundle,
-    aggregateCircuitPublicInputs,
-} from "./proof-data";
+export { checkBBAvailable, proveWithBB, verifyWithBB } from "./backends/backend-bb";
+export type { NativeOptions } from "./backends/backend-bb";
+export { proveWithWasm, verifyWithWasm } from "./backends/backend-wasm";
+export type { WasmOptions } from "./backends/backend-wasm";
 export type {
+    CircuitMetadata,
     CircuitName,
     CompiledCircuit,
-    ProofTarget,
-    ProofBundle,
-    CircuitMetadata,
     Hex,
-} from "./circuit-types";
-export { generateWitness } from "./witness";
+    ProofBundle,
+    ProofTarget,
+} from "./circuits/circuit-types";
+export {
+    CIRCUIT_NAMES,
+    getCircuitPath,
+    getVerificationKeyPath,
+    loadCircuit,
+    loadVerificationKey,
+} from "./circuits/circuits";
+export {
+    aggregateCircuitPublicInputs,
+    assertProofBundle,
+    getCircuitKey,
+    getCircuitMetadata,
+} from "./proofs/proof-data";
+export { generateProof, generateProofBundle, verifyProofBundle } from "./proofs/prover";
+export type { Backend, ProveParams } from "./proofs/prover";
+export { generateWitness } from "./witness/witness";
 
-import { BackendProver } from "./backend-service";
-import { generateProofBundle as proveNative, verifyProofBundle as verifyNative } from "./prover";
-import type { NativeOptions as NativeConfiguration } from "./backend-bb";
-import type { ProvingRequest, ProverOptions } from "./interfaces";
-import type { ProofBundle as NativeBundle } from "./circuit-types";
+import type { NativeOptions as NativeConfiguration } from "./backends/backend-bb";
+import { BackendProver } from "./backends/backend-service";
+import type { ProofBundle as NativeBundle } from "./circuits/circuit-types";
+import type { ProverOptions, ProvingRequest } from "./interfaces";
+import {
+    generateProofBundle as proveNative,
+    verifyProofBundle as verifyNative,
+} from "./proofs/prover";
 /** Explicit native proving. It never falls back to another process or service. */
 export class NativeProver extends BackendProver {
     readonly #options: NativeConfiguration;

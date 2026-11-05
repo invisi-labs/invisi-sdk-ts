@@ -1,11 +1,11 @@
+import { invisiAddressRegistryAbi, invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { Interface, Wallet, type Provider } from "ethers";
 import { expect, it, vi } from "vitest";
-import { Interface, Wallet, type Provider, type Signer } from "ethers";
-import { invisiProtocolAbi, invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import {
+    EthersAddressResolver,
     EthersChainReader,
     EthersFundingSigner,
     EthersFundingVerifier,
-    EthersAddressResolver,
 } from "./ethers";
 const word = (n: bigint) => `0x${n.toString(16).padStart(64, "0")}` as const;
 const address = "0x1111111111111111111111111111111111111111" as const;

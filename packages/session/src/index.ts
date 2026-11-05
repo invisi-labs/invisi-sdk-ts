@@ -1,10 +1,10 @@
-export * from "./codec";
-export * from "./receipts";
-export * from "./reservations";
-export * from "./state";
-export * from "./store";
-import { MemoryRecordCodec } from "./codec";
-import { MemoryAtomicRecords, TransactionalWalletStore } from "./store";
+export * from "./inventory/reservations";
+export * from "./storage/codec";
+export * from "./storage/state";
+export * from "./storage/store";
+export * from "./sync/receipts";
+import { MemoryRecordCodec } from "./storage/codec";
+import { MemoryAtomicRecords, TransactionalWalletStore } from "./storage/store";
 /** Explicit ephemeral state for demos and applications that choose memory-only operation. */
 export class MemoryWalletStore extends TransactionalWalletStore {
     constructor() {
@@ -12,7 +12,7 @@ export class MemoryWalletStore extends TransactionalWalletStore {
     }
 }
 
-export * from "./Operation";
+export * from "./operations/Operation";
 export type {
     CancelCreditPreparation,
     CoinSelector,
@@ -25,20 +25,20 @@ export type {
     OperationAggregateMember,
     ShieldPreparation,
     TopUpCreditPreparation,
-    TransferPreparation,
     TransactionExecution,
     TransactionProveOptions,
+    TransferPreparation,
     WalletSessionOptions,
-} from "./operation-types";
-export * from "./WalletSession";
+} from "./operations/operation-types";
+export * from "./wallet/WalletSession";
 
-export type { RefreshOptions, RefreshResult } from "./refresh";
+export type { RefreshOptions, RefreshResult } from "./sync/refresh";
 
 export type {
-    WalletHistory,
     HistoryOptions,
-    OutgoingHistoryEntry,
     IncomingHistoryEntry,
-} from "./history";
+    OutgoingHistoryEntry,
+    WalletHistory,
+} from "./history/history";
 
-export { EncryptedWalletCodec } from "./integrations/encrypted-codec";
+export { EncryptedWalletCodec } from "./storage/encrypted-codec";

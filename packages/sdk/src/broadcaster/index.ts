@@ -1,5 +1,5 @@
-import { AbiCoder, getAddress, Interface, keccak256, verifyTypedData } from "ethers";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { AbiCoder, getAddress, Interface, keccak256, verifyTypedData } from "ethers";
 
 export const broadcasterQuoteTypes = {
     Quote: [

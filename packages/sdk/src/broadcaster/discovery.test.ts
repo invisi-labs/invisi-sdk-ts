@@ -1,6 +1,6 @@
-import { afterEach, expect, it, vi } from "vitest";
-import { Protocol } from "../Protocol";
 import { Protocol as BaseProtocol } from "@invisi-labs/protocol";
+import { afterEach, expect, it, vi } from "vitest";
+import { Protocol } from "../protocol/Protocol";
 const a = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as `0x${string}`;
 const h = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as `0x${string}`;
 const block = { number: 10n, hash: h(10), parentHash: h(9), timestamp: 100n };

@@ -1,12 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
 import { Wallet, ZeroAddress, ZeroHash } from "ethers";
+import { describe, expect, it, vi } from "vitest";
 import {
+    BroadcasterClient,
     broadcasterQuoteDomain,
     broadcasterQuoteTypes,
     broadcasterRequestHash,
     broadcasterTransactInterface,
     verifyBroadcasterQuote,
-    BroadcasterClient,
 } from "./index";
 const signer = new Wallet("0x" + "11".repeat(32));
 const trust = { chainId: 31337n, protocol: "0x" + "22".repeat(20), signer: signer.address };

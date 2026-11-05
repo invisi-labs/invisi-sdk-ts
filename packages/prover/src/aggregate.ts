@@ -1,20 +1,20 @@
 import { MissingCapabilityError } from "@invisi-labs/core";
+import { assertExpectedProof } from "./backends/backend-service";
+import type { CircuitName, ProofBundle } from "./circuits/circuit-types";
 import {
     LocalWitness,
     type AggregateMember,
     type AggregatorCapability,
+    type ProofStatement,
     type Prover,
     type ProverOptions,
-    type ProofStatement,
 } from "./interfaces";
-import type { CircuitName, ProofBundle } from "./circuit-types";
 import {
     aggregateCircuitPublicInputs,
     assertProofBundle,
-    getCircuitMetadata,
     getCircuitKey,
-} from "./proof-data";
-import { assertExpectedProof } from "./backend-service";
+    getCircuitMetadata,
+} from "./proofs/proof-data";
 function copy(bundle: ProofBundle): ProofBundle {
     return {
         formatVersion: bundle.formatVersion,

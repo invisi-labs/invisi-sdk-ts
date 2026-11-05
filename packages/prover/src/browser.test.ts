@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { loadCircuit, loadVerificationKey } from "./circuits/circuits";
 import {
-    loadCircuitBrowser,
-    loadVerificationKeyBrowser,
     CIRCUIT_NAMES,
     generateProofBundle,
+    loadCircuitBrowser,
+    loadVerificationKeyBrowser,
 } from "./wasm";
-import { loadCircuit, loadVerificationKey } from "./circuits";
 describe("browser assets", () => {
     it.each(CIRCUIT_NAMES)("matches authenticated Node assets for %s", async (name) => {
         expect(await loadCircuitBrowser(name)).toEqual(loadCircuit(name));

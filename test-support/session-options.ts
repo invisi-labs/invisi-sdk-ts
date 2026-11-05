@@ -2,7 +2,7 @@ import { Invisi } from "@invisi-labs/sdk";
 import type {
     WalletSessionInfrastructure,
     WalletSessionOptions,
-} from "../packages/session/src/operation-types";
+} from "../packages/session/src/operations/operation-types";
 
 /** Compose managed test fixtures from separate neutral infrastructure and local capabilities. */
 export function sessionOptions(options: WalletSessionInfrastructure): WalletSessionOptions {

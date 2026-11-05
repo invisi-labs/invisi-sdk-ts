@@ -1,105 +1,105 @@
-export type {
-    ProtocolContext,
-    Note,
-    CreditNote,
-    CreditPolicy,
-    CreditDeliveryState,
-    ReceivingKeys,
-    CreditRemainderRecovery,
-} from "./types";
-export type {
-    WalletAuthorizationWitness,
-    WalletBytes,
-    WalletOperation,
-    WalletAuthorizationRequest,
-} from "./wallet";
+export { decodeAddress } from "./address/address";
+export type { DecodedAddress, ReceivingKeyLookup } from "./address/address";
+export { ReceivingAddress } from "./address/receiving-address";
 export {
-    computeOwnerAddress,
-    walletAuthorizationTypedData,
-    computeWalletAuthorizationDigest,
-    signWalletAuthorization,
-    verifyWalletAuthorization,
-    WALLET_AUTHORIZATION_TYPES,
-} from "./wallet";
-export type { DecodedAddress, ReceivingKeyLookup } from "./address";
-export { decodeAddress } from "./address";
-export { Wallet, PublicWallet } from "./wallet-object";
-export { Disclosure } from "./disclosure";
-export type {
-    CreditOpening,
-    DisclosureOutput,
-    DisclosureExport,
-    DisclosureResult,
-} from "./disclosure";
-export { ReceivingAddress } from "./receiving-address";
-export {
-    ViewingCapability,
-    Detector,
-    NullifierCapability,
-    WalletAuthorization,
-    AuthorizedStatement,
-} from "./capabilities";
-export type { WalletAuthorizationProvider } from "./capabilities";
-export { MissingCapabilityError } from "./errors";
-export { deriveClueKey, validateClueKey, createClue, createClueFromSeed } from "./fmd";
-export { poseidonHash } from "./poseidon";
-export {
-    D_IDENT,
-    D_NOTE,
-    D_NULL,
-    D_CREDIT,
     D_CNULL,
+    D_CREDIT,
     D_CREDIT_KEY_HASH,
     D_CREDIT_RECOVERY,
     D_CREDIT_REMAINDER_NONCE,
+    D_IDENT,
+    D_NOTE,
+    D_NULL,
     TREE_DEPTH,
-} from "./domains";
-export { computeNoteIdentity, computeNoteCommitment } from "./commitment";
-export { computeNoteNullifier } from "./nullifier";
+} from "./crypto/domains";
+export { poseidonHash } from "./crypto/poseidon";
+export { FIELD_MODULUS, generateCreditSharedKey, generateNonce } from "./crypto/random";
 export {
-    computeCreditSharedKeyHash,
-    normalizeCreditPolicy,
-    creditPeriods,
-    applyCreditDrawUsage,
-    CREDIT_POLICY_FIELDS,
-    computeCreditCommitment,
-    computeCreditNullifier,
-    deriveRemainderNonce,
-    computeCreditRecoveryPad,
-    recoverCreditRemainder,
-} from "./creditCommitment";
-export { FIELD_MODULUS, generateNonce, generateCreditSharedKey } from "./random";
-export type {
-    NoteBytes,
-    NoteEncryptionContext,
-    NoteDecryptionContext,
-    CreditNoteEncryptionContext,
-    CreditNoteDecryptionContext,
-} from "./encryption";
-export {
-    viewingPublicKey,
-    encryptPrivateTransferNote,
+    decryptCreditNote,
     decryptPrivateTransferNote,
     encryptCreditNote,
-    decryptCreditNote,
+    encryptPrivateTransferNote,
     normalizeCreditDeliveryState,
-} from "./encryption";
+    viewingPublicKey,
+} from "./delivery/encryption";
+export type {
+    CreditNoteDecryptionContext,
+    CreditNoteEncryptionContext,
+    NoteBytes,
+    NoteDecryptionContext,
+    NoteEncryptionContext,
+} from "./delivery/encryption";
+export { Disclosure } from "./disclosure/disclosure";
+export type {
+    CreditOpening,
+    DisclosureExport,
+    DisclosureOutput,
+    DisclosureResult,
+} from "./disclosure/disclosure";
+export { MissingCapabilityError } from "./errors";
+export { createClue, createClueFromSeed, deriveClueKey, validateClueKey } from "./fmd/fmd";
+export { computeNoteCommitment, computeNoteIdentity } from "./notes/commitment";
+export {
+    CREDIT_POLICY_FIELDS,
+    applyCreditDrawUsage,
+    computeCreditCommitment,
+    computeCreditNullifier,
+    computeCreditRecoveryPad,
+    computeCreditSharedKeyHash,
+    creditPeriods,
+    deriveRemainderNonce,
+    normalizeCreditPolicy,
+    recoverCreditRemainder,
+} from "./notes/creditCommitment";
+export { computeNoteNullifier } from "./notes/nullifier";
+export type {
+    CreditDeliveryState,
+    CreditNote,
+    CreditPolicy,
+    CreditRemainderRecovery,
+    Note,
+    ProtocolContext,
+    ReceivingKeys,
+} from "./types";
+export {
+    AuthorizedStatement,
+    Detector,
+    NullifierCapability,
+    ViewingCapability,
+    WalletAuthorization,
+} from "./wallet/capabilities";
+export type { WalletAuthorizationProvider } from "./wallet/capabilities";
+export {
+    WALLET_AUTHORIZATION_TYPES,
+    computeOwnerAddress,
+    computeWalletAuthorizationDigest,
+    signWalletAuthorization,
+    verifyWalletAuthorization,
+    walletAuthorizationTypedData,
+} from "./wallet/wallet";
+export type {
+    WalletAuthorizationRequest,
+    WalletAuthorizationWitness,
+    WalletBytes,
+    WalletOperation,
+} from "./wallet/wallet";
+export { PublicWallet, Wallet } from "./wallet/wallet-object";
 
-export type { Hex, Address } from "./primitives";
+export type { Address, Hex } from "./crypto/primitives";
 
-export { encodeMemo, decodeMemoText, MAX_MEMO_BYTES, type Memo } from "./memo";
-export { createSigningRequest } from "./signing-request";
-export type { SigningRequest } from "./signing-request";
+export { MAX_MEMO_BYTES, decodeMemoText, encodeMemo, type Memo } from "./delivery/memo";
+export { createSigningRequest } from "./wallet/signing-request";
+export type { SigningRequest } from "./wallet/signing-request";
 
 export {
     MAX_CIPHERTEXT_BYTES,
     deliveryCodec,
     deliveryHeader,
     validateDeliveryCiphertext,
-} from "./delivery-codec";
+} from "./delivery/delivery-codec";
 
-export { decodeDeliveryHeader } from "./delivery-codec";
-export { fundsV1, creditV1 } from "./payload";
-export type { DeliveryKind } from "./delivery-codec";
+export { decodeDeliveryHeader } from "./delivery/delivery-codec";
+export type { DeliveryKind } from "./delivery/delivery-codec";
+export { creditV1, fundsV1 } from "./delivery/payload";
 
-export type { FundsDataV1, CreditDataV1 } from "./types";
+export type { CreditDataV1, FundsDataV1 } from "./types";

@@ -1,11 +1,11 @@
-export { ProtocolRpcClient, ProtocolRpcError } from "./ProtocolRpcClient";
+export { ProtocolRpcClient, ProtocolRpcError } from "./client/ProtocolRpcClient";
 export type {
-    ProtocolRpcClientOptions,
-    ProtocolRpcReader,
-    ProtocolRpcConnectionOptions,
     ProtocolRpcChain,
-} from "./ProtocolRpcClient";
-export { defineDeployment } from "./deployment";
-export type { ProtocolDeployment, ContractDeployment } from "./deployment";
-export type * from "./types";
+    ProtocolRpcClientOptions,
+    ProtocolRpcConnectionOptions,
+    ProtocolRpcReader,
+} from "./client/ProtocolRpcClient";
 export { MAX_UPDATE_BLOCKS } from "./constants";
+export { defineDeployment } from "./deployment/deployment";
+export type { ContractDeployment, ProtocolDeployment } from "./deployment/deployment";
+export type * from "./types";

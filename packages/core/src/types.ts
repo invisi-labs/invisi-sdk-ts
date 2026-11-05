@@ -1,4 +1,4 @@
-import type { Memo } from "./memo";
+import type { Memo } from "./delivery/memo";
 /** Built-in funds v1 application fields; other versions define their own schemas. */
 export type FundsDataV1 = { memo?: Memo };
 /** Built-in Credit v1 application fields. */

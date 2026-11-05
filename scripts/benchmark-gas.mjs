@@ -28,7 +28,7 @@ const { poseidonHash } = require("@invisi-labs/core");
 const { NativeProver } = require("@invisi-labs/prover/native");
 const protocolRoot = resolve(process.env.INVISI_PROTOCOL_DIR ?? join(root, "../invisi-protocol"));
 const output = resolve(
-    process.env.GAS_BENCHMARK_OUTPUT ?? join(root, "packages/sdk/src/data/gas-benchmarks.json")
+    process.env.GAS_BENCHMARK_OUTPUT ?? join(root, "packages/sdk/src/gas/data/gas-benchmarks.json")
 );
 const broadcasterFee = BigInt(process.env.GAS_BENCHMARK_BROADCASTER_FEE ?? "0");
 if (broadcasterFee < 0n || broadcasterFee >= 1n << 128n)

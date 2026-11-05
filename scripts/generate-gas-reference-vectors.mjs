@@ -3,11 +3,11 @@ import { createRequire } from "node:module";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-const catalogPath = "packages/sdk/src/data/gas-benchmarks.json";
+const catalogPath = "packages/sdk/src/gas/data/gas-benchmarks.json";
 const bytes = readFileSync(catalogPath);
 const profiles = JSON.parse(bytes);
 const result = await build({
-    entryPoints: ["packages/sdk/src/gas-estimation.ts"],
+    entryPoints: ["packages/sdk/src/gas/gas-estimation.ts"],
     bundle: true,
     platform: "node",
     format: "cjs",
@@ -55,7 +55,7 @@ for (const profile of profiles)
         }
     }
 writeFileSync(
-    "packages/sdk/src/data/gas-reference-vectors.json",
+    "packages/sdk/src/gas/data/gas-reference-vectors.json",
     JSON.stringify(
         {
             tsCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
