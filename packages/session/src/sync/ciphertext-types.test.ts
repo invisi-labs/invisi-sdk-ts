@@ -4,7 +4,7 @@ import {
     Invisi,
     NoteOutput,
     type Note,
-    type NoteOutputOptions,
+    type PaymentRequest,
 } from "@invisi-labs/sdk";
 import { expectTypeOf, it } from "vitest";
 it("exposes raw application bytes without a configurable envelope version or codec registry", () => {
@@ -14,7 +14,7 @@ it("exposes raw application bytes without a configurable envelope version or cod
     expectTypeOf(creditV1.encode({ memo: "agreement" })).toEqualTypeOf<Uint8Array>();
 });
 function checkTypes() {
-    const good: NoteOutputOptions = {
+    const good: PaymentRequest = {
         chainId: 1n,
         protocolAddress: "0x1111111111111111111111111111111111111111",
         tokenAddress: "0x2222222222222222222222222222222222222222",
@@ -22,9 +22,9 @@ function checkTypes() {
         amount: 1n,
         payload: fundsV1.encode({ memo: "hello" }),
     };
-    const unknown: NoteOutputOptions = { ...good, payload: new Uint8Array([255, 99, 0]) };
+    const unknown: PaymentRequest = { ...good, payload: new Uint8Array([255, 99, 0]) };
     // @ts-expect-error A payload is bytes, not a versioned JavaScript schema object.
-    const wrong: NoteOutputOptions = { ...good, payload: { version: 2, data: {} } };
+    const wrong: PaymentRequest = { ...good, payload: { version: 2, data: {} } };
     // @ts-expect-error Only the factory constructs an output preparation input.
     const removed: NoteOutput = { to: "recipient", amount: 1n };
     // @ts-expect-error The output constructor is private; use NoteOutput.create.

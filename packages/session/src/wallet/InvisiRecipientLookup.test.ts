@@ -67,7 +67,7 @@ describe("per-output receiving-key lookup", () => {
                 ...h.h.context,
                 amount: 1n,
                 recipient,
-            } as import("../../../sdk/src/notes/NoteOutput").NoteOutputOptions);
+            } as import("../../../sdk/src/notes/NoteOutput").PaymentRequest);
             expect(output.deliveryPending).toBe(false);
             await invisi.prepareShield(shield(h, output));
         }
@@ -248,7 +248,7 @@ describe("per-output receiving-key lookup", () => {
     });
     it("keeps lookup selection in recipient types without public resolver injection", () => {
         expectTypeOf<
-            import("../../../sdk/src/notes/NoteOutput").NoteOutputOptions
+            import("../../../sdk/src/notes/NoteOutput").PaymentRequest
         >().not.toHaveProperty("addressResolver");
         expectTypeOf<import("../../../sdk/src/client/Invisi").InvisiOptions>().not.toHaveProperty(
             "addressLookup"

@@ -16,47 +16,21 @@ import type { PreparedOutput } from "../transactions/operation-types";
 import type { AddressLookup } from "./recipient-infrastructure";
 import { resolveRecipient } from "./resolve-recipient";
 
-export interface NoteOutputContext {
-    chainId: bigint;
-    protocolAddress: Hex;
-    tokenAddress: Hex;
-}
-export type NoteOutputRecipient =
-    | {
-          type: "evm";
-          address: string;
-          envelope?: boolean;
-          addressLookup?: AddressLookup;
-          nonce?: bigint | undefined;
-      }
-    | { type: "invisi"; address: string; nonce?: bigint | undefined }
-    | { type: "identity"; identity: Hex };
-type EncryptedRecipient =
-    | {
-          type: "evm";
-          address: string;
-          envelope?: true;
-          addressLookup?: AddressLookup;
-          nonce?: bigint | undefined;
-      }
-    | { type: "invisi"; address: string; nonce?: bigint | undefined };
-export type NoteOutputOptions = NoteOutputContext & {
-    amount: bigint;
-} & (
-        | { recipient: EncryptedRecipient; payload?: Uint8Array }
-        | {
-              recipient:
-                  | {
-                        type: "evm";
-                        address: string;
-                        envelope: false;
-                        addressLookup?: AddressLookup;
-                        nonce?: bigint | undefined;
-                    }
-                  | { type: "identity"; identity: Hex };
-              payload?: never;
-          }
-    );
+import type {
+    NoteOutputContext,
+    NoteOutputRecipient,
+    PaymentRequest,
+    NoteOutputExecutionOptions,
+} from "../payment-request/types";
+export type {
+    NoteOutputContext,
+    NoteOutputRecipient,
+    PaymentRequest,
+    NoteOutputExecutionOptions,
+} from "../payment-request/types";
+import { encodePaymentRequest, decodePaymentRequest } from "../payment-request/codec";
+import { assertRequestMatchesOutput } from "../payment-request/match-output";
+import { applyExecutionOptions } from "../payment-request/execution";
 function nonceValue(value: bigint): bigint {
     if (typeof value !== "bigint" || value < 0n || value >= FIELD_MODULUS)
         throw new RangeError("nonce must be a canonical BN254 field element");
@@ -112,6 +86,7 @@ const outputCreation = Symbol("NoteOutput.create");
 /** Immutable output statement and optional recoverable opening. */
 export class NoteOutput {
     readonly to: string;
+    readonly ipp: string;
     readonly amount: bigint;
     readonly identity: Hex;
     readonly commitment: Hex;
@@ -123,10 +98,11 @@ export class NoteOutput {
     declare readonly nonce: bigint | undefined;
     declare readonly payload: Uint8Array;
     declare readonly preparedOutput: PreparedOutput;
-    private constructor(output: PreparedOutput, token: symbol) {
+    private constructor(output: PreparedOutput, token: symbol, ipp: string) {
         if (token !== outputCreation)
             throw new TypeError("outputs must be created with NoteOutput.create");
         const saved = structuredClone(output);
+        this.ipp = ipp;
         this.to = saved.address;
         this.amount = saved.amount;
         this.identity = saved.identity;
@@ -142,8 +118,15 @@ export class NoteOutput {
         });
         Object.freeze(this);
     }
-    static async create(options: NoteOutputOptions): Promise<NoteOutput> {
-        rejectLegacy(options);
+    static async create(
+        input: PaymentRequest | string,
+        execution: NoteOutputExecutionOptions = {}
+    ): Promise<NoteOutput> {
+        if (typeof input !== "string") rejectLegacy(input);
+        const request =
+            typeof input === "string" ? decodePaymentRequest(input) : structuredClone(input);
+        rejectLegacy(request);
+        const options = applyExecutionOptions(request, execution);
         if (
             typeof options.amount !== "bigint" ||
             options.amount <= 0n ||
@@ -236,6 +219,7 @@ export class NoteOutput {
                 clue: hexlify(createClue(keys.clueKey)) as Hex,
             };
         }
+        const ipp = typeof input === "string" ? input : encodePaymentRequest(request);
         return new NoteOutput(
             {
                 context,
@@ -249,7 +233,8 @@ export class NoteOutput {
                 address,
                 change: false,
             },
-            outputCreation
+            outputCreation,
+            ipp
         );
     }
     assertCommitment(expectedHex: Hex): void {
@@ -380,6 +365,7 @@ export async function materializeNoteOutput(
         )) !== output.commitment
     )
         throw new Error("note output commitment mismatch");
+    assertRequestMatchesOutput(payment.ipp, output);
     if (pending) {
         if (recipient.type !== "evm") throw new Error("only EVM outputs may have pending delivery");
         const resolved = await resolveRecipient(

@@ -74,7 +74,7 @@ export type {
 export { InvisiError } from "./errors";
 export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
 export { NoteOutput } from "./notes/NoteOutput";
-export type { NoteOutputContext, NoteOutputOptions, NoteOutputRecipient } from "./notes/NoteOutput";
+export type { NoteOutputContext, PaymentRequest, NoteOutputRecipient } from "./notes/NoteOutput";
 export { Protocol } from "./protocol/Protocol";
 export type {
     CancelCreditPreparation,
@@ -153,3 +153,6 @@ export type {
     BroadcasterFeeSource,
     WithBroadcasterOptions,
 } from "./broadcaster/broadcaster-preparation";
+
+export { encodePaymentRequest, decodePaymentRequest } from "./payment-request/codec";
+export type { NoteOutputExecutionOptions } from "./payment-request/types";

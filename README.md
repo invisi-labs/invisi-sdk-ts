@@ -397,6 +397,55 @@ Funds outputs without delivery use paired empty ciphertext/clue bytes. Their com
 
 Repricing retains the fixed output identity, commitment and delivery. Mutable note/delivery/recipient snapshots are detached copies, and a local delivery fingerprint detects accidental corruption without authenticating storage. Create a fresh output for each distinct payment; retain one only for retries or repricing of that payment. All preparation outputs must be created with `NoteOutput.create`; raw output objects are rejected.
 
+### Portable Note payment requests (IPR)
+
+`PaymentRequest` describes the parameters for creating a Note output. `encodePaymentRequest(request)` and `decodePaymentRequest(ipr)` work offline and never select a nonce or resolve registered addresses.
+
+```ts
+import { NoteOutput, encodePaymentRequest, type PaymentRequest } from "@invisi-labs/sdk";
+
+const request: PaymentRequest = {
+    chainId: protocol.context.chainId,
+    protocolAddress: protocol.context.protocolAddress,
+    tokenAddress,
+    amount,
+    recipient: { type: "invisi", address: bobAddress },
+};
+const ipr = encodePaymentRequest(request);
+const output = await NoteOutput.create(ipr);
+const another = await NoteOutput.create(ipr, { nonce: chosenNonce });
+console.log(output.ipp); // The original request, with no generated nonce written back.
+```
+
+`NoteOutput.create(request)` also exposes the canonical request as its immutable `ipp` string. Missing request nonces are chosen independently for each output. A fixed request nonce cannot be overridden with a different value, and identity recipients reject nonce execution options. Fixed-nonce and identity requests produce a fixed commitment; they do not bypass on-chain duplicate-commitment checks. Encrypted deliveries use fresh cryptographic randomness and need not have identical ciphertext when restoring a request.
+
+EVM requests preserve the existing `recipient.envelope` default of true. Their local `recipient.addressLookup` is not encoded. A payer can select `NoteOutput.create(ipr, { addressLookup: "chain" })`; the default is `protocol-rpc`, resolved at preparation. This execution option applies only to encrypted EVM outputs. With object input, an explicit execution lookup takes precedence over the local recipient lookup. Invisi requests contain full public receiving materials and always use an envelope. Identity requests never contain an envelope or payload. An input request cannot include a commitment, signature, tree position, private key or arbitrary extra field.
+
+#### Canonical binary layout
+
+Text is `ipr:` followed by unpadded Base64URL. Integers are unsigned big-endian, addresses and public keys are raw bytes. The common header is:
+
+| Field | Bytes |
+| --- | ---: |
+| version (1) | 1 |
+| recipient type (1=evm, 2=invisi, 3=identity) | 1 |
+| chainId (positive uint64) | 8 |
+| protocolAddress | 20 |
+| tokenAddress | 20 |
+| amount (positive uint128) | 16 |
+
+Append exactly one recipient body:
+
+- EVM: ownerAddress (20), envelope flag (1), nonce-presence flag (1), nonce (32, only when present), then payloadLength (2) and payload when envelope is enabled.
+- Invisi: ownerAddress (20), compressed viewingPublicKey (33), clueKey (32), nonce-presence flag (1), optional nonce (32), payloadLength (2), payload.
+- Identity: identity (32), with no additional fields.
+
+Flags are exactly 0 or 1. A missing nonce differs from a present zero nonce. Nonces are canonical BN254 fields; identities are nonzero canonical fields. Empty/absent payload uses length zero. Raw payload is limited to 3936 bytes, matching the current Funds envelope's 4096-byte maximum. Canonical requests without payload or nonce contain 88 bytes for unencrypted EVM, 90 for encrypted EVM, 154 for Invisi and 98 for identity; their complete text lengths are 122, 124, 210 and 135 characters. A fixed address-mode nonce adds 32 binary bytes.
+
+Decoders reject unknown versions/types/fields, invalid addresses or key materials, out-of-range values, invalid flags, padding/noncanonical Base64URL, truncation and trailing bytes. The format does not authenticate the request issuer or assert on-chain receipt. Verify the request source, chain and deployment before paying.
+
+Language-neutral vectors include structured values, exact binary hex and complete encoded strings in [requests.json](packages/sdk/src/payment-request/testdata/requests.json). `python3 scripts/generate-payment-request-vectors.py` regenerates them independently using Python standard-library binary encoding, without invoking the TS codec. The codec supports Note payment requests.
+
 ### Raw application payloads and fixed SDK envelopes
 
 `prepareShield` and `prepareTransfer` accept `NoteOutput` instances created by the factory. The SDK always writes envelope v1, with first byte `0x01` for funds or `0x81` for Credit. Applications cannot select or inject custom envelope versions. Decryption dispatches by the authenticated header; unsupported envelope versions reject. Future SDK releases may implement another envelope version without coupling it to application schemas or the protocol/circuit version.

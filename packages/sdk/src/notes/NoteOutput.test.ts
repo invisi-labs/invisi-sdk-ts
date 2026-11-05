@@ -276,17 +276,17 @@ function recipientTypeChecks(
         // @ts-expect-error Opaque identities cannot carry a nonce.
         recipient: { type: "identity", identity, nonce: 1n },
     });
-    // @ts-expect-error Unencrypted outputs cannot carry application payloads.
     void NoteOutput.create({
         ...context,
         amount: 1n,
+        // @ts-expect-error Unencrypted outputs cannot carry application payloads.
         recipient: { type: "evm", address: identity, envelope: false },
         payload: new Uint8Array(),
     });
-    // @ts-expect-error Opaque identities cannot carry application payloads.
     void NoteOutput.create({
         ...context,
         amount: 1n,
+        // @ts-expect-error Opaque identities cannot carry application payloads.
         recipient: { type: "identity", identity },
         payload: new Uint8Array(),
     });

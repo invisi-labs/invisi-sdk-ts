@@ -150,7 +150,9 @@ export class Preparation<Result> {
             this.runtime.options.wallet.getReceivingAddress().toString();
         try {
             const output = await NoteOutput.create({
-                ...context,
+                chainId: context.chainId,
+                protocolAddress: context.protocolAddress,
+                tokenAddress: context.tokenAddress,
                 amount,
                 recipient: address.startsWith("0i")
                     ? { type: "invisi", address }
