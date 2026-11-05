@@ -8,3 +8,4 @@ export type {
 export { defineDeployment } from "./deployment";
 export type { ProtocolDeployment, ContractDeployment } from "./deployment";
 export type * from "./types";
+export { MAX_UPDATE_BLOCKS } from "./constants";

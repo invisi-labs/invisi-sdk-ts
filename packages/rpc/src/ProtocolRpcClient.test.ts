@@ -165,9 +165,9 @@ describe("ProtocolRpcClient", () => {
                 ? status()
                 : { blockHash: h(9), outputs: null, creditTransitions: null }
         );
-        await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 101n })).rejects.toThrow(
-            /100/
-        );
+        await expect(
+            client.getUpdates(context, { fromBlock: 1n, toBlock: 10001n })
+        ).rejects.toThrow(/100/);
         await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
             /anchor/
         );
@@ -1032,3 +1032,34 @@ it("preserves an empty Funds envelope in transaction updates", async () => {
         { leafIndex: 0, ciphertext: "0x", clue: "0x" },
     ]);
 });
+
+it("accepts exactly 10000 update blocks and reads only the requested canonical endpoint", async () => {
+    const { client, reader } = setup((method) =>
+        method === "invisi_getStatus"
+            ? {
+                  ...status(),
+                  indexedHead: {
+                      ...wireBlock,
+                      number: 20000,
+                      hash: h(20000),
+                      parentHash: h(19999),
+                  },
+              }
+            : { blockHash: h(10000), outputs: null, creditTransitions: null }
+    );
+    await expect(
+        client.getUpdates(context, { fromBlock: 1n, toBlock: 10000n })
+    ).resolves.toMatchObject({ block: { number: 10000n } });
+    expect(reader.getBlock.mock.calls.map(([number]) => number)).toEqual([10000n]);
+});
+it.each([null, { ...wireBlock, number: 9 }])(
+    "rejects update ranges outside indexed history %j",
+    async (indexedHead) => {
+        const { client, reader, requests } = setup(() => ({ ...status(), indexedHead }));
+        await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
+            /indexed/
+        );
+        expect(reader.getBlock).not.toHaveBeenCalled();
+        expect(requests).toHaveLength(1);
+    }
+);

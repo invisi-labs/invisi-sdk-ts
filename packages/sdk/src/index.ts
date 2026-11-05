@@ -103,7 +103,7 @@ export type {
     AggregateMember,
 } from "@invisi-labs/prover";
 
-export { ProtocolRpcError } from "@invisi-labs/rpc";
+export { ProtocolRpcError, MAX_UPDATE_BLOCKS } from "@invisi-labs/rpc";
 export type { ProtocolDeployment, RegisteredReceivingAddress } from "@invisi-labs/rpc";
 export { ProtocolRpcClient } from "./ProtocolRpcClient";
 export { AddressRegistry } from "./AddressRegistry";

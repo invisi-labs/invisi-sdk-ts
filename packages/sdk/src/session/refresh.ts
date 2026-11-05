@@ -1,3 +1,4 @@
+import { MAX_UPDATE_BLOCKS } from "@invisi-labs/rpc";
 import type {
     CanonicalBlock,
     ChainReader,
@@ -21,7 +22,7 @@ export interface RefreshOptions {
     toBlock?: bigint;
     /** Explicit permission to delegate detection; never provide a viewing or spending key. */
     detectionKey?: Uint8Array;
-    /** At most 100 blocks per service request. Reduce this on high-volume deployments. */
+    /** Defaults to MAX_UPDATE_BLOCKS (10000 blocks) per service request. Reduce this on high-volume deployments. */
     pageSize?: number;
     signal?: AbortSignal;
     /** Rebuild private inventory from these pages while retaining uncertain operations. */
@@ -43,9 +44,9 @@ export async function refreshWallet(
         signal?.throwIfAborted();
         if (typeof options.fromBlock !== "bigint" || options.fromBlock < runtime.fromBlock)
             throw new Error("refresh range precedes deployment");
-        const pageSize = options.pageSize ?? 100;
-        if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)
-            throw new Error("refresh page size must be 1..100");
+        const pageSize = options.pageSize ?? MAX_UPDATE_BLOCKS;
+        if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > MAX_UPDATE_BLOCKS)
+            throw new Error(`refresh page size must be 1..${MAX_UPDATE_BLOCKS}`);
         const status = await runtime.provider.getStatus(runtime.context, {
             ...(signal ? { signal } : {}),
         });
@@ -74,6 +75,16 @@ export async function refreshWallet(
             });
             if (page.block.number !== (end < toBlock ? end : toBlock))
                 throw new Error("Protocol RPC returned the wrong page anchor");
+            signal?.throwIfAborted();
+            // Empty candidates are not proof of an unchanged spent set (for example,
+            // a full payout has no outputs). Retain one final state refresh when all
+            // pages are empty; previous applications already observed this target.
+            if (
+                page.transactionHashes.length === 0 &&
+                (result || from + BigInt(pageSize) <= toBlock)
+            )
+                continue;
+            const firstApplication = result === undefined;
             result = await runtime.apply(
                 {
                     context: runtime.context,
@@ -82,7 +93,7 @@ export async function refreshWallet(
                 },
                 {
                     ...(signal ? { signal } : {}),
-                    ...(from === options.fromBlock && options.reset ? { reset: true } : {}),
+                    ...(firstApplication && options.reset ? { reset: true } : {}),
                 }
             );
             notes += result.notes;

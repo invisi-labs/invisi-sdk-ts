@@ -1,3 +1,4 @@
+import { MAX_UPDATE_BLOCKS } from "./constants";
 import type { Hex } from "@invisi-labs/core";
 import { MAX_CIPHERTEXT_BYTES, ReceivingAddress } from "@invisi-labs/core";
 import { getAddress, isAddress, getBytes } from "ethers";
@@ -549,9 +550,9 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         if (
             range.fromBlock < this.deployment.protocol.fromBlock ||
             range.toBlock < range.fromBlock ||
-            range.toBlock - range.fromBlock > 99n
+            range.toBlock - range.fromBlock >= BigInt(MAX_UPDATE_BLOCKS)
         )
-            invalid("RPC updates require at most 100 deployment blocks");
+            invalid(`RPC updates require at most ${MAX_UPDATE_BLOCKS} deployment blocks`);
         const fromBlock = numeric(range.fromBlock),
             toBlock = numeric(range.toBlock);
         let detectionKey: string | undefined;
@@ -561,9 +562,22 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                 "0x" +
                 Array.from(range.detectionKey, (b) => b.toString(16).padStart(2, "0")).join("");
         }
-        await this.getStatus(context, range.signal ? { signal: range.signal } : {});
+        const status = await this.readStatusMetadata(
+            context,
+            range.signal ? { signal: range.signal } : {}
+        );
+        if (status.indexedHead === null) invalid("RPC has not indexed any blocks");
+        const indexedHead = blockReference(status.indexedHead);
+        if (range.toBlock > indexedHead.number) invalid("RPC range exceeds indexed history");
         const block = await this.reader.getBlock(range.toBlock);
         if (block.number !== range.toBlock) invalid("Reader returned wrong block");
+        if (
+            indexedHead.number === block.number &&
+            (indexedHead.hash !== hash(block.hash) ||
+                indexedHead.parentHash !== hash(block.parentHash) ||
+                indexedHead.timestamp !== block.timestamp)
+        )
+            invalid("RPC canonical block mismatch");
         const anchor = { fromBlock, toBlock, blockHash: hash(block.hash) };
         const result = object(
             await this.rpc(

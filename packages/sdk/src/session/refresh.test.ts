@@ -14,7 +14,7 @@ function fixture() {
     const getUpdates = vi.fn(
         async (...[_context, range]: Parameters<ProtocolDataProvider["getUpdates"]>) => ({
             block: block(range.toBlock),
-            transactionHashes: [],
+            transactionHashes: [] as `0x${string}`[],
         })
     );
     const provider = { getStatus, getUpdates, getMembership: vi.fn() } as ProtocolDataProvider;
@@ -44,9 +44,14 @@ function fixture() {
 }
 it("pulls bounded indexed pages and resets private inventory only on the first page", async () => {
     const h = fixture();
+    h.getUpdates.mockImplementation(async (_context, range) => ({
+        block: block(range.toBlock),
+        transactionHashes: [hash],
+    }));
     const key = new Uint8Array(32).fill(1);
     const result = await refreshWallet(h.runtime, {
         fromBlock: 10n,
+        pageSize: 100,
         detectionKey: key,
         reset: true,
     });
@@ -82,12 +87,14 @@ it("rejects invalid ranges and service page anchors without applying anything", 
         { fromBlock: 9n },
         { fromBlock: 20n, toBlock: 19n },
         { fromBlock: 10n, toBlock: 261n },
-        { fromBlock: 10n, pageSize: 101 },
+        { fromBlock: 10n, pageSize: 10001 },
     ]) {
         await expect(refreshWallet(h.runtime, settings)).rejects.toThrow(/range|size|deployment/i);
     }
     h.getUpdates.mockImplementation(async () => ({ block: block(999n), transactionHashes: [] }));
-    await expect(refreshWallet(h.runtime, { fromBlock: 10n })).rejects.toThrow(/anchor/i);
+    await expect(refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100 })).rejects.toThrow(
+        /anchor/i
+    );
     expect(h.apply).not.toHaveBeenCalled();
 });
 it("stops on a failed page instead of skipping it", async () => {
@@ -96,4 +103,65 @@ it("stops on a failed page instead of skipping it", async () => {
     await expect(refreshWallet(h.runtime, { fromBlock: 10n })).rejects.toThrow("unavailable");
     expect(h.getUpdates).toHaveBeenCalledTimes(1);
     expect(h.apply).not.toHaveBeenCalled();
+});
+
+it("coalesces empty pages into one final state refresh", async () => {
+    const h = fixture();
+    h.apply.mockImplementation(async (batch) => ({
+        block: batch.block,
+        notes: 0,
+        credits: 0,
+        balances: [],
+    }));
+    const result = await refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100, reset: true });
+    expect(h.getUpdates).toHaveBeenCalledTimes(3);
+    expect(h.apply).toHaveBeenCalledTimes(1);
+    expect(h.apply).toHaveBeenCalledWith(
+        { context, block: block(260n), transactionHashes: [] },
+        { reset: true }
+    );
+    expect(result).toMatchObject({ notes: 0, credits: 0 });
+});
+it("skips empty leading and trailing pages and delays reset until actual application", async () => {
+    const h = fixture();
+    h.getUpdates.mockImplementation(async (_context, range) => ({
+        block: block(range.toBlock),
+        transactionHashes: range.fromBlock === 110n ? [hash] : [],
+    }));
+    await refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100, reset: true });
+    expect(h.apply).toHaveBeenCalledTimes(1);
+    expect(h.apply.mock.calls[0]![0].transactionHashes).toEqual([hash]);
+    expect(h.apply.mock.calls[0]![1].reset).toBe(true);
+});
+it("still validates skipped empty page anchors", async () => {
+    const h = fixture();
+    h.getUpdates.mockImplementation(async (_context, range) => ({
+        block: block(range.fromBlock === 210n ? 999n : range.toBlock),
+        transactionHashes: range.fromBlock === 10n ? [hash] : [],
+    }));
+    await expect(refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100 })).rejects.toThrow(
+        /anchor/
+    );
+    expect(h.apply).toHaveBeenCalledTimes(1);
+});
+
+it("defaults to 10000 blocks and accepts an explicit 10000 block page", async () => {
+    for (const pageSize of [undefined, 10000]) {
+        const h = fixture();
+        h.getStatus.mockResolvedValue({
+            indexedHead: block(10010n),
+            detectionEnabled: true,
+            checkedBits: 8,
+        });
+        await refreshWallet(h.runtime, {
+            fromBlock: 10n,
+            ...(pageSize === undefined ? {} : { pageSize }),
+        });
+        expect(
+            h.getUpdates.mock.calls.map(([, range]) => [range.fromBlock, range.toBlock])
+        ).toEqual([
+            [10n, 10009n],
+            [10010n, 10010n],
+        ]);
+    }
 });
