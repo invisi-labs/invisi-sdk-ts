@@ -1,5 +1,9 @@
 # @invisi-labs/rpc
 
+## 1.1.7
+
+- Add commitment-based Note lookup with independently verified Merkle membership and canonical chain anchors.
+
 ## 1.1.6
 
 ### Patch Changes

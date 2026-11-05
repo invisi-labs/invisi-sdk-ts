@@ -1,5 +1,9 @@
 # @invisi-labs/core
 
+## 1.1.7
+
+- Organize cryptography, delivery and wallet capabilities into focused modules.
+
 ## 1.1.6
 
 ### Patch Changes

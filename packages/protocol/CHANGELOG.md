@@ -1,5 +1,9 @@
 # @invisi-labs/protocol
 
+## 1.1.7
+
+- Organize protocol capabilities by transaction and deployment responsibility.
+
 ## 1.1.6
 
 ### Patch Changes

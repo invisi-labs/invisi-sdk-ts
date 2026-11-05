@@ -1,7 +1,10 @@
 # @invisi-labs/sdk
 
-## Unreleased
+## 1.1.7
 
+- Add canonical cross-language IPR payment requests and fixed-size IPN Note delivery.
+- Add confirmed membership and owner spendability verification, plus final output and change export.
+- Rename NoteOutputOptions to PaymentRequest; move managed sessions and storage to @invisi-labs/session.
 - Separate managed wallet sessions and storage into `@invisi-labs/session`; retain stateless preparation in `@invisi-labs/sdk`.
 
 ## 1.1.6

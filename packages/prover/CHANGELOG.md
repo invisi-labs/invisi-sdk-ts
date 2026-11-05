@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.1.7
+
+- Organize proof adapters and authenticated resources into focused modules.
+
 ## 1.1.6
 
 ### Patch Changes

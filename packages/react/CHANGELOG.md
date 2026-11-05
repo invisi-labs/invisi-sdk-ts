@@ -1,7 +1,8 @@
 # @invisi-labs/react
 
-## Unreleased
+## 1.1.7
 
+- Use the independent @invisi-labs/session package for managed wallet integration.
 - Separate managed wallet sessions and storage into `@invisi-labs/session`; retain stateless preparation in `@invisi-labs/sdk`.
 
 ## 1.1.6
