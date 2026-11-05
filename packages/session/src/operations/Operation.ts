@@ -1,3 +1,4 @@
+import { TransactionOutput } from "@invisi-labs/sdk/session-support";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     acceptFundingSignature,
@@ -172,6 +173,12 @@ export class Operation {
             this.#saved.plan,
             this.#runtime.options.protocol,
             this.#runtime.options.gasBenchmarks
+        );
+    }
+    /** Final Note outputs, including change. Credit openings have no IPN export. */
+    getOutputs(): readonly TransactionOutput[] {
+        return Object.freeze(
+            this.#saved.plan.outputs.map((output) => new TransactionOutput(output))
         );
     }
     preview() {

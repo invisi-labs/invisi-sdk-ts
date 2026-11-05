@@ -496,6 +496,68 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         return value as boolean;
     }
 
+    /** Locate a Note by commitment, then independently authenticate its membership. */
+    async getNote(
+        context: DeploymentContext,
+        commitment: Hex,
+        block: CanonicalBlock
+    ): Promise<{ output: ProtocolOutput; membership: Membership } | null> {
+        this.context(context);
+        const leaf = fieldHash(commitment);
+        const response = await this.rpc("invisi_getNote", [leaf, numeric(block.number)]);
+        if (response === null) return null;
+        const result = object(response);
+        const { outputs } = await this.parseOutputCandidates(
+            block,
+            [result.output],
+            {
+                fromBlock: this.deployment.protocol.fromBlock,
+                toBlock: block.number,
+            },
+            false
+        );
+        if (outputs.length !== 1 || outputs[0]!.commitment !== leaf)
+            invalid("RPC note commitment mismatch");
+        const output = outputs[0]!;
+        const proof = object(result.membership);
+        const anchor = object(proof.anchor);
+        const membership = await this.getMembership(
+            context,
+            {
+                treeId: output.treeId,
+                leafIndex: output.leafIndex,
+                commitment: leaf,
+                root: fieldHash(anchor.root),
+            },
+            block
+        );
+        if (
+            integer(anchor.treeId) !== membership.treeId ||
+            integer(proof.leafIndex, 32) !== BigInt(membership.leafIndex) ||
+            fieldHash(proof.commitment) !== leaf ||
+            integer(anchor.leafCount, 32) <= BigInt(output.leafIndex) ||
+            integer(anchor.leafCount, 32) > 1n << BigInt(TREE_DEPTH)
+        )
+            invalid("RPC note membership binding mismatch");
+        const siblings = list(proof.siblings).map((value) => BigInt(fieldHash(value)));
+        if (
+            siblings.length !== membership.path.length ||
+            siblings.some((value, i) => value !== membership.path[i])
+        )
+            invalid("RPC note membership proof mismatch");
+        const anchorBlock = await this.canonical(anchor.block);
+        if (anchorBlock.number > block.number) invalid("RPC note membership anchor mismatch");
+        const current = await this.reader.getBlock(block.number);
+        if (
+            current.number !== block.number ||
+            hash(current.hash) !== hash(block.hash) ||
+            hash(current.parentHash) !== hash(block.parentHash) ||
+            current.timestamp !== block.timestamp
+        )
+            invalid("RPC note lookup block changed during query");
+        return { output, membership };
+    }
+
     async getMembership(
         context: DeploymentContext,
         input: { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex },

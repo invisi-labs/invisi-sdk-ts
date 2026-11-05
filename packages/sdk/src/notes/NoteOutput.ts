@@ -1,3 +1,4 @@
+import { exportPaymentNote } from "../payment-note/export";
 import {
     FIELD_MODULUS,
     ReceivingAddress,
@@ -117,6 +118,10 @@ export class NoteOutput {
             preparedOutput: { enumerable: true, get: () => structuredClone(saved) },
         });
         Object.freeze(this);
+    }
+    /** Private offline delivery data; does not assert that the output has been mined. */
+    exportPaymentNote(): string {
+        return exportPaymentNote(this.preparedOutput);
     }
     static async create(
         input: PaymentRequest | string,

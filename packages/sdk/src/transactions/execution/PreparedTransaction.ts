@@ -1,3 +1,4 @@
+import { TransactionOutput } from "../../notes/TransactionOutput";
 import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { ProofBundle, Prover } from "@invisi-labs/prover";
@@ -102,6 +103,12 @@ export class PreparedTransaction {
             this.#saved.plan,
             this.#runtime.options.protocol,
             this.#runtime.options.gasBenchmarks
+        );
+    }
+    /** Final Note outputs, including change; Credit outputs are not exported as IPN. */
+    getOutputs(): readonly TransactionOutput[] {
+        return Object.freeze(
+            this.#saved.plan.outputs.map((output) => new TransactionOutput(output))
         );
     }
     preview() {

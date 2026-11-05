@@ -1,3 +1,4 @@
+import { rememberProtocolConnection } from "./connections";
 import { Protocol as BaseProtocol } from "@invisi-labs/protocol";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { getAddress, type Provider } from "ethers";
@@ -9,7 +10,7 @@ const sources = new WeakMap<Protocol, Pick<ProtocolRpcClient, "getBroadcasters">
 export class Protocol extends BaseProtocol {
     static override async fromRpc(
         rpc: Pick<ProtocolRpcClient, "getDeployment"> &
-            Partial<Pick<ProtocolRpcClient, "getBroadcasters">>,
+            Partial<Pick<ProtocolRpcClient, "getBroadcasters" | "withReader">>,
         provider: Provider,
         options: { signal?: AbortSignal } = {}
     ): Promise<Protocol> {
@@ -17,6 +18,12 @@ export class Protocol extends BaseProtocol {
         const protocol = new Protocol({ deployment: verified.deployment });
         if (rpc.getBroadcasters)
             sources.set(protocol, rpc as Pick<ProtocolRpcClient, "getBroadcasters">);
+        if (rpc.withReader)
+            rememberProtocolConnection(
+                protocol,
+                provider,
+                rpc as Pick<ProtocolRpcClient, "withReader">
+            );
         return protocol;
     }
 

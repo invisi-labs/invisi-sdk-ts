@@ -27,3 +27,5 @@ export * from "./transactions/signing/funding";
 export * from "./transactions/signing/statement";
 
 export * from "./client/infrastructure";
+
+export { TransactionOutput } from "./notes/TransactionOutput";

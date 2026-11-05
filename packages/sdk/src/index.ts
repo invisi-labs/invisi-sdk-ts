@@ -156,3 +156,12 @@ export type {
 
 export { encodePaymentRequest, decodePaymentRequest } from "./payment-request/codec";
 export type { NoteOutputExecutionOptions } from "./payment-request/types";
+
+export { PaymentNote, VerifiedPaymentNote, SpendablePaymentNote } from "./payment-note/PaymentNote";
+export { encodePaymentNote, decodePaymentNote } from "./payment-note/codec";
+export type { PaymentNoteData } from "./payment-note/types";
+export type {
+    PaymentNoteVerificationOptions,
+    PaymentNoteVerificationSettings,
+} from "./payment-note/verification";
+export { TransactionOutput } from "./notes/TransactionOutput";

@@ -134,3 +134,50 @@ Start with [02-05 Shield via broadcaster](02-transparent-amount/05-shield-via-br
 The same attachment method supports Transfer, Shield, Credit creation, top-up and cancellation. Credit draw and registration do not support broadcasting. Existing self-submission uses the original prepared handle and ethers. When private inputs already have sufficient change, that change pays the fee without increasing public funding. Otherwise an explicitly selected public funding source adds the fee to the original amount and requires an external funding signature; Shield uses that signature without a proof, while funded private operations prove before exporting funding authorization. Private inputs pay from notes/change without reducing business outputs or Credit balances. Cancellation deducts the fee from the refund. Preparation fails on insufficient funds, an excessive fee or an unstable estimate.
 
 Approve the final gross funding amount separately, or supply `fundingPermit` to sign an exact final permit through your application once fee preparation stabilizes. An existing permit is rejected when its public funding amount would increase without that callback. Managed operations atomically replace reservations under one operation id; the former managed handle becomes stale. Detached originals remain usable for ordinary self-submission. Do not execute against a deployment until its fee-enabled ABI and authenticated circuits are installed.
+
+### Payment requests and offline Note delivery
+
+IPR carries a recipient's payment request. IPN carries one definite Note opening after the payer has selected its nonce. This changes how an output is created and delivered; signing, proving and submission follow the existing [transparent payment](02-transparent-amount/01-alice-to-bob.ts) or [private transfer](03-hidden-amount/03-notes-to-three-with-change.ts) example.
+
+```ts
+import { NoteOutput, PaymentNote, encodePaymentRequest } from "@invisi-labs/sdk";
+
+// 1. Recipient: publish a reusable request, for example in a QR code.
+const ipr = encodePaymentRequest({
+    ...protocol.context,
+    tokenAddress,
+    amount,
+    recipient: { type: "invisi", address: bobAddress },
+});
+
+// 2. Payer: replace direct object-based output creation with the received IPR.
+// No fixed request nonce means each payment chooses a fresh nonce.
+const output = await NoteOutput.create(ipr);
+// Pass outputs: [output] to prepareShield or prepareTransfer as in the existing examples.
+// Keep the final prepared handle after any broadcaster fee/change reconstruction.
+
+// 3. Payer: export only this recipient's output from the final prepared transaction.
+const recipientOutput = prepared.getOutputs().find(item => item.commitment === output.commitment);
+if (!recipientOutput) throw new Error("Payment output is missing from the final plan");
+const ipn = recipientOutput.exportPaymentNote();
+// Submit using the existing example's authorization/proof/ethers steps.
+// After confirmation, privately deliver ipn to Bob. Do not deliver your change Note.
+
+// 4. Bob: decode the opening and recompute its commitment.
+const note = await PaymentNote.from(ipn);
+if (BigInt(note.tokenAddress) !== BigInt(tokenAddress) || note.amount !== amount)
+    throw new Error("Payment does not match the requested token and amount");
+
+// 5. Public check: correct opening and confirmed on-chain membership; spent Notes may pass.
+// Protocol.fromRpc(protocolRpc, provider) supplies the verification connections.
+const verified = await note.verify(protocol);
+
+// 6. Owner check: Bob's spending Wallet and the latest unspent nullifier are also required.
+const spendable = await note.verifySpendable(protocol, bobWallet);
+const input = spendable.toInput();
+// Use inputs: [input] in a subsequent prepareTransfer; its authorization remains separate.
+```
+
+The sections above are separate recipient/payer steps, using the selected protocol, token and amount from the payment examples. They are not one additional executable scenario. IPN can be exported before submission, but only chain verification establishes receipt. `getOutputs()` includes generated change, so select the intended recipient's output. EVM recipients can also export IPN, with or without a chain envelope; identity-only recipients cannot. IPN contains private Note data and no wallet keys. Neither verification method signs or submits a transaction.
+
+For encoding layouts, nonce overrides and explicit verification connections, see [IPR](../README.md#portable-note-payment-requests-ipr) and [IPN](../README.md#offline-payment-notes-ipn).

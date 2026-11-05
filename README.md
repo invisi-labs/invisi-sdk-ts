@@ -446,6 +446,52 @@ Decoders reject unknown versions/types/fields, invalid addresses or key material
 
 Language-neutral vectors include structured values, exact binary hex and complete encoded strings in [requests.json](packages/sdk/src/payment-request/testdata/requests.json). `python3 scripts/generate-payment-request-vectors.py` regenerates them independently using Python standard-library binary encoding, without invoking the TS codec. The codec supports Note payment requests.
 
+### Offline payment Notes (IPN)
+
+IPN privately delivers a complete funds Note opening. It uses `ipn:` plus canonical unpadded Base64URL, with a fixed 149-byte body and 203-character text. It contains no application payload, ciphertext, clue, viewing key, spending key or signature.
+
+```ts
+import { PaymentNote } from "@invisi-labs/sdk";
+
+// Use the final prepared/quoted plan so generated change is included.
+const ipn = prepared.getOutputs()[0].exportPaymentNote();
+// Deliver privately; this string alone does not prove that a payment was mined.
+const note = await PaymentNote.from(ipn);
+
+// Protocol.fromRpc(protocolRpc, provider) captures the public verification connections.
+const verified = await note.verify(protocol);
+// Confirms the opening and canonical Merkle membership. Spent Notes may pass.
+console.log(verified.checkedAt.number);
+
+const spendable = await note.verifySpendable(protocol, ownerWallet);
+// Additionally requires this owner's spending Wallet and a currently unspent nullifier.
+const input = spendable.toInput();
+console.log(spendable.spendabilityCheckedAt.number);
+```
+
+`NoteOutput.exportPaymentNote()` also exports a created output directly. Neither export asserts that the transaction was mined. Both stateless `PreparedTransaction` and managed session operations expose detached `getOutputs()` snapshots, including change. An identity recipient has no recoverable owner/nonce opening and rejects IPN export. Credit openings have no IPN export.
+
+`PaymentNote.from(ipn)` validates the encoding and recomputes identity and commitment. `verify()` checks deployment context and code, obtains a commitment lookup, validates the Merkle path, independently checks the Protocol's accepted root through the chain connection, and rechecks canonical blocks. It does not inspect spent status or wallet authority. `verifySpendable()` includes those checks, requires an actual owner `Wallet` with spending authorization capability, and checks the latest chain nullifier/root state without signing. `toInput()` is available only on the spendable result. Returned paths, blocks and inputs are detached copies.
+
+Both methods accept `{ confirmations }` (default 1). The verification anchor is the indexed head or the requested confirmation-depth block, whichever is earlier. A manually constructed Protocol can supply connections explicitly: `{ protocolRpc, provider, confirmations }` or `{ protocolRpc, chainReader, confirmations }`. Protocol RPC is an untrusted index; chain reads provide the verification anchor. An absent lookup may mean indexing has not caught up. Match the amount and token to your business request before accepting payment. Spendability is a point-in-time observation; transaction preparation and simulation still check operation-specific authorization and execution restrictions.
+
+#### IPN binary layout
+
+All integers are unsigned big-endian. Addresses and field elements are raw bytes.
+
+| Field | Bytes |
+| --- | ---: |
+| version (1) | 1 |
+| chainId (positive uint64) | 8 |
+| protocolAddress | 20 |
+| tokenAddress | 20 |
+| amount (positive uint128) | 16 |
+| ownerAddress | 20 |
+| nonce (canonical BN254 field, zero allowed) | 32 |
+| commitment (nonzero canonical BN254 field) | 32 |
+
+`encodePaymentNote` and `decodePaymentNote` provide offline structural encoding and decoding; semantic commitment validation is performed by `PaymentNote.from`. Unknown versions, extra fields, malformed addresses, invalid ranges, padding, nonzero unused Base64URL bits and nonexact lengths are rejected. Independent Python-generated wire vectors are in [notes.json](packages/sdk/src/payment-note/testdata/notes.json); regenerate with `python3 scripts/generate-payment-note-vectors.py`.
+
 ### Raw application payloads and fixed SDK envelopes
 
 `prepareShield` and `prepareTransfer` accept `NoteOutput` instances created by the factory. The SDK always writes envelope v1, with first byte `0x01` for funds or `0x81` for Credit. Applications cannot select or inject custom envelope versions. Decryption dispatches by the authenticated header; unsupported envelope versions reject. Future SDK releases may implement another envelope version without coupling it to application schemas or the protocol/circuit version.
