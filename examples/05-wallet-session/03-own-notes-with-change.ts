@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { hkdfSync } from "node:crypto";
 import { createRequire } from "node:module";
@@ -78,10 +79,13 @@ try {
     const prepared = await session.prepareTransfer({
         tokenAddress,
         outputs: [
-            {
-                to: bob.publicWallet.getAddress(),
+            await NoteOutput.create({
+                chainId: protocol.context.chainId,
+                protocolAddress: protocol.context.protocolAddress,
+                tokenAddress,
                 amount: balance.availableKnown / 2n,
-            },
+                recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
+            }),
         ],
         deadline: BigInt(Math.floor(Date.now() / 1000)) + 3600n,
     });

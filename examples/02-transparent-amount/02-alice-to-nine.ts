@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { PublicWallet } from "@invisi-labs/sdk";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
@@ -45,10 +46,18 @@ try {
     }
 
     // 3. Use each recipient's provided 0i privacy address and send 1 token to each.
-    const outputs = accounts.slice(1).map((recipient) => ({
-        to: recipient.receivingAddress,
-        amount,
-    }));
+    const outputs = await Promise.all(
+        accounts.slice(1).map(
+            async (recipient) =>
+                await NoteOutput.create({
+                    chainId: protocol.context.chainId,
+                    protocolAddress: protocol.context.protocolAddress,
+                    tokenAddress,
+                    amount: amount,
+                    recipient: { type: "invisi", address: recipient.receivingAddress },
+                })
+        )
+    );
 
     // 4. The SDK builds transparent-amount funding; ethers handles subsequent on-chain submission.
     const aliceWallet = PublicWallet.fromAddress(alice.receivingAddress);

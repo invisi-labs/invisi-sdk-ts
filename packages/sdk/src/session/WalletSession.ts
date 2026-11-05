@@ -1,3 +1,4 @@
+import { configureRecipientInfrastructure } from "../recipient-infrastructure";
 import { Wallet } from "@invisi-labs/core";
 import { walletHistory, type HistoryOptions } from "./history";
 import { prepareWithErrors } from "../errors";
@@ -43,6 +44,11 @@ export class WalletSession {
     readonly protocol: Protocol;
 
     constructor(options: WalletSessionOptions) {
+        if ("addressLookup" in options || "addressResolver" in options)
+            throw new TypeError(
+                "Recipient lookup belongs to each EVM output; caller resolver injection is not supported"
+            );
+        options = configureRecipientInfrastructure(options);
         if ("ciphertextCodecs" in options || "envelopeVersion" in options) {
             throw new Error(
                 "SDK envelope versions are fixed; encode application payload bytes externally"
@@ -80,7 +86,7 @@ export class WalletSession {
         this.scope = Object.freeze({
             namespace: options.namespace ?? "default",
             ...options.protocol.context,
-            walletIdentity: options.wallet.walletIdentity,
+            ownerAddress: options.wallet.ownerAddress,
         });
         scopeKey(this.scope);
         Object.freeze(this);
@@ -316,7 +322,7 @@ export class WalletSession {
     }
 
     toJSON() {
-        return { walletSession: true, walletIdentity: this.scope.walletIdentity };
+        return { walletSession: true, ownerAddress: this.scope.ownerAddress };
     }
 
     [Symbol.for("nodejs.util.inspect.custom")]() {

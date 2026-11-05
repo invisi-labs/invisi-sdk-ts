@@ -1,3 +1,4 @@
+import { configureRecipientInfrastructure } from "./recipient-infrastructure";
 import type { WalletSessionInfrastructure } from "./session/operation-types";
 import { prepareWithErrors } from "./errors";
 import { copyGasBenchmarks } from "./gas-estimation";
@@ -14,12 +15,8 @@ import type {
 } from "./explicit-types";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import type { Provider } from "ethers";
-import {
-    EthersChainReader,
-    EthersFundingVerifier,
-    EthersAddressResolver,
-} from "./integrations/ethers";
-import { MissingCapabilityError, PublicWallet, ReceivingAddress } from "@invisi-labs/core";
+import { EthersChainReader, EthersFundingVerifier } from "./integrations/ethers";
+import { MissingCapabilityError, PublicWallet } from "@invisi-labs/core";
 import { AddressRegistry } from "./AddressRegistry";
 import type { RegistrationPreparation, RegistrationOperation } from "@invisi-labs/protocol";
 import { Protocol, type ChainReader } from "@invisi-labs/protocol";
@@ -37,8 +34,6 @@ type InvisiInfrastructure = Omit<
     | "signer"
     | "fundingSigner"
 > & {
-    /** Recipient discovery source; defaults to protocol-rpc. An explicit addressResolver takes precedence. */
-    addressLookup?: "chain" | "protocol-rpc";
     provider?: Provider;
     chainReader?: ChainReader;
 };
@@ -49,7 +44,7 @@ export type InvisiOptions = InvisiInfrastructure;
 export type RegistrationPreparationOptions = Pick<RegistrationPreparation, "update" | "deadline"> &
     Pick<TransactionIdentity, "wallet">;
 
-/** Wallet identity and session permissions; shared infrastructure belongs to InvisiOptions. */
+/** Owner address and session permissions; shared infrastructure belongs to InvisiOptions. */
 export type ConnectionOptions = Pick<
     WalletSessionOptions,
     "wallet" | "protocol" | "namespace" | "viewing" | "authorization" | "signer" | "fundingSigner"
@@ -60,6 +55,10 @@ export class Invisi {
     readonly #options: InvisiInfrastructure;
 
     constructor(options: InvisiOptions = {}) {
+        if ("addressLookup" in options || "addressResolver" in options)
+            throw new TypeError(
+                "Recipient lookup belongs to each EVM output; caller resolver injection is not supported"
+            );
         if ("ciphertextCodecs" in options || "envelopeVersion" in options) {
             throw new Error(
                 "SDK envelope versions are fixed; encode application payload bytes externally"
@@ -101,14 +100,7 @@ export class Invisi {
         }
         const selected = { ...options };
         const combined = { ...this.#options, ...selected };
-        const { provider, addressLookup = "protocol-rpc", ...runtime } = combined;
-        if (
-            addressLookup !== undefined &&
-            addressLookup !== "chain" &&
-            addressLookup !== "protocol-rpc"
-        ) {
-            throw new Error("Invalid recipient address lookup source");
-        }
+        const { provider, ...runtime } = combined;
         const reader =
             combined.chainReader ?? (provider ? new EthersChainReader(provider) : undefined);
         if (!reader) throw new MissingCapabilityError("chain reader");
@@ -118,54 +110,18 @@ export class Invisi {
         if (runtime.protocolRpc instanceof ProtocolRpcClient) {
             runtime.protocolRpc = runtime.protocolRpc.withReader(reader);
         }
-        const registry = selected.protocol.deployment.registry;
         const fundingVerifier =
             combined.fundingVerifier ??
             (provider
                 ? new EthersFundingVerifier(provider, selected.protocol.context.chainId)
                 : undefined);
-        let addressResolver = combined.addressResolver;
-        if (!addressResolver && registry) {
-            if (addressLookup === "protocol-rpc") {
-                const rpc = runtime.protocolRpc;
-                addressResolver = async (identity) => {
-                    if (!(rpc instanceof ProtocolRpcClient)) {
-                        throw new MissingCapabilityError("Protocol RPC recipient discovery");
-                    }
-                    const discovered = await rpc.getDeployment(selected.protocol.context.chainId);
-                    const expected = selected.protocol.deployment;
-                    if (
-                        discovered.protocol.address !== expected.protocol.address ||
-                        discovered.protocol.runtimeCodeHash !== expected.protocol.runtimeCodeHash ||
-                        discovered.protocol.fromBlock !== expected.protocol.fromBlock ||
-                        discovered.registry?.address !== registry.address ||
-                        discovered.registry.runtimeCodeHash !== registry.runtimeCodeHash ||
-                        discovered.registry.fromBlock !== registry.fromBlock
-                    )
-                        throw new Error("Recipient registry deployment pins mismatch");
-                    const registration = await rpc.getReceivingAddress(identity);
-                    return registration
-                        ? ReceivingAddress.parse(registration.receivingAddress).getReceivingKeys()
-                        : null;
-                };
-            } else if (provider) {
-                addressResolver = new EthersAddressResolver(
-                    provider,
-                    {
-                        chainId: selected.protocol.context.chainId,
-                        registryAddress: registry.address,
-                    },
-                    registry.runtimeCodeHash
-                ).lookup;
-            }
-        }
-        return {
+        return configureRecipientInfrastructure({
             ...runtime,
+            ...(provider ? { provider } : {}),
             chainReader: reader,
             ...(fundingVerifier ? { fundingVerifier } : {}),
-            ...(addressResolver ? { addressResolver } : {}),
             protocol: selected.protocol,
-        } as WalletSessionOptions;
+        } as WalletSessionOptions);
     }
 
     /** Discover the selected chain's registry and prepare an independent signing request. */

@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { discoverCandidates } from "./discover-candidates.js";
 import { randomInt } from "node:crypto";
@@ -91,10 +92,13 @@ try {
         inputs,
         deadline,
         outputs: [
-            {
-                to: charlie.publicWallet.getAddress(),
+            await NoteOutput.create({
+                chainId: protocol.context.chainId,
+                protocolAddress: protocol.context.protocolAddress,
+                tokenAddress,
                 amount: charlieAmount,
-            },
+                recipient: { type: "invisi", address: charlie.publicWallet.getAddress() },
+            }),
         ],
         withdrawal: {
             to: bob.address,

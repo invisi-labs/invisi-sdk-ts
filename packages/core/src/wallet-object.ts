@@ -16,11 +16,6 @@ class WalletAddress {
         this.#address = address;
     }
 
-    get walletIdentity(): `0x${string}` {
-        return this.#address.walletIdentity;
-    }
-
-    /** The checksummed EVM owner; available without receiving keys or a registry lookup. */
     get ownerAddress(): `0x${string}` {
         return this.#address.ownerAddress;
     }
@@ -47,11 +42,11 @@ class WalletAddress {
 
     /** Nullifiers derive from public identity and do not grant spending authority. */
     exportNullifier(): NullifierCapability {
-        return NullifierCapability.fromIdentity(this.walletIdentity);
+        return NullifierCapability.fromIdentity(this.ownerAddress);
     }
 
     toJSON() {
-        return { walletIdentity: this.walletIdentity, address: this.#address.toString() };
+        return { ownerAddress: this.ownerAddress, address: this.#address.toString() };
     }
 
     [Symbol.for("nodejs.util.inspect.custom")]() {
@@ -106,14 +101,14 @@ export class Wallet extends WalletAddress {
             const address = ReceivingAddress.from(raw);
             return new Wallet(address, {
                 viewing: new ViewingCapability(
-                    raw.walletIdentity,
+                    raw.ownerAddress,
                     raw.viewingPrivateKey,
                     raw.viewingPublicKey
                 ),
                 detection: new Detector(raw.detectionKey),
-                nullifier: NullifierCapability.fromIdentity(raw.walletIdentity),
+                nullifier: NullifierCapability.fromIdentity(raw.ownerAddress),
                 authorization: await WalletAuthorization.fromMaterial(
-                    raw.walletIdentity,
+                    raw.ownerAddress,
                     raw.spendingPrivateKey
                 ),
             });

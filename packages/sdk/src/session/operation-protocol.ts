@@ -43,10 +43,10 @@ export function requiresAuthorization(plan: OperationPlan): boolean {
         BigInt(plan.params.feeRecipient ?? 0n) === 0n &&
         (plan.funding.amount ?? 0n) === 0n &&
         plan.fundingMode === "none" &&
-        BigInt(plan.params.withdrawalAddress) === BigInt(plan.scope.walletIdentity) &&
+        BigInt(plan.params.withdrawalAddress) === BigInt(plan.scope.ownerAddress) &&
         plan.params.withdrawalAmount ===
             plan.inputs.reduce((sum, input) => sum + input.note.amount, 0n) &&
-        plan.inputs.every((input) => input.note.walletIdentity === plan.scope.walletIdentity);
+        plan.inputs.every((input) => input.note.ownerAddress === plan.scope.ownerAddress);
     if (ownerOnlyFullWithdrawal) return false;
     return !!plan.credit || plan.inputs.length > 0;
 }
@@ -228,7 +228,11 @@ export async function witnessFor(
         deliveries: plan.outputs.map((output) => output.delivery),
         funding: plan.funding,
         inputs: plan.inputs,
-        outputs: plan.outputs.map((output) => output.note),
+        outputs: plan.outputs.map((output) => ({
+            identity: output.identity,
+            amount: output.amount,
+            ...(output.note ? { note: output.note } : {}),
+        })),
         ...(authorization ? { authorization } : {}),
         target: plan.statement!.target,
     });

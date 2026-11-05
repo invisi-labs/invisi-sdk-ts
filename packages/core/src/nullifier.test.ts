@@ -12,7 +12,7 @@ const leaf = async (
     nonce = 123n,
     token = BigInt(vectors.context.tokenAddress),
     amount = 70n,
-    wallet = BigInt(vectors.note.walletIdentity)
+    wallet = BigInt(vectors.note.ownerAddress)
 ) => computeNoteCommitment(CHAIN_ID, await computeNoteIdentity(wallet, nonce), token, amount);
 
 describe("computeNoteNullifier", () => {
@@ -44,14 +44,14 @@ describe("computeNoteNullifier", () => {
             vectors.note.nullifier
         );
     });
-    it("binds the complete leaf including amount and wallet identity", async () => {
+    it("binds the complete leaf including amount and owner address", async () => {
         for (const commitment of [
             await leaf(123n, BigInt(vectors.context.tokenAddress), 71n),
             await leaf(
                 123n,
                 BigInt(vectors.context.tokenAddress),
                 70n,
-                BigInt(vectors.note.walletIdentity) + 1n
+                BigInt(vectors.note.ownerAddress) + 1n
             ),
         ]) {
             expect(await computeNoteNullifier(CHAIN_ID, KEY, commitment)).not.toBe(

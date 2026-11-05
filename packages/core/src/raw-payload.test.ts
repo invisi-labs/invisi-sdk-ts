@@ -6,8 +6,8 @@ const context = {
     chainId: BigInt(vectors.context.chainId),
     protocolAddress: BigInt(vectors.context.protocolAddress),
     tokenAddress: BigInt(vectors.context.tokenAddress),
-    walletIdentity:
-        `0x${BigInt(vectors.note.walletIdentity).toString(16).padStart(40, "0")}` as `0x${string}`,
+    ownerAddress:
+        `0x${BigInt(vectors.note.ownerAddress).toString(16).padStart(40, "0")}` as `0x${string}`,
     outputCommitment: vectors.note.commitment as `0x${string}`,
 };
 const note = { ...context, amount: BigInt(vectors.note.amount), nonce: BigInt(vectors.note.nonce) };
@@ -86,7 +86,7 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
         const scope = {
             ...ownerScope,
             role,
-            walletIdentity:
+            ownerAddress:
                 role === "owner"
                     ? state.note.ownerWalletIdentity
                     : state.note.spenderWalletIdentity,
@@ -101,7 +101,7 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
         expect(envelope[0]).toBe(129);
         const decoded = await core.decryptCreditNote(secret, envelope, scope);
         expect(decoded.note.payload).toEqual(payload);
-        const viewer = new core.ViewingCapability(scope.walletIdentity, secret);
+        const viewer = new core.ViewingCapability(scope.ownerAddress, secret);
         const output = { ...scope, ciphertext: envelope };
         const disclosure = await viewer.discloseCredit(envelope, scope);
         const imported = await core.Disclosure.fromExport(disclosure.export());

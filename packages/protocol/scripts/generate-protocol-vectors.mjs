@@ -163,7 +163,7 @@ const output = { identity: w(3), amount: 100n },
     shieldParams = {
         token: context.tokenAddress,
         outputCommitments: [
-            await n.noteCommitment(context, { walletIdentity: 1n, amount: 100n, nonce: 1n }),
+            await n.noteCommitment(context, { ownerAddress: 1n, amount: 100n, nonce: 1n }),
         ],
         deadline: 900n,
         feeRecipient: zeroFunding.payer,
@@ -280,9 +280,9 @@ const sweepWitness = await createWalletTransactFixture({
     },
     wallet: sweepWallet,
     sourceNotes: [
-        { walletIdentity: sweepWallet.walletIdentity, amount: 100n, nonce: 123n, treeId: 1n },
+        { ownerAddress: sweepWallet.ownerAddress, amount: 100n, nonce: 123n, treeId: 1n },
     ],
-    withdrawalAddress: toBeHex(sweepWallet.walletIdentity, 20),
+    withdrawalAddress: toBeHex(sweepWallet.ownerAddress, 20),
     withdrawalAmount: 100n,
 });
 for (const key of ["signature", "public_key_x", "public_key_y"]) sweepWitness.witness[key].fill(0);

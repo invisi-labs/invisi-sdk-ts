@@ -136,7 +136,7 @@ export async function confirmOperation(
             (value) => value.role === "funds" && value.commitment === output.commitment
         );
         check(candidate, "confirmed output is missing from canonical receipt");
-        if (output.note.walletIdentity !== scope.walletIdentity) {
+        if (!output.note || output.note.ownerAddress !== scope.ownerAddress) {
             continue;
         }
         const input = {
@@ -162,7 +162,7 @@ export async function confirmOperation(
         for (const role of ["owner", "spender"] as const) {
             if (
                 (role === "owner" ? n.ownerWalletIdentity : n.spenderWalletIdentity) !==
-                scope.walletIdentity
+                scope.ownerAddress
             ) {
                 continue;
             }

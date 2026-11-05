@@ -31,7 +31,7 @@ describe("actual zero-input transact14 circuit", () => {
     });
     it("rejects private authority metadata and broken funding conservation", async () => {
         const circuit = loadCircuit("transact_user_slots14");
-        for (const changes of [{ wallet_identity: "1" }, { deposit_amount: "201" }]) {
+        for (const changes of [{ input_owner_address: "1" }, { deposit_amount: "201" }]) {
             await expect(
                 generateWitness(circuit, { ...ZERO_INPUT_FIXTURE.witness, ...changes })
             ).rejects.toThrow();

@@ -49,7 +49,7 @@ describe("EVM account key restoration", () => {
         const publicKey = secp256k1.getPublicKey(hexToBytes(row.spendingPrivateKey), false);
         expect(
             await verifyWalletAuthorization(
-                wallet.walletIdentity,
+                wallet.ownerAddress,
                 publicKey,
                 Uint8Array.from(witness.signature),
                 request
@@ -64,7 +64,7 @@ describe("EVM account key restoration", () => {
         const signature = signWalletAuthorization(key, request);
         expect(
             await verifyWalletAuthorization(
-                wallet.walletIdentity,
+                wallet.ownerAddress,
                 secp256k1.getPublicKey(hexToBytes(key.slice(2)), false),
                 signature,
                 request

@@ -1,3 +1,4 @@
+import { testOutput } from "../test-output";
 import { PublicWallet } from "@invisi-labs/core";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { Wallet as EvmWallet, Interface, getBytes } from "ethers";
@@ -34,7 +35,7 @@ it("authorizes exactly the frozen statement, verifies the local proof, and retur
         session = new WalletSession({ ...h.options, prover: backend });
     const prepared = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     await expect(prepared.prove()).rejects.toThrow(/authoriz/);
     const authorized = await prepared.authorize(),
@@ -88,8 +89,8 @@ it("proofs precede EVM funding signatures; public funding needs no private walle
     const op = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
         outputs: [
-            { to: h.bob.getAddress(), amount: 30n },
-            { to: h.wallet.getAddress(), amount: 70n },
+            await testOutput(h, { to: h.bob.getAddress(), amount: 30n }),
+            await testOutput(h, { to: h.wallet.getAddress(), amount: 70n }),
         ],
         funding: { payer: signer.address, amount: 100n },
     });
@@ -222,7 +223,7 @@ it("requires one explicit caller-funded shield encoding and never broadcasts an 
         });
     const prepared = await session.prepareShield({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-        outputs: [{ to: h.bob.getAddress(), amount: 100n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
         funding: { payer: signer.address, amount: 100n, authorization: "caller" },
     });
     await expect(prepared.prove()).rejects.toThrow(/no proof/);
@@ -246,7 +247,7 @@ it("rejects corrupted canonical paths and incomplete spent-state replies before 
     await expect(
         h.session.prepareTransfer({
             tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         })
     ).rejects.toThrow(/membership/);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBeUndefined();
@@ -438,8 +439,8 @@ it("uses an explicitly injected ERC-1271 verifier for a contract payer funding g
     const operation = await session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
         outputs: [
-            { to: h.bob.getAddress(), amount: 30n },
-            { to: h.wallet.getAddress(), amount: 70n },
+            await testOutput(h, { to: h.bob.getAddress(), amount: 30n }),
+            await testOutput(h, { to: h.wallet.getAddress(), amount: 70n }),
         ],
         funding: { payer: contractPayer, amount: 100n },
     });
@@ -462,7 +463,7 @@ it.each(["funding-nonce", "funding-expiry", "unknown-root"] as const)(
             });
         const prepared = await session.prepareTransfer({
                 tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-                outputs: [{ to: h.bob.getAddress(), amount: 120n }],
+                outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 120n })],
                 funding: { payer: signer.address, amount: 20n, deadline: 2000000050n },
             }),
             ready = await (await (await prepared.authorize()).prove()).authorizeFunding();
@@ -609,7 +610,7 @@ it("late confirmation updates a previously discovered change note to its current
     await h.tree.insert(BigInt(output.commitment));
     await h.store.transaction(h.scope, (state) => {
         state.notes[output.commitment] = {
-            note: output.note,
+            note: output.note!,
             commitment: output.commitment,
             treeId: 1n,
             leafIndex: 1,
@@ -751,4 +752,76 @@ it("checks protocol facts before export without taking responsibility for EVM fe
     h.reader.isSpent = async (_, values) => values.map(() => true);
     await expect(ready.exportTransaction()).rejects.toThrow(/spent/);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(ready.id);
+});
+
+it("recovers a known unencrypted owned opening on confirmation without inventing opaque notes", async () => {
+    const h = await fixture();
+    const { NoteOutput } = await import("../NoteOutput");
+    const owned = await NoteOutput.create({
+        ...h.context,
+        amount: 30n,
+        recipient: { type: "evm", address: h.wallet.ownerAddress, envelope: false },
+    });
+    const opaque = await NoteOutput.create({
+        ...h.context,
+        amount: 20n,
+        recipient: { type: "identity", identity: owned.identity },
+    });
+    const session = new WalletSession({
+        ...h.options,
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+    });
+    const ready = await (
+        await session.prepareShield({
+            tokenAddress: h.context.tokenAddress,
+            outputs: [owned, opaque],
+            funding: { payer: signer.address, amount: 50n, authorization: "caller" },
+        })
+    ).ready();
+    const call = await ready.exportTransaction();
+    const hash = `0x${"ab".repeat(32)}` as Hex;
+    await h.tree.insert(BigInt(owned.commitment));
+    await h.tree.insert(BigInt(opaque.commitment));
+    h.reader.getTransaction = async () => ({
+        ...call,
+        transactionHash: hash,
+        from: signer.address,
+        nonce: 0n,
+    });
+    const logs = [
+        await receiptLog(
+            "CommitmentsInserted",
+            { treeId: 1n, startLeafIndex: 1, commitments: [owned.commitment, opaque.commitment] },
+            0,
+            hash
+        ),
+        await receiptLog(
+            "Shield",
+            {
+                token: h.context.tokenAddress,
+                treeId: 1n,
+                startLeafIndex: 1,
+                payer: signer.address,
+                amount: 50n,
+                deadline: (
+                    (await h.store.readSnapshot(h.scope)).operations[ready.id]!
+                        .payload as import("./operation-types").SavedOperation
+                ).plan.deadline,
+                deliveries: [owned.delivery, opaque.delivery],
+            },
+            1,
+            hash
+        ),
+    ];
+    h.reader.getReceipt = async () => ({
+        block: await h.reader.getBlock(12n),
+        transactionHash: hash,
+        status: "success",
+        logs,
+    });
+    expect((await ready.reconcile({ transactionHash: hash })).status).toBe("confirmed");
+    const state = await h.store.readSnapshot(h.scope);
+    expect(state.notes[owned.commitment]!.note).toEqual(owned.note);
+    expect(state.notes[owned.commitment]!.leafIndex).toBe(1);
+    expect(state.notes[opaque.commitment]).toBeUndefined();
 });

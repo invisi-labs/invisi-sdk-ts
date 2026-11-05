@@ -1,3 +1,4 @@
+import { testOutput } from "./test-output";
 import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, it } from "vitest";
 import { Interface, Signature, Wallet as EthereumWallet, getBytes } from "ethers";
@@ -36,10 +37,10 @@ for (const managed of [false, true]) {
         const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership, prover });
         const session = new WalletSession({ ...h.options, wallet, prover });
         const common = { wallet, protocol: h.protocol, tokenAddress: h.context.tokenAddress };
-        const shield = () => {
+        const shield = async () => {
             const options = {
                 ...common,
-                outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+                outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
                 funding: {
                     payer: payer.address as `0x${string}`,
                     amount: 30n,
@@ -53,7 +54,7 @@ for (const managed of [false, true]) {
             const options = {
                 ...common,
                 inputs,
-                outputs: [{ to: h.bob.getAddress(), amount: 120n }],
+                outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 120n })],
                 funding: {
                     payer: payer.address as `0x${string}`,
                     amount: 20n,
@@ -255,7 +256,7 @@ it("accepts arbitrary ERC-1271 bytes only through the configured verifier", asyn
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: contractPayer, amount: 30n, authorization: "signature" },
     });
     await expect(prepared.withFundingSignature("0x1234")).rejects.toThrow(/signature/);
@@ -287,7 +288,7 @@ it("rejects a delayed external verifier after managed operation recovery", async
     });
     const prepared = await session.prepareShield({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: payer.address as `0x${string}`, amount: 30n, authorization: "signature" },
     });
     const request = await prepared.exportFundingAuthorization();

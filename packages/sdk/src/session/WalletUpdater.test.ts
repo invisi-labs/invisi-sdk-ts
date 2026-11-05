@@ -79,7 +79,7 @@ async function harness() {
             root === treeRoots.get(treeId),
         isSpent: vi.fn(async (_context, words: readonly Hex[]) => words.map(() => spent)),
     } as unknown as ChainReader;
-    const identity = ownerHex(BigInt(vectors.owner.walletIdentity));
+    const identity = ownerHex(BigInt(vectors.owner.ownerAddress));
     const viewing = new ViewingCapability(identity, vectors.owner.viewingPrivateKey as Hex);
     const protocol = new Protocol({
         deployment: {
@@ -336,7 +336,7 @@ it.each([false, true])(
             (v) => v.kind === "credit" && v.role === "owner" && v.name === "binary"
         )!;
         const parentState = await new ViewingCapability(
-            ownerHex(BigInt(vectors.owner.walletIdentity)),
+            ownerHex(BigInt(vectors.owner.ownerAddress)),
             vectors.owner.viewingPrivateKey as Hex
         ).decryptCredit(parent.ciphertext as Hex, {
             ...context,

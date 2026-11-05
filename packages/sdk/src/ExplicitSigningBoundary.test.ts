@@ -1,3 +1,4 @@
+import { testOutput } from "./test-output";
 import { expect, it } from "vitest";
 import { PublicWallet } from "@invisi-labs/core";
 import { Invisi } from "./Invisi";
@@ -18,7 +19,7 @@ it("rejects a full wallet rather than inheriting its private authority", async (
             wallet: h.wallet,
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 1n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 1n })],
             funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
         })
     ).rejects.toThrow(/PublicWallet|public wallet/i);
@@ -34,7 +35,7 @@ it.each(["authorization", "signer", "fundingSigner", "viewing"])(
                 wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
                 tokenAddress: h.context.tokenAddress,
-                outputs: [{ to: h.bob.getAddress(), amount: 1n }],
+                outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 1n })],
                 funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
                 [key]: h.wallet,
             } as never)

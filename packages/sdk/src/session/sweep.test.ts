@@ -1,3 +1,4 @@
+import { testOutput } from "../test-output";
 import { PublicWallet } from "@invisi-labs/core";
 import { expect, it, vi } from "vitest";
 import { Wallet } from "@invisi-labs/core";
@@ -17,7 +18,7 @@ it("prepares an owner-only sweep without exporting a spending key", async () => 
     expect(op.kind).toBe("transfer");
     expect(op.preview().permissions.walletAuthorization).toBe(false);
     expect(op.preview().withdrawalAmount).toBe(100n);
-    expect(BigInt(op.preview().withdrawalAddress!)).toBe(BigInt(h.wallet.walletIdentity));
+    expect(BigInt(op.preview().withdrawalAddress!)).toBe(BigInt(h.wallet.ownerAddress));
     expect(op.preview().outputs).toEqual([]);
     await expect(op.authorize()).rejects.toThrow(/does not require/);
 });
@@ -91,7 +92,10 @@ it.each(["different-owner", "partial", "private-output", "cash-input"] as const)
         const session = new WalletSession({ ...h.options, wallet });
         const operation = await session.prepareTransfer({
             tokenAddress: h.context.tokenAddress,
-            outputs: scenario === "private-output" ? [{ to: h.bob.getAddress(), amount: 10n }] : [],
+            outputs:
+                scenario === "private-output"
+                    ? [await testOutput(h, { to: h.bob.getAddress(), amount: 10n })]
+                    : [],
             withdrawal: {
                 to: scenario === "different-owner" ? h.bob.ownerAddress : h.wallet.ownerAddress,
                 amount:
@@ -144,7 +148,7 @@ it("atomically replaces one managed reservation after a firm quote and fences th
     const { quoteClient } = await import("../broadcaster-fixture");
     const original = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
     expect(original.preview().feeAmount).toBe(0n);
@@ -161,7 +165,7 @@ it("retains managed reservations on quote failure and commits only one competing
     const { quoteClient } = await import("../broadcaster-fixture");
     const original = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const before = await h.store.readSnapshot(h.scope);
     await expect(

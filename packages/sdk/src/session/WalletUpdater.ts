@@ -38,7 +38,7 @@ export class WalletUpdater extends InventoryProcessor {
         super(options);
         this.#options = { ...options };
         check(
-            options.viewing.walletIdentity === options.scope.walletIdentity,
+            options.viewing.ownerAddress === options.scope.ownerAddress,
             "viewing capability wallet mismatch"
         );
     }
@@ -49,7 +49,7 @@ export class WalletUpdater extends InventoryProcessor {
 
     private async run(batch: CandidatePage, options: ApplyPageOptions): Promise<RefreshResult> {
         const { reader, protocol, scope, store, viewing } = this.#options;
-        const nullifier = NullifierCapability.fromIdentity(scope.walletIdentity);
+        const nullifier = NullifierCapability.fromIdentity(scope.ownerAddress);
         const { signal, reset } = options;
         signal?.throwIfAborted();
         const context = protocol.context;

@@ -96,9 +96,9 @@ describe("current protocol executable reference vectors", () => {
                 f.funding
             )
         ).toHaveLength(48);
-        expect(() =>
-            createCreditPublicInputs(context, withChange, f.deliveries, f.funding)
-        ).toThrow();
+        expect(createCreditPublicInputs(context, withChange, f.deliveries, f.funding)).toHaveLength(
+            48
+        );
     });
 
     it("selects the smallest tier and rejects retired/pure-single-output shapes", () => {

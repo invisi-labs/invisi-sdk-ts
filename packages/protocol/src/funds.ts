@@ -72,7 +72,9 @@ export function normalizeTransactRequest(
         os = notes(p.outputCommitments, "outputCommitments"),
         capacity = selectTransactCapacity(ns.length, os.length);
     const sources = normalizeSources(p.sources, ns.length, capacity),
-        deliveries = dense(cs, "deliveries").map((v) => normalizeOpaqueDelivery(v));
+        deliveries = dense(cs, "deliveries").map((v) =>
+            normalizeOpaqueDelivery(v, { allowEmpty: true })
+        );
     if (deliveries.length !== os.length) throw new Error("deliveries count mismatch");
     const withdrawalAmount = uint(p.withdrawalAmount, 128, "withdrawalAmount"),
         withdrawalAddress = getAddress(p.withdrawalAddress) as Hex,
@@ -333,7 +335,7 @@ export async function validateShieldRequest(p: BuildShieldCalldataParams) {
         uint(o.amount, 128, "amount");
         if (o.amount === 0n) throw new Error("amount must be positive");
         field(o.identity);
-        normalizeOpaqueDelivery(cs[i]!);
+        normalizeOpaqueDelivery(cs[i]!, { allowEmpty: true });
         if (
             (await computeNoteCommitment(
                 p.context.chainId,

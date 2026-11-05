@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { discoverCandidates } from "./discover-candidates.js";
 import { randomInt } from "node:crypto";
@@ -76,18 +77,27 @@ try {
     // Build hidden-amount outputs with prepareTransfer rather than the transparent-amount prepareShield.
     const share = inputAmount / 4n;
     const outputs = [
-        {
-            to: alice.publicWallet.getAddress(),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: share,
-        },
-        {
-            to: bob.publicWallet.getAddress(),
+            recipient: { type: "invisi", address: alice.publicWallet.getAddress() },
+        }),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: share,
-        },
-        {
-            to: charlie.publicWallet.getAddress(),
+            recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
+        }),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: share,
-        },
+            recipient: { type: "invisi", address: charlie.publicWallet.getAddress() },
+        }),
     ];
     // Each of three recipients receives share; inputAmount - 3 * share is returned as change. All amounts use integer base units.
     const prepared = await invisi.prepareTransfer({

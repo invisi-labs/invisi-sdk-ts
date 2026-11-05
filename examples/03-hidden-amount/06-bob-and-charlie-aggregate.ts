@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { randomInt } from "node:crypto";
 import { Interface, JsonRpcProvider, Wallet as EthereumWallet, getBytes } from "ethers";
@@ -70,10 +71,13 @@ try {
             tokenAddress,
             inputs: [input],
             outputs: [
-                {
-                    to: dave.publicWallet.getAddress(),
+                await NoteOutput.create({
+                    chainId: protocol.context.chainId,
+                    protocolAddress: protocol.context.protocolAddress,
+                    tokenAddress,
                     amount: input.note.amount / 2n,
-                },
+                    recipient: { type: "invisi", address: dave.publicWallet.getAddress() },
+                }),
             ],
             deadline,
             // Each transfer sends half to its recipient and automatically returns the remainder as change to the original owner.
@@ -129,10 +133,13 @@ try {
             tokenAddress,
             inputs: [input],
             outputs: [
-                {
-                    to: eve.publicWallet.getAddress(),
+                await NoteOutput.create({
+                    chainId: protocol.context.chainId,
+                    protocolAddress: protocol.context.protocolAddress,
+                    tokenAddress,
                     amount: input.note.amount / 2n,
-                },
+                    recipient: { type: "invisi", address: eve.publicWallet.getAddress() },
+                }),
             ],
             deadline,
             // Each transfer sends half to its recipient and automatically returns the remainder as change to the original owner.

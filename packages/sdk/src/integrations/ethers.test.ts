@@ -85,7 +85,7 @@ it("resolves a canonical EVM owner using padded registry ABI words", async () =>
     const iface = new Interface(invisiAddressRegistryAbi);
     const call = vi.fn(async (request: { data: string }) => {
         const decoded = iface.parseTransaction({ data: request.data })!;
-        expect(BigInt(decoded.args[0])).toBe(BigInt(wallet.walletIdentity));
+        expect(BigInt(decoded.args[0])).toBe(BigInt(wallet.ownerAddress));
         return decoded.name === "isRegistered"
             ? iface.encodeFunctionResult("isRegistered", [true])
             : iface.encodeFunctionResult("receivingKeysOf", [
@@ -100,7 +100,7 @@ it("resolves a canonical EVM owner using padded registry ABI words", async () =>
             registryAddress: token,
         }
     );
-    const resolved = await resolver.lookup(wallet.walletIdentity);
+    const resolved = await resolver.lookup(wallet.ownerAddress);
     expect(resolved?.viewingPublicKey).toEqual(keys.viewingPublicKey);
     expect(call).toHaveBeenCalledTimes(2);
 });

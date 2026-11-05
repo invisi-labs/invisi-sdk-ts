@@ -25,14 +25,14 @@ const context = {
 const payment: core.Note = {
     payload: new Uint8Array(),
     ...context,
-    walletIdentity: ownerHex(BigInt(vectors.note.walletIdentity)),
+    ownerAddress: ownerHex(BigInt(vectors.note.ownerAddress)),
     amount: BigInt(vectors.note.amount),
     nonce: BigInt(vectors.note.nonce),
 };
 const noteContext = {
     ...context,
     outputCommitment: vectors.note.commitment as `0x${string}`,
-    walletIdentity: payment.walletIdentity,
+    ownerAddress: payment.ownerAddress,
 };
 const credit: core.CreditNote = {
     payload: new Uint8Array(),
@@ -56,7 +56,7 @@ const credit: core.CreditNote = {
 const creditContext = {
     ...context,
     outputCommitment: vectors.credit.commitment as `0x${string}`,
-    walletIdentity: credit.ownerWalletIdentity,
+    ownerAddress: credit.ownerWalletIdentity,
     role: "owner" as const,
 };
 const receivingKeys = (role: "owner" | "spender") => ({
@@ -126,7 +126,7 @@ function referenceSeal(plain: Uint8Array, version: number, c: ReferenceContext) 
     return Buffer.concat([header, cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
 }
 const notePlaintext = Buffer.concat([
-    bytes(BigInt(payment.walletIdentity)),
+    bytes(BigInt(payment.ownerAddress)),
     bytes(payment.amount, 16),
     bytes(payment.nonce),
     bytes(0n, 2),
@@ -263,7 +263,7 @@ describe("current authenticated note envelopes", () => {
         );
         mutableContext.protocolAddress += 1n;
         mutableNote.protocolAddress += 1n;
-        mutableNote.walletIdentity = hex(1n);
+        mutableNote.ownerAddress = hex(1n);
         const envelope = await pendingNote;
         await expect(core.decryptPrivateTransferNote(key, envelope, noteContext)).resolves.toEqual(
             payment
@@ -278,7 +278,7 @@ describe("current authenticated note envelopes", () => {
         );
         mutableCreditContext.protocolAddress += 1n;
         mutableCreditContext.role = "spender";
-        mutableCreditContext.walletIdentity = hex(1n);
+        mutableCreditContext.ownerAddress = hex(1n);
         mutableCredit.note.protocolAddress += 1n;
         mutableCredit.note.ownerPayout += 1n;
         mutableCredit.note.ownerWalletIdentity = hex(1n);
@@ -295,14 +295,14 @@ describe("current authenticated note envelopes", () => {
             mutableNoteContext
         );
         mutableNoteContext.protocolAddress += 1n;
-        mutableNoteContext.walletIdentity = hex(1n);
+        mutableNoteContext.ownerAddress = hex(1n);
         await expect(pendingNote).resolves.toEqual(payment);
 
         const mutableCreditContext: core.CreditNoteDecryptionContext = { ...creditContext };
         const pendingCredit = core.decryptCreditNote(key, creditVector, mutableCreditContext);
         mutableCreditContext.protocolAddress += 1n;
         mutableCreditContext.role = "spender";
-        mutableCreditContext.walletIdentity = hex(1n);
+        mutableCreditContext.ownerAddress = hex(1n);
         await expect(pendingCredit).resolves.toEqual(creditState);
     });
     it("rejects note contexts that differ from the authenticated envelope context", async () => {
@@ -496,7 +496,7 @@ describe("current authenticated note envelopes", () => {
         const spenderContext = {
             ...creditContext,
             role: "spender" as const,
-            walletIdentity: credit.spenderWalletIdentity,
+            ownerAddress: credit.spenderWalletIdentity,
         };
         expect(Buffer.from(core.viewingPublicKey(spenderKey))).toEqual(spenderPublicKey);
         await expect(
@@ -516,15 +516,15 @@ describe("current authenticated note envelopes", () => {
             core.decryptCreditNote(spenderKey, generated, spenderContext)
         ).resolves.toEqual(creditState);
     });
-    it("requires the expected recipient wallet identity for funds and Credit", async () => {
+    it("requires the expected recipient owner address for funds and Credit", async () => {
         for (const [vector, c, decrypt] of decryptionCases) {
             await expect(
                 decrypt(key, vector, {
                     ...c,
-                    walletIdentity: ownerHex(BigInt(c.walletIdentity) + 1n),
+                    ownerAddress: ownerHex(BigInt(c.ownerAddress) + 1n),
                 })
             ).rejects.toThrow();
-            const { walletIdentity, ...withoutIdentity } = c;
+            const { ownerAddress, ...withoutIdentity } = c;
             await expect(
                 decrypt(key, vector, withoutIdentity as ReferenceContext)
             ).rejects.toThrow();
@@ -533,7 +533,7 @@ describe("current authenticated note envelopes", () => {
         await expect(
             core.decryptPrivateTransferNote(key, misdirected, {
                 ...noteContext,
-                walletIdentity: credit.spenderWalletIdentity,
+                ownerAddress: credit.spenderWalletIdentity,
             })
         ).rejects.toThrow();
     });
@@ -542,7 +542,7 @@ describe("current authenticated note envelopes", () => {
             core.decryptCreditNote(key, creditVector, {
                 ...creditContext,
                 role: "spender",
-                walletIdentity: credit.spenderWalletIdentity,
+                ownerAddress: credit.spenderWalletIdentity,
             })
         ).rejects.toThrow();
         await expect(
@@ -639,8 +639,8 @@ describe("current authenticated note envelopes", () => {
             ).rejects.toThrow();
         }
         for (const changed of [
-            { ...payment, walletIdentity: ownerHex(0n) },
-            { ...payment, walletIdentity: ownerHex(core.FIELD_MODULUS) },
+            { ...payment, ownerAddress: ownerHex(0n) },
+            { ...payment, ownerAddress: ownerHex(core.FIELD_MODULUS) },
             { ...payment, tokenAddress: 1n << 160n },
             { ...payment, tokenAddress: -1n },
             { ...payment, amount: 0n },

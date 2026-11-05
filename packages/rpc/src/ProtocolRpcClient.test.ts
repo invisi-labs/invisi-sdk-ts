@@ -527,6 +527,7 @@ it.each([
     { ciphertext: "0x" },
     { ciphertext: "0x" + "00".repeat(4097) },
     { clue: "0x12" },
+    { clue: "0x" },
     { commitment: h(1n << 255n) },
     { transactionHash: "0x12" },
     { kind: "" },
@@ -983,4 +984,51 @@ describe("transaction updates", () => {
             client.getTransactionUpdates(context, h(123), { signal: controller.signal })
         ).rejects.toMatchObject({ kind: "aborted" });
     });
+});
+
+it("preserves mixed empty Funds outputs and classifies empty Credit change as Funds", async () => {
+    const outputs = [
+        { ...encryptedOutput(), ciphertext: "0x", clue: "0x" },
+        { ...encryptedOutput(), leafIndex: 4, commitment: h(13) },
+        {
+            ...encryptedOutput(),
+            kind: "CreditCreated",
+            leafIndex: 5,
+            commitment: h(14),
+            ciphertext: "0x",
+            clue: "0x",
+        },
+        {
+            ...encryptedOutput(),
+            kind: "CreditCreated",
+            leafIndex: 6,
+            commitment: h(15),
+            ciphertext: "0x81" + "ab".repeat(753),
+        },
+    ];
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : { blockHash: h(10), outputs, creditTransitions: [] }
+    );
+    const range = { fromBlock: 10n, toBlock: 10n };
+    expect(
+        (await client.getOutputs(context, range)).outputs.map((output) => output.leafIndex)
+    ).toEqual([3, 4, 5]);
+    expect(
+        (await client.getCreditOutputs(context, range)).outputs.map((output) => output.leafIndex)
+    ).toEqual([6]);
+    expect(
+        (await client.getEncryptedOutputs(context, range)).outputs.map((output) => output.leafIndex)
+    ).toEqual([3, 4, 5, 6]);
+});
+
+it("preserves an empty Funds envelope in transaction updates", async () => {
+    const output = { ...transactionOutput(), ciphertext: "0x", clue: "0x" };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus" ? status() : { ...transactionWire(), outputs: [output] }
+    );
+    expect((await client.getTransactionUpdates(context, h(123))).outputs).toMatchObject([
+        { leafIndex: 0, ciphertext: "0x", clue: "0x" },
+    ]);
 });

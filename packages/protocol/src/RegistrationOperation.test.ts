@@ -81,7 +81,7 @@ it("prepares and signs registry EIP-712 data without a prover in its independent
     const typed = operation.typedData();
     expect(signature).toHaveLength(132);
     expect(verifyTypedData(typed.domain, typed.types, typed.message, signature).toLowerCase()).toBe(
-        h.wallet.walletIdentity.toLowerCase()
+        h.wallet.ownerAddress.toLowerCase()
     );
     expect(JSON.stringify(ready)).not.toMatch(/nullifier_key|signature|privateKey|public_key_x/);
     expect(ready).not.toHaveProperty("prove");
@@ -134,7 +134,7 @@ it.each([false, true])(
         const keys = h.wallet.getReceivingAddress().getReceivingKeys();
         const iface = new Interface(invisiAddressRegistryAbi);
         const log = iface.encodeEventLog(iface.getEvent("ReceivingKeysSet")!, [
-            zeroPadValue(h.wallet.walletIdentity, 32),
+            zeroPadValue(h.wallet.ownerAddress, 32),
             keys.viewingPublicKey,
             keys.clueKey,
             1n,
@@ -148,7 +148,7 @@ it.each([false, true])(
         h.reader.getTransaction.mockResolvedValue({
             ...call,
             transactionHash: hash,
-            from: direct ? h.wallet.walletIdentity : context.registryAddress,
+            from: direct ? h.wallet.ownerAddress : context.registryAddress,
         });
         expect((await ready.reconcile({ transactionHash: hash })).status).toBe("confirmed");
     }

@@ -18,7 +18,7 @@ const context = {
     registryAddress: "0x0000000000000000000000000000000000001234" as const,
 };
 const registration = {
-    walletIdentity: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf" as const,
+    ownerAddress: "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf" as const,
     keys: {
         viewingPublicKey:
             "0x02eddb7c79146305faaf1b1d994afc1900e183c5792a128472ac59f41bbf87ad42" as const,
@@ -40,7 +40,7 @@ describe("wallet-authorized receiving-key registry", () => {
         });
         expect(typed.primaryType).toBe("RegisterReceivingKeys");
         expect(typed.message).toEqual({
-            walletIdentity: toBeHex(BigInt(registration.walletIdentity), 32),
+            walletIdentity: toBeHex(BigInt(registration.ownerAddress), 32),
             ...registration.keys,
             nonce: 0n,
             deadline: registration.deadline,
@@ -67,8 +67,10 @@ describe("wallet-authorized receiving-key registry", () => {
             })!;
             expect(decoded.name).toBe(update ? "updateKeys" : "registerKeys");
             expect(decoded.args[0].toObject(true)).toEqual({
-                ...request,
-                walletIdentity: toBeHex(BigInt(request.walletIdentity), 32),
+                keys: request.keys,
+                nonce: request.nonce,
+                deadline: request.deadline,
+                walletIdentity: toBeHex(BigInt(request.ownerAddress), 32),
             });
             expect(decoded.args[1]).toBe("0xaabb");
             expect(Object.keys(built).sort()).toEqual(["callData", "to", "value"]);
@@ -105,11 +107,11 @@ describe("wallet-authorized receiving-key registry", () => {
             );
     });
     it("rejects malformed identities, both point keys, exhausted/mismatched nonces, expiry, and domains", () => {
-        for (const walletIdentity of ["0x1234", `0x${"00".repeat(32)}`, `0x${"ff".repeat(32)}`]) {
+        for (const ownerAddress of ["0x1234", `0x${"00".repeat(32)}`, `0x${"ff".repeat(32)}`]) {
             expect(() =>
                 registrationTypedData(context, {
                     ...registration,
-                    walletIdentity: walletIdentity as Hex,
+                    ownerAddress: ownerAddress as Hex,
                 })
             ).toThrow();
         }
@@ -166,14 +168,14 @@ describe("wallet-authorized receiving-key registry", () => {
                 expect(String(call.to).toLowerCase()).toBe(context.registryAddress);
                 const iface = new Interface(invisiAddressRegistryAbi);
                 expect(iface.parseTransaction({ data: call.data! })!.args[0]).toBe(
-                    toBeHex(BigInt(registration.walletIdentity), 32)
+                    toBeHex(BigInt(registration.ownerAddress), 32)
                 );
                 return iface.encodeFunctionResult("receivingKeysOf", [registration.keys, 9n]);
             },
         };
         const lookup = createRegistryReceivingKeyLookup(client, context.registryAddress);
         const receiving = {
-            walletIdentity: registration.walletIdentity,
+            ownerAddress: registration.ownerAddress,
             viewingPublicKey: getBytes(registration.keys.viewingPublicKey),
             clueKey: getBytes(registration.keys.clueKey),
         };
@@ -183,7 +185,7 @@ describe("wallet-authorized receiving-key registry", () => {
         expect(requests).toBe(0);
         expect(
             await ReceivingAddress.parse(
-                ReceivingAddress.fromIdentity(registration.walletIdentity).toString()
+                ReceivingAddress.fromIdentity(registration.ownerAddress).toString()
             ).resolve(lookup)
         ).toEqual(long);
         expect(requests).toBe(1);
@@ -199,7 +201,7 @@ describe("wallet-authorized receiving-key registry", () => {
         const lookup = createRegistryReceivingKeyLookup(broken, context.registryAddress);
         await expect(
             ReceivingAddress.parse(
-                ReceivingAddress.fromIdentity(registration.walletIdentity).toString()
+                ReceivingAddress.fromIdentity(registration.ownerAddress).toString()
             ).resolve(lookup)
         ).rejects.toBe(error);
         const malformed = createRegistryReceivingKeyLookup(
@@ -213,7 +215,7 @@ describe("wallet-authorized receiving-key registry", () => {
             },
             context.registryAddress
         );
-        await expect(malformed(registration.walletIdentity)).rejects.toThrow();
+        await expect(malformed(registration.ownerAddress)).rejects.toThrow();
     });
 });
 
@@ -225,7 +227,7 @@ it.each(vectors.rows)("matches independently signed registration fixture %#", (r
     };
     const registration = {
         ...row.registration,
-        walletIdentity: row.registration.walletIdentity as Hex,
+        ownerAddress: row.registration.ownerAddress as Hex,
         keys: {
             viewingPublicKey: row.registration.keys.viewingPublicKey as Hex,
             clueKey: row.registration.keys.clueKey as Hex,

@@ -24,7 +24,6 @@ export type {
     FundingSource,
     FundingTypedData,
     OperationAggregateMember,
-    PaymentOutput,
     ShieldPreparation,
     TopUpCreditPreparation,
     TransferPreparation,

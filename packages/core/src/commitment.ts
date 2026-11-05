@@ -1,14 +1,14 @@
 import { poseidonHash } from "./poseidon";
 import { D_IDENT, D_NOTE } from "./domains";
 
-/** Randomized per-note identity; the full wallet identity stays private on chain. */
+/** Randomized per-note identity; the full owner address stays private on chain. */
 export async function computeNoteIdentity(
-    walletIdentity: bigint,
+    ownerAddress: bigint,
     nonce: bigint
 ): Promise<`0x${string}`> {
-    if (walletIdentity <= 0n || walletIdentity >= 1n << 160n)
-        throw new RangeError("invalid wallet identity");
-    return poseidonHash([D_IDENT, walletIdentity, nonce]);
+    if (ownerAddress <= 0n || ownerAddress >= 1n << 160n)
+        throw new RangeError("invalid owner address");
+    return poseidonHash([D_IDENT, ownerAddress, nonce]);
 }
 
 /** Note leaf from a randomized identity, token and positive u128 amount. */

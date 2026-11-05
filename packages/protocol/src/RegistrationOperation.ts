@@ -22,7 +22,7 @@ export interface RegistryReader extends Pick<
     isValidRegistrationSignature?(owner: Address, digest: Hex, signature: Hex): Promise<boolean>;
     getRegistryNonce(
         context: RegistryContext,
-        walletIdentity: Hex,
+        ownerAddress: Hex,
         block: CanonicalBlock
     ): Promise<bigint>;
 }
@@ -97,7 +97,7 @@ export class RegistrationOperation {
         const context = { ...registry.context, now: block.timestamp };
         const nonce = await runtime.reader.getRegistryNonce(
             context,
-            runtime.wallet.walletIdentity,
+            runtime.wallet.ownerAddress,
             block
         );
         check(
@@ -111,7 +111,7 @@ export class RegistrationOperation {
         const address = ReceivingAddress.parse(await registry.resolve(runtime.wallet.getAddress()));
         const keys = address.getReceivingKeys();
         const registration: AddressRegistration = {
-            walletIdentity: runtime.wallet.walletIdentity,
+            ownerAddress: runtime.wallet.ownerAddress,
             keys: {
                 viewingPublicKey: hexlify(keys.viewingPublicKey) as Hex,
                 clueKey: hexlify(keys.clueKey) as Hex,
@@ -170,7 +170,7 @@ export class RegistrationOperation {
             "registry signature must be nonempty hexadecimal bytes"
         );
         const p = this.#plan;
-        const owner = p.registration.walletIdentity as Address;
+        const owner = p.registration.ownerAddress as Address;
         // Match the protocol's SignatureChecker: canonical ECDSA first, including
         // delegated EOAs with code, then the contract-owner ERC-1271 fallback.
         let valid = false;
@@ -255,7 +255,7 @@ export class RegistrationOperation {
         check(
             (await this.#runtime.reader.getRegistryNonce(
                 p.context,
-                p.registration.walletIdentity,
+                p.registration.ownerAddress,
                 block
             )) === p.registration.nonce,
             "registry nonce changed; prepare again"
@@ -320,7 +320,7 @@ export class RegistrationOperation {
                     transaction.data.toLowerCase() === call.data.toLowerCase() &&
                     transaction.value === 0n &&
                     (this.#signature !== "0x" ||
-                        BigInt(transaction.from) === BigInt(p.registration.walletIdentity)),
+                        BigInt(transaction.from) === BigInt(p.registration.ownerAddress)),
                 "registry transaction differs from frozen request"
             );
             check(
@@ -348,7 +348,7 @@ export class RegistrationOperation {
                         return (
                             event.eventName === "ReceivingKeysSet" &&
                             BigInt(event.args.walletIdentity) ===
-                                BigInt(p.registration.walletIdentity) &&
+                                BigInt(p.registration.ownerAddress) &&
                             event.args.viewingPublicKey.toLowerCase() ===
                                 p.registration.keys.viewingPublicKey.toLowerCase() &&
                             event.args.clueKey.toLowerCase() ===
@@ -377,7 +377,7 @@ export class RegistrationOperation {
             }
         }
         const head = await reader.getBlock(await reader.getLatestBlockNumber());
-        const nonce = await reader.getRegistryNonce(p.context, p.registration.walletIdentity, head);
+        const nonce = await reader.getRegistryNonce(p.context, p.registration.ownerAddress, head);
         check(
             (await reader.getBlock(head.number)).hash === head.hash,
             "canonical registry block changed during reconciliation"

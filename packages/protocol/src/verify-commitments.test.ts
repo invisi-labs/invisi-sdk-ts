@@ -8,7 +8,7 @@ const tokenAddress = vectors.context.tokenAddress as `0x${string}`;
 const note = {
     chainId,
     tokenAddress,
-    walletIdentity: ownerHex(vectors.note.walletIdentity),
+    ownerAddress: ownerHex(vectors.note.ownerAddress),
     amount: BigInt(vectors.note.amount),
     nonce: hex(vectors.note.nonce),
     noteCommitment: vectors.note.commitment as `0x${string}`,
@@ -46,7 +46,7 @@ describe("verifyNoteCommitment", () => {
     it("returns false for wrong amount, wallet, nonce, token or chain", async () => {
         for (const changed of [
             { ...note, amount: note.amount + 1n },
-            { ...note, walletIdentity: ownerHex(BigInt(note.walletIdentity) + 1n) },
+            { ...note, ownerAddress: ownerHex(BigInt(note.ownerAddress) + 1n) },
             { ...note, nonce: hex(BigInt(note.nonce) + 1n) },
             { ...note, tokenAddress: hex(1n) },
             { ...note, chainId: chainId + 1n },
@@ -56,8 +56,8 @@ describe("verifyNoteCommitment", () => {
     });
     it("rejects noncanonical wallet, nonce and amount values", async () => {
         for (const changed of [
-            { ...note, walletIdentity: ownerHex(0n) },
-            { ...note, walletIdentity: ownerHex(FIELD_MODULUS) },
+            { ...note, ownerAddress: ownerHex(0n) },
+            { ...note, ownerAddress: ownerHex(FIELD_MODULUS) },
             { ...note, nonce: hex(FIELD_MODULUS) },
             { ...note, amount: 0n },
             { ...note, amount: 1n << 128n },

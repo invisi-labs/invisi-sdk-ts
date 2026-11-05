@@ -90,130 +90,54 @@ describe("public preparation errors", () => {
 });
 
 describe("recipient preparation failures", () => {
-    it.each(["unregistered", "network", "invalid keys", "invalid address", "missing resolver"])(
-        "reports %s with batch position and address",
-        async (kind) => {
-            const h = await fixture();
-            const cause = new Error("Registry request failed");
-            const lookup = vi.fn(async () => {
-                if (kind === "network") throw cause;
-                if (kind === "invalid keys")
-                    return { viewingPublicKey: new Uint8Array(33), clueKey: new Uint8Array(32) };
-                return null;
-            });
-            const to = kind === "invalid address" ? "not-an-address" : h.bob.ownerAddress;
-            const invisi = new Invisi({
-                chainReader: h.reader,
-                ...(kind === "missing resolver" ? {} : { addressResolver: lookup }),
-            });
-            const error = await invisi
-                .prepareShield({
-                    wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-                    protocol: h.protocol,
-                    tokenAddress: h.context.tokenAddress,
-                    outputs: [
-                        { to: h.bob.getAddress(), amount: 1n },
-                        { to, amount: 1n },
-                    ],
-                    funding: { payer: h.wallet.ownerAddress, amount: 2n, authorization: "caller" },
-                })
-                .catch((error: unknown) => error);
-            const code =
-                kind === "unregistered"
-                    ? "EVM_ADDRESS_NOT_REGISTERED"
-                    : kind === "invalid address"
-                      ? "INVALID_RECIPIENT"
-                      : kind === "missing resolver"
-                        ? "MISSING_CAPABILITY"
-                        : "RECIPIENT_LOOKUP_FAILED";
-            expect(error).toBeInstanceOf(InvisiError);
-            expect(error).toMatchObject({
-                code,
-                address: to,
-                outputIndex: 1,
-                operation: "prepareShield",
-                field: "to",
-            });
-            if (kind === "network") expect(error).toHaveProperty("cause", cause);
-        }
-    );
-    it.each(["amount", "payload"])(
-        "keeps recipient context for invalid output %s",
-        async (field) => {
-            const h = await fixture();
-            const inputs = Object.values((await h.store.readSnapshot(h.scope)).notes);
-            const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
-            for (const method of ["prepareShield", "prepareTransfer"] as const) {
-                const error = await invisi[method]({
-                    wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-                    protocol: h.protocol,
-                    tokenAddress: h.context.tokenAddress,
-                    inputs,
-                    outputs: [
-                        { to: h.bob.getAddress(), amount: 1n },
-                        {
-                            to: h.bob.getAddress(),
-                            amount: field === "amount" ? 0n : 1n,
-                            ...(field === "payload" ? { payload: new Uint8Array(3937) } : {}),
-                        },
-                    ],
-                    funding: { payer: h.wallet.ownerAddress, amount: 2n, authorization: "caller" },
-                }).catch((error: unknown) => error);
-                expect(error).toBeInstanceOf(InvisiError);
-                expect(error).toMatchObject({
-                    code: "PREPARATION_FAILED",
-                    operation: method,
-                    address: h.bob.getAddress(),
-                    outputIndex: 1,
-                });
-            }
-        }
-    );
-
-    it("resolves a short address once, freezes keys, and never looks up a full address", async () => {
+    it("rejects copied output corruption with its batch position and leaves inventory unlocked", async () => {
         const h = await fixture();
-        const lookup = vi.fn(async () => h.bob.getReceivingAddress().getReceivingKeys());
-        const prepared = await new Invisi({
-            chainReader: h.reader,
-            addressResolver: lookup,
-        }).prepareShield({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol: h.protocol,
-            tokenAddress: h.context.tokenAddress,
-            outputs: [
-                { to: h.bob.ownerAddress, amount: 1n },
-                { to: h.bob.getAddress(), amount: 1n },
-            ],
-            funding: { payer: h.wallet.ownerAddress, amount: 2n, authorization: "caller" },
+        const { NoteOutput } = await import("./NoteOutput");
+        const good = await NoteOutput.create({
+            ...h.context,
+            amount: 1n,
+            recipient: { type: "invisi", address: h.bob.getAddress() },
         });
-        expect(lookup).toHaveBeenCalledTimes(1);
-        lookup.mockRejectedValue(new Error("Registry later offline"));
-        const ready = await prepared.ready();
-        expect((await ready.exportTransaction()).data).toMatch(/^0x/);
-        expect(lookup).toHaveBeenCalledTimes(1);
-    });
-    it("reports managed-session errors without creating reservations", async () => {
-        const h = await fixture();
-        const session = new WalletSession({ ...h.options, addressResolver: async () => null });
+        const invalid = structuredClone(good);
+        Object.assign(invalid, { amount: 0n });
+        const session = new WalletSession(h.options);
         const error = await session
-            .prepareTransfer({
-                tokenAddress: h.context.tokenAddress,
-                outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
-            })
+            .prepareTransfer({ tokenAddress: h.context.tokenAddress, outputs: [good, invalid] })
             .catch((error: unknown) => error);
+        expect(error).toBeInstanceOf(InvisiError);
         expect(error).toMatchObject({
-            code: "EVM_ADDRESS_NOT_REGISTERED",
-            outputIndex: 0,
+            code: "PREPARATION_FAILED",
+            outputIndex: 1,
             operation: "prepareTransfer",
+            address: h.bob.getAddress(),
         });
         expect((await h.store.readSnapshot(h.scope)).reservations).toEqual({});
     });
-    it("identifies Credit spender resolution", async () => {
+    it("rejects legacy plain outputs at preparation without resolving recipients", async () => {
         const h = await fixture();
-        const error = await new Invisi({ chainReader: h.reader, addressResolver: async () => null })
-            .prepareCreateCredit({
+        const error = await new Invisi({ chainReader: h.reader })
+            .prepareShield({
                 wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
+                tokenAddress: h.context.tokenAddress,
+                outputs: [{ to: h.bob.ownerAddress, amount: 1n } as never],
+                funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
+            })
+            .catch((error: unknown) => error);
+        expect(error).toMatchObject({
+            code: "PREPARATION_FAILED",
+            operation: "prepareShield",
+            outputIndex: 0,
+        });
+        expect((error as Error).message).toMatch(/NoteOutput.create/);
+    });
+    it("identifies Credit spender resolution", async () => {
+        const { registryFixture } = await import("./registry-fixture");
+        const { h, reader, protocol, protocolRpc } = await registryFixture("unregistered");
+        const error = await new Invisi({ chainReader: reader, protocolRpc })
+            .prepareCreateCredit({
+                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                protocol,
                 tokenAddress: h.context.tokenAddress,
                 inputs: [],
                 spender: h.bob.ownerAddress,

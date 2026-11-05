@@ -6,8 +6,8 @@ const context = {
     chainId: BigInt(vectors.context.chainId),
     protocolAddress: BigInt(vectors.context.protocolAddress),
     tokenAddress: BigInt(vectors.context.tokenAddress),
-    walletIdentity:
-        `0x${BigInt(vectors.note.walletIdentity).toString(16).padStart(40, "0")}` as `0x${string}`,
+    ownerAddress:
+        `0x${BigInt(vectors.note.ownerAddress).toString(16).padStart(40, "0")}` as `0x${string}`,
     outputCommitment: vectors.note.commitment as `0x${string}`,
 };
 const note = { ...context, amount: BigInt(vectors.note.amount), nonce: BigInt(vectors.note.nonce) };
@@ -68,7 +68,7 @@ it("reveals raw funds memos only through the selected payload-key disclosure", a
         { ...note, payload: core.fundsV1.encode({ memo }) },
         context
     );
-    const viewer = new core.ViewingCapability(context.walletIdentity, key);
+    const viewer = new core.ViewingCapability(context.ownerAddress, key);
     const output = { ...context, role: "funds" as const, ciphertext: envelope };
     const keyed = await viewer.discloseNote(envelope, output);
     expect(keyed.getScope().revealsMemo).toBe(true);
@@ -124,7 +124,7 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         const scoped = {
             ...context,
             outputCommitment: vectors.credit.commitment as `0x${string}`,
-            walletIdentity: address(
+            ownerAddress: address(
                 vectors.credit[
                     (role + "WalletIdentity") as "ownerWalletIdentity" | "spenderWalletIdentity"
                 ]
@@ -150,7 +150,7 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         expect(core.creditV1.decode(decoded.note.payload!).memo).toEqual(
             new Uint8Array(256).fill(255)
         );
-        const viewer = new core.ViewingCapability(scoped.walletIdentity, privateKey);
+        const viewer = new core.ViewingCapability(scoped.ownerAddress, privateKey);
         const keyed = await viewer.discloseCredit(envelope, scoped);
         expect(
             core.creditV1.decode(
@@ -191,7 +191,7 @@ it("decrypts every independently generated text and opaque shared memo vector", 
                 vector.ciphertext as `0x${string}`,
                 {
                     ...context,
-                    walletIdentity: identity(vectors[role].walletIdentity),
+                    ownerAddress: identity(vectors[role].ownerAddress),
                     role,
                     outputCommitment: vectors.credit.commitment as `0x${string}`,
                 }

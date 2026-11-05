@@ -5,7 +5,7 @@ export interface WalletScope {
     namespace: string;
     chainId: bigint;
     protocolAddress: Hex;
-    walletIdentity: Hex;
+    ownerAddress: Hex;
 }
 
 export function creditReservationKey(commitment: string): string {

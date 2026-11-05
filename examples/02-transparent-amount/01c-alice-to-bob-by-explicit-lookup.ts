@@ -1,9 +1,9 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { PublicWallet } from "@invisi-labs/sdk";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
 import { erc20Abi } from "viem";
-import { AddressRegistry, Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
-import { EthersAddressResolver } from "@invisi-labs/sdk/ethers";
+import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { getAccounts } from "../accounts.js";
 
 // Bob has registered his address and provides only a 0x address; Alice looks up the registration and sends 1 token.
@@ -50,49 +50,17 @@ try {
         await approval.wait();
     }
 
-    // 5. The SDK builds transparent-amount funding; ethers handles subsequent on-chain submission.
-    // Bob provides only a 0x address; choose either lookup method without reading his private key or local 0i address.
-    // First run Bob's initial registration example in category 1.
-    // false: read the registry contract via Chain RPC; true: query the registration event index via Protocol RPC.
-    const useProtocolRpc = false;
-    let bobReceivingAddress: string;
-
-    if (useProtocolRpc) {
-        // Option 1: trust registration information from the configured Protocol RPC, waiting for confirmations and indexing to catch up.
-        const registration = await protocolRpc.getReceivingAddress(bobAddress);
-        if (!registration) {
-            throw new Error("Bob has not registered a privacy receiving address, or the registration event has not been indexed");
-        }
-
-        bobReceivingAddress = registration.receivingAddress;
-        console.log("Bob privacy receiving address resolved via Protocol RPC:", bobReceivingAddress);
-        console.log("Registration index block:", registration.block.number);
-        console.log("Registration index block hash:", registration.block.hash);
-    } else {
-        // Option 2: read the registry contract through your own Chain RPC, independently of the Protocol RPC registration event index.
-        const deployment = await protocolRpc.getDeployment(settings.chainId);
-        if (!deployment.registry) {
-            throw new Error("The current deployment does not provide an address registry contract");
-        }
-
-        const registryContext = {
-            chainId: settings.chainId,
-            registryAddress: deployment.registry.address,
-        };
-        const resolver = new EthersAddressResolver(provider, registryContext, deployment.registry.runtimeCodeHash);
-        const registry = new AddressRegistry(registryContext, {
-            lookup: resolver.lookup,
-            expectedRuntimeCodeHash: deployment.registry.runtimeCodeHash,
-        });
-        bobReceivingAddress = await registry.resolve(bobAddress);
-        console.log("Bob privacy receiving address resolved on-chain:", bobReceivingAddress);
-    }
-
+    // 5. Select direct chain lookup for this recipient only.
+    // Preparation validates the Protocol registry and reads its current receiving keys.
+    // No custom resolver or lookup option belongs on the Invisi constructor.
     const outputs = [
-        {
-            to: bobReceivingAddress,
-            amount,
-        },
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
+            amount: amount,
+            recipient: { type: "evm", address: bobAddress, addressLookup: "chain" },
+        }),
     ];
 
     const aliceWallet = PublicWallet.fromAddress(alice.receivingAddress);

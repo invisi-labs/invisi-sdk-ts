@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
@@ -33,7 +34,15 @@ try {
         wallet: alice.publicWallet,
         protocol,
         tokenAddress: settings.tokenAddress,
-        outputs: [{ to: bob.receivingAddress, amount: businessAmount }],
+        outputs: [
+            await NoteOutput.create({
+                chainId: protocol.context.chainId,
+                protocolAddress: protocol.context.protocolAddress,
+                tokenAddress: settings.tokenAddress,
+                amount: businessAmount,
+                recipient: { type: "invisi", address: bob.receivingAddress },
+            }),
+        ],
         funding: { payer: alice.address, amount: businessAmount, authorization: "signature" },
         deadline: BigInt(latest.timestamp) + 3600n,
     });

@@ -97,7 +97,7 @@ async function harness() {
         expectedRuntimeCodeHash: keccak256("0x01") as Hex,
     });
     const viewing = new ViewingCapability(
-        `0x${BigInt(vectors.note.walletIdentity).toString(16).padStart(40, "0")}` as Hex,
+        `0x${BigInt(vectors.note.ownerAddress).toString(16).padStart(40, "0")}` as Hex,
         vectors.owner.viewingPrivateKey as Hex
     );
     const disclosure = await viewing.discloseNote(vectors.note.ciphertext as Hex, {

@@ -22,7 +22,7 @@ export async function runStoreContract(
                 chainId: scope.chainId,
                 protocolAddress: BigInt(scope.protocolAddress),
                 tokenAddress: 0x2222222222222222222222222222222222222222n,
-                walletIdentity: scope.walletIdentity,
+                ownerAddress: scope.ownerAddress,
                 amount: 100n,
                 nonce: 1n,
             },

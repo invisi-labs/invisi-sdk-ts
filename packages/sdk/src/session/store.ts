@@ -16,9 +16,9 @@ export function scopeKey(scope: WalletScope): string {
         if (!/^0x[0-9a-fA-F]{40}$/.test(address) || BigInt(address) === 0n)
             throw new Error("invalid scope deployment");
     if (
-        !/^0x[0-9a-fA-F]{40}$/.test(scope.walletIdentity) ||
-        BigInt(scope.walletIdentity) <= 0n ||
-        BigInt(scope.walletIdentity) >= 1n << 160n
+        !/^0x[0-9a-fA-F]{40}$/.test(scope.ownerAddress) ||
+        BigInt(scope.ownerAddress) <= 0n ||
+        BigInt(scope.ownerAddress) >= 1n << 160n
     )
         throw new Error("invalid scope wallet");
     return bytesToHex(
@@ -29,7 +29,7 @@ export function scopeKey(scope: WalletScope): string {
                         scope.namespace,
                         scope.chainId.toString(),
                         scope.protocolAddress.toLowerCase(),
-                        scope.walletIdentity.toLowerCase(),
+                        scope.ownerAddress.toLowerCase(),
                     ])
             )
         )
@@ -67,7 +67,7 @@ export function validateState(state: WalletState, scope: WalletScope, revision: 
             record.note.tokenAddress >= 1n << 160n ||
             record.note.chainId !== scope.chainId ||
             record.note.protocolAddress !== BigInt(scope.protocolAddress) ||
-            record.note.walletIdentity.toLowerCase() !== scope.walletIdentity.toLowerCase() ||
+            record.note.ownerAddress.toLowerCase() !== scope.ownerAddress.toLowerCase() ||
             typeof record.note.amount !== "bigint" ||
             record.note.amount <= 0n ||
             record.note.amount >= 1n << 128n
@@ -85,7 +85,7 @@ export function validateState(state: WalletState, scope: WalletScope, revision: 
             (record.role === "owner"
                 ? note.ownerWalletIdentity
                 : note.spenderWalletIdentity
-            ).toLowerCase() !== scope.walletIdentity.toLowerCase() ||
+            ).toLowerCase() !== scope.ownerAddress.toLowerCase() ||
             !["unspent", "unknown", "spent"].includes(record.spent)
         )
             throw new Error("invalid stored Credit context or role");

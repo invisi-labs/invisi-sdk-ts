@@ -1,17 +1,9 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { setTimeout } from "node:timers/promises";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, getBytes, parseUnits } from "ethers";
 import { erc20Abi } from "viem";
-import {
-    fundsV1,
-    Invisi,
-    InvisiError,
-    Protocol,
-    ProtocolRpcClient,
-    ViewingCapability,
-    decodeMemoText,
-    type PaymentOutput,
-} from "@invisi-labs/sdk";
+import { fundsV1, Invisi, InvisiError, Protocol, ProtocolRpcClient, ViewingCapability, decodeMemoText } from "@invisi-labs/sdk";
 import { getAccounts } from "../accounts.js";
 
 // Alice transfers a public amount of 1 token to Bob, demonstrating the standard v1 payload.
@@ -62,14 +54,17 @@ try {
     // const json = new TextEncoder().encode(JSON.stringify({ orderId: 'INVISI-TEST-001' }));
     // const customPayload = new Uint8Array([1, ...json]);
     // Replace payload below with customPayload and decode using the same convention at the recipient; no codec injection into Invisi is needed.
-    const outputs: PaymentOutput[] = [
-        {
-            to: bob.publicWallet.getAddress(),
-            amount,
+    const outputs: NoteOutput[] = [
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
+            amount: amount,
+            recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
             payload: fundsV1.encode({
                 memo,
             }),
-        },
+        }),
     ];
     // 4. caller means Alice funds and submits herself; no extra funding signature or proof is required.
     const prepared = await invisi.prepareShield({

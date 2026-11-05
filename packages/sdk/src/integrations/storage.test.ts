@@ -19,7 +19,7 @@ const scope: WalletScope = {
     namespace: "merchant-user-1",
     chainId: 31337n,
     protocolAddress: "0x1111111111111111111111111111111111111111",
-    walletIdentity: ("0x" + "01".padStart(40, "0")) as `0x${string}`,
+    ownerAddress: ("0x" + "01".padStart(40, "0")) as `0x${string}`,
 };
 it("authenticates private state, scope and revision without BigInt marker collisions", async () => {
     const codec = await EncryptedWalletCodec.fromBytes(new Uint8Array(32).fill(7)),

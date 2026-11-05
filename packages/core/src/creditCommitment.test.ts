@@ -55,7 +55,7 @@ const leaf = async (n: core.CreditNote = note) =>
 describe("current protocol vectors", () => {
     it("matches independent current ordinary identity, leaf, and nullifier witnesses", async () => {
         const identity = await core.computeNoteIdentity(
-            BigInt(vectors.note.walletIdentity),
+            BigInt(vectors.note.ownerAddress),
             BigInt(vectors.note.nonce)
         );
         expect(BigInt(identity)).toBe(BigInt(vectors.note.identity));

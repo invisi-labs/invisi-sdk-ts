@@ -18,7 +18,7 @@ const context = {
     protocolAddress: vectors.context.protocolAddress as `0x${string}`,
 };
 const token = vectors.context.tokenAddress as `0x${string}`;
-const walletIdentity = toBeHex(BigInt(vectors.note.walletIdentity), 20) as `0x${string}`;
+const ownerAddress = toBeHex(BigInt(vectors.note.ownerAddress), 20) as `0x${string}`;
 const key = Uint8Array.from(Buffer.from(vectors.owner.viewingPrivateKey.slice(2), "hex"));
 const clue = fmd.vectors[0]!.clue;
 const meta = {
@@ -51,7 +51,7 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
             ...context,
             protocolAddress: BigInt(context.protocolAddress),
             tokenAddress: BigInt(token),
-            walletIdentity,
+            ownerAddress,
             amount: 70n,
             nonce: BigInt(i + 1),
             payload: fundsV1.encode({
@@ -60,7 +60,7 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
         };
         const commitment = await computeNoteCommitment(
             note.chainId,
-            await computeNoteIdentity(BigInt(walletIdentity), note.nonce),
+            await computeNoteIdentity(BigInt(ownerAddress), note.nonce),
             note.tokenAddress,
             note.amount
         );
@@ -83,7 +83,7 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
     };
     const result = await decryptCandidates([inserted, log], {
         context,
-        viewing: new ViewingCapability(walletIdentity, key),
+        viewing: new ViewingCapability(ownerAddress, key),
         confirmedThrough: 12n,
     });
     expect(result.notes.map((n) => n.leafIndex)).toEqual([0, 1, 2]);

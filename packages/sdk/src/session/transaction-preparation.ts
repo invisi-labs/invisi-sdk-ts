@@ -1,3 +1,4 @@
+import { NoteOutput, resolvedOutputSnapshot } from "../NoteOutput";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress } from "ethers";
 import {
@@ -19,7 +20,6 @@ import type {
     DrawCreditPreparation,
     OperationPlan,
     PreparationRuntime,
-    PaymentOutput,
     ShieldPreparation,
     TopUpCreditPreparation,
     TransferPreparation,
@@ -32,11 +32,16 @@ export class TransactionPreparation<Result> {
         const complete = context.complete;
         this.context = {
             ...context,
-            complete: (plan) =>
-                complete({
-                    ...plan,
-                    ...(this.#intent ? { intent: structuredClone(this.#intent) } : {}),
-                }),
+            complete: (plan) => {
+                const intent = this.#intent ? structuredClone(this.#intent) : undefined;
+                if (intent && (intent.kind === "transfer" || intent.kind === "shield")) {
+                    const businessOutputs = plan.outputs.filter((output) => !output.change);
+                    intent.options.outputs = intent.options.outputs.map((payment, index) =>
+                        resolvedOutputSnapshot(payment, businessOutputs[index]!)
+                    );
+                }
+                return complete({ ...plan, ...(intent ? { intent } : {}) });
+            },
         };
     }
     private runtime(tokenAddress: Hex): PreparationRuntime<Result> {
@@ -102,7 +107,7 @@ export class TransactionPreparation<Result> {
     }
 
     private async funds(
-        payments: readonly PaymentOutput[],
+        payments: readonly NoteOutput[],
         total: bigint,
         withdrawalAddress: `0x${string}`,
         withdrawalAmount: bigint,
@@ -124,18 +129,7 @@ export class TransactionPreparation<Result> {
         );
         const change = selection.amount + (funding.funding.amount ?? 0n) - total;
         if (change > 0n) {
-            outputs.push(
-                await preparation.output(
-                    {
-                        to:
-                            this.context.changeAddress ??
-                            this.context.options.wallet.getReceivingAddress().toString(),
-                        amount: change,
-                    },
-                    context,
-                    true
-                )
-            );
+            outputs.push(await preparation.change(change, context));
         }
         const params = {
             token: context.tokenAddress,
@@ -188,7 +182,7 @@ export class TransactionPreparation<Result> {
             )
         );
         if (
-            outputs.reduce((sum, output) => sum + output.note.amount, 0n) !==
+            outputs.reduce((sum, output) => sum + output.amount, 0n) !==
             (funding.funding.amount ?? 0n) - (copied.fee?.amount ?? 0n)
         ) {
             throw new Error("shield funding must equal output total");
@@ -214,7 +208,7 @@ export class TransactionPreparation<Result> {
             },
             shieldOutputs: outputs.map((output) => ({
                 identity: output.identity,
-                amount: output.note.amount,
+                amount: output.amount,
             })),
         });
     }

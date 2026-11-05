@@ -1,3 +1,4 @@
+import { testOutput } from "./test-output";
 import { fundsV1 } from "@invisi-labs/core";
 import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, it, vi } from "vitest";
@@ -25,7 +26,7 @@ describe("explicit transactions without a wallet store", () => {
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         });
         expect(prepared.preview().outputs.map((o) => o.amount)).toEqual([30n, 70n]);
         expect(prepared.preview().inputs).toBe(1);
@@ -55,7 +56,7 @@ describe("explicit transactions without a wallet store", () => {
     });
 });
 
-import { Interface, Wallet as EvmWallet, getBytes } from "ethers";
+import { Interface, Wallet as EvmWallet, getBytes, getAddress } from "ethers";
 import {
     Wallet,
     computeCreditCommitment,
@@ -112,11 +113,11 @@ it("authorizes, proves, verifies and exports without any store", async () => {
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [structuredClone(await testOutput(h, { to: h.bob.getAddress(), amount: 30n }))],
     };
     const prepared = await h.invisi.prepareTransfer(options);
     options.inputs[0]!.note.amount = 999n;
-    options.outputs[0]!.amount = 999n;
+    Object.assign(options.outputs[0]!, { amount: 999n });
     expect(prepared.preview().outputs[0]!.amount).toBe(30n);
     await expect(prepared.prove()).rejects.toThrow(/authoriz/);
     const authorized = await externallyAuthorize(prepared);
@@ -139,7 +140,7 @@ it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", 
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     };
     await expect(
         h.invisi.prepareTransfer({
@@ -173,7 +174,7 @@ it("uses all explicit inputs even when public funding covers the requested outpu
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
     });
     expect(op.preview().inputs).toBe(1);
@@ -199,7 +200,7 @@ it("supports full owner-only sweeps and recursive member export", async () => {
     const recursive = await h.invisi.prepareTransfer({
         ...identity,
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const ready = await (await externallyAuthorize(recursive)).prove({ execution: "aggregate" });
     expect(ready.exportAggregateMember().bundle.target).toBe("noir-recursive");
@@ -215,7 +216,7 @@ it.each([undefined, "single", "aggregate"] as const)(
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         });
         const request = await prepared.exportWalletAuthorization();
         const authorized = await externallyAuthorize(prepared);
@@ -252,7 +253,7 @@ it.each([
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
             ...invalid,
         } as any)
     ).rejects.toThrow(/execution|target/);
@@ -265,7 +266,9 @@ it("rejects aggregation above 14 slots without invoking the prover", async () =>
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: Array.from({ length: 14 }, () => ({ to: h.bob.getAddress(), amount: 1n })),
+        outputs: await Promise.all(
+            Array.from({ length: 14 }, () => testOutput(h, { to: h.bob.getAddress(), amount: 1n }))
+        ),
     });
     const authorized = await externallyAuthorize(prepared);
     await expect(authorized.prove({ execution: "aggregate" })).rejects.toThrow(/14-slot/);
@@ -284,7 +287,7 @@ it.each(["evm", "noir-recursive", null, "invalid"])(
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         });
         const authorized = await externallyAuthorize(prepared);
         await expect(authorized.prove({ execution } as any)).rejects.toThrow(/execution/);
@@ -307,7 +310,7 @@ it("supports public shield and signature-funded outputs using independent EVM au
     };
     const shield = await h.invisi.prepareShield({
         ...identity,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: signer.address, amount: 30n, authorization: "caller" },
     });
     expect((await (await shield.ready()).exportTransaction()).to).toBe(h.context.protocolAddress);
@@ -315,8 +318,8 @@ it("supports public shield and signature-funded outputs using independent EVM au
         ...identity,
         inputs: [],
         outputs: [
-            { to: h.bob.getAddress(), amount: 20n },
-            { to: h.wallet.getAddress(), amount: 10n },
+            await testOutput(h, { to: h.bob.getAddress(), amount: 20n }),
+            await testOutput(h, { to: h.wallet.getAddress(), amount: 10n }),
         ],
         funding: { payer: signer.address, amount: 30n },
     });
@@ -333,14 +336,14 @@ it("freezes each operation independently when one Invisi serves multiple wallets
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.wallet.getAddress(), amount: 1n }],
+        outputs: [await testOutput(h, { to: h.wallet.getAddress(), amount: 1n })],
         funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
     });
     const second = await h.invisi.prepareShield({
         wallet: PublicWallet.fromAddress(h.bob.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 2n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 2n })],
         funding: { payer: h.bob.ownerAddress, amount: 2n, authorization: "caller" },
     });
     expect(first.id).not.toBe(second.id);
@@ -360,10 +363,10 @@ it.each([1, 2] as const)(
                 chainId: h.context.chainId,
                 protocolAddress: BigInt(h.context.protocolAddress),
                 tokenAddress: BigInt(h.context.tokenAddress),
-                ownerWalletIdentity: h.wallet.walletIdentity,
-                spenderWalletIdentity: h.bob.walletIdentity,
-                ownerPayout: BigInt(h.wallet.walletIdentity),
-                spenderPayout: BigInt(h.bob.walletIdentity),
+                ownerWalletIdentity: h.wallet.ownerAddress,
+                spenderWalletIdentity: h.bob.ownerAddress,
+                ownerPayout: BigInt(h.wallet.ownerAddress),
+                spenderPayout: BigInt(h.bob.ownerAddress),
                 amount: 100n,
                 nonce: 456n,
                 expiry: 2000003600n,
@@ -506,7 +509,7 @@ it("checks explicit note preimages, token scope and canonical paths", async () =
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     };
     await expect(
         h.invisi.prepareTransfer({
@@ -611,7 +614,7 @@ realNativeProof(
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         });
         const authorized = await externallyAuthorize(prepared);
         const ready = await authorized.prove(prover);
@@ -635,11 +638,11 @@ it.each(["shield", "transfer"] as const)(
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [
-                {
+                await testOutput(h, {
                     to: h.bob.getAddress(),
                     amount: 30n,
                     payload: fundsV1.encode({ memo }),
-                },
+                }),
             ],
         };
         const pending =
@@ -698,8 +701,8 @@ it("draws Credits from two different owners with one external spender authorizat
                 chainId: h.context.chainId,
                 protocolAddress: BigInt(h.context.protocolAddress),
                 tokenAddress: BigInt(h.context.tokenAddress),
-                ownerWalletIdentity: owner.walletIdentity,
-                spenderWalletIdentity: h.wallet.walletIdentity,
+                ownerWalletIdentity: owner.ownerAddress,
+                spenderWalletIdentity: h.wallet.ownerAddress,
                 ownerPayout: BigInt(owner.ownerAddress),
                 spenderPayout: BigInt(h.wallet.ownerAddress),
                 amount: 100n,
@@ -749,7 +752,7 @@ it("draws Credits from two different owners with one external spender authorizat
     const call = await ready.exportTransaction();
     const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
     expect(decoded.name).toBe("creditDraw");
-    expect(decoded.args[1].spender).toBe(h.wallet.ownerAddress);
+    expect(decoded.args[1].spender.toLowerCase()).toBe(h.wallet.ownerAddress);
     expect(decoded.args[1].totalAmount).toBe(30n);
     expect(decoded.args[1].nullifiers).toHaveLength(2);
     expect(decoded.args[1].remainderCommitments).toHaveLength(2);
@@ -770,7 +773,7 @@ it("draws Credits from two different owners with one external spender authorizat
                 role: "spender",
             });
         expect(ownerCopy.note.amount).toBe(BigInt(90 - 10 * index));
-        expect(ownerCopy.note.ownerWalletIdentity).toBe(owner.walletIdentity);
+        expect(ownerCopy.note.ownerWalletIdentity).toBe(owner.ownerAddress);
         expect(spenderCopy).toEqual(ownerCopy);
         expect(ownerCopy.ownerReceivingKeys).toEqual(creditInputs[index]!.state.ownerReceivingKeys);
         expect(ownerCopy.spenderReceivingKeys).toEqual(
@@ -789,7 +792,7 @@ it.each(["shield", "transfer"] as const)(
             wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n, payload }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n, payload })],
         };
         const pending =
             kind === "shield"
@@ -829,24 +832,16 @@ it.each(["shield", "transfer"] as const)(
         }
     }
 );
-it("rejects non-byte application payloads from JavaScript callers instead of coercing them", async () => {
+it("rejects non-byte application payloads at the output factory instead of coercing them", async () => {
     const h = await setup();
     for (const payload of ["hello", [1, 2], null]) {
         await expect(
-            h.invisi.prepareShield({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-                protocol: h.protocol,
-                tokenAddress: h.context.tokenAddress,
-                outputs: [
-                    {
-                        to: h.bob.getAddress(),
-                        amount: 1n,
-                        payload: payload as unknown as Uint8Array,
-                    },
-                ],
-                funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
+            testOutput(h, {
+                to: h.bob.getAddress(),
+                amount: 1n,
+                payload: payload as unknown as Uint8Array,
             })
-        ).rejects.toMatchObject({ code: "PREPARATION_FAILED", outputIndex: 0 });
+        ).rejects.toThrow(/payload must be Uint8Array/);
     }
 });
 
@@ -857,7 +852,7 @@ it("binds an immediate public fee and withdrawal while conserving private change
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         withdrawal: { to: h.wallet.ownerAddress, amount: 20n },
         fee: { recipient: h.bob.ownerAddress, amount: 10n },
     });
@@ -908,7 +903,7 @@ it("exports a non-sendable frozen public intent before authorization for a firm 
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         fee: { recipient: h.bob.ownerAddress, amount: 10n },
     });
     const intent = await prepared.exportBroadcasterIntent();
@@ -998,7 +993,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const prepared = await original.withBroadcaster(client, { maxFeeAmount: 10n });
     expect(original.preview().feeAmount).toBe(0n);
@@ -1021,19 +1016,19 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
     });
     const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
     expect(original.preview().fundingAmount).toBe(30n);
     expect(quoted.preview().fundingAmount).toBe(40n);
     expect(original.preview().funding).toMatchObject({
-        payer: h.wallet.ownerAddress,
+        payer: getAddress(h.wallet.ownerAddress),
         amount: 30n,
         authorization: "caller",
     });
     expect(quoted.preview().funding).toMatchObject({
-        payer: h.wallet.ownerAddress,
+        payer: getAddress(h.wallet.ownerAddress),
         amount: 40n,
         authorization: "signature",
     });
@@ -1067,7 +1062,7 @@ it("rejects excessive or unstable broadcaster fees before signing and preserves 
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     await expect(
         prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 9n })
@@ -1102,7 +1097,7 @@ it("requests an app-owned permit once after the gross funding amount stabilizes"
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller", permit },
     });
     await expect(
@@ -1131,7 +1126,7 @@ it("re-quotes from the original public funding intent without accumulating fees"
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
     });
     const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
@@ -1153,7 +1148,7 @@ it("broadcasts a zero-input funded transfer while preserving its business paymen
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: [],
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
     });
     const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
@@ -1181,7 +1176,7 @@ it("uses existing private change before increasing mixed public funding", async 
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 130n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 130n })],
         funding: { payer: h.wallet.ownerAddress, amount: 50n, authorization: "signature" },
     });
     const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
@@ -1203,7 +1198,7 @@ it("refreshes caller-only zero nonce and deadline when attaching a broadcaster",
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: {
             payer: h.wallet.ownerAddress,
             amount: 30n,
@@ -1228,7 +1223,7 @@ it("stops fee iteration when rebuilt intent pays at least its recalculated fee",
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
-        outputs: [{ to: h.bob.getAddress(), amount: 80n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 80n })],
     });
     const quoted = await prepared.withBroadcaster(client, { maxFeeAmount: 20n });
     expect(quoted.preview().feeAmount).toBe(20n);

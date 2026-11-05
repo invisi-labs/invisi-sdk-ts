@@ -3,7 +3,7 @@ import { hexToBytes } from "@noble/hashes/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
     deriveWallet,
-    computeWalletIdentity,
+    computeOwnerAddress,
     walletAuthorizationTypedData,
     computeWalletAuthorizationDigest,
     signWalletAuthorization,
@@ -20,7 +20,7 @@ const request = {
     words: [31337n, 0x1234n],
 };
 it("rejects malformed owner public keys", async () => {
-    await expect(computeWalletIdentity(new Uint8Array(33))).rejects.toThrow();
+    await expect(computeOwnerAddress(new Uint8Array(33))).rejects.toThrow();
 });
 
 describe("private wallet authorization", () => {
@@ -45,7 +45,7 @@ describe("private wallet authorization", () => {
         expect(signature).toHaveLength(130);
         expect(
             await verifyWalletAuthorization(
-                wallet.walletIdentity,
+                wallet.ownerAddress,
                 wallet.spendingPublicKey,
                 signature,
                 request
@@ -66,7 +66,7 @@ describe("private wallet authorization", () => {
         ]) {
             expect(
                 await verifyWalletAuthorization(
-                    wallet.walletIdentity,
+                    wallet.ownerAddress,
                     wallet.spendingPublicKey,
                     signature,
                     { ...request, ...patch }
@@ -83,7 +83,7 @@ describe("private wallet authorization", () => {
         ])
             expect(
                 await verifyWalletAuthorization(
-                    wallet.walletIdentity,
+                    wallet.ownerAddress,
                     wallet.spendingPublicKey,
                     signature,
                     changed
@@ -92,7 +92,7 @@ describe("private wallet authorization", () => {
         for (const key of [wallet.viewingPrivateKey, wallet.detectionSeed]) {
             const pub = secp256k1.getPublicKey(key, false),
                 sig = signWalletAuthorization(key, request);
-            expect(await verifyWalletAuthorization(wallet.walletIdentity, pub, sig, request)).toBe(
+            expect(await verifyWalletAuthorization(wallet.ownerAddress, pub, sig, request)).toBe(
                 false
             );
         }
@@ -117,7 +117,7 @@ describe("private wallet authorization", () => {
             .addRecoveryBit(2)
             .recoverPublicKey(digest)
             .toRawBytes(false);
-        const identity = await computeWalletIdentity(publicKey);
+        const identity = await computeOwnerAddress(publicKey);
         expect(await verifyWalletAuthorization(identity, publicKey, signature, request)).toBe(true);
         await expect(
             verifyWalletAuthorization(

@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
 import { erc20Abi } from "viem";
@@ -68,10 +69,13 @@ try {
 
     // Build hidden-amount outputs with prepareTransfer rather than the transparent-amount prepareShield.
     const outputs = [
-        {
-            to: bob.publicWallet.getAddress(),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: parseUnits("3", decimals),
-        },
+            recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
+        }),
     ];
     // From 10 cash minus 3 for Bob, the SDK automatically creates 7 token in change for Alice.
     const prepared = await invisi.prepareTransfer({

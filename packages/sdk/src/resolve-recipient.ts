@@ -30,7 +30,7 @@ export async function resolveRecipient(
     }
     let keys: Awaited<ReturnType<ReceivingKeyLookup>>;
     try {
-        keys = await lookup(recipient.walletIdentity);
+        keys = await lookup(recipient.ownerAddress);
     } catch (cause) {
         if (cause instanceof MissingCapabilityError) {
             throw new InvisiError("MISSING_CAPABILITY", cause.message, {
@@ -53,7 +53,7 @@ export async function resolveRecipient(
     }
     try {
         return ReceivingAddress.from({
-            walletIdentity: recipient.walletIdentity,
+            ownerAddress: recipient.ownerAddress,
             viewingPublicKey: keys.viewingPublicKey,
             clueKey: keys.clueKey,
         });

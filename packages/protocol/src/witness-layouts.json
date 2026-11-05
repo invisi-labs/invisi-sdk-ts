@@ -1,9 +1,9 @@
 {
   "transact_user_slots14": {
-    "artifactSha256": "67afd8a7b9b906097e6a3e4262cb0e180757e5ac68648c1998fad48e0d8f09d0",
+    "artifactSha256": "df9458f0be9c8905241ee74e5f11c0e1c348ef749fe1a9d599034a983f08dbd5",
     "keys": {
-      "evm": "95d42117d98b561fe700a6b169375607f515baebfb8e252932520bf0046de7cc",
-      "noir-recursive": "037c51ff1b8a13283d656ac911b0d99f4cd8fc372b0b147efbfb9fd8afb2a52f"
+      "evm": "a9db580b09d05f09d4ea58b8d9755855525b8cc20beee4b1fbfe4cad10251e4e",
+      "noir-recursive": "912191fc9484b2c0ab869d44900054b1a7c25c3256177abfc102884f3fa7d7ed"
     },
     "publicInputCount": 59,
     "public": [
@@ -109,11 +109,11 @@
       }
     ],
     "private": [
-      "wallet_identity",
+      "input_owner_address",
       "public_key_x",
       "public_key_y",
       "signature",
-      "output_wallet_identities",
+      "output_identities",
       "amounts",
       "nonces",
       "leaf_indices",
@@ -122,9 +122,9 @@
     ]
   },
   "transact_user_slots56": {
-    "artifactSha256": "d65c2e856e6a3f1d7883f399db3a76db4e29b7bb446128ee38ca576932839a2b",
+    "artifactSha256": "370299e1ee32a57b6a81ccdbf5e95efef144bee17d38d402bbbfbaa392d355d8",
     "keys": {
-      "evm": "b18cc411ba56d01c23d12ac83d15396487fe7aa9dc9a43a6a11e990d8a6e8aef"
+      "evm": "2bb2fdf9ef33200038aa6e0a9f35e2a7252bf3946f5b5d68dd0ae85172adeddf"
     },
     "publicInputCount": 185,
     "public": [
@@ -230,11 +230,11 @@
       }
     ],
     "private": [
-      "wallet_identity",
+      "input_owner_address",
       "public_key_x",
       "public_key_y",
       "signature",
-      "output_wallet_identities",
+      "output_identities",
       "amounts",
       "nonces",
       "leaf_indices",
@@ -243,9 +243,9 @@
     ]
   },
   "transact_user_slots112": {
-    "artifactSha256": "377d5e6e1e67ea8238e4d42633251349fc17c42e56f296461e0d8afdbb3ae742",
+    "artifactSha256": "259417390705f5ced1cbd671582a2fe40dbf7a259d8717f4e90989dc4368ad91",
     "keys": {
-      "evm": "bc5332db1a916906c4532dd10dfe7bb5e56edf26168d3a9d12d336798399e75b"
+      "evm": "523652b9391818c0af0af8668ba2cd786be25ef00e6bcafa662ed829a32746a7"
     },
     "publicInputCount": 353,
     "public": [
@@ -351,11 +351,11 @@
       }
     ],
     "private": [
-      "wallet_identity",
+      "input_owner_address",
       "public_key_x",
       "public_key_y",
       "signature",
-      "output_wallet_identities",
+      "output_identities",
       "amounts",
       "nonces",
       "leaf_indices",
@@ -364,9 +364,9 @@
     ]
   },
   "transact_user_slots168": {
-    "artifactSha256": "09c0d1c312bdb5698c3c436b36db8c6681d1e0a39c5f9b2cecf409111d78196f",
+    "artifactSha256": "2a86703ca068c50f305d3b4b856ab3b2145d066da0bab894eac8e7c174c20292",
     "keys": {
-      "evm": "5e69afe04fb55706878c537c9274f2bd2d277a5aa98686d02f50f34a7b44338a"
+      "evm": "c9d821fdd5b8cfcdc7fe93e673a8c99487879a4680c8f1b86c0b5c05a3cad515"
     },
     "publicInputCount": 521,
     "public": [
@@ -472,11 +472,11 @@
       }
     ],
     "private": [
-      "wallet_identity",
+      "input_owner_address",
       "public_key_x",
       "public_key_y",
       "signature",
-      "output_wallet_identities",
+      "output_identities",
       "amounts",
       "nonces",
       "leaf_indices",

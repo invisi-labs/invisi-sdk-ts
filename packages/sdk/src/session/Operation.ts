@@ -387,7 +387,7 @@ export class Operation {
         );
         const provider = this.#runtime.authorization();
         check(
-            provider.walletIdentity === this.#runtime.scope.walletIdentity,
+            provider.ownerAddress === this.#runtime.scope.ownerAddress,
             "wallet authorization capability mismatch"
         );
         return this.stage(

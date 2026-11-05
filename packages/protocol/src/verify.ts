@@ -7,7 +7,7 @@ import {
 } from "@invisi-labs/core";
 
 export interface VerifyNoteCommitmentParams {
-    walletIdentity: `0x${string}`;
+    ownerAddress: `0x${string}`;
     tokenAddress: `0x${string}`;
     amount: bigint;
     nonce: `0x${string}`;
@@ -18,7 +18,7 @@ export interface VerifyNoteCommitmentParams {
 export async function verifyNoteCommitment(params: VerifyNoteCommitmentParams): Promise<boolean> {
     const expected = await computeNoteCommitment(
         params.chainId,
-        await computeNoteIdentity(BigInt(params.walletIdentity), BigInt(params.nonce)),
+        await computeNoteIdentity(BigInt(params.ownerAddress), BigInt(params.nonce)),
         BigInt(params.tokenAddress),
         params.amount
     );

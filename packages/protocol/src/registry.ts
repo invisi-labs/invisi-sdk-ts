@@ -26,7 +26,7 @@ export interface RegistryReceivingKeys {
 }
 export interface AddressRegistration {
     /** Nonzero EVM owner: 20 bytes or canonical zero-padded bytes32. */
-    walletIdentity: Hex;
+    ownerAddress: Hex;
     keys: RegistryReceivingKeys;
     /** The current registry nonce expected for this operation. */
     nonce: bigint;
@@ -53,10 +53,10 @@ function hexBytes(value: Hex, length: number): Uint8Array {
         throw new Error(`Expected ${length} hexadecimal bytes`);
     return getBytes(value);
 }
-function normalizeKeys(walletIdentity: Hex, keys: RegistryReceivingKeys): RegistryReceivingKeys {
+function normalizeKeys(ownerAddress: Hex, keys: RegistryReceivingKeys): RegistryReceivingKeys {
     const decoded = decodeAddress(
         ReceivingAddress.from({
-            walletIdentity,
+            ownerAddress,
             viewingPublicKey: hexBytes(keys.viewingPublicKey, 33),
             clueKey: hexBytes(keys.clueKey, 32),
         }).toString()
@@ -75,15 +75,15 @@ function normalize(
     uint64(context.chainId, "chainId");
     const registryAddress = getAddress(context.registryAddress) as Hex;
     if (BigInt(registryAddress) === 0n) throw new Error("Registry address must be nonzero");
-    if (!/^0x(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(registration.walletIdentity))
+    if (!/^0x(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(registration.ownerAddress))
         throw new Error("Wallet identity must be an EVM owner or padded bytes32");
     // Converting to 20 bytes rejects nonzero high bits instead of truncating them.
-    const walletIdentity = decodeAddress(
+    const ownerAddress = decodeAddress(
         ReceivingAddress.fromIdentity(
-            toBeHex(BigInt(registration.walletIdentity), 20) as Hex
+            toBeHex(BigInt(registration.ownerAddress), 20) as Hex
         ).toString()
-    ).walletIdentity;
-    const keys = normalizeKeys(walletIdentity, registration.keys);
+    ).ownerAddress;
+    const keys = normalizeKeys(ownerAddress, registration.keys);
     const nonce = uint64(registration.nonce, "nonce"),
         deadline = uint64(registration.deadline, "deadline");
     if (nonce === MAX_NONCE) throw new Error("Registry nonce exhausted");
@@ -98,7 +98,7 @@ function normalize(
         throw new Error("Registry nonce mismatch");
     if (context.now !== undefined && deadline < uint64(context.now, "now"))
         throw new Error("Registration expired");
-    return { registryAddress, registration: { walletIdentity, keys, nonce, deadline } };
+    return { registryAddress, registration: { ownerAddress, keys, nonce, deadline } };
 }
 
 /** Standard registry EIP-712 data, independent of private WalletAuthorization. */
@@ -127,7 +127,7 @@ export function registrationTypedData(
             ],
         },
         message: {
-            walletIdentity: toBeHex(BigInt(r.walletIdentity), 32),
+            walletIdentity: toBeHex(BigInt(r.ownerAddress), 32),
             ...r.keys,
             nonce: r.nonce,
             deadline: r.deadline,
@@ -159,8 +159,11 @@ export function buildRegistrationCalldata(
             options.update ? "updateKeys" : "registerKeys",
             [
                 {
-                    ...normalized.registration,
-                    walletIdentity: toBeHex(BigInt(normalized.registration.walletIdentity), 32),
+                    // The registry wire schema retains its deployed EIP-712/ABI field name.
+                    walletIdentity: toBeHex(BigInt(normalized.registration.ownerAddress), 32),
+                    keys: normalized.registration.keys,
+                    nonce: normalized.registration.nonce,
+                    deadline: normalized.registration.deadline,
                 },
                 signature,
             ]
@@ -177,10 +180,10 @@ export function createRegistryReceivingKeyLookup(
 ): ReceivingKeyLookup {
     const address = getAddress(registryAddress) as Hex;
     if (BigInt(address) === 0n) throw new Error("Registry address must be nonzero");
-    return async (walletIdentity) => {
+    return async (ownerAddress) => {
         const identity = decodeAddress(
-            ReceivingAddress.fromIdentity(walletIdentity).toString()
-        ).walletIdentity;
+            ReceivingAddress.fromIdentity(ownerAddress).toString()
+        ).ownerAddress;
         const [keys, nonce] = await new Contract(
             address,
             invisiAddressRegistryAbi,

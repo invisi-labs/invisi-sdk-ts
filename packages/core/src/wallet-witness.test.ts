@@ -15,7 +15,7 @@ it("builds only the private circuit authority fields and rejects a mismatched ke
     expect(witness.signature).toHaveLength(64);
     expect(
         await verifyWalletAuthorization(
-            wallet.walletIdentity,
+            wallet.ownerAddress,
             wallet.spendingPublicKey,
             Uint8Array.from(witness.signature),
             request
@@ -23,10 +23,10 @@ it("builds only the private circuit authority fields and rejects a mismatched ke
     ).toBe(true);
     await expect(
         buildWalletAuthorizationWitness(
-            { ...wallet, walletIdentity: "0x0000000000000000000000000000000000000001" },
+            { ...wallet, ownerAddress: "0x0000000000000000000000000000000000000001" },
             request
         )
-    ).rejects.toThrow(/identity/i);
+    ).rejects.toThrow(/owner address/i);
     await expect(
         buildWalletAuthorizationWitness(
             { ...wallet, spendingPrivateKey: new Uint8Array(32).fill(2) },

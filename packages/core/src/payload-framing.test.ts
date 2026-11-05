@@ -4,7 +4,7 @@ const context = {
     chainId: 97n,
     protocolAddress: 1n,
     tokenAddress: 2n,
-    walletIdentity: "0x0000000000000000000000000000000000000003" as const,
+    ownerAddress: "0x0000000000000000000000000000000000000003" as const,
     outputCommitment: "0x01" as `0x${string}`,
 };
 const note = { ...context, amount: 1n, nonce: 4n };

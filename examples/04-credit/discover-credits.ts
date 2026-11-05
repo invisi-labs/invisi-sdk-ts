@@ -29,7 +29,7 @@ export async function discoverCredits({
     tokenAddress: `0x${string}`;
     role: "owner" | "spender";
 }): Promise<CreditInput[]> {
-    if (wallet.walletIdentity !== viewer.walletIdentity) {
+    if (wallet.ownerAddress !== viewer.ownerAddress) {
         throw new Error("The public wallet and credit viewing capability belong to different accounts");
     }
     const rpc = protocolRpc.withProvider(provider);
@@ -73,7 +73,7 @@ export async function discoverCredits({
                     continue;
                 }
                 const identity = role === "owner" ? state.note.ownerWalletIdentity : state.note.spenderWalletIdentity;
-                if (identity !== wallet.walletIdentity) {
+                if (identity !== wallet.ownerAddress) {
                     throw new Error("The decrypted credit role identity does not match");
                 }
                 const fingerprint = JSON.stringify(output, (_, value) => {

@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { discoverCandidates } from "./discover-candidates.js";
 import { randomInt } from "node:crypto";
@@ -101,19 +102,27 @@ try {
     const bobAmount = (totalAmount - 1n) / 2n;
     // Build hidden-amount outputs with prepareTransfer rather than the transparent-amount prepareShield.
     const outputs = [
-        {
-            to: alice.publicWallet.getAddress(),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: totalAmount - bobAmount - 1n,
-        },
-        {
-            to: bob.publicWallet.getAddress(),
+            recipient: { type: "invisi", address: alice.publicWallet.getAddress() },
+        }),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: bobAmount,
-        },
-        {
-            to: charlie.publicWallet.getAddress(),
-            // 1n represents 1 base unit, not 1 whole token.
+            recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
+        }),
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount: 1n,
-        },
+            recipient: { type: "invisi", address: charlie.publicWallet.getAddress() },
+        }),
     ];
     // The three explicit outputs sum to totalAmount, producing no change.
     const prepared = await invisi.prepareTransfer({

@@ -13,7 +13,7 @@ const record = (amount: bigint, index: number): StoredNote => ({
         chainId: 31337n,
         protocolAddress: 1n,
         tokenAddress: 2n,
-        walletIdentity: hash(3),
+        ownerAddress: hash(3),
         amount,
         nonce: BigInt(index),
     },

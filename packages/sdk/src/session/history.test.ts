@@ -1,3 +1,4 @@
+import { testOutput } from "../test-output";
 import { expect, it, vi } from "vitest";
 import { WalletSession } from "./WalletSession";
 import { fixture } from "./operation-fixture";
@@ -8,7 +9,7 @@ it("restores private outgoing history without exposing execution witnesses", asy
     const payload = new Uint8Array([1, 42]);
     const operation = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n, payload }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n, payload })],
     });
     const restored = new WalletSession(h.options);
     const history = await restored.getHistory();
@@ -48,7 +49,7 @@ it("notifies after local commits and isolates observer errors", async () => {
     });
     const operation = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     expect(listener).toHaveBeenCalled();
     expect((await h.session.getHistory()).outgoing[0]!.id).toBe(operation.id);
@@ -91,7 +92,7 @@ it("does not notify failed writes or read-only queries", async () => {
     await expect(
         session.prepareTransfer({
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         })
     ).rejects.toThrow(/disk unavailable/);
     expect(listener).not.toHaveBeenCalled();
@@ -114,7 +115,13 @@ it("restores history and reservations through a newly opened encrypted store", a
     const session = new WalletSession({ ...h.options, store: first });
     const operation = await session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n, payload: new Uint8Array([9]) }],
+        outputs: [
+            await testOutput(h, {
+                to: h.bob.getAddress(),
+                amount: 30n,
+                payload: new Uint8Array([9]),
+            }),
+        ],
     });
     const reopened = new TransactionalWalletStore(
         records,

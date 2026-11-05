@@ -20,19 +20,19 @@ export async function fixture() {
         scope: WalletScope = {
             namespace: "operation-test",
             ...context,
-            walletIdentity: wallet.walletIdentity,
+            ownerAddress: wallet.ownerAddress,
         };
     const note = {
             chainId: context.chainId,
             protocolAddress: BigInt(context.protocolAddress),
             tokenAddress: BigInt(context.tokenAddress),
-            walletIdentity: wallet.walletIdentity,
+            ownerAddress: wallet.ownerAddress,
             amount: 100n,
             nonce: 123n,
         },
         leaf = await computeNoteCommitment(
             context.chainId,
-            await computeNoteIdentity(BigInt(wallet.walletIdentity), 123n),
+            await computeNoteIdentity(BigInt(wallet.ownerAddress), 123n),
             note.tokenAddress,
             100n
         ),

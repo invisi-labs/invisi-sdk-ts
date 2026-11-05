@@ -20,7 +20,7 @@ const context = {
 };
 const note: Note = {
     ...context,
-    walletIdentity: ownerHex(vectors.note.walletIdentity),
+    ownerAddress: ownerHex(vectors.note.ownerAddress),
     tokenAddress: BigInt(vectors.context.tokenAddress),
     amount: 70n,
     nonce: 123n,
@@ -29,7 +29,7 @@ const credit: CreditNote = {
     ...context,
     tokenAddress: note.tokenAddress,
     spenderWalletIdentity: ownerHex(vectors.credit.spenderWalletIdentity),
-    ownerWalletIdentity: note.walletIdentity,
+    ownerWalletIdentity: note.ownerAddress,
     spenderPayout: BigInt(vectors.credit.spenderWalletIdentity),
     ownerPayout: BigInt(vectors.credit.ownerWalletIdentity),
     amount: 100n,
@@ -63,7 +63,7 @@ const creditLeaf = (n: CreditNote) =>
 
 describe("wallet-owned note vectors", () => {
     it("matches genuine current protocol identity, leaf and private-key nullifier", async () => {
-        const identity = await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce);
+        const identity = await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce);
         expect(BigInt(identity)).toBe(BigInt(vectors.note.identity));
         const commitment = await computeNoteCommitment(
             note.chainId,
@@ -121,7 +121,7 @@ describe("wallet-owned note vectors", () => {
                 ...context,
                 tokenAddress: note.tokenAddress,
                 outputCommitment: vectors.note.commitment as `0x${string}`,
-                walletIdentity: note.walletIdentity,
+                ownerAddress: note.ownerAddress,
             }
         );
         expect(recovered).toEqual({ ...note, payload: new Uint8Array() });
@@ -136,7 +136,7 @@ describe("wallet-owned note vectors", () => {
                         ...context,
                         tokenAddress: note.tokenAddress,
                         outputCommitment: vectors.credit.commitment as `0x${string}`,
-                        walletIdentity: ownerHex(vectors[role].walletIdentity),
+                        ownerAddress: ownerHex(vectors[role].ownerAddress),
                         role,
                     }
                 )

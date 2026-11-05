@@ -1,82 +1,39 @@
 import { PublicWallet } from "@invisi-labs/core";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
-import { describe, expect, it, vi } from "vitest";
-import { Interface, type Provider, hexlify, keccak256 } from "ethers";
-import { Invisi, InvisiError, Protocol, ProtocolRpcClient } from "./index";
-import { fixture } from "./session/operation-fixture";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { Interface, type Provider } from "ethers";
+import { Invisi, InvisiError, NoteOutput, WalletSession } from "./index";
+import { registryFixture } from "./registry-fixture";
 
-async function setup(result: "registered" | "unregistered" | "failure" = "registered") {
-    const h = await fixture();
-    const deployment = {
-        ...h.protocol.deployment,
-        registry: {
-            address: "0x3333333333333333333333333333333333333333" as const,
-            runtimeCodeHash: keccak256("0x6000") as `0x${string}`,
-            fromBlock: 0n,
-        },
-    };
-    const protocol = new Protocol({ deployment });
-    const reader = {
-        ...h.reader,
-        getProtocolAddressRegistry: async () => deployment.registry.address,
-    };
-    const requests: string[] = [];
-    const keys = h.bob.getReceivingAddress().getReceivingKeys();
-    const cause = new Error("Registry service offline");
-    const fetch = vi.fn(async (_url, init) => {
-        const request = JSON.parse(init!.body as string);
-        requests.push(request.method);
-        if (result === "failure") throw cause;
-        const value =
-            request.method === "invisi_getDeployment"
-                ? {
-                      apiVersion: "v1",
-                      protocolVersion: "1",
-                      deployment: JSON.parse(
-                          JSON.stringify(deployment, (_, v) =>
-                              typeof v === "bigint" ? v.toString() : v
-                          )
-                      ),
-                  }
-                : result === "unregistered"
-                  ? null
-                  : {
-                        walletIdentity: h.bob.ownerAddress,
-                        viewingPublicKey: hexlify(keys.viewingPublicKey),
-                        clueKey: hexlify(keys.clueKey),
-                        nonce: "1",
-                        block: {
-                            number: 12,
-                            hash: `0x${"00".repeat(31)}0c`,
-                            parentHash: `0x${"00".repeat(31)}0b`,
-                            timestamp: 2000000000,
-                        },
-                    };
-        return new Response(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: value }));
-    }) as unknown as typeof globalThis.fetch;
-    const protocolRpc = new ProtocolRpcClient({ url: "https://example.org/v1", deployment, fetch });
-    return { h, reader, protocol, protocolRpc, requests };
-}
-
-describe("Invisi recipient lookup selection", () => {
+const shield = (h: Awaited<ReturnType<typeof registryFixture>>, output: NoteOutput) => ({
+    wallet: PublicWallet.fromAddress(h.h.wallet.getAddress()),
+    protocol: h.protocol,
+    tokenAddress: h.h.context.tokenAddress,
+    outputs: [output],
+    funding: {
+        payer: h.h.wallet.ownerAddress,
+        amount: output.amount,
+        authorization: "caller" as const,
+    },
+});
+describe("per-output receiving-key lookup", () => {
     it.each(["registered", "unregistered", "failure"] as const)(
-        "defaults to Protocol RPC for %s owners with no direct-chain fallback",
+        "creates EVM outputs offline and resolves %s recipients during preparation",
         async (result) => {
-            const { h, reader, protocol, protocolRpc, requests } = await setup(result);
-            const invisi = new Invisi({
-                chainReader: reader,
-                protocolRpc,
+            const h = await registryFixture(result);
+            const output = await NoteOutput.create({
+                ...h.h.context,
+                amount: 1n,
+                recipient: { type: "evm", address: h.h.bob.ownerAddress, nonce: 0n },
             });
-            const pending = invisi.prepareShield({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-                protocol,
-                tokenAddress: h.context.tokenAddress,
-                outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
-                funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
-            });
+            expect(output.deliveryPending).toBe(true);
+            expect(h.requests).toEqual([]);
+            const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.protocolRpc });
+            const pending = invisi.prepareShield(shield(h, structuredClone(output)));
             if (result === "registered") {
-                expect((await pending).preview().outputs[0]?.to).toBe(h.bob.ownerAddress);
-                expect(requests).toEqual(["invisi_getDeployment", "invisi_getReceivingAddress"]);
+                const prepared = await pending;
+                expect(prepared.preview().outputs[0]!.commitment).toBe(output.commitment);
+                expect(h.requests).toEqual(["invisi_getDeployment", "invisi_getReceivingAddress"]);
             } else {
                 const error = await pending.catch((error: unknown) => error);
                 expect(error).toBeInstanceOf(InvisiError);
@@ -85,89 +42,212 @@ describe("Invisi recipient lookup selection", () => {
                         result === "unregistered"
                             ? "EVM_ADDRESS_NOT_REGISTERED"
                             : "RECIPIENT_LOOKUP_FAILED",
+                    address: h.h.bob.ownerAddress,
                     outputIndex: 0,
-                    address: h.bob.ownerAddress,
+                    operation: "prepareShield",
                 });
             }
         }
     );
-    it("accepts a full 0i address without registration or a working registry service", async () => {
-        const { h, reader, protocol, protocolRpc, requests } = await setup("failure");
-        await new Invisi({
-            chainReader: reader,
-            protocolRpc,
-            addressLookup: "protocol-rpc",
-        }).prepareShield({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol,
-            tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 1n }],
-            funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
-        });
-        expect(requests).toEqual([]);
+    it("never resolves unencrypted EVM or long-address outputs", async () => {
+        const h = await registryFixture("failure");
+        const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.protocolRpc });
+        for (const recipient of [
+            {
+                type: "evm" as const,
+                address: h.h.bob.ownerAddress,
+                envelope: false as const,
+                addressLookup: "chain" as const,
+            },
+            { type: "invisi" as const, address: h.h.bob.getAddress() },
+        ]) {
+            const output = await NoteOutput.create({
+                ...h.h.context,
+                amount: 1n,
+                recipient,
+            } as import("./NoteOutput").NoteOutputOptions);
+            expect(output.deliveryPending).toBe(false);
+            await invisi.prepareShield(shield(h, output));
+        }
+        expect(h.requests).toEqual([]);
     });
-
-    it("does not require an unused Protocol RPC client for full addresses", async () => {
-        const { h, reader, protocol } = await setup();
-        await new Invisi({ chainReader: reader, addressLookup: "protocol-rpc" }).prepareShield({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol,
-            tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 1n }],
-            funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
+    it("freezes resolved delivery and keys through broadcaster repricing", async () => {
+        const h = await registryFixture();
+        const output = await NoteOutput.create({
+            ...h.h.context,
+            amount: 30n,
+            recipient: { type: "evm", address: h.h.bob.ownerAddress },
         });
+        const session = new WalletSession({
+            ...h.h.options,
+            protocol: h.protocol,
+            chainReader: h.reader,
+            protocolRpc: h.protocolRpc,
+        });
+        const prepared = await session.prepareShield(shield(h, output));
+        const saved = () => h.h.store.readSnapshot(h.h.scope);
+        const first = (await saved()).operations[prepared.id]!
+            .payload as import("./session/operation-types").SavedOperation;
+        const delivery = first.plan.outputs[0]!.delivery;
+        h.setResult("failure");
+        expect(output.deliveryPending).toBe(true);
+        expect(first.plan.intent!.kind).toBe("shield");
+        expect(
+            (first.plan.intent!.options as import("./session/operation-types").ShieldPreparation)
+                .outputs[0]!.deliveryPending
+        ).toBe(false);
+        expect(delivery.ciphertext).not.toBe("0x");
+        const { quoteClient } = await import("./broadcaster-fixture");
+        const quoted = await prepared.withBroadcaster(quoteClient(h.h.context), {
+            maxFeeAmount: 20n,
+        });
+        const next = (await saved()).operations[quoted.id]!
+            .payload as import("./session/operation-types").SavedOperation;
+        expect(next.plan.outputs[0]!.identity).toBe(output.identity);
+        expect(next.plan.outputs[0]!.commitment).toBe(output.commitment);
+        expect(next.plan.outputs[0]!.delivery).toEqual(delivery);
+        expect(h.requests).toEqual(["invisi_getDeployment", "invisi_getReceivingAddress"]);
     });
-
-    it("honors an explicit resolver without contacting Protocol RPC", async () => {
-        const { h, reader, protocol, protocolRpc, requests } = await setup("failure");
-        const invisi = new Invisi({
-            chainReader: reader,
-            protocolRpc,
-            addressLookup: "protocol-rpc",
-            addressResolver: async () => h.bob.getReceivingAddress().getReceivingKeys(),
-        });
-        await invisi.prepareShield({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol,
-            tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
-            funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
-        });
-        expect(requests).toEqual([]);
-    });
-    it("allows direct chain lookup instead of the default Protocol RPC", async () => {
-        const { h, reader, protocol, protocolRpc, requests } = await setup("failure");
+    it("selects direct-chain lookup per EVM output without Protocol RPC fallback", async () => {
+        const h = await registryFixture("failure");
         const abi = new Interface(invisiAddressRegistryAbi);
-        const keys = h.bob.getReceivingAddress().getReceivingKeys();
-        const call = vi.fn(async (request: { data: string }) => {
-            const decoded = abi.parseTransaction({ data: request.data })!;
-            return decoded.name === "isRegistered"
+        const keys = h.h.bob.getReceivingAddress().getReceivingKeys();
+        const call = vi.fn(async (request: { data: string }) =>
+            abi.parseTransaction({ data: request.data })!.name === "isRegistered"
                 ? abi.encodeFunctionResult("isRegistered", [true])
                 : abi.encodeFunctionResult("receivingKeysOf", [
                       [keys.viewingPublicKey, keys.clueKey],
                       1n,
-                  ]);
-        });
+                  ])
+        );
         const provider = {
-            getNetwork: async () => ({ chainId: protocol.context.chainId }),
+            getNetwork: async () => ({ chainId: h.protocol.context.chainId }),
             getCode: async () => "0x6000",
             getBlock: async () => ({ number: 12, hash: `0x${"12".repeat(32)}` }),
             call,
             resolveName: async (name: string) => name,
         } as unknown as Provider;
+        const output = await NoteOutput.create({
+            ...h.h.context,
+            amount: 1n,
+            recipient: { type: "evm", address: h.h.bob.ownerAddress, addressLookup: "chain" },
+        });
         await new Invisi({
             provider,
-            chainReader: reader,
-            protocolRpc,
-            addressLookup: "chain",
-        }).prepareShield({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol,
-            tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.ownerAddress, amount: 1n }],
-            funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
-        });
+            chainReader: h.reader,
+            protocolRpc: h.protocolRpc,
+        }).prepareShield(shield(h, output));
         expect(call).toHaveBeenCalledTimes(2);
-        expect(requests).toEqual([]);
+        expect(h.requests).toEqual([]);
+    });
+    it("rejects removed constructor lookup and resolver options", async () => {
+        const h = await registryFixture();
+        for (const options of [{ addressLookup: "chain" }, { addressResolver: async () => null }]) {
+            expect(() => new Invisi(options as never)).toThrow(/recipient|resolver|lookup/i);
+            expect(() => new WalletSession({ ...h.h.options, ...options } as never)).toThrow(
+                /recipient|resolver|lookup/i
+            );
+        }
+        await expect(
+            NoteOutput.create({
+                ...h.h.context,
+                amount: 1n,
+                recipient: { type: "evm", address: h.h.bob.ownerAddress },
+                addressResolver: async () => null,
+            } as never)
+        ).rejects.toThrow(/addressResolver/);
+    });
+    it.each(["chain", "protocol-rpc"] as const)(
+        "requires only the selected %s capability when resolving a pending envelope",
+        async (source) => {
+            const h = await registryFixture();
+            const output = await NoteOutput.create({
+                ...h.h.context,
+                amount: 1n,
+                recipient: { type: "evm", address: h.h.bob.ownerAddress, addressLookup: source },
+            });
+            const error = await new Invisi({ chainReader: h.reader })
+                .prepareShield(shield(h, output))
+                .catch((error: unknown) => error);
+            expect(error).toMatchObject({
+                code: "MISSING_CAPABILITY",
+                operation: "prepareShield",
+                outputIndex: 0,
+            });
+            expect(h.requests).toEqual([]);
+        }
+    );
+    it("does not allow copied pending state to omit an encrypted delivery", async () => {
+        const h = await registryFixture();
+        const { materializeNoteOutput } = await import("./NoteOutput");
+        const output = await NoteOutput.create({
+            ...h.h.context,
+            amount: 1n,
+            recipient: { type: "evm", address: h.h.bob.ownerAddress },
+        });
+        const changed = structuredClone(output);
+        Object.assign(changed, { deliveryPending: false });
+        delete changed.preparedOutput.deliveryPending;
+        await expect(materializeNoteOutput(changed, h.h.context)).rejects.toThrow(/delivery mode/);
+        const omitted = structuredClone(output);
+        delete omitted.preparedOutput.deliveryPending;
+        await expect(materializeNoteOutput(omitted, h.h.context)).rejects.toThrow(
+            /pending delivery/
+        );
+        const corrupted = structuredClone(output);
+        corrupted.preparedOutput.note!.payload = new Uint8Array([1]);
+        await expect(materializeNoteOutput(corrupted, h.h.context)).rejects.toThrow(/opening/);
+    });
+    it("rejects invalid per-recipient lookup sources", async () => {
+        const h = await registryFixture();
+        for (const recipient of [
+            { type: "evm", address: h.h.bob.ownerAddress, addressLookup: "cached" },
+            { type: "invisi", address: h.h.bob.getAddress(), addressLookup: "chain" },
+            { type: "identity", identity: `0x${"01".repeat(32)}`, addressLookup: "chain" },
+        ])
+            await expect(
+                NoteOutput.create({ ...h.h.context, amount: 1n, recipient } as never)
+            ).rejects.toThrow();
+    });
+
+    it("snapshots direct-session lookup capabilities at construction", async () => {
+        const h = await registryFixture();
+        const options = {
+            ...h.h.options,
+            protocol: h.protocol,
+            chainReader: h.reader,
+            protocolRpc: h.protocolRpc,
+        };
+        const session = new WalletSession(options);
+        Object.assign(options, {
+            protocolRpc: h.h.membership,
+            chainReader: {
+                ...h.reader,
+                getCode: async () => {
+                    throw new Error("mutated reader");
+                },
+            },
+        });
+        const output = await NoteOutput.create({
+            ...h.h.context,
+            amount: 1n,
+            recipient: { type: "evm", address: h.h.bob.ownerAddress },
+        });
+        await session.prepareShield({
+            tokenAddress: h.h.context.tokenAddress,
+            outputs: [output],
+            funding: { payer: h.h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
+        });
+        expect(h.requests).toEqual(["invisi_getDeployment", "invisi_getReceivingAddress"]);
+    });
+    it("keeps lookup selection in recipient types without public resolver injection", () => {
+        expectTypeOf<import("./NoteOutput").NoteOutputOptions>().not.toHaveProperty(
+            "addressResolver"
+        );
+        expectTypeOf<import("./Invisi").InvisiOptions>().not.toHaveProperty("addressLookup");
+        expectTypeOf<import("./Invisi").InvisiOptions>().not.toHaveProperty("addressResolver");
+        expectTypeOf<import("./session/operation-types").WalletSessionOptions>().not.toHaveProperty(
+            "addressResolver"
+        );
     });
 });

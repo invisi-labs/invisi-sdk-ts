@@ -32,7 +32,7 @@ export interface InventoryOptions {
     scope: WalletScope;
     store: WalletStore;
     reader: ChainReader;
-    viewing: Pick<ViewingCapability, "walletIdentity" | "decryptNote" | "decryptCredit">;
+    viewing: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
     receivingKeys?: ReceivingKeys;
 }
 

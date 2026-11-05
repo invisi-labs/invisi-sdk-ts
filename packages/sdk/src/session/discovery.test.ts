@@ -2,7 +2,7 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import { toBeHex } from "ethers";
 
 import { ViewingCapability } from "@invisi-labs/core";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import fmd from "../../../core/src/testdata/fmd-rust-vectors.json";
 import vectors from "../../../core/src/testdata/wallet-note-vectors.json";
 import { decryptCandidates, extractDeliveryCandidates, type DeliveryEventLog } from "./discovery";
@@ -11,7 +11,7 @@ const context = {
     protocolAddress: vectors.context.protocolAddress as `0x${string}`,
     tokenAddress: vectors.context.tokenAddress as `0x${string}`,
 };
-const walletIdentity = toBeHex(BigInt(vectors.owner.walletIdentity), 20) as Hex;
+const ownerAddress = toBeHex(BigInt(vectors.owner.ownerAddress), 20) as Hex;
 const clue = ("0x" + fmd.vectors[0]!.clue) as `0x${string}`;
 const delivery = { ciphertext: vectors.note.ciphertext as `0x${string}`, clue };
 const meta = {
@@ -38,7 +38,7 @@ const shield = (): DeliveryEventLog => ({
     args: { token: context.tokenAddress, treeId: 1n, startLeafIndex: 0, deliveries: [delivery] },
 });
 const viewing = () =>
-    new ViewingCapability(walletIdentity, vectors.owner.viewingPrivateKey as `0x${string}`);
+    new ViewingCapability(ownerAddress, vectors.owner.viewingPrivateKey as `0x${string}`);
 const decrypt = (logs: readonly DeliveryEventLog[], confirmedThrough = 12n) =>
     decryptCandidates(logs, { context, viewing: viewing(), confirmedThrough });
 it("recovers authenticated local notes without retaining inventory or mutating input", async () => {
@@ -46,7 +46,7 @@ it("recovers authenticated local notes without retaining inventory or mutating i
     const before = structuredClone(batch);
     const result = await decrypt(batch);
     expect(result.notes).toMatchObject([
-        { note: { amount: 70n, walletIdentity }, treeId: 1n, leafIndex: 0 },
+        { note: { amount: 70n, ownerAddress }, treeId: 1n, leafIndex: 0 },
     ]);
     expect(result.credits).toEqual([]);
     result.notes[0]!.note.amount = 900n;
@@ -126,7 +126,7 @@ it("maps packed aggregate segments and Credit owner/spender slots without treati
             state: {
                 note: {
                     amount: 100n,
-                    ownerWalletIdentity: walletIdentity,
+                    ownerWalletIdentity: ownerAddress,
                     ownerPayout: BigInt(vectors.credit.ownerPayout),
                 },
             },
@@ -244,7 +244,7 @@ it("skips redirected ciphertexts and unrelated addresses, with independent concu
         context,
         confirmedThrough: 12n,
         viewing: new ViewingCapability(
-            toBeHex(BigInt(vectors.spender.walletIdentity), 20) as Hex,
+            toBeHex(BigInt(vectors.spender.ownerAddress), 20) as Hex,
             vectors.spender.viewingPrivateKey as Hex
         ),
     });
@@ -290,4 +290,68 @@ it("binds decryption to the Credit delivery role", async () => {
         notes: [],
         credits: [],
     });
+});
+
+it("preserves mixed packed empty output positions and skips their decryption", async () => {
+    const commitments = [toBeHex(91n, 32), vectors.note.commitment, toBeHex(92n, 32)];
+    const packed =
+        "0x0000" +
+        toBeHex((delivery.ciphertext.length - 2) / 2, 2).slice(2) +
+        delivery.ciphertext.slice(2) +
+        clue.slice(2) +
+        "0000";
+    const batch: DeliveryEventLog = {
+        ...meta,
+        logIndex: 2,
+        eventName: "BatchOutputs",
+        args: {
+            tokens: commitments.map(() => context.tokenAddress),
+            treeId: 1n,
+            startLeafIndex: 7,
+            commitments,
+            packedDeliveries: packed,
+        },
+    };
+    const logs = [inserted(commitments, 1n, 7), batch];
+    const candidates = extractDeliveryCandidates(logs, context, 12n);
+    expect(candidates.map((c) => [c.leafIndex, c.delivery.ciphertext === "0x"])).toEqual([
+        [7, true],
+        [8, false],
+        [9, true],
+    ]);
+    const viewer = viewing();
+    const decryptNote = vi.fn(viewer.decryptNote.bind(viewer));
+    const result = await decryptCandidates(logs, {
+        context,
+        confirmedThrough: 12n,
+        viewing: { ownerAddress, decryptNote, decryptCredit: viewer.decryptCredit.bind(viewer) },
+    });
+    expect(decryptNote).toHaveBeenCalledOnce();
+    expect(result.notes).toMatchObject([{ leafIndex: 8, note: { amount: 70n } }]);
+});
+
+it("accepts paired empty direct funds deliveries but keeps Credit roles mandatory", async () => {
+    const empty = { ciphertext: "0x", clue: "0x" };
+    const direct = shield();
+    direct.args = { ...direct.args, deliveries: [empty] };
+    expect(extractDeliveryCandidates([inserted(), direct], context, 12n)).toMatchObject([
+        { leafIndex: 0, delivery: empty },
+    ]);
+    expect(await decrypt([inserted(), direct])).toEqual({ notes: [], credits: [] });
+    const credit: DeliveryEventLog = {
+        ...meta,
+        logIndex: 2,
+        eventName: "CreditCreated",
+        args: {
+            token: context.tokenAddress,
+            outputTreeId: 1n,
+            creditCommitment: vectors.credit.commitment,
+            changeCommitment: toBeHex(0n, 32),
+            leafIndices: [0],
+            deliveries: [empty, empty, empty],
+        },
+    };
+    expect(() =>
+        extractDeliveryCandidates([inserted([vectors.credit.commitment]), credit], context, 12n)
+    ).toThrow();
 });

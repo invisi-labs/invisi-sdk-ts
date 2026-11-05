@@ -49,7 +49,7 @@ import {
     transactUserPublicInputs,
     type BuildTransactCalldataParams,
 } from "./funds";
-import { FIELD_MODULUS, type FundingInput } from "./validation";
+import { FIELD_MODULUS, field, uint, word, type FundingInput } from "./validation";
 import layouts from "./witness-layouts.json";
 
 export interface NoteMembership {
@@ -69,7 +69,7 @@ export interface TransactWitnessParams extends Omit<
     "proof" | "context"
 > {
     inputs: readonly NoteMembership[];
-    outputs: readonly Note[];
+    outputs: readonly (Note | { identity: Hex; amount: bigint; note?: Note })[];
     authorization?: AuthorizedStatement;
     target?: ProofTarget;
 }
@@ -218,7 +218,7 @@ export class WitnessBuilder {
                 words: words.slice(0, -2).map(BigInt),
             };
         check(
-            signed.walletIdentity === identity &&
+            signed.ownerAddress === identity &&
                 signed.digest === computeWalletAuthorizationDigest(request),
             "authorization statement mismatch"
         );
@@ -264,7 +264,7 @@ export class WitnessBuilder {
         this.context(note);
         return computeNoteCommitment(
             note.chainId,
-            await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce),
+            await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
             note.tokenAddress,
             note.amount
         );
@@ -295,7 +295,7 @@ export class WitnessBuilder {
         check(inputs.length === nullifiers.length, "input count mismatch");
         return Promise.all(
             inputs.map(async (input, i) => {
-                check(input.note.walletIdentity === identity, "input wallet mismatch");
+                check(input.note.ownerAddress === identity, "input wallet mismatch");
                 const leaf = await this.noteLeaf(input.note);
                 check(
                     (await computeNoteNullifier(input.note.chainId, input.note.nonce, leaf)) ===
@@ -314,7 +314,7 @@ export class WitnessBuilder {
             p.inputs.length === n.inputCount && p.outputs.length === n.outputCount,
             "note count mismatch"
         );
-        const identity = p.inputs[0]?.note.walletIdentity;
+        const identity = p.inputs[0]?.note.ownerAddress;
         const unsignedSweep =
             !!identity &&
             !p.authorization &&
@@ -333,22 +333,48 @@ export class WitnessBuilder {
             identity ?? (("0x" + "00".repeat(32)) as Hex),
             authority
         );
-        for (const [i, note] of p.outputs.entries())
-            check(
-                (await this.noteLeaf(note)) === p.params.outputCommitments[i],
-                "output commitment mismatch"
-            );
-        const all = [...p.inputs.map((input) => input.note), ...p.outputs];
+        const outputs = await Promise.all(
+            p.outputs.map(async (output, i) => {
+                const opening = "identity" in output ? output.note : output;
+                const identity =
+                    "identity" in output
+                        ? field(output.identity)
+                        : BigInt(
+                              await computeNoteIdentity(BigInt(output.ownerAddress), output.nonce)
+                          );
+                const amount = uint(output.amount, 128, "output amount");
+                check(identity !== 0n && amount !== 0n, "zero output identity or amount");
+                if (opening) {
+                    this.context(opening);
+                    check(
+                        opening.amount === amount &&
+                            BigInt(
+                                await computeNoteIdentity(
+                                    BigInt(opening.ownerAddress),
+                                    opening.nonce
+                                )
+                            ) === identity,
+                        "output opening mismatch"
+                    );
+                }
+                const commitment = await computeNoteCommitment(
+                    c.chainId,
+                    word(identity),
+                    BigInt(c.tokenAddress),
+                    amount
+                );
+                check(commitment === p.params.outputCommitments[i], "output commitment mismatch");
+                return { identity, amount };
+            })
+        );
+        const all = [...p.inputs.map((input) => input.note), ...outputs];
         return provingRequest(
             `transact_user_slots${n.capacity}`,
             {
-                wallet_identity: identity ? BigInt(identity) : 0n,
+                input_owner_address: identity ? BigInt(identity) : 0n,
                 ...authority,
-                output_wallet_identities: pad(
-                    [
-                        ...p.inputs.map(() => 0n),
-                        ...p.outputs.map((note) => BigInt(note.walletIdentity)),
-                    ],
+                output_identities: pad(
+                    [...p.inputs.map(() => 0n), ...outputs.map((output) => output.identity)],
                     n.capacity,
                     () => 0n
                 ),
@@ -358,7 +384,7 @@ export class WitnessBuilder {
                     () => 0n
                 ),
                 nonces: pad(
-                    all.map((note) => note.nonce),
+                    [...p.inputs.map((input) => input.note.nonce), ...outputs.map(() => 0n)],
                     n.capacity,
                     () => 0n
                 ),
@@ -412,7 +438,7 @@ export class WitnessBuilder {
         );
         if (p.change)
             check(
-                p.change.walletIdentity === note.ownerWalletIdentity &&
+                p.change.ownerAddress === note.ownerWalletIdentity &&
                     (await this.noteLeaf(p.change)) === p.params.changeCommitment,
                 "change commitment mismatch"
             );

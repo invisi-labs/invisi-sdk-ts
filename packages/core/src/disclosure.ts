@@ -52,7 +52,7 @@ export type DisclosureResult =
     | { kind: "note"; note: Readonly<Note> }
     | { kind: "credit"; note: Readonly<CreditOpening & { payload?: Uint8Array }> };
 
-const NOTE_FIELDS = ["walletIdentity", "amount", "nonce"] as const;
+const NOTE_FIELDS = ["ownerAddress", "amount", "nonce"] as const;
 const CREDIT_FIELDS = [
     "spenderWalletIdentity",
     "ownerWalletIdentity",
@@ -161,7 +161,7 @@ async function commitment(note: Note | CreditOpening): Promise<`0x${string}`> {
     }
     return computeNoteCommitment(
         note.chainId,
-        await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce),
+        await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount
     );
@@ -185,7 +185,7 @@ export class Disclosure {
         const copied = { ...value };
         const note: Note = {
             ...context(copied),
-            walletIdentity: owner(copied.walletIdentity, "wallet identity"),
+            ownerAddress: owner(copied.ownerAddress, "owner address"),
             amount: number(copied.amount, 128, "amount"),
             nonce: nonce(copied.nonce),
         };
@@ -198,7 +198,7 @@ export class Disclosure {
                 outputCommitment: await commitment(note),
             } as DisclosureExport["context"],
             data: encode({
-                walletIdentity: note.walletIdentity,
+                ownerAddress: note.ownerAddress,
                 amount: note.amount,
                 nonce: note.nonce,
             }),
@@ -272,7 +272,7 @@ export class Disclosure {
                 } as DisclosureExport["context"],
                 data: {
                     payloadKey: `0x${bytesToHex(payloadKey)}`,
-                    walletIdentity: owner(scoped.walletIdentity, "wallet identity"),
+                    ownerAddress: owner(scoped.ownerAddress, "owner address"),
                     role,
                 },
             });
@@ -304,7 +304,7 @@ export class Disclosure {
         const outputCommitment = hash(rawContext.outputCommitment, "commitment");
         const fields =
             root.method === "payload-key"
-                ? ["payloadKey", "walletIdentity", "role"]
+                ? ["payloadKey", "ownerAddress", "role"]
                 : root.kind === "note"
                   ? NOTE_FIELDS
                   : CREDIT_FIELDS;
@@ -322,11 +322,13 @@ export class Disclosure {
             } else if (
                 key === "payloadKey" ||
                 key.endsWith("Identity") ||
+                key === "ownerAddress" ||
                 key === "creditSharedKeyHash"
             ) {
-                data[key] = key.endsWith("Identity")
-                    ? owner(raw[key], key)
-                    : hash(raw[key], key, key !== "payloadKey");
+                data[key] =
+                    key.endsWith("Identity") || key === "ownerAddress"
+                        ? owner(raw[key], key)
+                        : hash(raw[key], key, key !== "payloadKey");
             } else {
                 const bits = key.endsWith("Payout")
                     ? 160
@@ -412,7 +414,7 @@ export class Disclosure {
             const decryption = {
                 ...scoped,
                 outputCommitment: output.outputCommitment,
-                walletIdentity: data.walletIdentity as `0x${string}`,
+                ownerAddress: data.ownerAddress as `0x${string}`,
             };
             if (material.kind === "note")
                 return {
@@ -443,7 +445,7 @@ export class Disclosure {
         if (material.kind === "note") {
             const note: Note = {
                 ...scoped,
-                walletIdentity: data.walletIdentity as `0x${string}`,
+                ownerAddress: data.ownerAddress as `0x${string}`,
                 amount: BigInt(data.amount!),
                 nonce: BigInt(data.nonce!),
             };

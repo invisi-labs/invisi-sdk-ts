@@ -1,7 +1,8 @@
+import type { NoteOutput } from "../NoteOutput";
 import type {} from "@invisi-labs/core";
 import type { PublicWallet } from "@invisi-labs/core";
 import type { GasBenchmarkProfile } from "../gas-estimation";
-import type { Signer } from "ethers";
+import type { Signer, Provider } from "ethers";
 import type {
     Address,
     CancelCreditParams,
@@ -19,7 +20,6 @@ import type {
     AuthorizedStatement,
     CreditDeliveryState,
     Note,
-    ReceivingKeyLookup,
     ViewingCapability,
     Wallet,
     WalletAuthorizationProvider,
@@ -68,14 +68,6 @@ export interface FundingSource {
     deadline?: bigint;
     permit?: NonNullable<FundingInput["permit"]>;
 }
-export interface PaymentOutput {
-    /** Omission samples a fresh canonical BN254 field element. */
-    nonce?: bigint;
-    /** Version-specific application data. Omission uses built-in v1 with no data. */
-    payload?: Uint8Array;
-    to: string;
-    amount: bigint;
-}
 /** Public submission mode; backend proof targets are selected internally. */
 export type TransactionExecution = "single" | "aggregate";
 
@@ -92,22 +84,27 @@ export interface TransferPreparation {
     withdrawal?: { to: Address; amount: bigint };
     /** Immediate public fee paid from this operation's token. */
     fee?: { recipient: Address; amount: bigint };
-    outputs: readonly PaymentOutput[];
+    outputs: readonly NoteOutput[];
     funding?: FundingSource;
     deadline?: bigint;
 }
 export interface ShieldPreparation {
     fee?: { recipient: Address; amount: bigint };
     tokenAddress: Address;
-    outputs: readonly PaymentOutput[];
+    outputs: readonly NoteOutput[];
     funding: FundingSource;
     deadline?: bigint;
 }
 export interface PreparedOutput {
-    note: Note;
+    context: import("../NoteOutput").NoteOutputContext;
+    recipient: import("../NoteOutput").NoteOutputRecipient;
+    amount: bigint;
+    note?: Note;
     commitment: Hex;
     identity: Hex;
     delivery: Delivery;
+    /** Only offline encrypted EVM outputs may await registry-key resolution. */
+    deliveryPending?: true;
     address: string;
     change: boolean;
 }
@@ -210,7 +207,7 @@ export interface WalletSessionInfrastructure {
     gasBenchmarks?: readonly GasBenchmarkProfile[];
     /** Optional ethers gas/funding signer; distinct from the Invisi wallet authority. */
     signer?: Signer;
-    viewing?: Pick<ViewingCapability, "walletIdentity" | "decryptNote" | "decryptCredit">;
+    viewing?: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
     wallet: Wallet | PublicWallet;
     protocol: Protocol;
     namespace?: string;
@@ -221,7 +218,8 @@ export interface WalletSessionInfrastructure {
     prover?: Prover;
     fundingSigner?: FundingSigner;
     fundingVerifier?: FundingAuthorizationVerifier;
-    addressResolver?: ReceivingKeyLookup;
+    /** Optional ethers provider used by per-output direct-chain receiving-key lookup. */
+    provider?: Provider;
     coinSelector?: CoinSelector;
     transactionTTL?: bigint;
 }

@@ -14,7 +14,7 @@ export type {
     WalletAuthorizationRequest,
 } from "./wallet";
 export {
-    computeWalletIdentity,
+    computeOwnerAddress,
     walletAuthorizationTypedData,
     computeWalletAuthorizationDigest,
     signWalletAuthorization,

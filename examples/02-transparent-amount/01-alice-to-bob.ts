@@ -47,10 +47,15 @@ try {
     // 3. Use the 0i privacy receiving address provided by Bob; his private key is unnecessary.
     const outputs = [
         await NoteOutput.create({
-            to: bob.receivingAddress,
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
             amount,
-            context: { ...protocol.context, tokenAddress },
-            // Omit nonce for secure random generation; supply a canonical bigint to set it explicitly.
+            recipient: {
+                type: "invisi",
+                address: bob.receivingAddress,
+                // Omit nonce for secure random generation; supply it here to choose one explicitly.
+            },
         }),
     ];
 

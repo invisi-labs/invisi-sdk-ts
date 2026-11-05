@@ -13,7 +13,7 @@ const context = {
 };
 const note: core.Note = {
     ...context,
-    walletIdentity: ownerHex(vectors.note.walletIdentity),
+    ownerAddress: ownerHex(vectors.note.ownerAddress),
     amount: BigInt(vectors.note.amount),
     nonce: BigInt(vectors.note.nonce),
 };
@@ -48,7 +48,7 @@ const creditOutput = {
     ciphertext: vectors.credit.ownerCiphertext as `0x${string}`,
 };
 const viewer = new core.ViewingCapability(
-    note.walletIdentity,
+    note.ownerAddress,
     vectors.owner.viewingPrivateKey as `0x${string}`
 );
 
@@ -113,10 +113,10 @@ describe("selective disclosure", () => {
     it.each(["owner", "spender"] as const)(
         "discloses only the selected Credit %s envelope",
         async (role) => {
-            const walletIdentity =
+            const ownerAddress =
                 role === "owner" ? credit.ownerWalletIdentity : credit.spenderWalletIdentity;
             const localViewer = new core.ViewingCapability(
-                walletIdentity,
+                ownerAddress,
                 vectors[role].viewingPrivateKey as `0x${string}`
             );
             const selected = {
@@ -157,7 +157,7 @@ describe("selective disclosure", () => {
         for (const changed of [
             { ...note, amount: 0n },
             { ...note, nonce: core.FIELD_MODULUS },
-            { ...note, walletIdentity: ownerHex(core.FIELD_MODULUS) },
+            { ...note, ownerAddress: ownerHex(core.FIELD_MODULUS) },
             { ...note, protocolAddress: -1n },
         ])
             await expect(core.Disclosure.fromNote(changed)).rejects.toThrow();
@@ -174,7 +174,7 @@ describe("selective disclosure", () => {
             `${output.ciphertext.slice(0, -2)}${output.ciphertext.endsWith("00") ? "01" : "00"}` as `0x${string}`;
         await expect(disclosure.verify({ ...output, ciphertext: broken })).rejects.toThrow();
         await expect(viewer.discloseNote(broken, output)).rejects.toThrow();
-        const wrongViewer = new core.ViewingCapability(note.walletIdentity, hex(321));
+        const wrongViewer = new core.ViewingCapability(note.ownerAddress, hex(321));
         await expect(wrongViewer.discloseNote(output.ciphertext, output)).rejects.toThrow();
     });
 
@@ -198,7 +198,7 @@ describe("selective disclosure", () => {
         expect(typeof secret).toBe("string");
         expect(JSON.stringify(keyed)).not.toContain(secret as string);
         expect(inspect(keyed)).not.toContain(secret as string);
-        expect(JSON.stringify(disclosure)).not.toContain("walletIdentity");
+        expect(JSON.stringify(disclosure)).not.toContain("ownerAddress");
     });
 
     it("strictly rejects unsupported exports, unexpected secrets and noncanonical numbers", async () => {

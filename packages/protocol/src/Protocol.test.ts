@@ -63,7 +63,7 @@ it("resolves address strings to a full address string without exposing parsing o
         {
             lookup: async (identity) => {
                 calls++;
-                expect(identity).toBe(wallet.walletIdentity);
+                expect(identity).toBe(wallet.ownerAddress);
                 return { viewingPublicKey: wallet.viewingPublicKey, clueKey: wallet.clueKey };
             },
         }

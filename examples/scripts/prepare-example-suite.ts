@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits, formatUnits } from "ethers";
 import { erc20Abi } from "viem";
@@ -55,11 +56,41 @@ try {
     const token = new Contract(tokenAddress, erc20Abi, signer);
     const amount = parseUnits("1", Number(await token.decimals()));
     // Eight Alice notes cover withdrawals and sessions; four each for Bob and Charlie cover aggregation and credit.
-    const outputs = [
-        ...Array.from({ length: 8 }, () => ({ to: alice.receivingAddress, amount })),
-        ...Array.from({ length: 4 }, () => ({ to: bob.receivingAddress, amount })),
-        ...Array.from({ length: 4 }, () => ({ to: charlie.receivingAddress, amount })),
-    ];
+    const outputs = await Promise.all([
+        ...Array.from(
+            { length: 8 },
+            async () =>
+                await NoteOutput.create({
+                    chainId: protocol.context.chainId,
+                    protocolAddress: protocol.context.protocolAddress,
+                    tokenAddress,
+                    amount: amount,
+                    recipient: { type: "invisi", address: alice.receivingAddress },
+                })
+        ),
+        ...Array.from(
+            { length: 4 },
+            async () =>
+                await NoteOutput.create({
+                    chainId: protocol.context.chainId,
+                    protocolAddress: protocol.context.protocolAddress,
+                    tokenAddress,
+                    amount: amount,
+                    recipient: { type: "invisi", address: bob.receivingAddress },
+                })
+        ),
+        ...Array.from(
+            { length: 4 },
+            async () =>
+                await NoteOutput.create({
+                    chainId: protocol.context.chainId,
+                    protocolAddress: protocol.context.protocolAddress,
+                    tokenAddress,
+                    amount: amount,
+                    recipient: { type: "invisi", address: charlie.receivingAddress },
+                })
+        ),
+    ]);
     const total = amount * BigInt(outputs.length);
     const allowance = await token.allowance(alice.address, protocol.context.protocolAddress);
     if (allowance < total) {

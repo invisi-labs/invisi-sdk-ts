@@ -1,3 +1,4 @@
+import { recipientLookup } from "../recipient-infrastructure";
 import { resolveRecipient } from "../resolve-recipient";
 import type {
     CreateCreditParams,
@@ -106,7 +107,7 @@ export class CreditPreparation<Result> {
         const n = state.note;
         if (
             (role === "owner" ? n.ownerWalletIdentity : n.spenderWalletIdentity) !==
-                this.runtime.scope.walletIdentity ||
+                this.runtime.scope.ownerAddress ||
             n.chainId !== frame.context.chainId ||
             n.protocolAddress !== BigInt(frame.context.protocolAddress) ||
             n.tokenAddress !== BigInt(frame.context.tokenAddress) ||
@@ -157,16 +158,16 @@ export class CreditPreparation<Result> {
         const expiry = this.expiry(options.expiry, frame);
         const spender = await resolveRecipient(
             options.spender,
-            this.runtime.options.addressResolver,
+            recipientLookup(this.runtime.options),
             { field: "spender" }
         );
         const owner = await resolveRecipient(
             this.runtime.options.wallet.getReceivingAddress().toString(),
-            this.runtime.options.addressResolver,
+            recipientLookup(this.runtime.options),
             { field: "wallet" }
         );
-        const ownerPayout = getAddress(owner.walletIdentity) as Hex;
-        const spenderPayout = getAddress(spender.walletIdentity) as Hex;
+        const ownerPayout = getAddress(owner.ownerAddress) as Hex;
+        const spenderPayout = getAddress(spender.ownerAddress) as Hex;
         if (BigInt(ownerPayout) === 0n || BigInt(spenderPayout) === 0n) {
             throw new Error("Credit payouts must be nonzero");
         }
@@ -176,8 +177,8 @@ export class CreditPreparation<Result> {
                     chainId: frame.context.chainId,
                     protocolAddress: BigInt(frame.context.protocolAddress),
                     tokenAddress: BigInt(frame.context.tokenAddress),
-                    ownerWalletIdentity: this.runtime.scope.walletIdentity,
-                    spenderWalletIdentity: spender.walletIdentity,
+                    ownerWalletIdentity: this.runtime.scope.ownerAddress,
+                    spenderWalletIdentity: spender.ownerAddress,
                     ownerPayout: BigInt(ownerPayout),
                     spenderPayout: BigInt(spenderPayout),
                     ...normalizeCreditPolicy({
@@ -226,18 +227,7 @@ export class CreditPreparation<Result> {
         plan.inputs = selected.inputs;
         Object.assign(plan, funding);
         if (change > 0n) {
-            plan.outputs.push(
-                await this.#prepare.output(
-                    {
-                        to:
-                            this.runtime.changeAddress ??
-                            this.runtime.options.wallet.getReceivingAddress().toString(),
-                        amount: change,
-                    },
-                    frame.context,
-                    true
-                )
-            );
+            plan.outputs.push(await this.#prepare.change(change, frame.context));
         }
         const creation: CreateCreditParams = {
             token: frame.context.tokenAddress,

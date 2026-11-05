@@ -38,7 +38,7 @@ console.log("Receiving address length:", receivingAddress.length);
 console.log("EVM owner address:", ownerAddress);
 console.log("Owner address length:", ownerAddress.length);
 
-if (ownerAddress !== evmAddress) {
+if (ownerAddress !== evmAddress.toLowerCase()) {
     throw new Error("The Invisi owner address must match the ethers wallet address");
 }
 

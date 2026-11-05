@@ -44,10 +44,10 @@ async function creditFixture(
             chainId: h.scope.chainId,
             protocolAddress: BigInt(h.scope.protocolAddress),
             tokenAddress: BigInt(h.context.tokenAddress),
-            ownerWalletIdentity: h.wallet.walletIdentity,
-            spenderWalletIdentity: h.bob.walletIdentity,
-            ownerPayout: BigInt(h.wallet.walletIdentity),
-            spenderPayout: BigInt(h.bob.walletIdentity),
+            ownerWalletIdentity: h.wallet.ownerAddress,
+            spenderWalletIdentity: h.bob.ownerAddress,
+            ownerPayout: BigInt(h.wallet.ownerAddress),
+            spenderPayout: BigInt(h.bob.ownerAddress),
             ...normalizeCreditPolicy(policy),
             amount,
             ...(memo === undefined ? {} : { payload: fundsV1.encode({ memo }) }),
@@ -78,7 +78,7 @@ async function creditFixture(
         [h.wallet, "owner"],
         [h.bob, "spender"],
     ] as const) {
-        const scope = { ...h.scope, walletIdentity: wallet.walletIdentity };
+        const scope = { ...h.scope, ownerAddress: wallet.ownerAddress };
         await h.store.transaction(scope, (draft) => {
             draft.credits[commitment + ":" + role] = {
                 state,
@@ -113,7 +113,7 @@ it("creates a privately funded Credit with complete dual 498-byte snapshots and 
             .payload as SavedOperation,
         credit = saved.plan.credit!;
     expect(credit.outputs[0]!.state.note.amount).toBe(70n);
-    expect(saved.plan.outputs[0]!.note.amount).toBe(30n);
+    expect(saved.plan.outputs[0]!.note!.amount).toBe(30n);
     expect(credit.deliveries.map((delivery) => (delivery.ciphertext.length - 2) / 2)).toEqual([
         498, 498, 160,
     ]);
@@ -140,27 +140,22 @@ it("creates a privately funded Credit with complete dual 498-byte snapshots and 
 });
 it("draws only as the spender, preserves both snapshots and never resolves current registry keys", async () => {
     const h = await creditFixture(),
-        lookup = vi.fn(async () => {
-            throw new Error("unexpected lookup");
-        }),
         session = new WalletSession({
             ...h.options,
             wallet: h.bob,
             prover: backend(),
-            addressResolver: lookup,
         });
     const operation = await session.prepareDrawCredit({
             tokenAddress: "0x2222222222222222222222222222222222222222" as const,
             credits: [{ credit: h.commitment, amount: 30n }],
         }),
-        scope = { ...h.scope, walletIdentity: h.bob.walletIdentity },
+        scope = { ...h.scope, ownerAddress: h.bob.ownerAddress },
         saved = (await h.store.readSnapshot(scope)).operations[operation.id]!
             .payload as SavedOperation;
     const remainder = saved.plan.credit!.outputs[0]!.state;
     expect(remainder.note.amount).toBe(70n);
     expect(remainder.ownerReceivingKeys).toEqual(h.state.ownerReceivingKeys);
     expect(remainder.spenderReceivingKeys).toEqual(h.state.spenderReceivingKeys);
-    expect(lookup).not.toHaveBeenCalled();
     const ready = await (await operation.authorize()).prove();
     expect(ready.status).toBe("ready");
     const encoded = (
@@ -190,7 +185,7 @@ it("tops up only before expiry, inherits receiving snapshots, and cancels the pu
     expect(note.amount).toBe(180n);
     expect(note.expiry).toBe(2000007200n);
     expect(note.creditSharedKey).toBe(h.state.note.creditSharedKey);
-    expect(saved.plan.outputs[0]!.note.amount).toBe(20n);
+    expect(saved.plan.outputs[0]!.note!.amount).toBe(20n);
     const ready = await (await operation.authorize()).prove();
     expect(ready.status).toBe("ready");
     const encoded = (
@@ -434,7 +429,7 @@ it("preserves Credit memos by default and applies top-up and per-remainder overr
                 },
             ],
         });
-        const scope = { ...h.scope, walletIdentity: h.bob.walletIdentity };
+        const scope = { ...h.scope, ownerAddress: h.bob.ownerAddress };
         const drawPlan = (
             (await h.store.readSnapshot(scope)).operations[draw.id]!.payload as SavedOperation
         ).plan;
@@ -481,7 +476,7 @@ it("applies private per-input limits before full draws and preserves counters th
         tokenAddress: h.context.tokenAddress,
         credits: [{ credit: h.commitment, amount: 30n }],
     });
-    const scope = { ...h.scope, walletIdentity: h.bob.walletIdentity };
+    const scope = { ...h.scope, ownerAddress: h.bob.ownerAddress };
     const plan = (
         (await h.store.readSnapshot(scope)).operations[draw.id]!.payload as SavedOperation
     ).plan;
@@ -556,7 +551,7 @@ it.skipIf(!process.env.BB_BINARY_PATH).each(["draw", "top-up"] as const)(
         expect(ready.status).toBe("ready");
         const scope = {
             ...h.scope,
-            walletIdentity: kind === "draw" ? h.bob.walletIdentity : h.wallet.walletIdentity,
+            ownerAddress: kind === "draw" ? h.bob.ownerAddress : h.wallet.ownerAddress,
         };
         const saved = (await h.store.readSnapshot(scope)).operations[ready.id]!
             .payload as SavedOperation;
@@ -614,7 +609,7 @@ it("disabled limits count consumption so later re-enabling cannot hide prior dra
         tokenAddress: h.context.tokenAddress,
         credits: [{ credit: h.commitment, amount: 30n }],
     });
-    const scope = { ...h.scope, walletIdentity: h.bob.walletIdentity };
+    const scope = { ...h.scope, ownerAddress: h.bob.ownerAddress };
     const saved = (await h.store.readSnapshot(scope)).operations[draw.id]!
         .payload as SavedOperation;
     expect(saved.plan.credit!.outputs[0]!.state.note).toMatchObject({

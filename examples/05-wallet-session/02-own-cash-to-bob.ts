@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { hkdfSync } from "node:crypto";
 import { createRequire } from "node:module";
@@ -62,7 +63,15 @@ try {
     const amount = parseUnits("1", Number(await token.decimals()));
     const prepared = await session.prepareShield({
         tokenAddress,
-        outputs: [{ to: bob.publicWallet.getAddress(), amount }],
+        outputs: [
+            await NoteOutput.create({
+                chainId: protocol.context.chainId,
+                protocolAddress: protocol.context.protocolAddress,
+                tokenAddress,
+                amount: amount,
+                recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
+            }),
+        ],
         funding: {
             payer: alice.address,
             amount,

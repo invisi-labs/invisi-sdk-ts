@@ -17,7 +17,7 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
                 kind: "notes" as const,
                 commitment: input.commitment,
                 amount: input.note.amount,
-                owner: input.note.walletIdentity,
+                owner: input.note.ownerAddress,
                 treeId: input.treeId,
                 leafIndex: input.leafIndex,
             })),
@@ -53,7 +53,7 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
         outputs: p.outputs.map((output) => ({
             commitment: output.commitment,
             to: output.address,
-            amount: output.note.amount,
+            amount: output.amount,
             change: output.change,
         })),
         capacity: p.capacity,

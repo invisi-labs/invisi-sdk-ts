@@ -1,3 +1,4 @@
+import { testOutput } from "../test-output";
 import { fundsV1 } from "@invisi-labs/core";
 import { PublicWallet } from "@invisi-labs/core";
 import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/core";
@@ -9,17 +10,17 @@ import { fixture } from "./operation-fixture";
 it("prepares private transfer 30 and random ordinary change 70 as an immutable owned plan", async () => {
     const h = await fixture(),
         payments = [
-            {
+            await testOutput(h, {
                 to: h.bob.getAddress(),
                 amount: 30n,
                 payload: fundsV1.encode({ memo: "original payload" }),
-            },
+            }),
         ];
     const pending = h.session.prepareTransfer({
         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
         outputs: payments,
     });
-    payments[0]!.amount = 999n;
+    expect(() => Object.assign(payments[0]!, { amount: 999n })).toThrow();
     payments[0]!.payload.fill(0);
     const operation = await pending,
         review = operation.preview();
@@ -29,10 +30,10 @@ it("prepares private transfer 30 and random ordinary change 70 as an immutable o
     const state = await h.store.readSnapshot(h.scope);
     expect(state.reservations[h.leaf]).toBe(operation.id);
     const saved = state.operations[operation.id]!.payload as SavedOperation;
-    expect(fundsV1.decode(saved.plan.outputs[0]!.note.payload!).memo).toEqual(
+    expect(fundsV1.decode(saved.plan.outputs[0]!.note!.payload!).memo).toEqual(
         new TextEncoder().encode("original payload")
     );
-    expect(saved.plan.outputs[1]!.note.payload).toEqual(new Uint8Array());
+    expect(saved.plan.outputs[1]!.note!.payload).toEqual(new Uint8Array());
     expect(JSON.stringify(operation)).not.toContain("nonce");
     expect(JSON.stringify(operation)).not.toContain("amount");
 });
@@ -41,7 +42,7 @@ it("reserves inputs atomically between sessions and requires explicit state and 
         second = new WalletSession(h.options),
         input = {
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         };
     const results = await Promise.allSettled([
         h.session.prepareTransfer(input),
@@ -73,25 +74,20 @@ it("validates explicitly supplied selection strategies without silently changing
     expect(Object.keys((await h.store.readSnapshot(h.scope)).reservations)).toHaveLength(0);
 });
 
-it("keeps the requested short identity when a resolver returns additional wallet fields", async () => {
-    const h = await fixture(),
-        requested = h.wallet.ownerAddress,
-        session = new WalletSession({
-            ...h.options,
-            addressResolver: async () => ({
-                walletIdentity: h.bob.walletIdentity,
-                ...h.bob.getReceivingAddress().getReceivingKeys(),
-            }),
-        });
-    const operation = await session.prepareTransfer({
-            tokenAddress: "0x2222222222222222222222222222222222222222" as const,
-            outputs: [{ to: requested, amount: 30n }],
-        }),
-        state = await h.store.readSnapshot(h.scope);
-    const saved = state.operations[operation.id]!
-        .payload as import("./operation-types").SavedOperation;
-    expect(operation.preview().outputs[0]!.to).toBe(requested);
-    expect(saved.plan.outputs[0]!.note.walletIdentity).toBe(h.wallet.walletIdentity);
+it("keeps the requested EVM owner fixed while preparation resolves receiving keys", async () => {
+    const { registryFixture } = await import("../registry-fixture");
+    const { h, protocol, reader, protocolRpc } = await registryFixture("registered", "wallet");
+    const session = new WalletSession({ ...h.options, protocol, chainReader: reader, protocolRpc });
+    const output = await testOutput(h, { to: h.wallet.ownerAddress, amount: 30n });
+    const operation = await session.prepareShield({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [output],
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
+    });
+    const saved = (await h.store.readSnapshot(h.scope)).operations[operation.id]!
+        .payload as SavedOperation;
+    expect(operation.preview().outputs[0]!.to).toBe(h.wallet.ownerAddress);
+    expect(saved.plan.outputs[0]!.note!.ownerAddress).toBe(h.wallet.ownerAddress);
 });
 
 it("shares a deployment scope while selecting, reserving and reporting each token separately", async () => {
@@ -101,7 +97,7 @@ it("shares a deployment scope while selecting, reserving and reporting each toke
     const note = { ...h.note, tokenAddress: BigInt(otherToken), amount: 50n, nonce: 456n };
     const commitment = await core.computeNoteCommitment(
         h.context.chainId,
-        await core.computeNoteIdentity(BigInt(h.wallet.walletIdentity), note.nonce),
+        await core.computeNoteIdentity(BigInt(h.wallet.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount
     );
@@ -145,7 +141,7 @@ it("uses the authenticated historical proof root in the spending statement", asy
     const h = await fixture();
     const operation = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const state = await h.store.readSnapshot(h.scope);
     const saved = state.operations[operation.id]!
@@ -160,7 +156,7 @@ it("pins a shared root across multiple inputs from one tree", async () => {
     const note = { ...h.note, nonce: 124n };
     const commitment = await computeNoteCommitment(
         note.chainId,
-        await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce),
+        await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount
     );
@@ -176,7 +172,7 @@ it("pins a shared root across multiple inputs from one tree", async () => {
     };
     await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 150n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 150n })],
     });
     expect(roots).toEqual([undefined, `0x${h.tree.getRoot().toString(16).padStart(64, "0")}`]);
 });
@@ -196,11 +192,11 @@ it("keeps application bytes independent of the SDK envelope in managed preparati
     const payload = new Uint8Array([255, 99, 1]);
     const operation = await session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n, payload }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n, payload })],
     });
     const state = await h.store.readSnapshot(h.scope);
     const saved = state.operations[operation.id]!.payload as SavedOperation;
     expect(saved.plan.outputs[0]!.delivery.ciphertext.slice(0, 4)).toBe("0x01");
-    expect(saved.plan.outputs[0]!.note.payload).toEqual(payload);
-    expect(saved.plan.outputs[1]!.note.payload).toEqual(new Uint8Array());
+    expect(saved.plan.outputs[0]!.note!.payload).toEqual(payload);
+    expect(saved.plan.outputs[1]!.note!.payload).toEqual(new Uint8Array());
 });

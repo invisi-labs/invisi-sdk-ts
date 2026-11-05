@@ -4,7 +4,7 @@ import { FIELD_MODULUS } from "./random";
 import vectors from "./testdata/wallet-note-vectors.json";
 
 const CHAIN_ID = BigInt(vectors.context.chainId);
-const WALLET_IDENTITY = BigInt(vectors.note.walletIdentity);
+const WALLET_IDENTITY = BigInt(vectors.note.ownerAddress);
 const NONCE = BigInt(vectors.note.nonce);
 const TOKEN = BigInt(vectors.context.tokenAddress);
 const hex = (n: bigint): `0x${string}` => `0x${n.toString(16).padStart(64, "0")}`;
@@ -25,7 +25,7 @@ describe("computeNoteIdentity", () => {
     it("different wallets produce different identities", async () => {
         expect(await computeNoteIdentity(WALLET_IDENTITY + 1n, NONCE)).not.toBe(IDENTITY);
     });
-    it("requires a positive canonical wallet identity and canonical nonce", async () => {
+    it("requires a positive canonical owner address and canonical nonce", async () => {
         for (const wallet of [-1n, 0n, FIELD_MODULUS]) {
             await expect(computeNoteIdentity(wallet, NONCE)).rejects.toThrow(RangeError);
         }

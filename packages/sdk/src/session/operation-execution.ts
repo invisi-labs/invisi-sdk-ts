@@ -2,7 +2,7 @@ import { Signature, SigningKey, getBytes, concat, verifyTypedData } from "ethers
 import {
     computeWalletAuthorizationDigest,
     AuthorizedStatement,
-    computeWalletIdentity,
+    computeOwnerAddress,
     createSigningRequest,
     walletAuthorizationTypedData,
     type WalletAuthorizationProvider,
@@ -32,12 +32,12 @@ export async function authorizeOperation(
     plan: OperationPlan,
     provider: WalletAuthorizationProvider
 ) {
-    if (provider.walletIdentity !== plan.scope.walletIdentity)
+    if (provider.ownerAddress !== plan.scope.ownerAddress)
         throw new Error("wallet authorization capability mismatch");
     const request = authorizationRequest(plan);
     const digest = computeWalletAuthorizationDigest(request);
     const signed = await provider.authorize(structuredClone(request));
-    if (signed.walletIdentity !== plan.scope.walletIdentity || signed.digest !== digest)
+    if (signed.ownerAddress !== plan.scope.ownerAddress || signed.digest !== digest)
         throw new Error("wallet authorization statement mismatch");
     return signed;
 }
@@ -114,11 +114,11 @@ export async function acceptWalletSignature(plan: OperationPlan, signature: stri
     try {
         const signed = Signature.from(signature);
         const publicKey = getBytes(SigningKey.recoverPublicKey(digest, signed));
-        const owner = await computeWalletIdentity(publicKey);
-        if (owner.toLowerCase() !== plan.scope.walletIdentity.toLowerCase()) {
+        const owner = await computeOwnerAddress(publicKey);
+        if (owner.toLowerCase() !== plan.scope.ownerAddress.toLowerCase()) {
             throw new Error("wallet signature identity mismatch");
         }
-        return new AuthorizedStatement(plan.scope.walletIdentity, digest, {
+        return new AuthorizedStatement(plan.scope.ownerAddress, digest, {
             public_key_x: Array.from(publicKey.slice(1, 33)),
             public_key_y: Array.from(publicKey.slice(33)),
             signature: Array.from(getBytes(concat([signed.r, signed.s]))),

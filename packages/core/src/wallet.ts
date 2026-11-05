@@ -16,7 +16,7 @@ export interface InvisiWallet {
     detectionSeed: Uint8Array;
     detectionKey: Uint8Array;
     clueKey: Uint8Array;
-    walletIdentity: `0x${string}`;
+    ownerAddress: `0x${string}`;
 }
 const OPERATIONS = {
     transact: "Transact",
@@ -82,7 +82,7 @@ function deriveScalar(
 }
 
 /** Standard EVM owner address from a validated secp256k1 public key. */
-export async function computeWalletIdentity(publicKey: WalletBytes): Promise<`0x${string}`> {
+export async function computeOwnerAddress(publicKey: WalletBytes): Promise<`0x${string}`> {
     const point = secp256k1.ProjectivePoint.fromHex(bytes(publicKey));
     point.assertValidity();
     return hex(keccak_256(point.toRawBytes(false).slice(1)).slice(12));
@@ -117,8 +117,8 @@ export async function deriveWallet(privateKey: string | Uint8Array): Promise<Inv
             32
         );
         const spendingPublicKey = secp256k1.getPublicKey(spendingPrivateKey, false);
-        const walletIdentity = await computeWalletIdentity(spendingPublicKey);
-        nonzeroField(BigInt(walletIdentity), "wallet identity");
+        const ownerAddress = await computeOwnerAddress(spendingPublicKey);
+        nonzeroField(BigInt(ownerAddress), "owner address");
         detectionKey = deriveScalar(detectionSeed, "Invisi.WalletDetectionKey.v1", true);
         const wallet = {
             spendingPrivateKey,
@@ -128,7 +128,7 @@ export async function deriveWallet(privateKey: string | Uint8Array): Promise<Inv
             detectionSeed,
             detectionKey,
             clueKey: deriveClueKey(detectionKey),
-            walletIdentity,
+            ownerAddress,
         };
         complete = true;
         return wallet;
@@ -245,7 +245,7 @@ export async function verifyWalletAuthorization(
 ): Promise<boolean> {
     const raw = bytes(signature, 64),
         digest = bytes(computeWalletAuthorizationDigest(request));
-    if ((await computeWalletIdentity(publicKey)) !== expectedIdentity) return false;
+    if ((await computeOwnerAddress(publicKey)) !== expectedIdentity) return false;
     return secp256k1.verify(raw, digest, bytes(publicKey), { lowS: true });
 }
 
@@ -256,21 +256,21 @@ export interface WalletAuthorizationWitness {
 }
 /** Local signature witness; never serialize this as an ordinary application request. */
 export async function buildWalletAuthorizationWitness(
-    wallet: Pick<InvisiWallet, "spendingPrivateKey" | "spendingPublicKey" | "walletIdentity">,
+    wallet: Pick<InvisiWallet, "spendingPrivateKey" | "spendingPublicKey" | "ownerAddress">,
     request: WalletAuthorizationRequest
 ): Promise<WalletAuthorizationWitness> {
     const publicKey = secp256k1.ProjectivePoint.fromHex(bytes(wallet.spendingPublicKey)).toRawBytes(
         false
     );
     const privateKey = bytes(wallet.spendingPrivateKey, 32),
-        identity = wallet.walletIdentity;
+        identity = wallet.ownerAddress;
     const statement = { ...request, context: { ...request.context }, words: [...request.words] };
     try {
         const derived = secp256k1.getPublicKey(privateKey, false);
         if (!derived.every((value, i) => value === publicKey[i]))
             throw new Error("spending key pair mismatch");
-        if (BigInt(await computeWalletIdentity(publicKey)) !== BigInt(identity))
-            throw new Error("wallet identity mismatch");
+        if (BigInt(await computeOwnerAddress(publicKey)) !== BigInt(identity))
+            throw new Error("owner address mismatch");
         return {
             public_key_x: Array.from(publicKey.slice(1, 33)),
             public_key_y: Array.from(publicKey.slice(33)),

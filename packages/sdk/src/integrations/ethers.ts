@@ -72,7 +72,7 @@ function word(value: unknown): Hex {
 
 function ownerWord(value: Hex): Hex {
     // Public owners use canonical EVM addresses; registry slots remain bytes32.
-    const identity = ReceivingAddress.fromIdentity(value).walletIdentity;
+    const identity = ReceivingAddress.fromIdentity(value).ownerAddress;
     return zeroPadValue(identity, 32) as Hex;
 }
 
@@ -199,14 +199,14 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
         );
     }
 
-    async getRegistryNonce(context: RegistryContext, walletIdentity: Hex, block: CanonicalBlock) {
+    async getRegistryNonce(context: RegistryContext, ownerAddress: Hex, block: CanonicalBlock) {
         return number(
             await this.read(
                 context,
                 context.registryAddress,
                 invisiAddressRegistryAbi,
                 "nonceOf",
-                [ownerWord(walletIdentity)],
+                [ownerWord(ownerAddress)],
                 block
             )
         );
@@ -325,7 +325,7 @@ export class EthersAddressResolver {
         check(BigInt(context.registryAddress) !== 0n, "invalid registry address");
     }
 
-    readonly lookup: ReceivingKeyLookup = async (walletIdentity) => {
+    readonly lookup: ReceivingKeyLookup = async (ownerAddress) => {
         await chain(this.client, this.#context.chainId);
         if (this.expectedRuntimeCodeHash) {
             const code = await this.client.getCode(this.#context.registryAddress);
@@ -341,11 +341,11 @@ export class EthersAddressResolver {
             invisiAddressRegistryAbi,
             this.client
         );
-        const registered = await contract.getFunction("isRegistered")(ownerWord(walletIdentity), {
+        const registered = await contract.getFunction("isRegistered")(ownerWord(ownerAddress), {
             blockTag: block.number,
         });
         if (!registered) return null;
-        const [keys] = await contract.getFunction("receivingKeysOf")(ownerWord(walletIdentity), {
+        const [keys] = await contract.getFunction("receivingKeysOf")(ownerWord(ownerAddress), {
             blockTag: block.number,
         });
         check(
@@ -353,7 +353,7 @@ export class EthersAddressResolver {
             "canonical registry read changed"
         );
         return ReceivingAddress.from({
-            walletIdentity,
+            ownerAddress,
             viewingPublicKey: getBytes(keys.viewingPublicKey),
             clueKey: getBytes(keys.clueKey),
         }).getReceivingKeys();

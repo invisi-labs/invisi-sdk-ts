@@ -20,7 +20,7 @@ export interface NoteEncryptionContext extends ProtocolContext {
 }
 export interface NoteDecryptionContext extends NoteEncryptionContext {
     tokenAddress: bigint;
-    walletIdentity: `0x${string}`;
+    ownerAddress: `0x${string}`;
 }
 export interface CreditNoteEncryptionContext extends NoteEncryptionContext {
     role: "owner" | "spender";
@@ -131,8 +131,8 @@ function validateNote(note: Note): void {
     uint(note.amount, 128, "amount");
     if (note.amount === 0n) throw new Error("amount must be positive");
     field(note.nonce, "nonce");
-    uint(BigInt(note.walletIdentity), 160, "walletIdentity");
-    if (BigInt(note.walletIdentity) === 0n) throw new Error("wallet identity must be positive");
+    uint(BigInt(note.ownerAddress), 160, "ownerAddress");
+    if (BigInt(note.ownerAddress) === 0n) throw new Error("owner address must be positive");
     uint(note.tokenAddress, 160, "tokenAddress");
 }
 function validateCredit(note: CreditNote): void {
@@ -162,7 +162,7 @@ async function noteCommitment(context: NoteEncryptionContext, note: Note): Promi
     validateNote(note);
     const commitment = await computeNoteCommitment(
         context.chainId,
-        await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce),
+        await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount
     );
@@ -372,8 +372,8 @@ async function readNote(
             codec.decode(plain, Object.freeze({ ...authenticatedContext }))
         );
 
-        if (BigInt(note.walletIdentity) !== BigInt(authenticatedContext.walletIdentity))
-            throw new Error("recipient wallet identity mismatch");
+        if (BigInt(note.ownerAddress) !== BigInt(authenticatedContext.ownerAddress))
+            throw new Error("recipient owner address mismatch");
         if (note.tokenAddress !== authenticatedContext.tokenAddress)
             throw new Error("note token context mismatch");
         await noteCommitment(authenticatedContext, note);
@@ -449,9 +449,9 @@ async function readCredit(
                 authenticatedContext.role === "owner"
                     ? note.ownerWalletIdentity
                     : note.spenderWalletIdentity
-            ) !== BigInt(authenticatedContext.walletIdentity)
+            ) !== BigInt(authenticatedContext.ownerAddress)
         )
-            throw new Error("recipient wallet identity mismatch");
+            throw new Error("recipient owner address mismatch");
 
         if (!payloadKey)
             matchCreditRecipient(state, authenticatedContext.role, viewingPublicKey(key));

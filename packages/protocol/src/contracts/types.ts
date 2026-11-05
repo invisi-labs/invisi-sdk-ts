@@ -103,7 +103,7 @@ export interface ReceivingKeys {
     clueKey: Hex;
 }
 export interface AddressRegistration {
-    walletIdentity: Hex;
+    ownerAddress: Hex;
     keys: ReceivingKeys;
     nonce: bigint;
     deadline: bigint;

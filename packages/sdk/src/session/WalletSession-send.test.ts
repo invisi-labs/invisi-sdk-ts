@@ -1,3 +1,4 @@
+import { testOutput } from "../test-output";
 import { expect, it, vi } from "vitest";
 import type { Signer, TransactionResponse } from "ethers";
 import { WalletSession } from "./WalletSession";
@@ -34,7 +35,7 @@ it("exports a managed operation and records its transaction hash without waiting
     const h = await setup();
     const prepared = await h.session.prepareShield({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 100n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
         funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
     });
     const ready = await prepared.ready();
@@ -54,7 +55,7 @@ it("rejects a missing signer or a foreign operation before sending", async () =>
     const ready = await (
         await other.prepareShield({
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 100n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
             funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
         })
     ).ready();
@@ -87,7 +88,7 @@ it("reports the broadcast hash if tracking fails and keeps the exported operatio
     const h = await setup();
     const prepared = await h.session.prepareShield({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 100n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
         funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
     });
     const ready = await prepared.ready();
@@ -124,7 +125,7 @@ it("fences overlapping sends of the same managed handle within a session", async
     const ready = await (
         await h.session.prepareShield({
             tokenAddress: h.context.tokenAddress,
-            outputs: [{ to: h.bob.getAddress(), amount: 100n }],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
             funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
         })
     ).ready();

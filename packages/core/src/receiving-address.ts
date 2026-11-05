@@ -14,7 +14,7 @@ export class ReceivingAddress {
 
     private constructor(text: string) {
         const decoded = decodeAddress(text);
-        this.#text = decoded.kind === "short" ? encodeShortAddress(decoded.walletIdentity) : text;
+        this.#text = decoded.kind === "short" ? encodeShortAddress(decoded.ownerAddress) : text;
         Object.freeze(this);
     }
 
@@ -30,12 +30,8 @@ export class ReceivingAddress {
         return new ReceivingAddress(encodeShortAddress(identity));
     }
 
-    get walletIdentity(): `0x${string}` {
-        return decodeAddress(this.#text).walletIdentity;
-    }
-
     get ownerAddress(): `0x${string}` {
-        return encodeShortAddress(this.walletIdentity) as `0x${string}`;
+        return decodeAddress(this.#text).ownerAddress;
     }
 
     get kind(): "long" | "short" {
@@ -57,12 +53,12 @@ export class ReceivingAddress {
         if (!lookup) {
             throw new MissingCapabilityError("explicit registry lookup");
         }
-        const keys = await lookup(this.walletIdentity);
+        const keys = await lookup(this.ownerAddress);
         if (!keys) {
-            throw new Error("wallet identity is not registered");
+            throw new Error("owner address is not registered");
         }
         return ReceivingAddress.from({
-            walletIdentity: this.walletIdentity,
+            ownerAddress: this.ownerAddress,
             viewingPublicKey: keys.viewingPublicKey,
             clueKey: keys.clueKey,
         });

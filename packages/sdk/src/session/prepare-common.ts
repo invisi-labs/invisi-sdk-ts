@@ -1,3 +1,5 @@
+import { recipientLookup } from "../recipient-infrastructure";
+import { NoteOutput } from "../NoteOutput";
 import { InvisiError } from "../errors";
 import { materializeNoteOutput } from "../NoteOutput";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -21,7 +23,6 @@ import type {
     FundingSource,
     OperationPlan,
     PreparationRuntime,
-    PaymentOutput,
     PreparedOutput,
 } from "./operation-types";
 import { selectNotes, type SelectableNote } from "./selection";
@@ -48,7 +49,7 @@ export function copyApplicationPayload(value?: Uint8Array): Uint8Array {
 }
 
 /** Preserve the offending payment position even when summing transfer amounts first. */
-export function positiveOutputAmount(payment: PaymentOutput, outputIndex?: number): bigint {
+export function positiveOutputAmount(payment: NoteOutput, outputIndex?: number): bigint {
     try {
         return positiveAmount(payment.amount);
     } catch (cause) {
@@ -144,18 +145,45 @@ export class Preparation<Result> {
         return { funding, fundingMode: mode };
     }
 
+    async change(amount: bigint, context: TransactionContext): Promise<PreparedOutput> {
+        const address =
+            this.runtime.changeAddress ??
+            this.runtime.options.wallet.getReceivingAddress().toString();
+        try {
+            const output = await NoteOutput.create({
+                ...context,
+                amount,
+                recipient: address.startsWith("0i")
+                    ? { type: "invisi", address }
+                    : { type: "evm", address },
+            });
+            return await this.output(output, context, true);
+        } catch (cause) {
+            if (cause instanceof InvisiError)
+                throw new InvisiError(cause.code, cause.message, {
+                    address,
+                    field: "changeAddress",
+                    ...(cause.capability ? { capability: cause.capability } : {}),
+                    cause: cause.cause ?? cause,
+                });
+            throw new InvisiError(
+                "PREPARATION_FAILED",
+                cause instanceof Error ? cause.message : "Change output preparation failed",
+                { address, field: "changeAddress", cause }
+            );
+        }
+    }
+
     async output(
-        payment: PaymentOutput,
+        payment: NoteOutput,
         context: TransactionContext,
         change = false,
         outputIndex?: number
     ): Promise<PreparedOutput> {
         try {
             positiveOutputAmount(payment, outputIndex);
-            const output = await materializeNoteOutput(
-                payment,
-                context,
-                this.runtime.options.addressResolver
+            const output = await materializeNoteOutput(payment, context, (source) =>
+                recipientLookup(this.runtime.options, source)
             );
             return { ...output, change };
         } catch (cause) {
@@ -249,13 +277,13 @@ export class Preparation<Result> {
             const note = input.note;
             const c = frame.context;
             if (
-                note.walletIdentity !== scope.walletIdentity ||
+                note.ownerAddress !== scope.ownerAddress ||
                 note.chainId !== c.chainId ||
                 note.protocolAddress !== BigInt(c.protocolAddress) ||
                 note.tokenAddress !== BigInt(c.tokenAddress) ||
                 (await computeNoteCommitment(
                     c.chainId,
-                    await computeNoteIdentity(BigInt(note.walletIdentity), note.nonce),
+                    await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
                     note.tokenAddress,
                     note.amount
                 )) !== input.commitment

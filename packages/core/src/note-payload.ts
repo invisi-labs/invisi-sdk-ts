@@ -85,7 +85,7 @@ export const fundsEnvelopeV1 = {
     maximum: 4096,
     encode(note: import("./types").Note) {
         return concat(
-            encode(BigInt(note.walletIdentity)),
+            encode(BigInt(note.ownerAddress)),
             encode(note.amount, 16),
             encode(note.nonce),
             encodePayload(note.payload)
@@ -96,7 +96,7 @@ export const fundsEnvelopeV1 = {
             chainId: context.chainId,
             protocolAddress: context.protocolAddress,
             tokenAddress: context.tokenAddress,
-            walletIdentity: hexField(decode(plain.slice(0, 32))),
+            ownerAddress: hexField(decode(plain.slice(0, 32))),
             amount: decode(plain.slice(32, 48)),
             nonce: decode(plain.slice(48, 80)),
             payload: readPayload(plain, 80),

@@ -3,7 +3,7 @@
 A capability SDK for browser wallets, merchant applications, proof services, aggregators and relayers. Independent objects compose through `Invisi`; applications explicitly choose permissions, infrastructure and runtime backends.
 
 ```ts
-import { Invisi, Wallet, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
+import { Invisi, Wallet, NoteOutput, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 
 const provider = new JsonRpcProvider(chainRpcUrl);
@@ -17,7 +17,13 @@ const session = await invisi.connect({ wallet, protocol, signer });
 await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
 const prepared = await session.prepareTransfer({
     tokenAddress,
-    outputs: [{ to: recipientAddress, amount: 30n }],
+    outputs: [await NoteOutput.create({
+        chainId: protocol.context.chainId,
+        protocolAddress: protocol.context.protocolAddress,
+        tokenAddress,
+        amount: 30n,
+        recipient: { type: "invisi", address: recipientAddress },
+    })],
 });
 // Review prepared.preview() locally before private authorization.
 const authorized = await prepared.authorize();
@@ -45,7 +51,13 @@ const prepared = await invisi.prepareTransfer({
     protocol,
     tokenAddress,
     inputs: applicationSelectedNotes,
-    outputs: [{ to: recipientAddress, amount: 30n }],
+    outputs: [await NoteOutput.create({
+        chainId: protocol.context.chainId,
+        protocolAddress: protocol.context.protocolAddress,
+        tokenAddress,
+        amount: 30n,
+        recipient: { type: "invisi", address: recipientAddress },
+    })],
 });
 
 // Review privately before granting authorization.
@@ -108,7 +120,7 @@ WalletSession prepares shield, private transfers, full/partial withdrawals, Cred
 
 Note delivery and discovery use canonical chain events. Credit role envelopes contain both complete receiving-key snapshots, so later draw/top-up delivery does not require a business service or a fresh registry lookup. Public ERC20 settlement on Credit draw/cancel remains bound to the note's payout addresses. Business invoices, quotes, orders and negotiations belong to applications.
 
-Receiving addresses use a 138-character `0i` full address or the owner's standard 42-character EIP-55 `0x` address as the short form. Address APIs use strings: `wallet.getAddress()`, `wallet.ownerAddress`, and `registry.resolve(ownerAddress)`. Pass recipient strings directly to `prepareTransfer`; the SDK validates and resolves them internally using the configured resolver. `PublicWallet.fromAddress` provides public receiving material. `getAddress()` requires complete receiving keys; an owner-only import exposes `ownerAddress` immediately and resolves receiving keys explicitly through the selected registry. Viewing handles decrypt and permit full funds sweeps to the same EVM owner; detection handles filter; public nullifier helpers use each note nonce to reconcile spent state; WalletAuthorization authorizes a frozen private statement. Export only the capabilities needed by the recipient. Default JSON/inspect output redacts secrets. JavaScript process memory and these variable-time, unaudited cryptographic implementations are not hardware isolation.
+Receiving addresses use a 138-character `0i` full address or the owner's standard 42-character EIP-55 `0x` address as the short form. Address APIs use strings: `wallet.getAddress()`, `wallet.ownerAddress`, and `registry.resolve(ownerAddress)`. Create each recipient output with `NoteOutput.create`, then pass the resulting objects to preparation. Encrypted short-address outputs are resolved by the SDK during preparation. `PublicWallet.fromAddress` provides public receiving material. `getAddress()` requires complete receiving keys; an owner-only import exposes `ownerAddress` immediately and resolves receiving keys explicitly through the selected registry. Viewing handles decrypt and permit full funds sweeps to the same EVM owner; detection handles filter; public nullifier helpers use each note nonce to reconcile spent state; WalletAuthorization authorizes a frozen private statement. Export only the capabilities needed by the recipient. Default JSON/inspect output redacts secrets. JavaScript process memory and these variable-time, unaudited cryptographic implementations are not hardware isolation.
 
 State is scoped by namespace, chain, protocol and wallet identity. Balance snapshots expose known funds, reservations, spent-check block/hash and the candidate observation checkpoint `observedThrough`. Unknown spent state and an unchecked empty wallet return `availableKnown:null`. Candidate updates advance `observedThrough`; they do not establish complete history. Refreshes with no incoming candidates can refresh known spent state, but cannot establish absence of incoming funds. Explicit `session.refresh({ fromBlock, reset: true })` rebuilds inventory while retaining uncertain operations and reservations; subsequent history ranges must not reset it again. Ordinary RPC supplies a trusted canonical data source; this SDK is not a consensus light client.
 
@@ -244,7 +256,7 @@ BB_BINARY_PATH=/path/to/bb node scripts/benchmark-gas.mjs
 
 The collector starts and stops its own isolated loopback Anvil node on port18945. It never uses public RPC or modifies deployment catalogs. It runs `forge build`, fingerprints tracked and untracked executable sources, and rejects changes during the run. A clean commit is not required. `INVISI_PROTOCOL_DIR`, `GAS_BENCHMARK_PORT` and `GAS_BENCHMARK_OUTPUT` override source, private port and output. `GAS_BENCHMARK_CASES` selects comma-separated case IDs; subsets write a `.partial` result without replacing the catalog. Full publication occurs atomically after all measurements and identity checks pass.
 
-Application metadata is always raw `Uint8Array` in `PaymentOutput.payload` and `Note.payload`. Use `fundsV1.encode({ memo })` or `creditV1.encode({ memo })` before preparation, and explicitly call the corresponding `.decode(note.payload)` after authenticated decryption. These are pure external application codecs: no codec registry is injected into Invisi, WalletSession, viewers or disclosure handles. Built-in memo encoders accept UTF-8 text or bytes, capped at256 encoded bytes. The generic raw payload limit is the remaining envelope budget, not the built-in memo limit. Omitted funds/create payloads become empty bytes; Credit top-up and partial draw preserve previous raw bytes unless an explicit replacement is supplied. `new Uint8Array()` clears all application metadata. Decryption never attempts application decoding, including for built-in or unknown application formats.
+Application metadata is always raw `Uint8Array` in `NoteOutput.create({ payload, ... })` and `Note.payload`. Use `fundsV1.encode({ memo })` or `creditV1.encode({ memo })` before preparation, and explicitly call the corresponding `.decode(note.payload)` after authenticated decryption. These are pure external application codecs: no codec registry is injected into Invisi, WalletSession, viewers or disclosure handles. Built-in memo encoders accept UTF-8 text or bytes, capped at256 encoded bytes. The generic raw payload limit is the remaining envelope budget, not the built-in memo limit. Omitted funds/create payloads become empty bytes; Credit top-up and partial draw preserve previous raw bytes unless an explicit replacement is supplied. `new Uint8Array()` clears all application metadata. Decryption never attempts application decoding, including for built-in or unknown application formats.
 
 Memos are encrypted and authenticated with each delivery. They do not enter financial commitments or nullifiers. Commitment-only disclosures exclude memos; a scoped payload-key disclosure reveals the selected envelope's memo. Financial Credit recovery from a bad child envelope recovers the balance but leaves an unknown child memo absent. Funds and Credit envelope codec version 1 are independent of the unified Factory/Protocol version 1 and `/v1` Protocol RPC API. Use runtime-code pins for a deployment that supports these memo formats; historical immutable deployments retain their original wire format.
 
@@ -280,7 +292,7 @@ All public `prepare*` methods on `Invisi`, `WalletSession`, and the SDK `Address
 
 Recipient errors include `address`, `field` (`to`, `amount`, `changeAddress`, `spender`, or `wallet`) and, for explicit payment outputs, zero-based `outputIndex`. Automatic change and Credit roles do not pretend to be entries in the caller's outputs array. Unknown/internal failures are not guessed into business categories by parsing their messages. A preparation failure never returns a prepared handle; existing preparation atomicity/reservation rules remain unchanged.
 
-Recipient strings accept full `0i` addresses or registered `0x` owners. A full address is validated locally and bypasses registration lookup. Configure `new Invisi({ provider, protocolRpc, addressLookup: "chain" })` for direct registry reads, or omit `addressLookup` to use the default `"protocol-rpc"` indexed `ReceivingKeysSet` lookup. Indexed registration visibility follows confirmations/indexing; an absent record describes that indexed state, not necessarily the latest chain state. RPC discovery pins are checked against the supplied Protocol deployment, and the application trusts its selected RPC for the keys. An explicit `addressResolver` overrides source selection. There is no automatic fallback to a second source. Public receiving keys are resolved during preparation and frozen into deliveries before signing or export.
+Recipients accept full `0i` addresses or EVM `0x` owners. A full address is validated locally and bypasses registration lookup. EVM recipients select `addressLookup: "chain"` for direct registry reads or omit it for default `"protocol-rpc"` indexed lookup. `new Invisi` accepts neither `addressLookup` nor a custom `addressResolver`. Indexed registration visibility follows confirmations/indexing; an absent record describes that indexed state, not necessarily the latest chain state. RPC discovery pins are checked against the supplied Protocol deployment, and the application trusts its selected RPC for the keys. There is no automatic fallback to a second source. For encrypted EVM outputs, `NoteOutput.create` fixes the financial opening offline; preparation resolves receiving keys, rejects missing registrations, and freezes delivery before signing or export. `envelope: false` skips lookup entirely.
 
 ```ts
 try {
@@ -321,40 +333,66 @@ The SDK also exposes `creditPeriods(chainTimestamp)` for application-side UTC qu
 
 ### Prebuilt note outputs
 
-`NoteOutput.create` constructs an immutable output before transaction preparation. `to` accepts a complete `0i` receiving address or a registered `0x` owner; short addresses require an explicit `addressResolver` for receiving keys. Supply the chain, Protocol and token context explicitly. Omit `nonce` to sample a canonical BN254 field element, or provide a bigint in `[0, FIELD_MODULUS)`.
+`NoteOutput.create` accepts explicit `chainId`, `protocolAddress`, `tokenAddress`, `amount` and a discriminated `recipient`. Its output is independent of a transaction preparation. `prepareShield` and `prepareTransfer`, including WalletSession variants, reject a different chain, Protocol or token rather than rewriting the output.
 
 ```ts
 import { NoteOutput } from "@invisi-labs/sdk";
 
 const output = await NoteOutput.create({
-    to: bobAddress,
+    chainId: protocol.context.chainId,
+    protocolAddress: protocol.context.protocolAddress,
+    tokenAddress,
     amount,
-    context: { ...protocol.context, tokenAddress },
-    // nonce: customNonce,
+    recipient: { type: "invisi", address: bobAddress },
 });
 const outputs = [output];
 ```
 
-Pass these outputs to `prepareShield` or `prepareTransfer`, including their WalletSession equivalents. The prepared transaction checks the deployment/token and financial material and reuses the fixed identity, commitment, ciphertext and clue, including during Broadcaster fee reconstruction. `output.nonce`, `output.identity`, `output.commitment`, `output.note` and `output.delivery` expose the result; mutable byte arrays and note/delivery snapshots are detached copies. A delivery fingerprint detects accidental changes to copyable material; applications must still authenticate their persisted state. Create a fresh output for each distinct payment, and retain an existing output only for retries or repricing of that payment. Construction is not proof of payment or confirmation.
+Recipient modes:
 
-Plain `{ to, amount }` outputs remain available, with optional `nonce` and application `payload`; preparation constructs those outputs directly. The factory accepts addresses, without a separate wallet-identity input mode.
+- `{ type: "evm", address, envelope?: boolean, nonce?, addressLookup?: "chain" | "protocol-rpc" }`: `envelope` defaults to true. Preparation resolves registered receiving keys using the selected source, defaulting to `"protocol-rpc"`; an absent registration fails preparation. Set `envelope: false` to omit delivery and skip registration lookup.
+- `{ type: "invisi", address, nonce? }`: a full `0i` address always generates delivery without a registry lookup.
+- `{ type: "identity", identity }`: a precomputed per-note Poseidon2 identity, not an EVM wallet identity. This mode has no nonce or delivery, and does not reveal or fabricate the recipient's wallet identity/opening.
+
+Factory-created encrypted EVM outputs expose `deliveryPending === true`. Preparation resolves their receiving keys and freezes generated delivery in the prepared transaction; the original immutable output remains an offline intent. Pending empty bytes do not represent a deliberate no-envelope output; `envelope: false` is explicit.
+
+Address-mode nonces are canonical BN254 field elements in `[0, FIELD_MODULUS)`; omission samples one securely. `payload` belongs to the outer options and is accepted only for encrypted recipients. Plaintext-free identity outputs expose `note === undefined`; address outputs expose a detached complete note, which the recipient must retain when delivery is omitted.
+
+For a merchant's precomputed request, build the output from its identity and independently check the supplied commitment:
+
+```ts
+const output = await NoteOutput.create({
+    chainId,
+    protocolAddress,
+    tokenAddress,
+    amount,
+    recipient: { type: "identity", identity: merchantNoteIdentity },
+});
+output.assertCommitment(merchantCommitment); // Throws on mismatch.
+```
+
+`expectedCommitment` is not a constructor option. Commitment checks compare the independently computed result. A commitment binds chain, identity, token and amount; the Protocol address is separately checked as deployment context.
+
+Funds outputs without delivery use paired empty ciphertext/clue bytes. Their commitments and exact positions are still indexed, but delegated FMD scanning skips them. A merchant retaining the original wallet identity and nonce can match its commitment, obtain a confirmed leaf/path, and prepare a spend. Creating an identity-only output alone does not provide that secret opening or prove payment. Credit role deliveries remain mandatory; ordinary funds change may omit delivery.
+
+Repricing retains the fixed output identity, commitment and delivery. Mutable note/delivery/recipient snapshots are detached copies, and a local delivery fingerprint detects accidental corruption without authenticating storage. Create a fresh output for each distinct payment; retain one only for retries or repricing of that payment. All preparation outputs must be created with `NoteOutput.create`; raw output objects are rejected.
 
 ### Raw application payloads and fixed SDK envelopes
 
-`prepareShield` and `prepareTransfer` share `PaymentOutput`: `{ to, amount, nonce?: bigint, payload?: Uint8Array }`. The SDK always writes envelope v1, with first byte `0x01` for funds or `0x81` for Credit. Applications cannot select or inject custom envelope versions. Decryption dispatches by the authenticated header; unsupported envelope versions reject. Future SDK releases may implement another envelope version without coupling it to application schemas or the protocol/circuit version.
+`prepareShield` and `prepareTransfer` accept `NoteOutput` instances created by the factory. The SDK always writes envelope v1, with first byte `0x01` for funds or `0x81` for Credit. Applications cannot select or inject custom envelope versions. Decryption dispatches by the authenticated header; unsupported envelope versions reject. Future SDK releases may implement another envelope version without coupling it to application schemas or the protocol/circuit version.
 
-The encrypted body is `fixedFields | payloadLength2 | payloadBytes`. Fixed funds fields occupy80 bytes (`walletIdentity32 | amount16 | nonce32`); Credit recovery fields and both receiving-key snapshots occupy418 bytes. The unsigned big-endian payloadLength counts all following application bytes and may be zero. Exact body length is checked. Envelopes are bounded at4096 bytes: funds160..4096 with at most3936 payload bytes, Credit498..4096 with at most3598. No application bytes affect financial commitment/nullifier formulas, but complete ciphertext/clue bytes remain bound to transaction authorization/proof delivery hashes. Financial context, recipient, Credit keys/policy and commitment checks remain SDK-owned.
+The encrypted body is `fixedFields | payloadLength2 | payloadBytes`. Fixed funds fields occupy80 bytes (`ownerAddress32 | amount16 | nonce32`); Credit recovery fields and both receiving-key snapshots occupy418 bytes. The unsigned big-endian payloadLength counts all following application bytes and may be zero. Exact body length is checked. Envelopes are bounded at4096 bytes: funds160..4096 with at most3936 payload bytes, Credit498..4096 with at most3598. No application bytes affect financial commitment/nullifier formulas, but complete ciphertext/clue bytes remain bound to transaction authorization/proof delivery hashes. Financial context, recipient, Credit keys/policy and commitment checks remain SDK-owned.
 
 The outer envelope is `typeAndVersion1 | ephemeralKey33 | salt16 | iv12 | encryptedBody | GCMtag16`. The high bit identifies funds/Credit; the remaining seven bits encode the SDK envelope version. HKDF/AAD domains remain `Invisi.NoteDelivery.v1` and `Invisi.CreditDelivery.v1`. Contract and Protocol RPC transport remains opaque, with the4096-byte resource bound, uint16 batch framing and68-byte clues. Neither requires application codec registration.
 
 Built-in pure application codecs are symmetric:
 
 ```ts
-const outputs: PaymentOutput[] = [{
-    to: bobAddress,
-    amount,
+const outputs = [await NoteOutput.create({
+    chainId, protocolAddress, tokenAddress, amount,
+    recipient: { type: "invisi", address: bobAddress },
     payload: fundsV1.encode({ memo: "Invoice INV-1042" }),
-}];
+})];
 const note = await viewer.decryptNote(ciphertext, context);
 const data = fundsV1.decode(note.payload);
 if (data.memo) console.log(decodeMemoText(data.memo));

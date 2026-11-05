@@ -15,7 +15,7 @@ import {
 import {
     buildWalletAuthorizationWitness,
     computeWalletAuthorizationDigest,
-    computeWalletIdentity,
+    computeOwnerAddress,
     type WalletAuthorizationRequest,
     type WalletAuthorizationWitness,
     type WalletBytes,
@@ -39,16 +39,16 @@ function copyBytes(value: WalletBytes): Uint8Array {
 }
 
 function identity(value: Identity): Identity {
-    return ReceivingAddress.fromIdentity(value).walletIdentity;
+    return ReceivingAddress.fromIdentity(value).ownerAddress;
 }
 
 /** Local viewing permission, permitting note recovery and owner-only sweep, without arbitrary spending. */
 export class ViewingCapability {
     readonly #key: Uint8Array;
-    readonly walletIdentity: Identity;
+    readonly ownerAddress: Identity;
 
-    constructor(walletIdentity: Identity, privateKey: WalletBytes, expectedPublicKey?: Uint8Array) {
-        this.walletIdentity = identity(walletIdentity);
+    constructor(ownerAddress: Identity, privateKey: WalletBytes, expectedPublicKey?: Uint8Array) {
+        this.ownerAddress = identity(ownerAddress);
         this.#key = copyBytes(privateKey);
         const publicKey = viewingPublicKey(this.#key);
         if (expectedPublicKey && bytesToHex(publicKey) !== bytesToHex(expectedPublicKey)) {
@@ -57,20 +57,17 @@ export class ViewingCapability {
         Object.freeze(this);
     }
 
-    decryptNote(envelope: NoteBytes, context: Omit<NoteDecryptionContext, "walletIdentity">) {
+    decryptNote(envelope: NoteBytes, context: Omit<NoteDecryptionContext, "ownerAddress">) {
         return decryptPrivateTransferNote(this.#key, envelope, {
             ...context,
-            walletIdentity: this.walletIdentity,
+            ownerAddress: this.ownerAddress,
         });
     }
 
-    decryptCredit(
-        envelope: NoteBytes,
-        context: Omit<CreditNoteDecryptionContext, "walletIdentity">
-    ) {
+    decryptCredit(envelope: NoteBytes, context: Omit<CreditNoteDecryptionContext, "ownerAddress">) {
         return decryptCreditNote(this.#key, envelope, {
             ...context,
-            walletIdentity: this.walletIdentity,
+            ownerAddress: this.ownerAddress,
         });
     }
 
@@ -79,21 +76,21 @@ export class ViewingCapability {
     }
 
     /** Disclose this authenticated output's payload key, without exporting the wallet viewing key. */
-    discloseNote(envelope: NoteBytes, context: Omit<NoteDecryptionContext, "walletIdentity">) {
+    discloseNote(envelope: NoteBytes, context: Omit<NoteDecryptionContext, "ownerAddress">) {
         return Disclosure.fromEncryptedNote(this.#key, envelope, {
             ...context,
-            walletIdentity: this.walletIdentity,
+            ownerAddress: this.ownerAddress,
         });
     }
 
     /** Exposes the entire Credit envelope; prefer Disclosure.fromCredit() for hash-only opening. */
     discloseCredit(
         envelope: NoteBytes,
-        context: Omit<CreditNoteDecryptionContext, "walletIdentity">
+        context: Omit<CreditNoteDecryptionContext, "ownerAddress">
     ) {
         return Disclosure.fromEncryptedCredit(this.#key, envelope, {
             ...context,
-            walletIdentity: this.walletIdentity,
+            ownerAddress: this.ownerAddress,
         });
     }
 
@@ -103,7 +100,7 @@ export class ViewingCapability {
     }
 
     toJSON() {
-        return { capability: "viewing", walletIdentity: this.walletIdentity };
+        return { capability: "viewing", ownerAddress: this.ownerAddress };
     }
 
     [inspect]() {
@@ -142,15 +139,15 @@ export class Detector {
 
 /** Note-derived spent-state calculation; the note opening supplies its nonce. */
 export class NullifierCapability {
-    readonly walletIdentity: Identity;
+    readonly ownerAddress: Identity;
 
-    private constructor(walletIdentity: Identity) {
-        this.walletIdentity = identity(walletIdentity);
+    private constructor(ownerAddress: Identity) {
+        this.ownerAddress = identity(ownerAddress);
         Object.freeze(this);
     }
 
-    static fromIdentity(walletIdentity: Identity): NullifierCapability {
-        return new NullifierCapability(walletIdentity);
+    static fromIdentity(ownerAddress: Identity): NullifierCapability {
+        return new NullifierCapability(ownerAddress);
     }
 
     compute(chainId: bigint, commitment: Identity, nonce: bigint): Promise<Identity> {
@@ -158,7 +155,7 @@ export class NullifierCapability {
     }
 
     toJSON() {
-        return { capability: "nullifier", walletIdentity: this.walletIdentity };
+        return { capability: "nullifier", ownerAddress: this.ownerAddress };
     }
 
     [inspect]() {
@@ -170,10 +167,10 @@ export class NullifierCapability {
 export class AuthorizedStatement {
     readonly #witness: WalletAuthorizationWitness;
     readonly digest: Identity;
-    readonly walletIdentity: Identity;
+    readonly ownerAddress: Identity;
 
-    constructor(walletIdentity: Identity, digest: Identity, witness: WalletAuthorizationWitness) {
-        this.walletIdentity = walletIdentity;
+    constructor(ownerAddress: Identity, digest: Identity, witness: WalletAuthorizationWitness) {
+        this.ownerAddress = ownerAddress;
         this.digest = digest;
         this.#witness = copyWitness(witness);
         Object.freeze(this);
@@ -184,7 +181,7 @@ export class AuthorizedStatement {
     }
 
     toJSON() {
-        return { walletIdentity: this.walletIdentity, digest: this.digest };
+        return { ownerAddress: this.ownerAddress, digest: this.digest };
     }
 
     [inspect]() {
@@ -193,7 +190,7 @@ export class AuthorizedStatement {
 }
 
 export interface WalletAuthorizationProvider {
-    readonly walletIdentity: Identity;
+    readonly ownerAddress: Identity;
     authorize(request: WalletAuthorizationRequest): Promise<AuthorizedStatement>;
 }
 
@@ -201,25 +198,25 @@ export interface WalletAuthorizationProvider {
 export class WalletAuthorization implements WalletAuthorizationProvider {
     readonly #privateKey: Uint8Array;
     readonly #publicKey: Uint8Array;
-    readonly walletIdentity: Identity;
+    readonly ownerAddress: Identity;
 
-    private constructor(walletIdentity: Identity, privateKey: Uint8Array, publicKey: Uint8Array) {
-        this.walletIdentity = walletIdentity;
+    private constructor(ownerAddress: Identity, privateKey: Uint8Array, publicKey: Uint8Array) {
+        this.ownerAddress = ownerAddress;
         this.#privateKey = privateKey;
         this.#publicKey = publicKey;
         Object.freeze(this);
     }
 
     static async fromMaterial(
-        walletIdentity: Identity,
+        ownerAddress: Identity,
         privateKey: WalletBytes
     ): Promise<WalletAuthorization> {
         const privateBytes = copyBytes(privateKey);
         const publicBytes = secp256k1.getPublicKey(privateBytes, false);
-        if ((await computeWalletIdentity(publicBytes)) !== identity(walletIdentity)) {
-            throw new Error("wallet identity mismatch");
+        if ((await computeOwnerAddress(publicBytes)) !== identity(ownerAddress)) {
+            throw new Error("owner address mismatch");
         }
-        return new WalletAuthorization(identity(walletIdentity), privateBytes, publicBytes);
+        return new WalletAuthorization(identity(ownerAddress), privateBytes, publicBytes);
     }
 
     async authorize(request: WalletAuthorizationRequest): Promise<AuthorizedStatement> {
@@ -227,17 +224,17 @@ export class WalletAuthorization implements WalletAuthorizationProvider {
         const digest = computeWalletAuthorizationDigest(frozen);
         const witness = await buildWalletAuthorizationWitness(
             {
-                walletIdentity: this.walletIdentity,
+                ownerAddress: this.ownerAddress,
                 spendingPrivateKey: this.#privateKey,
                 spendingPublicKey: this.#publicKey,
             },
             frozen
         );
-        return new AuthorizedStatement(this.walletIdentity, digest, witness);
+        return new AuthorizedStatement(this.ownerAddress, digest, witness);
     }
 
     toJSON() {
-        return { capability: "wallet-authorization", walletIdentity: this.walletIdentity };
+        return { capability: "wallet-authorization", ownerAddress: this.ownerAddress };
     }
 
     [inspect]() {

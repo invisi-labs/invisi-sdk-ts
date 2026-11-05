@@ -158,7 +158,7 @@ export function extractDeliveryCandidates(
         check(inserted, "delivery has no matching canonical insertion");
         if (commitment !== undefined)
             check(hash(commitment) === inserted, "delivery commitment conflicts with insertion");
-        const delivery = normalizeOpaqueDelivery(wire as never);
+        const delivery = normalizeOpaqueDelivery(wire as never, { allowEmpty: role === "funds" });
         check(
             typeof token === "string" && isAddress(token) && BigInt(token) !== 0n,
             "invalid event token"
@@ -239,15 +239,14 @@ export function extractDeliveryCandidates(
                 const length = Number.parseInt(packed.slice(offset, offset + 4), 16);
                 offset += 4;
                 check(
-                    length >= 1 &&
-                        length <= MAX_CIPHERTEXT_BYTES &&
-                        offset + length * 2 + 136 <= packed.length,
+                    length <= MAX_CIPHERTEXT_BYTES &&
+                        offset + length * 2 + (length === 0 ? 0 : 136) <= packed.length,
                     "invalid packed delivery length"
                 );
                 const ciphertext = `0x${packed.slice(offset, offset + length * 2)}`;
                 offset += length * 2;
-                const clue = `0x${packed.slice(offset, offset + 136)}`;
-                offset += 136;
+                const clue = length === 0 ? "0x" : `0x${packed.slice(offset, offset + 136)}`;
+                if (length !== 0) offset += 136;
                 add(log, tree, start + i, c, "funds", { ciphertext, clue }, tokens[i]);
             });
             check(offset === packed.length, "trailing packed delivery bytes");
@@ -290,12 +289,12 @@ export async function decryptCandidates(
     logs: readonly DeliveryEventLog[],
     options: {
         context: DiscoveryContext;
-        viewing: Pick<ViewingCapability, "walletIdentity" | "decryptNote" | "decryptCredit">;
+        viewing: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
         confirmedThrough: bigint;
     }
 ): Promise<{ notes: DiscoveredNote[]; credits: DiscoveredCredit[] }> {
     contextCheck(options.context);
-    decodeAddress(ReceivingAddress.fromIdentity(options.viewing.walletIdentity).toString());
+    decodeAddress(ReceivingAddress.fromIdentity(options.viewing.ownerAddress).toString());
     check(
         !logs.some(
             (log) =>
@@ -334,6 +333,7 @@ export async function decryptCandidates(
         // Non-recipient ciphertexts and failed authentication are normal scan outcomes.
         try {
             if (role === "funds") {
+                if (delivery.ciphertext === "0x") continue;
                 const note = await options.viewing.decryptNote(delivery.ciphertext, context);
                 notes.push({ ...positionData, note });
             } else {

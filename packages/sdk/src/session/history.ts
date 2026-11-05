@@ -53,10 +53,10 @@ export function walletHistory(state: WalletState, options: HistoryOptions = {}):
             ...(record.transactionHash ? { transactionHash: record.transactionHash } : {}),
             outputs: plan.outputs.map((output) => ({
                 to: output.address,
-                amount: output.note.amount,
+                amount: output.amount,
                 change: output.change,
                 commitment: output.commitment,
-                payload: Uint8Array.from(output.note.payload ?? []),
+                payload: Uint8Array.from(output.note?.payload ?? []),
             })),
         });
     }

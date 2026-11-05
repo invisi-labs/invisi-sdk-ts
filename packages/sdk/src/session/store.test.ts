@@ -18,14 +18,14 @@ const scope: WalletScope = {
     namespace: "alice",
     chainId: 31337n,
     protocolAddress: "0x1111111111111111111111111111111111111111",
-    walletIdentity: ("0x" + "01".padStart(40, "0")) as `0x${string}`,
+    ownerAddress: ("0x" + "01".padStart(40, "0")) as `0x${string}`,
 };
 const leaf = (n: number) => ("0x" + n.toString(16).padStart(64, "0")) as `0x${string}`;
 const input = (amount = 100n) => ({
     note: {
         chainId: scope.chainId,
         protocolAddress: BigInt(scope.protocolAddress),
-        walletIdentity: scope.walletIdentity,
+        ownerAddress: scope.ownerAddress,
         tokenAddress: 0x2222222222222222222222222222222222222222n,
         amount,
         nonce: 1n,
@@ -137,7 +137,7 @@ it("applies repeated canonical receipts idempotently and rolls back position con
 it("does not expose tenant names or wallet identities in persistent record keys", () => {
     const key = scopeKey(scope);
     expect(key).not.toContain(scope.namespace);
-    expect(key).not.toContain(scope.walletIdentity);
+    expect(key).not.toContain(scope.ownerAddress);
     expect(
         scopeKey({
             ...scope,
@@ -244,8 +244,8 @@ it("reloads raw encrypted memo metadata through the record codec without aliasin
                     chainId: scope.chainId,
                     protocolAddress: BigInt(scope.protocolAddress),
                     tokenAddress: record.note.tokenAddress,
-                    ownerWalletIdentity: scope.walletIdentity,
-                    spenderWalletIdentity: scope.walletIdentity,
+                    ownerWalletIdentity: scope.ownerAddress,
+                    spenderWalletIdentity: scope.ownerAddress,
                     ownerPayout: 1n,
                     spenderPayout: 1n,
                     amount: 100n,

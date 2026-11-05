@@ -69,7 +69,7 @@ it("keeps same-token instances' inventories, reservations and operations isolate
             note: {
                 chainId: 31337n,
                 protocolAddress: BigInt(instance),
-                walletIdentity: wallet.walletIdentity,
+                ownerAddress: wallet.ownerAddress,
                 tokenAddress: BigInt(token),
                 amount: 100n,
                 nonce: 1n,

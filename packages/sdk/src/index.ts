@@ -1,5 +1,5 @@
 export { NoteOutput } from "./NoteOutput";
-export type { NoteOutputContext, NoteOutputOptions } from "./NoteOutput";
+export type { NoteOutputContext, NoteOutputOptions, NoteOutputRecipient } from "./NoteOutput";
 export { InvisiError } from "./errors";
 export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
 export { Invisi } from "./Invisi";
@@ -73,7 +73,6 @@ export type {
     WalletState,
     BalanceSnapshot,
     WalletSessionOptions,
-    PaymentOutput,
     TransferPreparation,
     TransactionExecution,
     TransactionProveOptions,

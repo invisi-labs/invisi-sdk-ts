@@ -418,14 +418,14 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         if (raw === null) return null;
         const value = object(raw);
         if (
-            typeof value.walletIdentity !== "string" ||
-            value.walletIdentity.toLowerCase() !== identity.toLowerCase()
+            typeof value.ownerAddress !== "string" ||
+            value.ownerAddress.toLowerCase() !== identity.toLowerCase()
         )
             invalid("RPC receiving-address identity mismatch");
         let receivingAddress: string;
         try {
             receivingAddress = ReceivingAddress.from({
-                walletIdentity: identity,
+                ownerAddress: identity,
                 viewingPublicKey: getBytes(value.viewingPublicKey as string),
                 clueKey: getBytes(value.clueKey as string),
             }).toString();
@@ -663,20 +663,25 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             if (typeof output.kind !== "string" || !output.kind) invalid("Invalid output kind");
             if (
                 typeof output.ciphertext !== "string" ||
-                !/^0x(?:[0-9a-f]{2})+$/i.test(output.ciphertext) ||
+                !/^0x(?:[0-9a-f]{2})*$/i.test(output.ciphertext) ||
                 (output.ciphertext.length - 2) / 2 > MAX_CIPHERTEXT_BYTES
             )
                 invalid("Invalid output ciphertext");
-            if (typeof output.clue !== "string" || !/^0x[0-9a-f]{136}$/i.test(output.clue))
+            const noEnvelope = output.ciphertext === "0x";
+            if (
+                typeof output.clue !== "string" ||
+                (noEnvelope ? output.clue !== "0x" : !/^0x[0-9a-f]{136}$/i.test(output.clue))
+            )
                 invalid("Invalid output clue");
             const creditEvent = ["CreditCreated", "CreditToppedUp", "CreditDraw"].includes(
                 output.kind as string
             );
             const isCredit =
+                !noEnvelope &&
                 creditEvent &&
                 (Number.parseInt((output.ciphertext as string).slice(2, 4), 16) & 0x80) !== 0;
             if (credit !== "all" && isCredit !== credit) continue;
-            const paired = credit === "all" ? creditEvent : isCredit;
+            const paired = credit === "all" ? creditEvent && !noEnvelope : isCredit;
             const candidate: ProtocolOutput = {
                 block: {
                     number: eventBlock.number,

@@ -52,7 +52,7 @@ describe("self-contained Credit delivery state", () => {
                 c = {
                     ...context,
                     outputCommitment: leaf,
-                    walletIdentity: identity(wallet.walletIdentity),
+                    ownerAddress: identity(wallet.ownerAddress),
                     role,
                 };
             const envelope = await encryptCreditNote(hexBytes(wallet.viewingPublicKey), state, c);
@@ -135,7 +135,7 @@ describe("self-contained Credit delivery state", () => {
         const c = {
             ...context,
             outputCommitment: leaf,
-            walletIdentity: note.ownerWalletIdentity,
+            ownerAddress: note.ownerWalletIdentity,
             role: "owner" as const,
         };
         await expect(
@@ -175,7 +175,7 @@ it("roundtrips full u128 actual usage even when owner limits are disabled or bel
     const c = {
         ...context,
         outputCommitment: commitment,
-        walletIdentity: wide.ownerWalletIdentity,
+        ownerAddress: wide.ownerWalletIdentity,
         role: "owner" as const,
     };
     const wideState = { ...state, note: wide };

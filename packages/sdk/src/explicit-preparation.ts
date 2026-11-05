@@ -38,7 +38,7 @@ export function explicitPreparation(
         if (
             input.note.chainId !== context.chainId ||
             input.note.protocolAddress !== BigInt(context.protocolAddress) ||
-            input.note.walletIdentity !== options.wallet.walletIdentity
+            input.note.ownerAddress !== options.wallet.ownerAddress
         )
             throw new Error("explicit note identity or deployment mismatch");
         inventory.notes[input.commitment] = { ...input, spent: "unspent" };
@@ -54,7 +54,7 @@ export function explicitPreparation(
     const scope = {
         ...context,
         namespace: "explicit",
-        walletIdentity: options.wallet.walletIdentity,
+        ownerAddress: options.wallet.ownerAddress,
     };
     const {
         store: _store,

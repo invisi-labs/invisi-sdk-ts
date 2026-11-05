@@ -1,3 +1,4 @@
+import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
 import { PublicWallet } from "@invisi-labs/sdk";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
@@ -50,22 +51,24 @@ try {
     }
 
     // 5. The SDK builds transparent-amount funding; ethers handles subsequent on-chain submission.
-    // Bob provides only a 0x address; the SDK looks up its registered public key inside prepareShield.
+    // Bob provides only a 0x address; the SDK looks up its registered public key during prepareShield.
     // A full 0i address contains receiving public keys and requires no registration; Bob's private key is not read here.
     const outputs = [
-        {
-            to: bobAddress,
-            amount,
-        },
+        await NoteOutput.create({
+            chainId: protocol.context.chainId,
+            protocolAddress: protocol.context.protocolAddress,
+            tokenAddress,
+            amount: amount,
+            // envelope defaults to true; addressLookup defaults to protocol-rpc.
+            // Registration must be confirmed and indexed before preparation.
+            recipient: { type: "evm", address: bobAddress },
+        }),
     ];
 
     const aliceWallet = PublicWallet.fromAddress(alice.receivingAddress);
     const invisi = new Invisi({
         provider,
         protocolRpc,
-        // Default protocol-rpc queries the registration event index; use chain to read the registry contract via Chain RPC.
-        // With protocol-rpc, newly registered or updated public keys require confirmations and indexing to catch up.
-        addressLookup: "protocol-rpc",
     });
     const prepared = await invisi.prepareShield({
         wallet: aliceWallet,

@@ -134,7 +134,7 @@ export const pad = (v: readonly bigint[], n: number): bigint[] => [
 /** Receipt/transport validation must not reject unrelated future wallet codecs. */
 export function normalizeOpaqueDelivery(
     value: Delivery,
-    options: { empty?: boolean } = {}
+    options: { empty?: boolean; allowEmpty?: boolean } = {}
 ): Delivery {
     known(value, ["ciphertext", "clue"], "delivery");
     if (options.empty) {
@@ -142,6 +142,8 @@ export function normalizeOpaqueDelivery(
             throw new Error("absent output requires an empty delivery");
         return { ciphertext: "0x", clue: "0x" };
     }
+    if (options.allowEmpty && value.ciphertext === "0x" && value.clue === "0x")
+        return { ciphertext: "0x", clue: "0x" };
     const ciphertext = envelope(value.ciphertext, 1, undefined, MAX_CIPHERTEXT_BYTES);
     const clue = envelope(value.clue, 68);
     if (clue.slice(130, 132).toLowerCase() !== "18") throw new Error("clue precision must be 24");

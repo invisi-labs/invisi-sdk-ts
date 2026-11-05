@@ -5,7 +5,7 @@ import { FIELD_MODULUS } from "./random";
 
 // Frozen specification example, decoded independently with a Python bitstream.
 const recipient = {
-    walletIdentity: "0x0123456789abcdef0123456789abcdef01234567" as const,
+    ownerAddress: "0x0123456789abcdef0123456789abcdef01234567" as const,
     viewingPublicKey: hexToBytes(
         "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
     ),
@@ -18,13 +18,13 @@ const short = "0x0123456789abcDEF0123456789abCDef01234567";
 describe("Invisi address encoding", () => {
     it("matches exact specification bytes, character lengths and case checksums", () => {
         expect(encodeLongAddress(recipient)).toBe(long);
-        expect(encodeShortAddress(recipient.walletIdentity)).toBe(short);
+        expect(encodeShortAddress(recipient.ownerAddress)).toBe(short);
         expect(long.length).toBe(138);
         expect(short.length).toBe(42);
         expect(decodeAddress(long)).toEqual({ kind: "long", ...recipient });
         expect(decodeAddress(short)).toEqual({
             kind: "short",
-            walletIdentity: recipient.walletIdentity,
+            ownerAddress: recipient.ownerAddress,
         });
     });
 
@@ -45,7 +45,7 @@ describe("Invisi address encoding", () => {
         for (const text of [short, short.toLowerCase(), "0x" + short.slice(2).toUpperCase()]) {
             expect(decodeAddress(text)).toEqual({
                 kind: "short",
-                walletIdentity: recipient.walletIdentity,
+                ownerAddress: recipient.ownerAddress,
             });
             expect(encodeShortAddress(text as `0x${string}`)).toBe(short);
         }
@@ -64,7 +64,7 @@ describe("Invisi address encoding", () => {
 
     it("rejects noncanonical identities, malformed secp keys and invalid clue keys", () => {
         for (const identity of [0n, -1n, FIELD_MODULUS])
-            expect(() => encodeShortAddress(identity)).toThrow(/identity/);
+            expect(() => encodeShortAddress(identity)).toThrow(/owner address/);
         expect(() =>
             encodeLongAddress({ ...recipient, viewingPublicKey: new Uint8Array(33) })
         ).toThrow(/viewing/);
@@ -85,7 +85,7 @@ describe("Invisi address encoding", () => {
         expect(lookup).not.toHaveBeenCalled();
         expect(await resolveAddress(short, { lookup })).toEqual(recipient);
         expect(lookup).toHaveBeenCalledTimes(1);
-        expect(lookup).toHaveBeenCalledWith(recipient.walletIdentity);
+        expect(lookup).toHaveBeenCalledWith(recipient.ownerAddress);
         await expect(resolveAddress(short)).rejects.toThrow(/lookup/);
         await expect(resolveAddress(short, { lookup: async () => null })).rejects.toThrow(
             /registered/

@@ -1,3 +1,4 @@
+import { testOutput } from "../test-output";
 import { expect, it } from "vitest";
 import { fixture } from "./operation-fixture";
 import { defineGasBenchmarks, estimateShapeGas } from "../gas-estimation";
@@ -7,7 +8,7 @@ it("returns only gasUnits before proving, including on another deployment", asyn
     const h = await fixture();
     const prepared = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
-        outputs: [{ to: h.bob.getAddress(), amount: 30n }],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const estimate = prepared.estimateGas();
     expect(Object.keys(estimate)).toEqual(["gasUnits"]);

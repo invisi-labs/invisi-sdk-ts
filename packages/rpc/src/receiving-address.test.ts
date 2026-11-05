@@ -20,7 +20,7 @@ async function fixture() {
     const wallet = await Wallet.fromPrivateKey(h(3));
     const keys = ReceivingAddress.parse(wallet.getAddress()).getReceivingKeys();
     return {
-        walletIdentity: owner,
+        ownerAddress: owner,
         viewingPublicKey: hexlify(keys.viewingPublicKey),
         clueKey: hexlify(keys.clueKey),
         nonce: "9007199254740993",
@@ -74,7 +74,7 @@ describe("receiving-address discovery", () => {
     it("rejects malformed or substituted registered data", async () => {
         const good = await fixture();
         for (const patch of [
-            { walletIdentity: deployment.registry.address },
+            { ownerAddress: deployment.registry.address },
             { viewingPublicKey: "0x02" },
             { clueKey: h(0) },
             { nonce: -1 },

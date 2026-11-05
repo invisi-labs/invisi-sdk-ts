@@ -11,7 +11,7 @@ export interface ProtocolContext {
 
 /** Deployment-scoped private funds note; contains no spending or nullifier key. */
 export interface Note extends ProtocolContext {
-    walletIdentity: `0x${string}`;
+    ownerAddress: `0x${string}`;
     tokenAddress: bigint;
     amount: bigint;
     nonce: bigint;
