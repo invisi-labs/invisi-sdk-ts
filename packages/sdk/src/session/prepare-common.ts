@@ -1,15 +1,12 @@
 import { InvisiError } from "../errors";
-import { resolveRecipient } from "../resolve-recipient";
+import { materializeNoteOutput } from "../NoteOutput";
 import type { Hex } from "@invisi-labs/protocol/contracts";
-import { getAddress, hexlify } from "ethers";
+import { getAddress } from "ethers";
 
 import {
     MissingCapabilityError,
     computeNoteCommitment,
     computeNoteIdentity,
-    createClue,
-    encryptPrivateTransferNote,
-    generateNonce,
 } from "@invisi-labs/core";
 import {
     normalizeFunding,
@@ -155,51 +152,22 @@ export class Preparation<Result> {
     ): Promise<PreparedOutput> {
         try {
             positiveOutputAmount(payment, outputIndex);
-            const recipient = await resolveRecipient(
-                payment.to,
-                this.runtime.options.addressResolver,
-                {
-                    field: change ? "changeAddress" : "to",
-                    ...(outputIndex === undefined ? {} : { outputIndex }),
-                }
+            const output = await materializeNoteOutput(
+                payment,
+                context,
+                this.runtime.options.addressResolver
             );
-            const nonce = generateNonce();
-            const identity = await computeNoteIdentity(BigInt(recipient.walletIdentity), nonce);
-            const keys = recipient.getReceivingKeys();
-            const note = {
-                chainId: context.chainId,
-                protocolAddress: BigInt(context.protocolAddress),
-                tokenAddress: BigInt(context.tokenAddress),
-                walletIdentity: recipient.walletIdentity,
-                amount: payment.amount,
-                payload: copyApplicationPayload(payment.payload),
-                nonce,
-            };
-            const commitment = await computeNoteCommitment(
-                context.chainId,
-                identity,
-                note.tokenAddress,
-                note.amount
-            );
-            return {
-                note,
-                commitment,
-                identity,
-                address: payment.to,
-                change,
-                delivery: {
-                    ciphertext: hexlify(
-                        await encryptPrivateTransferNote(keys.viewingPublicKey, note, {
-                            chainId: context.chainId,
-                            protocolAddress: note.protocolAddress,
-                            outputCommitment: commitment,
-                        })
-                    ) as Hex,
-                    clue: hexlify(createClue(keys.clueKey)) as Hex,
-                },
-            };
+            return { ...output, change };
         } catch (cause) {
-            if (cause instanceof InvisiError) throw cause;
+            if (cause instanceof InvisiError) {
+                throw new InvisiError(cause.code, cause.message, {
+                    address: cause.address ?? payment.to,
+                    field: change ? "changeAddress" : (cause.field ?? "to"),
+                    ...(outputIndex === undefined ? {} : { outputIndex }),
+                    ...(cause.capability ? { capability: cause.capability } : {}),
+                    cause: cause.cause ?? cause,
+                });
+            }
             throw new InvisiError(
                 "PREPARATION_FAILED",
                 cause instanceof Error ? cause.message : "Output preparation failed",

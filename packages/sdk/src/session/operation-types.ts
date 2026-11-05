@@ -69,6 +69,8 @@ export interface FundingSource {
     permit?: NonNullable<FundingInput["permit"]>;
 }
 export interface PaymentOutput {
+    /** Omission samples a fresh canonical BN254 field element. */
+    nonce?: bigint;
     /** Version-specific application data. Omission uses built-in v1 with no data. */
     payload?: Uint8Array;
     to: string;

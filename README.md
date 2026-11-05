@@ -319,9 +319,29 @@ The prepared transaction derives its authorization requirement from the frozen s
 
 The SDK also exposes `creditPeriods(chainTimestamp)` for application-side UTC quota selection and `computeCreditNullifier(chainId, creditSharedKey, commitment)` for indexed spent observations. Neither requires a signing key; never send the shared key itself to the service. Batched Credit draws may have different owners but require one spender and one bound public payout. A single spender request authorizes the complete batch; every input's remaining Credit retains its own owner and historical receiving snapshots.
 
+### Prebuilt note outputs
+
+`NoteOutput.create` constructs an immutable output before transaction preparation. `to` accepts a complete `0i` receiving address or a registered `0x` owner; short addresses require an explicit `addressResolver` for receiving keys. Supply the chain, Protocol and token context explicitly. Omit `nonce` to sample a canonical BN254 field element, or provide a bigint in `[0, FIELD_MODULUS)`.
+
+```ts
+import { NoteOutput } from "@invisi-labs/sdk";
+
+const output = await NoteOutput.create({
+    to: bobAddress,
+    amount,
+    context: { ...protocol.context, tokenAddress },
+    // nonce: customNonce,
+});
+const outputs = [output];
+```
+
+Pass these outputs to `prepareShield` or `prepareTransfer`, including their WalletSession equivalents. The prepared transaction checks the deployment/token and financial material and reuses the fixed identity, commitment, ciphertext and clue, including during Broadcaster fee reconstruction. `output.nonce`, `output.identity`, `output.commitment`, `output.note` and `output.delivery` expose the result; mutable byte arrays and note/delivery snapshots are detached copies. A delivery fingerprint detects accidental changes to copyable material; applications must still authenticate their persisted state. Create a fresh output for each distinct payment, and retain an existing output only for retries or repricing of that payment. Construction is not proof of payment or confirmation.
+
+Plain `{ to, amount }` outputs remain available, with optional `nonce` and application `payload`; preparation constructs those outputs directly. The factory accepts addresses, without a separate wallet-identity input mode.
+
 ### Raw application payloads and fixed SDK envelopes
 
-`prepareShield` and `prepareTransfer` share `PaymentOutput`: `{ to, amount, payload?: Uint8Array }`. The SDK always writes envelope v1, with first byte `0x01` for funds or `0x81` for Credit. Applications cannot select or inject custom envelope versions. Decryption dispatches by the authenticated header; unsupported envelope versions reject. Future SDK releases may implement another envelope version without coupling it to application schemas or the protocol/circuit version.
+`prepareShield` and `prepareTransfer` share `PaymentOutput`: `{ to, amount, nonce?: bigint, payload?: Uint8Array }`. The SDK always writes envelope v1, with first byte `0x01` for funds or `0x81` for Credit. Applications cannot select or inject custom envelope versions. Decryption dispatches by the authenticated header; unsupported envelope versions reject. Future SDK releases may implement another envelope version without coupling it to application schemas or the protocol/circuit version.
 
 The encrypted body is `fixedFields | payloadLength2 | payloadBytes`. Fixed funds fields occupy80 bytes (`walletIdentity32 | amount16 | nonce32`); Credit recovery fields and both receiving-key snapshots occupy418 bytes. The unsigned big-endian payloadLength counts all following application bytes and may be zero. Exact body length is checked. Envelopes are bounded at4096 bytes: funds160..4096 with at most3936 payload bytes, Credit498..4096 with at most3598. No application bytes affect financial commitment/nullifier formulas, but complete ciphertext/clue bytes remain bound to transaction authorization/proof delivery hashes. Financial context, recipient, Credit keys/policy and commitment checks remain SDK-owned.
 

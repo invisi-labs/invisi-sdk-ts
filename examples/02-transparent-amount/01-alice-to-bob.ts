@@ -1,5 +1,5 @@
 import { settings } from "../settings.js";
-import { PublicWallet } from "@invisi-labs/sdk";
+import { PublicWallet, NoteOutput } from "@invisi-labs/sdk";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
 import { erc20Abi } from "viem";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
@@ -46,10 +46,12 @@ try {
 
     // 3. Use the 0i privacy receiving address provided by Bob; his private key is unnecessary.
     const outputs = [
-        {
+        await NoteOutput.create({
             to: bob.receivingAddress,
             amount,
-        },
+            context: { ...protocol.context, tokenAddress },
+            // Omit nonce for secure random generation; supply a canonical bigint to set it explicitly.
+        }),
     ];
 
     // 4. The SDK builds transparent-amount funding; ethers handles subsequent on-chain submission.
