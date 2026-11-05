@@ -4,11 +4,11 @@
   "manifests": [
     {
       "name": "transact-user",
-      "sha256": "4a6841af55379477c5d12a250d211c36e3bde793b016f6a19da11ba1dea872a0"
+      "sha256": "9ef9d34d4459c2843d022712093216142e3eacdd1467d2382a6a68ad36c33b8f"
     },
     {
       "name": "credit",
-      "sha256": "b52596e3925972f8ff17ddc0fcf58b721893e79b2dec1415ae2dfad9458f82c8"
+      "sha256": "c27ff83889c3082b4c918bd63e15437881f0a6f12ed7f130312e1140873679fb"
     }
   ],
   "entries": [

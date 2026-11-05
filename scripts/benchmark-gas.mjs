@@ -23,7 +23,7 @@ const {
     MaxUint256,
     Wallet: EvmWallet,
 } = require("ethers");
-const { Invisi, Protocol, Wallet, PublicWallet } = require("@invisi-labs/sdk");
+const { Invisi, Protocol, Wallet, PublicWallet, NoteOutput } = require("@invisi-labs/sdk");
 const { poseidonHash } = require("@invisi-labs/core");
 const { NativeProver } = require("@invisi-labs/prover/native");
 const protocolRoot = resolve(process.env.INVISI_PROTOCOL_DIR ?? join(root, "../invisi-protocol"));
@@ -399,7 +399,15 @@ try {
             wallet: PublicWallet.fromAddress(wallet.getAddress()),
             protocol,
             tokenAddress,
-            outputs: [{ to: wallet.getAddress(), amount: 1000n }],
+            outputs: [
+                await NoteOutput.create({
+                    chainId: 31337n,
+                    protocolAddress: instance,
+                    tokenAddress,
+                    amount: 1000n,
+                    recipient: { type: "invisi", address: wallet.getAddress() },
+                }),
+            ],
             funding: { payer: account, amount: 1000n, authorization: "caller" },
         })
     );

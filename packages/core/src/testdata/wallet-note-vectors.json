@@ -29,7 +29,7 @@
       "envelopeVersion": 1,
       "header": 1,
       "ciphertextBytes": 160,
-      "protocolClientSha256": "80d0b704d717c0d868233c858cdb2578cb42d91512b18e6fb81c73ff7aaaec55"
+      "protocolClientSha256": "a8ef853309d3819df986020627ab18eff182f0ad1dbd3831b3535ca618d0e8e6"
     }
   },
   "credit": {
@@ -87,7 +87,7 @@
       "envelopeVersion": 1,
       "header": 129,
       "ciphertextBytes": 498,
-      "protocolClientSha256": "0d0ae1dfda7207b1d4565f4ba5a9333376b4371647e9f29645398b6d91e4df9e",
+      "protocolClientSha256": "ea8ce61a6c4e026f90fcaf57fb5e56bd684ccc75b3c0d12f8988ac367a07ce2e",
       "purpose": "Independent Node crypto delivery vectors; canonical fixture clue points do not claim FMD detectability."
     }
   },

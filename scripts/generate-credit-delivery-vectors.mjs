@@ -73,7 +73,7 @@ const { encryptPrivateTransferNote } = await import(pathToFileURL(fundsSource).h
 const fundsEnvelope = await encryptPrivateTransferNote(
     vectors.owner.viewingPublicKey,
     {
-        walletIdentity: BigInt(vectors.note.walletIdentity),
+        ownerAddress: BigInt(vectors.note.ownerAddress),
         amount: BigInt(vectors.note.amount),
         nonce: BigInt(vectors.note.nonce),
     },
@@ -114,7 +114,7 @@ for (const vector of vectors.memoVectors ?? []) {
     const envelope = await encryptPrivateTransferNote(
         vectors.owner.viewingPublicKey,
         {
-            walletIdentity: BigInt(vectors.note.walletIdentity),
+            ownerAddress: BigInt(vectors.note.ownerAddress),
             amount: BigInt(vectors.note.amount),
             nonce: BigInt(vectors.note.nonce),
             memo: Buffer.from(vector.memo.slice(2), "hex"),

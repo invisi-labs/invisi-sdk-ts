@@ -19,9 +19,7 @@ it("returns only gasUnits before proving, including on another deployment", asyn
 
 it("keeps complete real receipt evidence internally", () => {
     const profiles = defineGasBenchmarks(referenceProfiles);
-    expect(profiles).toHaveLength(4);
-    expect(profiles[3]!.measurements).toHaveLength(5);
-    expect(profiles[3]!.measurements.every((m) => m.samples.length === 3)).toBe(true);
+    expect(profiles).toHaveLength(3);
     expect(profiles[2]!.measurements).toHaveLength(5);
     expect(profiles[2]!.measurements.every((m) => m.samples.length === 3)).toBe(true);
     expect(profiles[0]!.measurements).toHaveLength(13);
