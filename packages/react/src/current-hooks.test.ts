@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useOperation } from "./index";
-import type { Operation } from "@invisi-labs/sdk";
+import type { Operation } from "@invisi-labs/session";
 it("tracks the same staged operation and retains its handle after a later stage fails", async () => {
     const prepared = { id: "one", status: "prepared" } as Operation,
         authorized = { id: "one", status: "authorized" } as Operation,

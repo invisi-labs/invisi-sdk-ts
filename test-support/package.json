@@ -1,0 +1,13 @@
+{
+  "name": "@invisi-tests/fixtures",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/protocol": "workspace:*",
+    "@invisi-labs/sdk": "workspace:*",
+    "@invisi-labs/session": "workspace:*",
+    "ethers": "^6.17.0",
+    "vitest": "^1.6.0"
+  }
+}

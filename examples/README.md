@@ -1,6 +1,6 @@
 # Invisi SDK examples
 
-Flat, independently readable TypeScript examples using the public SDK and ethers. Comments, logs and documentation are English. Business examples use external signing requests; only category 05 uses a WalletSession and persistent Store.
+Flat, independently readable TypeScript examples using the public SDK and ethers. Comments, logs and documentation are English. Business examples use external signing requests; only category 05 imports `@invisi-labs/session` for WalletSession and a persistent Store. Stateless examples import `@invisi-labs/sdk` without session or storage dependencies.
 
 ## Setup
 

@@ -29,7 +29,11 @@ import type {
     CanonicalBlock,
     CanonicalReceipt,
 } from "@invisi-labs/protocol";
-import type { FundingSigner, FundingTypedData, FundingAuthorizationVerifier } from "../session";
+import type {
+    FundingSigner,
+    FundingTypedData,
+    FundingAuthorizationVerifier,
+} from "../transactions/operation-types";
 
 const erc1271Abi = [
     "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",

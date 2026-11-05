@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "../..",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "baseUrl": "../..",
+    "paths": {
+      "@invisi-labs/sdk": [
+        "packages/sdk/src/index.ts"
+      ],
+      "@invisi-labs/sdk/session-support": [
+        "packages/sdk/src/session-support.ts"
+      ],
+      "@invisi-labs/sdk/ethers": [
+        "packages/sdk/src/integrations/ethers.ts"
+      ],
+      "@invisi-labs/session": [
+        "packages/session/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src"
+  ]
+}

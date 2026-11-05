@@ -14,7 +14,8 @@
     }
   },
   "dependencies": {
-    "@invisi-labs/sdk": "workspace:*"
+    "@invisi-labs/sdk": "workspace:*",
+    "@invisi-labs/session": "workspace:*"
   },
   "peerDependencies": {
     "vue": ">=3.4.0"

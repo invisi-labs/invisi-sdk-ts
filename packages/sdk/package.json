@@ -1,7 +1,7 @@
 {
   "name": "@invisi-labs/sdk",
   "version": "1.1.6",
-  "description": "Invisi client wallet sessions, operations and infrastructure integration",
+  "description": "Stateless Invisi transaction preparation, signing requests and protocol integration",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -17,20 +17,10 @@
       "import": "./dist/ethers.js",
       "require": "./dist/ethers.cjs"
     },
-    "./sqlite": {
-      "types": "./dist/sqlite.d.ts",
-      "import": "./dist/sqlite.js",
-      "require": "./dist/sqlite.cjs"
-    },
-    "./indexeddb": {
-      "types": "./dist/indexeddb.d.ts",
-      "import": "./dist/indexeddb.js",
-      "require": "./dist/indexeddb.cjs"
-    },
-    "./memory": {
-      "types": "./dist/memory.d.ts",
-      "import": "./dist/memory.js",
-      "require": "./dist/memory.cjs"
+    "./session-support": {
+      "types": "./dist/session-support.d.ts",
+      "import": "./dist/session-support.js",
+      "require": "./dist/session-support.cjs"
     }
   },
   "scripts": {

@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { FIELD_MODULUS, computeNoteIdentity, fundsV1 } from "@invisi-labs/core";
 import { NoteOutput } from "./NoteOutput";
-import { fixture } from "./session/operation-fixture";
+import { fixture } from "../../../test-support/operation-fixture";
 import { Invisi } from "./Invisi";
 import { PublicWallet } from "@invisi-labs/core";
 
@@ -100,7 +100,7 @@ it("reuses the exact delivery and rejects context or copied-material changes", a
 
 it("preserves output commitments during Broadcaster fee reconstruction", async () => {
     const h = await fixture();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const output = await NoteOutput.create({
         recipient: { type: "invisi", address: h.bob.getAddress(), nonce: 42n },
         amount: 30n,
@@ -209,7 +209,7 @@ it("creates envelope-free EVM and opaque identity outputs without receiving-key 
             funding: { payer: h.wallet.ownerAddress, amount: 29n, authorization: "signature" },
         })
     ).rejects.toThrow(/funding must equal output total/);
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 20n });
     expect(quoted.preview().outputs[0]!.commitment).toBe(opaque.commitment);
 });

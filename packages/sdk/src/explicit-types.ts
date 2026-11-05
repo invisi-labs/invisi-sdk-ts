@@ -9,7 +9,7 @@ import type {
     ShieldPreparation,
     TopUpCreditPreparation,
     TransferPreparation,
-} from "./session/operation-types";
+} from "./transactions/operation-types";
 
 export interface NoteInput {
     note: Note;

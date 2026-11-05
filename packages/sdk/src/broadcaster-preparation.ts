@@ -8,9 +8,9 @@ import type {
     CreateCreditPreparation,
     TopUpCreditPreparation,
     CancelCreditPreparation,
-} from "./session/operation-types";
-import { TransactionPreparation } from "./session/transaction-preparation";
-import { exportBroadcasterIntent } from "./session/operation-protocol";
+} from "./transactions/operation-types";
+import { TransactionPreparation } from "./transactions/transaction-preparation";
+import { exportBroadcasterIntent } from "./transactions/operation-protocol";
 export type PreparationIntent =
     | { kind: "transfer"; options: TransferPreparation }
     | { kind: "shield"; options: ShieldPreparation }

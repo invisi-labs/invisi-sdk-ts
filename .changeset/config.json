@@ -9,6 +9,7 @@
       "@invisi-labs/react",
       "@invisi-labs/rpc",
       "@invisi-labs/sdk",
+      "@invisi-labs/session",
       "@invisi-labs/vue"
     ]
   ],

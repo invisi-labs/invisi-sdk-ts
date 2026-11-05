@@ -1,9 +1,9 @@
-import { testOutput } from "./test-output";
+import { testOutput } from "../../../test-support/test-output";
 import { expect, it } from "vitest";
 import { PublicWallet } from "@invisi-labs/core";
 import { Invisi } from "./Invisi";
 import { PreparedTransaction } from "./PreparedTransaction";
-import { fixture } from "./session/operation-fixture";
+import { fixture } from "../../../test-support/operation-fixture";
 
 it("exposes external requests instead of private signing entry points on independent handles", () => {
     expect("authorize" in PreparedTransaction.prototype).toBe(false);

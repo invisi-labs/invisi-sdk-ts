@@ -1,9 +1,10 @@
 # Invisi TypeScript SDK
 
-A capability SDK for browser wallets, merchant applications, proof services, aggregators and relayers. Independent objects compose through `Invisi`; applications explicitly choose permissions, infrastructure and runtime backends.
+A capability SDK for browser wallets, merchant applications, proof services, aggregators and relayers. Stateless objects compose through `Invisi`; managed wallets add `WalletSession` from `@invisi-labs/session`. applications explicitly choose permissions, infrastructure and runtime backends.
 
 ```ts
 import { Invisi, Wallet, NoteOutput, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
+import { WalletSession } from "@invisi-labs/session";
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 
 const provider = new JsonRpcProvider(chainRpcUrl);
@@ -11,8 +12,8 @@ const signer = new EthereumWallet(evmPrivateKey, provider);
 const wallet = await Wallet.fromPrivateKey(evmPrivateKey);
 const protocolRpc = new ProtocolRpcClient(protocolRpcUrl);
 const protocol = await Protocol.fromRpc(protocolRpc, provider);
-const invisi = new Invisi({ provider, protocolRpc, store, prover });
-const session = await invisi.connect({ wallet, protocol, signer });
+const invisi = new Invisi({ provider, protocolRpc, prover });
+const session = await WalletSession.connect({ invisi, wallet, protocol, store, signer });
 
 await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
 const prepared = await session.prepareTransfer({
@@ -34,7 +35,7 @@ const tracked = await session.resume(ready.id);
 await tracked.reconcile();
 ```
 
-Deployment records pin a trusted multi-token Protocol, its runtime hash and scan start block. `Invisi.connect({ wallet, protocol })` validates that deployment; each operation selects `tokenAddress`. ERC20 assets require no registration. Protocol and circuit pauses, address screening, and funding/spend authorization control settlement. Exact-receipt checks reject fee-on-transfer deposits; rebasing assets are not supported. Teams deploy independent Protocols and publish their deployment through their own Protocol RPC. `Protocol.fromRpc(rpc, provider)` loads and pins the service record asynchronously. `new Protocol({ deployment })` accepts an explicitly supplied record synchronously. Select a trusted service, or pass an independently published record as `ProtocolRpcClient({ deployment, ... })` to pin the expected deployment. Chain validation checks consistency, not whether a deployment is official. Deployment schemas and parsing belong to `@invisi-labs/rpc`; the SDK keeps no deployment catalog. The Protocol repository's `deployment/deployment.json` includes the reproducible Anvil deployment; Protocol RPC reads that catalog. See [local deployment and custom records](examples/README.md#local-deployment). Indexed history and wallet state are scoped to the deployment; balances and coin selection remain asset-specific. `protocol.forToken(tokenAddress)` supplies low-level builders, while `protocol.aggregate(...)` supports mixed-token requests.
+Deployment records pin a trusted multi-token Protocol, its runtime hash and scan start block. `WalletSession.connect({ invisi, wallet, protocol })` validates that deployment; each operation selects `tokenAddress`. ERC20 assets require no registration. Protocol and circuit pauses, address screening, and funding/spend authorization control settlement. Exact-receipt checks reject fee-on-transfer deposits; rebasing assets are not supported. Teams deploy independent Protocols and publish their deployment through their own Protocol RPC. `Protocol.fromRpc(rpc, provider)` loads and pins the service record asynchronously. `new Protocol({ deployment })` accepts an explicitly supplied record synchronously. Select a trusted service, or pass an independently published record as `ProtocolRpcClient({ deployment, ... })` to pin the expected deployment. Chain validation checks consistency, not whether a deployment is official. Deployment schemas and parsing belong to `@invisi-labs/rpc`; the SDK keeps no deployment catalog. The Protocol repository's `deployment/deployment.json` includes the reproducible Anvil deployment; Protocol RPC reads that catalog. See [local deployment and custom records](examples/README.md#local-deployment). Indexed history and wallet state are scoped to the deployment; balances and coin selection remain asset-specific. `protocol.forToken(tokenAddress)` supplies low-level builders, while `protocol.aggregate(...)` supports mixed-token requests.
 
 `Invisi` owns shared infrastructure: Chain RPC, Protocol RPC, store, prover and protocol authorization. `connect()` selects `wallet`, `protocol`, optional `namespace`, optional `viewing` or `authorization` overrides, and explicit session-only `signer` / `fundingSigner` capabilities. A complete wallet supplies these permissions automatically. Membership paths come from Protocol RPC; note nullifiers and public receiving keys are derived from the selected wallet. No separate `membership`, `nullifier`, `detector` or `receivingAddress` session options are needed. FMD delegation remains explicit on `refresh({ detectionKey })`.
 
@@ -42,7 +43,7 @@ This transfer spends private notes. Explicit public funding adds an EVM funding 
 
 ## Application-owned data without a Store
 
-`WalletSession` manages inventory, selection, reservations and operation recovery. Applications that own their database can instead call `Invisi.prepareTransfer`, `prepareShield`, `prepareCreateCredit`, `prepareDrawCredit`, `prepareTopUpCredit` and `prepareCancelCredit` directly. These methods never read or write a WalletStore and do not create a hidden memory store. The managed and explicit paths share preparation, statement, witness, authorization, proof-verification and calldata logic.
+`@invisi-labs/session` provides `WalletSession`, which manages inventory, selection, reservations and operation recovery. It depends on the stateless `@invisi-labs/sdk`; the SDK never imports the session package. Store adapters are explicit imports from `@invisi-labs/session/memory`, `/indexeddb`, or `/sqlite`, with `EncryptedWalletCodec` available from the session root. Store, viewing, signing and selection capabilities belong to the session configuration. `new WalletSession({ invisi, wallet, protocol, store })` creates a handle without network access; asynchronous operations validate the deployment before using wallet state. `await WalletSession.connect(...)` performs that validation before returning the handle. Both use the same session implementation. `Invisi` takes shared infrastructure only. Applications that own their database can instead call `Invisi.prepareTransfer`, `prepareShield`, `prepareCreateCredit`, `prepareDrawCredit`, `prepareTopUpCredit` and `prepareCancelCredit` directly. These methods never read or write a WalletStore and do not create a hidden memory store. The managed and explicit paths share preparation, statement, witness, authorization, proof-verification and calldata logic.
 
 ```ts
 const invisi = new Invisi({ provider, protocolRpc, prover });
@@ -109,14 +110,15 @@ Applications own input reservations, concurrency across processes, persistence, 
 | `@invisi-labs/core` | Wallet keys and permissions, encryption/decryption, clue creation, commitments and nullifiers. `/address` parses addresses without a proving backend. |
 | `@invisi-labs/protocol` | Deployment records, protocol statements/calldata, witness builders, registry operations and generated ABIs. |
 | `@invisi-labs/prover` | Local witness execution, proving and proof verification through explicit `/native`, `/wasm` and `/aggregate` entries. |
-| `@invisi-labs/sdk` | Wallet sessions, private inventory, reservations, operation workflows and infrastructure composition. Encrypted storage uses explicit `/memory`, `/sqlite` and `/indexeddb` entries. |
+| `@invisi-labs/sdk` | Stateless transaction preparation, signing requests, proofs, calldata, output creation and infrastructure composition. |
+| `@invisi-labs/session` | Managed wallet inventory, reservations, synchronization, history and operation recovery. Storage adapters use explicit `/memory`, `/sqlite` and `/indexeddb` entries. |
 | `@invisi-labs/react`, `@invisi-labs/vue` | Thin operation lifecycle and cancellation wrappers. |
 
 The SDK uses two RPC endpoints. Chain RPC supplies canonical blocks, receipts, contract reads and transaction submission. Protocol RPC indexes public history and returns candidate transaction references and membership paths. Construct `ProtocolRpcClient` explicitly and pass it to `Invisi`; membership access is injected automatically. `session.refresh({ fromBlock })` obtains candidates, independently fetches receipts through Chain RPC, decrypts locally and requests paths only for owned notes. The server cannot decrypt notes or create wallet proofs. The SDK has no local history-scanning fallback or public tree implementation.
 
 Applications choose explicit `fromBlock` and optional `toBlock` ranges and own history pagination. Refresh also accepts `signal`, `pageSize` (1–10000 blocks per request, defaulting to the public `MAX_UPDATE_BLOCKS = 10000` constant exported by `@invisi-labs/rpc` and `@invisi-labs/sdk`) and `reset`, and returns a `RefreshResult` with the final block, added note/Credit counts and balances. Optional `detectionKey: wallet.getDetector().exportKey()` explicitly delegates detection to the detection method only; it does not delegate viewing or authorization. Candidate filtering and authenticated decryption cannot establish complete history. Credit recovery needs parent and lifecycle transactions, including draws whose new envelopes cannot be decrypted. `protocolRpc.getStatus(protocol.context)` reports `indexedHead`, `detectionEnabled` and `checkedBits`; the reported head is not a completeness proof.
 
-WalletSession prepares shield, private transfers, full/partial withdrawals, Credit creation, spender draws, unexpired owner top-ups and owner cancellation. AddressRegistry has its own registration nonce and standard owner EIP-712 or ERC-1271 authorization; direct owner calls use an empty signature. Registration is ready after signing and requires no prover. Aggregator accepts4/8/12 current slots14 recursive public members and needs no private wallet material. Combined ordinary slots select14/56/112/168; Credit draws select1/12/50/120.
+WalletSession from `@invisi-labs/session` prepares shield, private transfers, full/partial withdrawals, Credit creation, spender draws, unexpired owner top-ups and owner cancellation. AddressRegistry has its own registration nonce and standard owner EIP-712 or ERC-1271 authorization; direct owner calls use an empty signature. Registration is ready after signing and requires no prover. Aggregator accepts4/8/12 current slots14 recursive public members and needs no private wallet material. Combined ordinary slots select14/56/112/168; Credit draws select1/12/50/120.
 
 Note delivery and discovery use canonical chain events. Credit role envelopes contain both complete receiving-key snapshots, so later draw/top-up delivery does not require a business service or a fresh registry lookup. Public ERC20 settlement on Credit draw/cancel remains bound to the note's payout addresses. Business invoices, quotes, orders and negotiations belong to applications.
 
@@ -181,7 +183,7 @@ Applications that sign raw EVM transactions can persist the association before b
 
 ### WalletSession convenience sending
 
-A directly constructed `WalletSession` can delegate to an ethers signer explicitly configured in `WalletSessionOptions`. Sessions created through `Invisi.connect()` have no default signer and should export calls for the application to send with ethers. The signer is an EVM gas/funding capability, separate from the Invisi wallet identity and private spending authority.
+A `WalletSession` can delegate to an ethers signer explicitly configured in `WalletSessionOptions`, whether constructed directly or through `WalletSession.connect()`. Without a session signer, export calls for the application to send with ethers. The signer is an EVM gas/funding capability, separate from the Invisi wallet identity and private spending authority.
 
 ```ts
 // Plain call: delegate to ethers without associating a managed operation.

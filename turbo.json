@@ -27,5 +27,8 @@
     "clean": {
       "cache": false
     }
-  }
+  },
+  "globalDependencies": [
+    "test-support/**/*.ts"
+  ]
 }

@@ -5,32 +5,32 @@ import {
     acceptWalletSignature,
     fundingSigningRequest,
     acceptFundingSignature,
-} from "./session/operation-execution";
+} from "./transactions/operation-execution";
 import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { Prover, ProofBundle } from "@invisi-labs/prover";
 import type {
     OperationPlan,
-    OperationRuntime,
+    TransactionRuntime,
     OperationAggregateMember,
     SavedOperation,
     TransactionProveOptions,
-} from "./session/operation-types";
-import type { OperationStatus } from "./session/state";
+} from "./transactions/operation-types";
+import type { OperationStatus } from "./transactions/records";
 import {
     encodeOperation,
     exportBroadcasterIntent,
     publicProof,
     requiresAuthorization,
     statement,
-} from "./session/operation-protocol";
-import { sameStatement } from "./session/proof-integrity";
-import { operationPreview } from "./session/operation-preview";
+} from "./transactions/operation-protocol";
+import { sameStatement } from "./transactions/proof-integrity";
+import { operationPreview } from "./transactions/operation-preview";
 function check(ok: unknown, message: string): asserts ok {
     if (!ok) throw new Error(message);
 }
 
-type Runtime = Omit<OperationRuntime, "store" | "authorization"> & {
+type Runtime = TransactionRuntime & {
     reprepare?: (
         intent: import("./broadcaster-preparation").PreparationIntent
     ) => Promise<OperationPlan>;

@@ -1,10 +1,10 @@
-import { testOutput } from "./test-output";
+import { testOutput } from "../../../test-support/test-output";
 import { fundsV1 } from "@invisi-labs/core";
 import { PublicWallet } from "@invisi-labs/core";
 import { describe, expect, it, vi } from "vitest";
 import { Invisi } from "./Invisi";
 import { PreparedTransaction } from "./PreparedTransaction";
-import { fixture } from "./session/operation-fixture";
+import { fixture } from "../../../test-support/operation-fixture";
 
 describe("explicit transactions without a wallet store", () => {
     it("uses supplied notes without reading or reserving application state", async () => {
@@ -20,7 +20,10 @@ describe("explicit transactions without a wallet store", () => {
                 throw new Error("Store must not be accessed");
             }),
         };
-        const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership, store });
+        expect(
+            () => new Invisi({ chainReader: h.reader, protocolRpc: h.membership, store } as never)
+        ).toThrow(/WalletSession.*store/);
+        const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
         const prepared = await invisi.prepareTransfer({
             wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
@@ -1011,7 +1014,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
 
 it("adds a Shield broadcaster fee to public funding without shrinking its business outputs", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const original = await h.invisi.prepareShield({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
@@ -1056,7 +1059,7 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
 
 it("rejects excessive or unstable broadcaster fees before signing and preserves the original plan", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const prepared = await h.invisi.prepareTransfer({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
@@ -1086,7 +1089,7 @@ it("rejects excessive or unstable broadcaster fees before signing and preserves 
 
 it("requests an app-owned permit once after the gross funding amount stabilizes", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const permit = {
         deadline: 2000003600n,
         v: 27,
@@ -1121,7 +1124,7 @@ it("requests an app-owned permit once after the gross funding amount stabilizes"
 
 it("re-quotes from the original public funding intent without accumulating fees", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const original = await h.invisi.prepareShield({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
@@ -1142,7 +1145,7 @@ it("re-quotes from the original public funding intent without accumulating fees"
 
 it("broadcasts a zero-input funded transfer while preserving its business payment and change", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const original = await h.invisi.prepareTransfer({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
@@ -1170,7 +1173,7 @@ it("broadcasts a zero-input funded transfer while preserving its business paymen
 
 it("uses existing private change before increasing mixed public funding", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     const prepared = await h.invisi.prepareTransfer({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
@@ -1192,7 +1195,7 @@ it("uses existing private change before increasing mixed public funding", async 
 
 it("refreshes caller-only zero nonce and deadline when attaching a broadcaster", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     h.reader.getFundingNonce = async () => 7n;
     const prepared = await h.invisi.prepareShield({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
@@ -1215,7 +1218,7 @@ it("refreshes caller-only zero nonce and deadline when attaching a broadcaster",
 
 it("stops fee iteration when rebuilt intent pays at least its recalculated fee", async () => {
     const h = await setup();
-    const { quoteClient } = await import("./broadcaster-fixture");
+    const { quoteClient } = await import("../../../test-support/broadcaster-fixture");
     let calls = 0;
     const client = quoteClient(h.context, () => [10n, 20n, 10n][calls++] ?? 10n);
     const prepared = await h.invisi.prepareTransfer({

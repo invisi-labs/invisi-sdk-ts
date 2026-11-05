@@ -14,7 +14,7 @@ import { AbiCoder, getAddress, hexlify, keccak256 } from "ethers";
 import type { Delivery, Hex } from "@invisi-labs/protocol/contracts";
 import { InvisiError } from "./errors";
 import { resolveRecipient } from "./resolve-recipient";
-import type { PreparedOutput } from "./session/operation-types";
+import type { PreparedOutput } from "./transactions/operation-types";
 
 export interface NoteOutputContext {
     chainId: bigint;

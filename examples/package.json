@@ -46,7 +46,8 @@
     "@invisi-labs/prover": "workspace:*",
     "@invisi-labs/sdk": "workspace:*",
     "ethers": "6.17.0",
-    "viem": "2.57.13"
+    "viem": "2.57.13",
+    "@invisi-labs/session": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

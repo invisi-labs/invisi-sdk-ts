@@ -1,5 +1,9 @@
 # @invisi-labs/sdk
 
+## Unreleased
+
+- Separate managed wallet sessions and storage into `@invisi-labs/session`; retain stateless preparation in `@invisi-labs/sdk`.
+
 ## 1.1.6
 
 ### Patch Changes

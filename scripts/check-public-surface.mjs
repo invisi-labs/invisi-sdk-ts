@@ -53,7 +53,8 @@ const examples = JSON.parse(readFileSync("examples/package.json", "utf8"));
 assert(!examples.scripts.test, "examples must use build/typecheck and explicit smoke runs");
 assert(!examples.devDependencies?.vitest, "test runtime belongs to SDK packages");
 const core = await import(resolve("packages/core/dist/index.js")),
-    sdk = await import(resolve("packages/sdk/dist/index.js"));
+    sdk = await import(resolve("packages/sdk/dist/index.js")),
+    session = await import(resolve("packages/session/dist/index.js"));
 for (const name of [
     "deriveWallet",
     "deriveWalletFromMnemonic",
@@ -75,14 +76,7 @@ for (const name of [
     "WalletDiscovery",
 ])
     assert(!(name in sdk), `obsolete public API: ${name}`);
-for (const name of [
-    "Wallet",
-    "Invisi",
-    "WalletSession",
-    "Protocol",
-    "AddressRegistry",
-    "InvisiError",
-])
+for (const name of ["Wallet", "Invisi", "Protocol", "AddressRegistry", "InvisiError"])
     assert.equal(typeof sdk[name], "function", `missing public object: ${name}`);
 assert.equal(
     typeof sdk.Invisi.prototype.prepareRegistration,
@@ -138,10 +132,10 @@ for (const name of ["buildApproveCalldata", "buildPermitTypedData", "permitTypes
     assert(!(name in protocol), `generic Ethereum helper must remain in ethers: ${name}`);
 
 for (const name of ["sync", "resync", "startSync", "stopSync", "applyUpdates"]) {
-    assert(!(name in sdk.WalletSession.prototype), `wallet session must not scan: ${name}`);
+    assert(!(name in session.WalletSession.prototype), `wallet session must not scan: ${name}`);
 }
 assert.equal(
-    typeof sdk.WalletSession.prototype.refresh,
+    typeof session.WalletSession.prototype.refresh,
     "function",
     "missing indexed refresh entry"
 );
@@ -179,7 +173,7 @@ for (const name of ["PreparedTransaction", "Operation"]) {
         "withFundingSignature",
     ]) {
         assert.equal(
-            typeof sdk[name].prototype[method],
+            typeof (name === "Operation" ? session[name] : sdk[name]).prototype[method],
             "function",
             `missing external signing API: ${name}.${method}`
         );
@@ -200,7 +194,7 @@ for (const method of ["getViewer", "getDetector", "exportAuthorization"]) {
     assert(!(method in sdk.PublicWallet.prototype));
 }
 
-for (const entry of [sdk.Invisi, sdk.WalletSession]) {
+for (const entry of [sdk.Invisi, session.WalletSession]) {
     assert(!("prepareSweep" in entry.prototype));
     assert(!("prepareWithdraw" in entry.prototype));
 }
@@ -223,3 +217,5 @@ assert.equal(
 console.log(
     "Current public surface PASS: capability objects, no obsolete package or compatibility aliases"
 );
+
+await import("./check-session-boundary.mjs");

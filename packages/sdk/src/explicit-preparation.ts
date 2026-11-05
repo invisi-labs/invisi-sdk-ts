@@ -1,13 +1,16 @@
 import { getAddress } from "ethers";
 import type { CreditInput, NoteInput } from "./explicit-types";
 import { PreparedTransaction } from "./PreparedTransaction";
-import { positiveAmount } from "./session/prepare-common";
-import { TransactionPreparation } from "./session/transaction-preparation";
-import type { PreparationInventory, WalletSessionOptions } from "./session/operation-types";
+import { positiveAmount } from "./transactions/prepare-common";
+import { TransactionPreparation } from "./transactions/transaction-preparation";
+import type {
+    PreparationInventory,
+    TransactionInfrastructure,
+} from "./transactions/operation-types";
 
 /** Only explicitly supplied records participate. No store or automatic coin selection. */
 export function explicitPreparation(
-    options: WalletSessionOptions,
+    options: TransactionInfrastructure,
     data: {
         inputs?: readonly NoteInput[];
         creditInputs?: readonly CreditInput[];
@@ -56,15 +59,7 @@ export function explicitPreparation(
         namespace: "explicit",
         ownerAddress: options.wallet.ownerAddress,
     };
-    const {
-        store: _store,
-        coinSelector: _selector,
-        authorization: _authorization,
-        viewing: _viewing,
-        signer: _signer,
-        fundingSigner: _fundingSigner,
-        ...capabilities
-    } = options;
+    const capabilities = options;
 
     if (inputs.some((input) => input.note.tokenAddress !== BigInt(getAddress(tokenAddress))))
         throw new Error("explicit note token mismatch");

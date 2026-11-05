@@ -1,7 +1,7 @@
 import type { Hex } from "@invisi-labs/core";
 import type { TokenProtocol } from "@invisi-labs/protocol";
-import type { OperationPlan } from "./session/operation-types";
-import { operationSources } from "./session/operation-protocol";
+import type { OperationPlan } from "./transactions/operation-types";
+import { operationSources } from "./transactions/operation-protocol";
 import referenceProfiles from "./data/gas-benchmarks.json";
 
 export interface GasBenchmarkShape {

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { Operation, RegistrationOperation } from "@invisi-labs/sdk";
-type Handle = Operation | RegistrationOperation;
+import type { PreparedTransaction, RegistrationOperation } from "@invisi-labs/sdk";
+import type { Operation } from "@invisi-labs/session";
+type Handle = PreparedTransaction | Operation | RegistrationOperation;
 /** Run explicit SDK stages. Cancel aborts work; it never revokes an external transaction. */
 export function useOperation() {
     const [operation, setOperation] = useState<Handle | null>(null),

@@ -1,6 +1,7 @@
 import { shallowRef, shallowReadonly, getCurrentScope, onScopeDispose } from "vue";
-import type { Operation, RegistrationOperation } from "@invisi-labs/sdk";
-type Handle = Operation | RegistrationOperation;
+import type { PreparedTransaction, RegistrationOperation } from "@invisi-labs/sdk";
+import type { Operation } from "@invisi-labs/session";
+type Handle = PreparedTransaction | Operation | RegistrationOperation;
 /** Opaque SDK objects stay unproxied; cancel does not revoke transactions or release input locks. */
 export function useOperation() {
     const operation = shallowRef<Handle | null>(null),

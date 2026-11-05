@@ -1,5 +1,4 @@
-import { configureRecipientInfrastructure } from "./recipient-infrastructure";
-import type { WalletSessionInfrastructure } from "./session/operation-types";
+import type { TransactionInfrastructure } from "./transactions/operation-types";
 import { prepareWithErrors } from "./errors";
 import { copyGasBenchmarks } from "./gas-estimation";
 import { explicitPreparation } from "./explicit-preparation";
@@ -14,43 +13,23 @@ import type {
     ExplicitCancelCreditPreparation,
 } from "./explicit-types";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
-import type { Provider } from "ethers";
-import { EthersChainReader, EthersFundingVerifier } from "./integrations/ethers";
 import { MissingCapabilityError, PublicWallet } from "@invisi-labs/core";
 import { AddressRegistry } from "./AddressRegistry";
 import type { RegistrationPreparation, RegistrationOperation } from "@invisi-labs/protocol";
-import { Protocol, type ChainReader } from "@invisi-labs/protocol";
-import { WalletSession, type WalletSessionOptions } from "./session";
+import {
+    configureTransactionInfrastructure,
+    validateTransactionInfrastructure,
+} from "./infrastructure";
 
 /** Compose independent Chain RPC and indexed Protocol RPC with local wallet capabilities. */
-type InvisiInfrastructure = Omit<
-    WalletSessionInfrastructure,
-    | "wallet"
-    | "protocol"
-    | "namespace"
-    | "viewing"
-    | "authorization"
-    | "chainReader"
-    | "signer"
-    | "fundingSigner"
-> & {
-    provider?: Provider;
-    chainReader?: ChainReader;
-};
-
-export type InvisiOptions = InvisiInfrastructure;
+export type InvisiOptions = Omit<TransactionInfrastructure, "wallet" | "protocol" | "coinSelector">;
+type InvisiInfrastructure = InvisiOptions;
 
 /** Public wallet and registry-specific inputs; signing remains external. */
 export type RegistrationPreparationOptions = Pick<RegistrationPreparation, "update" | "deadline"> &
     Pick<TransactionIdentity, "wallet">;
 
-/** Owner address and session permissions; shared infrastructure belongs to InvisiOptions. */
-export type ConnectionOptions = Pick<
-    WalletSessionOptions,
-    "wallet" | "protocol" | "namespace" | "viewing" | "authorization" | "signer" | "fundingSigner"
->;
-
-/** A neutral composition entry point; every resolved instance owns an independent session. */
+/** Stateless transaction preparation and independent infrastructure composition. */
 export class Invisi {
     readonly #options: InvisiInfrastructure;
 
@@ -69,6 +48,18 @@ export class Invisi {
                 "Invisi does not accept signer defaults; export a signing request and attach the external signature"
             );
         }
+        for (const key of [
+            "store",
+            "viewing",
+            "authorization",
+            "namespace",
+            "coinSelector",
+            "wallet",
+            "protocol",
+        ]) {
+            if (key in options)
+                throw new TypeError(`Wallet state and permissions belong to WalletSession: ${key}`);
+        }
         this.#options = {
             ...options,
             ...(options.gasBenchmarks
@@ -78,50 +69,23 @@ export class Invisi {
         Object.freeze(this);
     }
 
-    async connect(options: ConnectionOptions): Promise<WalletSession> {
-        return new WalletSession(await this.resolve(options));
+    /** A detached snapshot of shared infrastructure; wallet permissions and persistence stay external. */
+    getInfrastructure(): Readonly<InvisiOptions> {
+        return Object.freeze({
+            ...this.#options,
+            ...(this.#options.gasBenchmarks
+                ? { gasBenchmarks: copyGasBenchmarks(this.#options.gasBenchmarks) }
+                : {}),
+        });
     }
-    private async resolve(options: ConnectionOptions): Promise<WalletSessionOptions> {
-        // Snapshot session permissions before the first network request.
-        const allowed = [
-            "wallet",
-            "protocol",
-            "namespace",
-            "viewing",
-            "authorization",
-            "signer",
-            "fundingSigner",
-        ];
-        for (const key of Object.keys(options)) {
-            if (!allowed.includes(key))
-                throw new Error(
-                    `Unknown connection option: ${key}; configure infrastructure on Invisi`
-                );
-        }
-        const selected = { ...options };
-        const combined = { ...this.#options, ...selected };
-        const { provider, ...runtime } = combined;
-        const reader =
-            combined.chainReader ?? (provider ? new EthersChainReader(provider) : undefined);
-        if (!reader) throw new MissingCapabilityError("chain reader");
-        if (provider && (await provider.getNetwork()).chainId !== selected.protocol.context.chainId)
-            throw new Error("provider deployment chain mismatch");
-        await selected.protocol.validateDeployment(reader);
-        if (runtime.protocolRpc instanceof ProtocolRpcClient) {
-            runtime.protocolRpc = runtime.protocolRpc.withReader(reader);
-        }
-        const fundingVerifier =
-            combined.fundingVerifier ??
-            (provider
-                ? new EthersFundingVerifier(provider, selected.protocol.context.chainId)
-                : undefined);
-        return configureRecipientInfrastructure({
-            ...runtime,
-            ...(provider ? { provider } : {}),
-            chainReader: reader,
-            ...(fundingVerifier ? { fundingVerifier } : {}),
-            protocol: selected.protocol,
-        } as WalletSessionOptions);
+
+    private async resolve(options: TransactionIdentity): Promise<TransactionInfrastructure> {
+        const runtime = configureTransactionInfrastructure({
+            ...this.getInfrastructure(),
+            ...options,
+        });
+        await validateTransactionInfrastructure(runtime);
+        return runtime;
     }
 
     /** Discover the selected chain's registry and prepare an independent signing request. */
@@ -170,7 +134,7 @@ export class Invisi {
         }
     }
 
-    private resolveExplicit(options: TransactionIdentity): Promise<WalletSessionOptions> {
+    private resolveExplicit(options: TransactionIdentity): Promise<TransactionInfrastructure> {
         this.assertPublicIdentity(options);
         return this.resolve({ wallet: options.wallet, protocol: options.protocol });
     }

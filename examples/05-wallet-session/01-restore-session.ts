@@ -1,10 +1,12 @@
+import { WalletSession } from "@invisi-labs/session";
 import { settings } from "../settings.js";
 import { hkdfSync } from "node:crypto";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { JsonRpcProvider, Wallet as EthereumWallet, getBytes } from "ethers";
-import { EncryptedWalletCodec, Invisi, Protocol, ProtocolRpcClient, Wallet } from "@invisi-labs/sdk";
-import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/sdk/sqlite";
+import { Invisi, Protocol, ProtocolRpcClient, Wallet } from "@invisi-labs/sdk";
+import { EncryptedWalletCodec } from "@invisi-labs/session";
+import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/session/sqlite";
 import { getAccounts } from "../accounts.js";
 
 // Exit before reading accounts, opening the database, or connecting to the network unless --execute is provided.
@@ -46,9 +48,10 @@ try {
     const invisi = new Invisi({
         provider,
         protocolRpc,
-        store,
     });
-    const session = await invisi.connect({
+    const session = await WalletSession.connect({
+        invisi,
+        store,
         wallet,
         protocol,
         namespace: "alice-local-experiments",

@@ -3,7 +3,7 @@ export type { NoteOutputContext, NoteOutputOptions, NoteOutputRecipient } from "
 export { InvisiError } from "./errors";
 export type { InvisiErrorCode, InvisiErrorDetails } from "./errors";
 export { Invisi } from "./Invisi";
-export type { InvisiOptions, ConnectionOptions, RegistrationPreparationOptions } from "./Invisi";
+export type { InvisiOptions, RegistrationPreparationOptions } from "./Invisi";
 export {
     fundsV1,
     creditV1,
@@ -60,40 +60,29 @@ export type {
     RegistryContext,
     TransactionContext,
 } from "@invisi-labs/protocol";
-export { WalletSession, Operation, walletBalance, DisclosureVerifier } from "./session";
+export { DisclosureVerifier } from "./transactions/DisclosureVerifier";
 export type {
-    WalletHistory,
-    HistoryOptions,
-    OutgoingHistoryEntry,
-    IncomingHistoryEntry,
-    RefreshOptions,
-    RefreshResult,
-    WalletStore,
-    WalletScope,
-    WalletState,
-    BalanceSnapshot,
-    WalletSessionOptions,
-    TransferPreparation,
-    TransactionExecution,
-    TransactionProveOptions,
-    ShieldPreparation,
-    CreateCreditPreparation,
-    DrawCreditPreparation,
-    TopUpCreditPreparation,
-    CancelCreditPreparation,
-    FundingSigner,
-    FundingAuthorizationVerifier,
-    FundingTypedData,
-    FundingSource,
-    CoinSelector,
-    OperationStatus,
-    OperationAggregateMember,
     DisclosureReference,
     DisclosureReader,
     DisclosureVerifierOptions,
     DisclosureEvidence,
     VerifiedDisclosure,
-} from "./session";
+} from "./transactions/DisclosureVerifier";
+export type {
+    FundingAuthorizationVerifier,
+    FundingSigner,
+    FundingTypedData,
+    FundingSource,
+    TransactionExecution,
+    TransactionProveOptions,
+    OperationAggregateMember,
+    TransferPreparation,
+    ShieldPreparation,
+    CreateCreditPreparation,
+    DrawCreditPreparation,
+    TopUpCreditPreparation,
+    CancelCreditPreparation,
+} from "./transactions/operation-types";
 export type {
     Prover,
     ProverOptions,
@@ -120,8 +109,6 @@ export type {
     ProtocolRpcChain,
 } from "@invisi-labs/rpc";
 
-export { EncryptedWalletCodec } from "./integrations/encrypted-codec";
-
 export { PreparedTransaction } from "./PreparedTransaction";
 export type {
     NoteInput,
@@ -134,8 +121,6 @@ export type {
     ExplicitTopUpCreditPreparation,
     ExplicitCancelCreditPreparation,
 } from "./explicit-types";
-
-export type { SessionTransactionOptions } from "./session/WalletSession";
 
 export type {
     GasBenchmarkProfile,
@@ -151,9 +136,9 @@ export { defineGasBenchmarks } from "./gas-estimation";
 export type { SigningRequest } from "@invisi-labs/core";
 
 // Stateless recovery for applications that supply canonical receipts without a wallet store.
-export { readProtocolLogs } from "./session/receipt-logs";
-export { decryptCandidates } from "./session/discovery";
-export type { DeliveryEventLog, DiscoveredNote, DiscoveredCredit } from "./session/discovery";
+export { readProtocolLogs } from "./transactions/receipt-logs";
+export { decryptCandidates } from "./transactions/discovery";
+export type { DeliveryEventLog, DiscoveredNote, DiscoveredCredit } from "./transactions/discovery";
 
 export type {
     ProtocolOutput,

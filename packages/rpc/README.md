@@ -6,7 +6,7 @@ Typed client for Invisi Protocol RPC.
 const rpc = new ProtocolRpcClient("http://localhost:8080/v1");
 ```
 
-`Invisi.connect()` supplies its Chain RPC reader automatically. Standalone data queries that verify blocks or roots require `rpc.withReader(reader)`. Deployment discovery does not require a reader. The options constructor remains available for authenticated gateways, custom fetch and timeouts.
+SDK preparation and `WalletSession` infrastructure composition supply the Chain RPC reader automatically. Standalone data queries that verify blocks or roots require `rpc.withReader(reader)`. Deployment discovery does not require a reader. The options constructor remains available for authenticated gateways, custom fetch and timeouts.
 
  It retrieves indexed candidate transaction references and historical membership paths. It does not scan Chain RPC logs, build public trees, decrypt notes, store wallet state, sign transactions or generate proofs.
 
@@ -65,7 +65,7 @@ Detection is explicit: pass a detection key as `range.detectionKey` and a bearer
 
 A versioned service URL (`/v1`) is routed to `/v1/chains/<chainId>` by `getDeployment(chainId)` or `Protocol.fromRpc(rpc, provider)`. An explicitly discovered chain URL is also supported. Once deployment pins exist, all indexed queries keep using that chain; the configured service URL is unchanged. Deployment discovery uses `invisi_getDeployment` with no parameters. An application trusts the selected service to identify its pool; returned address/hash pairs alone cannot establish official provenance. `Protocol.validateDeployment()` checks chain ID, deployed runtime and (with the ethers reader) onchain VERSION. Registry use independently validates its runtime. Optional constructor `deployment` pins an independently trusted profile and allows indexed queries without discovery.
 
-`await Protocol.fromRpc(rpc, provider, { signal })` loads the deployment and validates its chain ID, runtime bytecode and available onchain version before returning. `Invisi.connect()` also validates the deployment when opening a session. Failed lookup rejects without another service or local fallback.
+`await Protocol.fromRpc(rpc, provider, { signal })` loads the deployment and validates its chain ID, runtime bytecode and available onchain version before returning. `WalletSession.connect()` also validates the deployment when opening a session. Failed lookup rejects without another service or local fallback.
 
 ## Single-transaction updates
 

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { useOperation } from "./index";
-import type { Operation } from "@invisi-labs/sdk";
+import type { Operation } from "@invisi-labs/session";
 it("preserves opaque class handles without proxying private fields and retains the prior stage on failure", async () => {
     class OpaqueHandle {
         #id = "one";

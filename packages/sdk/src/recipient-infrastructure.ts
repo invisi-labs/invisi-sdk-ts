@@ -5,7 +5,7 @@ import {
 } from "@invisi-labs/core";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { EthersAddressResolver } from "./integrations/ethers";
-import type { WalletSessionInfrastructure } from "./session/operation-types";
+import type { TransactionInfrastructure } from "./transactions/operation-types";
 
 export type AddressLookup = "chain" | "protocol-rpc";
 const recipientInfrastructure = Symbol("SDK recipient infrastructure");
@@ -14,7 +14,7 @@ type InternalInfrastructure = {
 };
 
 /** Capture deployment pins before a Protocol is bound to an operation's token. */
-export function configureRecipientInfrastructure<T extends WalletSessionInfrastructure>(
+export function configureRecipientInfrastructure<T extends TransactionInfrastructure>(
     options: T
 ): T {
     const { provider, protocolRpc, chainReader } = options;

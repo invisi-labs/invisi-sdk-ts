@@ -48,6 +48,12 @@ assert(
     !Object.keys(result.metafile.inputs).some((path) => path.includes("/dest/node/")),
     "native backend entered browser graph"
 );
+assert(
+    !Object.keys(result.metafile.inputs).some((path) =>
+        /packages\/session\/|WalletSession|WalletStore/.test(path)
+    ),
+    "stateless browser entry acquired managed wallet state"
+);
 const prover = await build({
     entryPoints: ["packages/prover/src/index.ts"],
     bundle: true,
@@ -68,8 +74,8 @@ console.log(
 );
 const storage = await build({
     entryPoints: [
-        "packages/sdk/src/integrations/index.ts",
-        "packages/sdk/src/integrations/indexeddb.ts",
+        "packages/session/src/index.ts",
+        "packages/session/src/integrations/indexeddb.ts",
     ],
     bundle: true,
     platform: "browser",
