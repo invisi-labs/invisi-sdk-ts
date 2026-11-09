@@ -196,13 +196,13 @@ it.skipIf(!enabled)(
         const bytes = getBytes(bad.proofBundle.proof);
         bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1;
         bad.proofBundle.proof = hexlify(bytes);
-        await expect(coordinator.prepare("bad-local", intent, bad, "ts-bad-local")).rejects.toThrow(
-            "Native proof"
-        );
+        await expect(
+            coordinator.prepareDirect("bad-local", intent, bad, "ts-bad-local")
+        ).rejects.toThrow("Native proof");
         expect(await store.load("bad-local")).toBeUndefined();
         const id = "ts-recovery-live",
             base = "ts-recovery-" + Date.now();
-        await coordinator.prepare(id, intent, r.sidecar, base);
+        await coordinator.prepareDirect(id, intent, r.sidecar, base);
         expect((await store.load(id))!.state).toBe("broadcast_possible");
         expect(new TextDecoder().decode([...raw.values()][0]!.data)).not.toContain(r.calldata);
         if (r.invalidJobId) {
@@ -233,6 +233,33 @@ it.skipIf(!enabled)(
         expect(result.proofValid).toBe(true);
         expect(result.sourceState).toBe("recognized");
         expect(result.checkpointSequence).toBeTruthy();
+        const trackedService = {
+            trust: client.trust,
+            evaluateTransaction: client.evaluateTransaction.bind(client),
+            getTracking: client.getTracking.bind(client),
+            getOperationRecognition: client.getOperationRecognition.bind(client),
+            submitProof: async () => {
+                throw Error("Tracked recovery must not submit proof");
+            },
+            getProofJob: async () => {
+                throw Error("Tracked recovery must not fetch a proof job");
+            },
+        };
+        const automatic = new RecoveryCoordinator(store, trackedService, host);
+        const trackedPermit = await automatic.prepare(
+            "ts-tracked-live",
+            intent,
+            r.sidecar,
+            "ts-tracked-" + Date.now()
+        );
+        expect(trackedPermit.record.trackingId).toBe(r.trackingId);
+        expect((await store.load("ts-tracked-live"))!.trackingId).toBe(r.trackingId);
+        const trackedResult = await automatic.run("ts-tracked-live", {
+            pollMilliseconds: 100,
+            maxPolls: 300,
+        });
+        expect(trackedResult.state).toBe("recognized");
+        expect(trackedResult.intent).toEqual(intent);
         writeFileSync(
             join(dirname(path), "sdk-recovery-ts-validation.json"),
             JSON.stringify(
@@ -244,6 +271,8 @@ it.skipIf(!enabled)(
                     realNativeVerification: true,
                     nativeVerifications,
                     encryptedRestart: true,
+                    trackedRecovery: true,
+                    trackingId: trackedResult.trackingId,
                     badLocalProofRejected: true,
                     reasonCode: result.reasonCode,
                     invalidJobImported: Boolean(r.invalidJobId),

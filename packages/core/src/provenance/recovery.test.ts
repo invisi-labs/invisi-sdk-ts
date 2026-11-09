@@ -20,6 +20,7 @@ it("encrypts detached recovery state, authenticates purpose/revision/key and fen
     const store = await EncryptedRecoveryStore.fromBytes(records, new Uint8Array(32).fill(7));
     const value = {
         format: "invisi-provenance-recovery-v1",
+        deliveryMode: "direct",
         revision: 1,
         id: "one",
         intent: fixtures.intent,
@@ -97,6 +98,12 @@ async function recoveryHarness() {
     const keys: string[] = [];
     const service: RecoveryService = {
         trust,
+        evaluateTransaction: async () => {
+            throw Error("Explicit direct fixture has no preflight");
+        },
+        getTracking: async () => {
+            throw Error("No direct tracking");
+        },
         submitProof: async (_locator, _bundle, key) => {
             submits++;
             keys.push(key);
@@ -177,7 +184,7 @@ async function recoveryHarness() {
 it("persists before broadcast and resumes uncertain submission across restart without equating job validity to recognition", async () => {
     const h = await recoveryHarness();
     const first = h.coordinator();
-    const permit = await first.prepare(
+    const permit = await first.prepareDirect(
         "send1",
         fixtures.intent,
         fixtures.sidecars[0]! as ProofSidecar,
@@ -208,13 +215,18 @@ it("fences CAS, cancellation, mismatched statements and old generation after tra
     await expect(
         h
             .coordinator()
-            .prepare("blocked", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable")
+            .prepareDirect(
+                "blocked",
+                fixtures.intent,
+                fixtures.sidecars[0]! as ProofSidecar,
+                "stable"
+            )
     ).rejects.toThrow("CAS");
     expect(await h.store.load("blocked")).toBeUndefined();
     const p = await recoveryHarness();
     await p
         .coordinator()
-        .prepare("send", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
+        .prepareDirect("send", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
     await p.coordinator().markBroadcast("send", p.fact.transactionHash!);
     const cancelled = new AbortController();
     cancelled.abort();
@@ -250,7 +262,7 @@ it("fences CAS, cancellation, mismatched statements and old generation after tra
     await expect(
         bad
             .coordinator()
-            .prepare(
+            .prepareDirect(
                 "bad",
                 { ...fixtures.intent, operationDigest: "5" },
                 fixtures.sidecars[0]! as ProofSidecar,
@@ -270,7 +282,12 @@ it("waits for confirmation after a crash immediately after handing out the durab
     const h = await recoveryHarness();
     await h
         .coordinator()
-        .prepare("possible", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
+        .prepareDirect(
+            "possible",
+            fixtures.intent,
+            fixtures.sidecars[0]! as ProofSidecar,
+            "stable"
+        );
     let calls = 0;
     h.host.reconcileFrozenTransaction = async () => {
         calls++;
@@ -292,7 +309,7 @@ it("retains proof-valid pending source across provider outage and can resume a c
     const h = await recoveryHarness();
     await h
         .coordinator()
-        .prepare("pending", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
+        .prepareDirect("pending", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
     h.recognitionOutage();
     await expect(h.coordinator().resume("pending")).rejects.toThrow("provider outage");
     const saved = await h.store.load("pending");
@@ -312,10 +329,10 @@ it("checks the service idempotency boundary before returning any broadcast permi
         fixtures.idempotencyLimits.maxBaseSubmissionKey
     );
     expect(recoverySubmissionKey("a".repeat(63), sidecar).length).toBe(128);
-    await h.coordinator().prepare("max", fixtures.intent, sidecar, "a".repeat(63));
+    await h.coordinator().prepareDirect("max", fixtures.intent, sidecar, "a".repeat(63));
     for (const base of ["a".repeat(64), "a".repeat(128), "é", " "]) {
         await expect(
-            h.coordinator().prepare("blocked" + base.length, fixtures.intent, sidecar, base)
+            h.coordinator().prepareDirect("blocked" + base.length, fixtures.intent, sidecar, base)
         ).rejects.toThrow();
         expect(await h.store.load("blocked" + base.length)).toBeUndefined();
     }
@@ -335,7 +352,9 @@ it("refuses opening-shaped extension fields before persistence", async () => {
         openings: ["raw private material"],
     } as FrozenProvenanceIntent;
     await expect(
-        h.coordinator().prepare("unsafe", unsafe, fixtures.sidecars[0]! as ProofSidecar, "stable")
+        h
+            .coordinator()
+            .prepareDirect("unsafe", unsafe, fixtures.sidecars[0]! as ProofSidecar, "stable")
     ).rejects.toThrow("Unknown recovery field");
     expect(await h.store.load("unsafe")).toBeUndefined();
 });
@@ -344,7 +363,7 @@ it("handles real proof-job wire states separately from source rejection", async 
     const h = await recoveryHarness();
     await h
         .coordinator()
-        .prepare("invalid", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
+        .prepareDirect("invalid", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
     h.service.getProofJob = async () => ({ status: "invalid", reasonCode: "PROOF_INVALID" });
     expect((await h.coordinator().resume("invalid")).state).toBe("proof_rejected");
     const replacement = structuredClone(fixtures.sidecars[0]!) as ProofSidecar;
@@ -361,7 +380,12 @@ it("handles real proof-job wire states separately from source rejection", async 
         const p = await recoveryHarness();
         await p
             .coordinator()
-            .prepare(status, fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
+            .prepareDirect(
+                status,
+                fixtures.intent,
+                fixtures.sidecars[0]! as ProofSidecar,
+                "stable"
+            );
         p.service.getProofJob = async () => ({
             status,
             reasonCode:
@@ -373,4 +397,128 @@ it("handles real proof-job wire states separately from source rejection", async 
         expect(result.proofValid).not.toBe(true);
         expect(p.submits).toBe(1);
     }
+});
+
+it("defaults to durable preflight tracking and never redundantly submits a matched transaction", async () => {
+    const h = await recoveryHarness();
+    let evaluations = 0,
+        queries = 0;
+    const id = "a".repeat(48),
+        tracking = {
+            id,
+            status: "recognized" as const,
+            operationDigest:
+                "0x" + BigInt(fixtures.intent.operationDigest).toString(16).padStart(64, "0"),
+            expiresAt: "1",
+            matched: h.fact.locator as {
+                txHash: string;
+                blockHash: string;
+                operationIndex: string;
+            },
+        };
+    h.service.evaluateTransaction = async (data, sidecars) => {
+        evaluations++;
+        expect(data).toBe(fixtures.intent.calldata);
+        expect(sidecars).toEqual([fixtures.sidecars[0]]);
+        sidecars[0]!.proofBundle.publicInputs[2] = "0x" + "0".repeat(63) + "3";
+        return {
+            scope: fixtures.scope,
+            broadcastDecision: "allow",
+            operationDigest: fixtures.intent.operationDigest,
+            tracking,
+        };
+    };
+    h.service.getTracking = async (value) => {
+        queries++;
+        expect(value).toBe(id);
+        return { scope: fixtures.scope, tracking };
+    };
+    h.recognized();
+    const permit = await h
+        .coordinator()
+        .prepare("tracked", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable");
+    expect(permit.record.trackingId).toBe(id);
+    expect((await h.store.load("tracked"))?.trackingId).toBe(id);
+    const result = await h.coordinator().run("tracked", { pollMilliseconds: 1, maxPolls: 2 });
+    expect(result.state).toBe("recognized");
+    expect(evaluations).toBe(1);
+    expect(queries).toBe(1);
+    expect(h.submits).toBe(0);
+});
+it("refuses a permit without preflight tracking and never silently downgrades", async () => {
+    const h = await recoveryHarness();
+    h.service.evaluateTransaction = async () => ({
+        scope: fixtures.scope,
+        broadcastDecision: "allow",
+        operationDigest: fixtures.intent.operationDigest,
+    });
+    await expect(
+        h
+            .coordinator()
+            .prepare("missing", fixtures.intent, fixtures.sidecars[0]! as ProofSidecar, "stable")
+    ).rejects.toThrow("tracking");
+    expect(await h.store.load("missing")).toBeUndefined();
+    expect(h.submits).toBe(0);
+});
+
+it("does not persist or return a permit for terminal preflight tracking despite an allow decision", async () => {
+    for (const status of ["expired", "superseded"]) {
+        const h = await recoveryHarness();
+        h.service.evaluateTransaction = async () => ({
+            scope: fixtures.scope,
+            broadcastDecision: "allow",
+            operationDigest: fixtures.intent.operationDigest,
+            tracking: {
+                id: "a".repeat(48),
+                status,
+                expiresAt: "1",
+                operationDigest:
+                    "0x" + BigInt(fixtures.intent.operationDigest).toString(16).padStart(64, "0"),
+            },
+        });
+        await expect(
+            h
+                .coordinator()
+                .prepare(
+                    "terminal",
+                    fixtures.intent,
+                    fixtures.sidecars[0]! as ProofSidecar,
+                    "stable"
+                )
+        ).rejects.toThrow("no longer permits broadcast");
+        expect(await h.store.load("terminal")).toBeUndefined();
+        expect(h.submits).toBe(0);
+    }
+});
+
+it("rejects reserved internal idempotency bases before a recovery permit", async () => {
+    const h = await recoveryHarness();
+    await expect(
+        h
+            .coordinator()
+            .prepareDirect(
+                "reserved",
+                fixtures.intent,
+                fixtures.sidecars[0]! as ProofSidecar,
+                "internal/test"
+            )
+    ).rejects.toThrow("reserved");
+    expect(await h.store.load("reserved")).toBeUndefined();
+});
+it("rejects reserved internal submit keys before HTTP", async () => {
+    const h = await recoveryHarness();
+    let calls = 0;
+    const { ProvenanceClient } = await import("./index");
+    const client = new ProvenanceClient("https://example.test", h.service.trust, (async () => {
+        calls++;
+        throw Error("unexpected HTTP");
+    }) as typeof fetch);
+    await expect(
+        client.submitProof(
+            {},
+            fixtures.sidecars[0]!.proofBundle as ProofSidecar["proofBundle"],
+            "internal/test"
+        )
+    ).rejects.toThrow("reserved");
+    expect(calls).toBe(0);
 });

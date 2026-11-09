@@ -8,6 +8,7 @@ import {
     exportSidecar,
     noteOpening,
     operationDigest,
+    preflightTracking,
 } from "@invisi-labs/sdk/provenance";
 import type { Opening, RootCertificate, TrustContext } from "@invisi-labs/sdk/provenance";
 import { LocalProvenanceProver } from "@invisi-labs/prover/provenance";
@@ -139,6 +140,9 @@ const sidecar = await exportSidecar(
     0
 );
 
+const evaluated = await source.evaluateTransaction(prepared.data, [sidecar]);
+const tracking = preflightTracking(evaluated, "0", digest);
+// The Broadcaster coalesces its own preflight with this same scoped operation task.
 const broadcaster = new BroadcasterClient({
     ...config.broadcaster,
     provenancePolicyId: config.policyId,
@@ -156,7 +160,14 @@ const quote = await broadcaster.quote(
 const broadcastId = process.env.BROADCAST_ID!;
 if (!/^[A-Za-z0-9_-]{1,63}$/.test(broadcastId ?? ""))
     throw Error("Set a stable BROADCAST_ID (1-63 characters)");
-const record = { data: prepared.data, sidecar, broadcastId, quote, operationDigest: digest };
+const record = {
+    data: prepared.data,
+    sidecar,
+    broadcastId,
+    quote,
+    operationDigest: digest,
+    trackingId: tracking.id,
+};
 // This record is public evidence only. Exclusive creation prevents overwriting an uncertain submission.
 const file = await open(process.env.PROVENANCE_RECORD!, "wx", 0o600);
 try {

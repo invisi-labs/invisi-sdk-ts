@@ -14,6 +14,8 @@ const record = JSON.parse(await readFile(process.env.PROVENANCE_RECORD!, "utf8")
     data: string;
     sidecar: ProofSidecar;
     broadcastId: string;
+    trackingId: string;
+    operationDigest: string;
 };
 const trust: TrustContext = {
     chainId: config.chainId,
@@ -45,25 +47,26 @@ try {
         throw Error("Canonical transaction mismatch");
     const source = new ProvenanceClient(config.endpoint, trust);
     const locator = { txHash: hash, blockHash: receipt.blockHash, operationIndex: "0" };
-    const submitted = await source.submitProof(
-        locator,
-        record.sidecar.proofBundle,
-        `${record.broadcastId}-source`
-    );
-    const job = await source.waitProofJob(String(submitted.jobId));
-    if (job.status !== "valid")
-        throw Error(`Source proof job: ${job.status}; retain the original transaction/record`);
-    // A valid proof job precedes publication. Do not mark the output recognized yet.
-    for (let attempt = 0; attempt < 60; attempt++) {
-        const operation = await source.getOperationRecognition(locator);
-        if (operation.recognitionState === "recognized") {
-            console.log("Source service confirms operation recognition:", operation);
-            break;
-        }
-        if (attempt === 59)
-            throw Error("Publication pending; rerun with the same transaction and record");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+    const tracked = await source.waitTracking(record.trackingId, {
+        timeoutMs: 120000,
+        intervalMs: 2000,
+    });
+    if (tracked.tracking.status !== "recognized")
+        throw Error(
+            `Tracking ${tracked.tracking.status}; retain the frozen transaction and record`
+        );
+    const matched = tracked.tracking.matched!;
+    if (
+        matched.txHash !== hash ||
+        matched.blockHash !== receipt.blockHash ||
+        matched.operationIndex !== "0" ||
+        BigInt(tracked.tracking.operationDigest) !== BigInt(record.operationDigest)
+    )
+        throw Error("Tracking matched another operation");
+    const operation = await source.getOperationRecognition(locator);
+    if (operation.recognitionState !== "recognized")
+        throw Error("Publication pending; retry the same tracking ID");
+    console.log("Source service confirms operation recognition:", operation);
     // A recipient separately authenticates the published certificate and local membership.
 } finally {
     provider.destroy();

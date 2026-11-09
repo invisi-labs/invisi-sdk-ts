@@ -26,10 +26,11 @@ interface LiveTrust {
     checkedAt: string;
     rootId: string;
     commitment: string;
-    jobId: string;
+    jobId?: string;
+    trackingId: string;
 }
 it.skipIf(!enabled)(
-    "LIVE owned service: pinned identity,signed roots,paged replay,membership,note and native-proof job",
+    "LIVE owned service: pinned identity,signed roots,paged replay,membership,note and automatic tracking",
     async () => {
         const file = process.env.INVISI_PROVENANCE_TRUST;
         if (!file) throw new Error("INVISI_PROVENANCE_TRUST is required for live opt-in");
@@ -133,16 +134,15 @@ it.skipIf(!enabled)(
         expect(note.recognitionState).toBe("recognized");
         expect((note.note as { noteCommitment: string }).noteCommitment).toBe(fixture.commitment);
         assertCertificateTrust(note.certificate as RootCertificate, trust);
-        const job = await client.getProofJob(fixture.jobId);
-        identity(job);
-        expect(job.jobId).toBe(fixture.jobId);
-        expect(job.status).toBe("valid");
-        const waited = await client.waitProofJob(fixture.jobId, {
+        const tracked = await client.getTracking(fixture.trackingId);
+        identity(tracked);
+        expect(tracked.tracking.status).toBe("recognized");
+        const waited = await client.waitTracking(fixture.trackingId, {
             timeoutMs: 3000,
             intervalMs: 10,
         });
         identity(waited);
-        expect(waited.status).toBe("valid");
+        expect(waited.tracking.status).toBe("recognized");
         const bad = (patch: Partial<TrustContext>) =>
             new ProvenanceClient(fixture.endpoint, { ...trust, ...patch });
         await expect(
@@ -156,11 +156,11 @@ it.skipIf(!enabled)(
                 fixture.rootId
             )
         ).rejects.toThrow("generation");
-        await expect(bad({ signingKeys: {} }).getProofJob(fixture.jobId)).rejects.toThrow(
+        await expect(bad({ signingKeys: {} }).getTracking(fixture.trackingId)).rejects.toThrow(
             "Untrusted signing key"
         );
         await expect(
-            bad({ manifestSha256: "0".repeat(64) }).getProofJob(fixture.jobId)
+            bad({ manifestSha256: "0".repeat(64) }).getTracking(fixture.trackingId)
         ).rejects.toThrow("Manifest mismatch");
     },
     120000

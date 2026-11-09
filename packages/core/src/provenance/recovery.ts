@@ -1,3 +1,9 @@
+import {
+    preflightTracking,
+    validateTracking,
+    TrackingStaleGenerationError,
+    type TrackingResult,
+} from "./tracking";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { keccak256 } from "ethers";
@@ -37,12 +43,16 @@ export type RecoveryState =
     | "broadcast"
     | "pending"
     | "needs_reproof"
+    | "tracking_expired"
+    | "tracking_superseded"
     | "proof_rejected"
     | "pending_source"
     | "source_rejected"
     | "recognized";
 export interface RecoveryRecord {
     format: "invisi-provenance-recovery-v1";
+    deliveryMode: "tracked" | "direct";
+    trackingId?: string;
     revision: number;
     id: string;
     intent: FrozenProvenanceIntent;
@@ -67,6 +77,8 @@ function onlyKeys(value: unknown, keys: string[]) {
 function publicShape(record: RecoveryRecord) {
     onlyKeys(record, [
         "format",
+        "deliveryMode",
+        "trackingId",
         "revision",
         "id",
         "intent",
@@ -150,6 +162,7 @@ function canonical(value: unknown): unknown {
     return value;
 }
 export function recoverySubmissionKey(base: string, sidecar: ProofSidecar): string {
+    if (base.startsWith("internal/")) throw Error("reserved idempotency key prefix");
     if (!/^[\x21-\x7e]{1,63}$/.test(base)) throw Error("Invalid recovery idempotency key");
     return (
         base +
@@ -279,6 +292,11 @@ export interface RecoveryHost {
 }
 export interface RecoveryService {
     trust: TrustContext;
+    evaluateTransaction(
+        data: unknown,
+        sidecars: ProofSidecar[]
+    ): Promise<import("./index").PublicResult>;
+    getTracking(id: string): Promise<TrackingResult>;
     submitProof(
         locator: Record<string, string>,
         bundle: ProofSidecar["proofBundle"],
@@ -306,6 +324,15 @@ export class RecoveryCoordinator {
             record.idempotencyKey.length > 63
         )
             throw Error("Invalid recovery record");
+        if (
+            !["tracked", "direct"].includes(record.deliveryMode) ||
+            (record.trackingId !== undefined && !/^[a-f0-9]{48}$/.test(record.trackingId)) ||
+            (record.revision > 0 &&
+                record.deliveryMode === "tracked" &&
+                !record.trackingId &&
+                record.state !== "needs_reproof")
+        )
+            throw Error("Recovery tracking mode/identity missing");
         recoverySubmissionKey(record.idempotencyKey, record.sidecar);
         publicShape(record);
         publicJSON(record);
@@ -372,10 +399,28 @@ export class RecoveryCoordinator {
         intent: FrozenProvenanceIntent,
         sidecar: ProofSidecar,
         idempotencyKey: string
+    ) {
+        return this.prepareMode(id, intent, sidecar, idempotencyKey, "tracked");
+    }
+    async prepareDirect(
+        id: string,
+        intent: FrozenProvenanceIntent,
+        sidecar: ProofSidecar,
+        idempotencyKey: string
+    ) {
+        return this.prepareMode(id, intent, sidecar, idempotencyKey, "direct");
+    }
+    private async prepareMode(
+        id: string,
+        intent: FrozenProvenanceIntent,
+        sidecar: ProofSidecar,
+        idempotencyKey: string,
+        deliveryMode: "tracked" | "direct"
     ): Promise<{ record: RecoveryRecord; broadcastPermit: true }> {
         const record: RecoveryRecord = {
             format: "invisi-provenance-recovery-v1",
-            revision: 1,
+            revision: 0,
+            deliveryMode,
             id,
             intent: clone(intent),
             sidecar: clone(sidecar),
@@ -386,6 +431,16 @@ export class RecoveryCoordinator {
         };
         await this.validate(record);
         if (await this.store.load(id)) throw Error("Recovery id already exists");
+        if (deliveryMode === "tracked") {
+            const evaluated = await this.service.evaluateTransaction(record.intent.calldata, [
+                clone(record.sidecar),
+            ]);
+            record.trackingId = preflightTracking(
+                evaluated,
+                record.intent.operationIndex,
+                record.intent.operationDigest
+            ).id;
+        }
         await this.save(record, 0);
         return { record: clone(record), broadcastPermit: true };
     }
@@ -411,7 +466,7 @@ export class RecoveryCoordinator {
         const record = await this.required(id),
             previous = record.revision;
         // Reconciliation precedes generation checks and every remote mutation.
-        const fact = await this.host.reconcileFrozenTransaction(clone(record));
+        const fact = clone(await this.host.reconcileFrozenTransaction(clone(record)));
         checkCancelled(options.signal);
         if (
             fact.calldataHash !== record.intent.calldataHash ||
@@ -430,6 +485,7 @@ export class RecoveryCoordinator {
             (options.reprove === true && record.state === "proof_rejected")
         ) {
             record.state = "needs_reproof";
+            delete record.trackingId;
             delete record.jobId;
             delete record.locator;
             delete record.proofValid;
@@ -451,34 +507,91 @@ export class RecoveryCoordinator {
                 checkCancelled(options.signal);
                 const next = {
                     ...record,
+                    revision: 0,
                     sidecar: clone(sidecar),
                     chainGeneration: fact.chainGeneration,
                 };
                 await this.validate(next);
+                if (record.deliveryMode === "tracked") {
+                    const evaluated = await this.service.evaluateTransaction(next.intent.calldata, [
+                        clone(next.sidecar),
+                    ]);
+                    record.trackingId = preflightTracking(
+                        evaluated,
+                        next.intent.operationIndex,
+                        next.intent.operationDigest
+                    ).id;
+                }
                 record.sidecar = next.sidecar;
                 record.chainGeneration = next.chainGeneration;
                 // A replacement bundle gets its own deterministic submission key without changing the frozen transaction.
                 record.state = "pending";
             } else return this.save(record, previous);
         }
+        if (fact.status === "confirmed") {
+            if (!fact.locator || !fact.transactionHash)
+                throw Error("Missing authenticated mined locator");
+            if (
+                word(fact.transactionHash) !== fact.transactionHash ||
+                Object.keys(fact.locator).some(
+                    (k) => !["blockHash", "txHash", "operationIndex"].includes(k)
+                ) ||
+                fact.locator.txHash !== fact.transactionHash ||
+                word(fact.locator.blockHash!) !== fact.locator.blockHash ||
+                BigInt(fact.locator.operationIndex!) !== BigInt(record.intent.operationIndex)
+            )
+                throw Error("Invalid authenticated locator");
+            record.transactionHash = fact.transactionHash;
+            record.locator = clone(fact.locator);
+        }
+        if (record.deliveryMode === "tracked") {
+            if (!record.trackingId) throw Error("Recovery tracking id required");
+            let result: TrackingResult;
+            try {
+                result = await this.service.getTracking(record.trackingId);
+            } catch (error) {
+                if (error instanceof TrackingStaleGenerationError) {
+                    record.state = "needs_reproof";
+                    return this.save(record, previous);
+                }
+                throw error;
+            }
+            const tracking = validateTracking(result.tracking, record.trackingId);
+            if (tracking.operationDigest !== word(record.intent.operationDigest))
+                throw Error("Tracking statement mismatch");
+            delete record.reasonCode;
+            if (tracking.reasonCode !== undefined) record.reasonCode = tracking.reasonCode;
+            if (tracking.status === "expired" || tracking.status === "superseded") {
+                record.state =
+                    tracking.status === "expired" ? "tracking_expired" : "tracking_superseded";
+                delete record.reasonCode;
+                if (tracking.reasonCode !== undefined) record.reasonCode = tracking.reasonCode;
+                return this.save(record, previous);
+            }
+            if (fact.status !== "confirmed" || tracking.status === "pending_confirmation") {
+                record.state = "pending";
+                return this.save(record, previous);
+            }
+            const matched = tracking.matched!;
+            if (
+                !fact.locator ||
+                matched.txHash !== fact.transactionHash ||
+                matched.blockHash !== fact.locator.blockHash ||
+                matched.operationIndex !== fact.locator.operationIndex
+            )
+                throw Error("Tracking matched another transaction");
+            if (tracking.status === "pending_source") {
+                record.state = "pending_source";
+                record.sourceState = "pending_source";
+                record.transactionHash = fact.transactionHash;
+                record.locator = clone(fact.locator);
+                return this.save(record, previous);
+            }
+        }
         if (fact.status !== "confirmed") return clone(record);
-        if (!fact.locator || !fact.transactionHash)
-            throw Error("Missing authenticated mined locator");
-        if (
-            word(fact.transactionHash) !== fact.transactionHash ||
-            Object.keys(fact.locator).some(
-                (k) => !["blockHash", "txHash", "operationIndex"].includes(k)
-            ) ||
-            fact.locator.txHash !== fact.transactionHash ||
-            word(fact.locator.blockHash!) !== fact.locator.blockHash ||
-            BigInt(fact.locator.operationIndex!) !== BigInt(record.intent.operationIndex)
-        )
-            throw Error("Invalid authenticated locator");
-        record.transactionHash = fact.transactionHash;
-        record.locator = clone(fact.locator);
         if (record.state === "recognized" || record.state === "proof_rejected")
             return clone(record);
-        if (!record.jobId) {
+        if (record.deliveryMode === "direct" && !record.jobId) {
             // Save the locator before submission; retries use the same idempotency key after uncertain responses.
             const saved = await this.save(record, previous);
             Object.assign(record, saved);
@@ -495,8 +608,8 @@ export class RecoveryCoordinator {
             await this.save(record, record.revision);
         }
         checkCancelled(options.signal);
-        if (!record.proofValid) {
-            const job = await this.service.getProofJob(record.jobId);
+        if (record.deliveryMode === "direct" && !record.proofValid) {
+            const job = await this.service.getProofJob(record.jobId!);
             if (
                 ![
                     "queued",
@@ -519,7 +632,7 @@ export class RecoveryCoordinator {
             else record.state = "pending";
             await this.save(record, record.revision);
         }
-        if (record.proofValid) {
+        if (record.proofValid || record.deliveryMode === "tracked") {
             const recognition = await this.service.getOperationRecognition(clone(record.locator!));
             if (typeof recognition.recognitionState !== "string")
                 throw Error("Missing operation recognition state");

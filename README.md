@@ -137,3 +137,7 @@ The public SDK has no account-private-key wallet constructor or local executor.
 Native algorithms execute in the host; private-key simulation lives only in unpublished
 test support. Decrypted Note/Credit data and witnesses may enter JavaScript, while
 spending, viewing and detection keys remain in the native wallet.
+
+## Optional Provenance tracking
+
+The independent [Provenance module](PROVENANCE.md) keeps source recognition separate from protocol spendability. Successful private-input preflight returns a durable tracking ID; default recovery persists it before broadcast permission and uses automatic chain matching, with bounded tracking waits and primary reconciliation. Normal confirmation does not require another `submitProof`. Explicit `prepareDirect` / `PrepareDirect` / `prepare_direct` and manual submission remain available for an intentionally selected self-broadcast/reproof fallback; missing tracking never silently switches modes. App integration, raw openings, signing and nonce reservations remain host-owned. See the flat [Provenance examples](examples/07-provenance/README.md).

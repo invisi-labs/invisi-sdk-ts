@@ -1,3 +1,4 @@
+import { validateTracking, type TrackingResult } from "./tracking";
 import { sha256 } from "@noble/hashes/sha256";
 import { ed25519 } from "@noble/curves/ed25519";
 import { AbiCoder, keccak256, getBytes, hexlify, concat } from "ethers";
@@ -600,6 +601,7 @@ export class ProvenanceClient {
                 "provenance_evaluateTransaction",
                 "provenance_submitProof",
                 "provenance_getProofJob",
+                "provenance_getTracking",
             ].includes(method) &&
             ["chainGeneration", "providerId", "signingKeyId", "manifestSha256"].some(
                 (k) => result[k] === undefined
@@ -796,6 +798,7 @@ export class ProvenanceClient {
         idempotencyKey: string
     ): Promise<PublicResult> {
         if (!idempotencyKey) throw new Error("Idempotency key required");
+        if (idempotencyKey.startsWith("internal/")) throw Error("reserved idempotency key prefix");
         assertPublicSubmission(proofBundle);
         await validateProofBundle(proofBundle, this.trust);
         return this.call("provenance_submitProof", {
@@ -804,6 +807,68 @@ export class ProvenanceClient {
             proofBundle: proofSidecarToWire({ operationIndex: "0", proofBundle }).proofBundle,
             idempotencyKey,
         });
+    }
+    async getTracking(trackingId: string, signal?: AbortSignal): Promise<TrackingResult> {
+        if (!/^[a-f0-9]{48}$/.test(trackingId)) throw Error("Invalid tracking id");
+        const result = await this.call(
+            "provenance_getTracking",
+            { policyId: word(this.trust.policyId), trackingId },
+            signal
+        );
+        const tracking = validateTracking(result.tracking, trackingId);
+        return { ...result, tracking };
+    }
+    async waitTracking(
+        trackingId: string,
+        options: { signal?: AbortSignal; intervalMs?: number; timeoutMs?: number } = {}
+    ): Promise<TrackingResult> {
+        const interval = options.intervalMs ?? 1000,
+            timeout = options.timeoutMs ?? 120000;
+        if (
+            !Number.isFinite(timeout) ||
+            timeout < 1 ||
+            !Number.isFinite(interval) ||
+            interval < 1 ||
+            interval > 60000
+        )
+            throw Error("Tracking polling limits");
+        const deadline = Date.now() + timeout;
+        for (;;) {
+            options.signal?.throwIfAborted();
+            const controller = new AbortController();
+            const abort = () => controller.abort(options.signal?.reason);
+            options.signal?.addEventListener("abort", abort, { once: true });
+            const requestTimer = setTimeout(
+                () => controller.abort(Error("Tracking wait timeout")),
+                Math.max(1, deadline - Date.now())
+            );
+            let result: TrackingResult;
+            try {
+                result = await this.getTracking(trackingId, controller.signal);
+            } finally {
+                clearTimeout(requestTimer);
+                options.signal?.removeEventListener("abort", abort);
+            }
+
+            if (["recognized", "expired", "superseded"].includes(result.tracking.status))
+                return result;
+            if (Date.now() >= deadline) throw Error("Tracking wait timeout");
+            await new Promise<void>((resolve, reject) => {
+                const timer = setTimeout(
+                    () => {
+                        options.signal?.removeEventListener("abort", abort);
+                        resolve();
+                    },
+                    Math.min(interval, deadline - Date.now())
+                );
+                const abort = () => {
+                    clearTimeout(timer);
+                    reject(Error("Tracking wait cancelled"));
+                };
+                options.signal?.addEventListener("abort", abort, { once: true });
+                if (options.signal?.aborted) abort();
+            });
+        }
     }
     getProofJob(jobId: string, signal?: AbortSignal): Promise<PublicResult> {
         return this.call("provenance_getProofJob", { jobId }, signal);
@@ -981,3 +1046,5 @@ export {
 export type { RotationRecord, KeyValidity, TrustedKeyring } from "./rotation";
 
 export * from "./recovery";
+
+export * from "./tracking";
