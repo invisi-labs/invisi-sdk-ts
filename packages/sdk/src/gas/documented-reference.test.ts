@@ -30,7 +30,8 @@ it.each(["matching", "missing", "different", "malformed"] as const)(
             catalog.references.find((row) => row.shape.kind === "create-credit")!
         );
         const identity: Record<string, unknown> = { ...row.releaseIdentity };
-        if (scenario !== "missing")
+        if (scenario === "missing") delete identity.creditManifestSha256;
+        else
             identity.creditManifestSha256 =
                 scenario === "matching"
                     ? CIRCUIT_RELEASE.credit.manifestSha256
