@@ -11,7 +11,7 @@
     "release": "turbo run build && changeset publish",
     "sync:abis": "node scripts/sync-protocol-abis.mjs",
     "sync:protocol": "node scripts/sync-protocol.mjs",
-    "examples": "pnpm --filter @invisi-examples/scenarios start",
+    "examples": "pnpm --filter @invisi-examples/scenarios example:note:output",
     "lint:english": "node scripts/check-english.mjs",
     "check:browser": "node scripts/check-browser-entrypoints.mjs",
     "check:surface": "node scripts/check-public-surface.mjs",

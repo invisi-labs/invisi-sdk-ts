@@ -29,8 +29,8 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
-      - name: Run the offline wallet example
-        run: pnpm examples wallet
+      - name: Run the offline Note output example
+        run: pnpm examples
 
       - name: Check public API and example boundaries
         run: pnpm check:surface

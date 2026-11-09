@@ -1,13 +1,13 @@
 # TypeScript examples
 
-Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline wallet example runs without `--execute`.
+Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline Note output example runs without `--execute`.
 
 ## Setup
 
 ```sh
 pnpm install
 pnpm build
-pnpm examples wallet
+pnpm examples
 mkdir -p examples/accounts
 cp examples/accounts.example.json examples/accounts/accounts.json
 ```
@@ -19,6 +19,30 @@ pnpm --filter @invisi-examples/scenarios example:hidden:3 --execute
 ```
 
 Without `--execute`, live scripts exit before reading account configuration, environment inputs, opening databases, or connecting to RPC. Running with it can read sensitive note openings and persist encrypted wallet state, but never submits a transaction.
+
+## Public Wallet initialization
+
+When the host already supplies a complete receiving address, initialize with `Wallet.fromAddress(receivingAddress)`. If only the EVM owner is available, request its public profile first. `nativeWallet` is the host bridge; it keeps account selection and keys outside the SDK.
+
+```ts
+import { Wallet, ReceivingAddress, prepareWalletRequest, acceptWalletResponse } from "@invisi-labs/core";
+import { getBytes } from "ethers";
+
+const owner = Wallet.fromAddress(ownerAddress);
+const request = prepareWalletRequest(owner, "public-profile", "wallet.public", {});
+const responses = await nativeWallet.execute([request]);
+const response = responses.find((item) => item.id === request.id);
+if (!response) throw new Error("Missing public-profile response");
+
+// Validate the response against the retained owner and request before using the keys.
+const profile = await acceptWalletResponse(request, response);
+const wallet = Wallet.fromAddress(ReceivingAddress.from({
+    ownerAddress: owner.ownerAddress,
+    viewingPublicKey: getBytes(profile.viewingPublicKey),
+    clueKey: getBytes(profile.clueKey),
+}));
+console.log(wallet.getAddress());
+```
 
 ## Host request and response boundaries
 
@@ -32,9 +56,8 @@ The final output is an unsigned transaction. Review its chain, target, value, ca
 
 ## Scenarios
 
-- `00-wallet`: offline validation of a public wallet profile and receiving address. The fixture contains public material only.
 - `01-address-registry`: initial registration and update, with external EVM authorization.
-- `02-transparent-amount`: shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, memo, and verified broadcaster quote.
+- `02-transparent-amount`: offline Note output construction, shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, memo, and verified broadcaster quote.
 - `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
 - `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted shield/transfer preparation, and operation reconciliation. There is no injected private executor or automatic signer.

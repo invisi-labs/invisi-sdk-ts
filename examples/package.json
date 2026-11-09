@@ -10,7 +10,6 @@
     "example:registry:1": "tsx 01-address-registry/01-register-bob.ts",
     "example:registry:2": "tsx 01-address-registry/02-update-bob.ts",
     "example:transparent:1b": "tsx 02-transparent-amount/01b-alice-to-bob-by-registered-address.ts",
-    "example:wallet:1": "tsx 00-wallet/01-wallet.ts",
     "example:transparent:1c": "tsx 02-transparent-amount/01c-alice-to-bob-by-explicit-lookup.ts",
     "example:hidden:1": "tsx 03-hidden-amount/01-cash-to-bob-with-change.ts",
     "example:hidden:2": "tsx 03-hidden-amount/02-notes-and-cash-to-three.ts",
@@ -34,9 +33,9 @@
     "example:session:4": "tsx 05-wallet-session/04-recover-operations.ts",
     "lint": "tsc --noEmit",
     "build": "tsc --noEmit",
-    "start": "tsx run.ts",
     "clean": "rm -rf dist",
-    "example:transparent:5": "tsx 02-transparent-amount/05-shield-via-broadcaster.ts"
+    "example:transparent:5": "tsx 02-transparent-amount/05-shield-via-broadcaster.ts",
+    "example:note:output": "tsx 02-transparent-amount/00-note-output.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",
