@@ -59,3 +59,7 @@ A generation change or reorg returns `needs_reproof` after host reconciliation. 
 Recovery state-machine tests use explicitly marked synthetic proof bytes and real signed root certificates; they validate recovery/encryption behavior and do not claim another native-prover or App integration test.
 
 TypeScript: `EncryptedRecoveryStore.fromKey(existingAtomicRecordStore, aesGcmKey)` (or `fromBytes`), then `new RecoveryCoordinator(store, provenanceClient, hostCapabilities)`. The existing session `AtomicRecordStore`, including host SQLite/IndexedDB adapters, satisfies the structural ciphertext interface. `prepare` returns `{record, broadcastPermit:true}` only after successful CAS.
+
+## Flat examples
+
+See [`examples/07-provenance`](examples/07-provenance/README.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.

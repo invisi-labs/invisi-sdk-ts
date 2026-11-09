@@ -1,6 +1,6 @@
 # TypeScript examples
 
-Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline Note output example runs without `--execute`.
+Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline Note output example runs without `--execute`. The Provenance walkthrough adds a separate explicit `--submit` option.
 
 ## Setup
 
@@ -18,7 +18,7 @@ Fill the copied file with public EVM addresses and complete public `0i` receivin
 pnpm --filter @invisi-examples/scenarios example:hidden:3 --execute
 ```
 
-Without `--execute`, live scripts exit before reading account configuration, environment inputs, opening databases, or connecting to RPC. Running with it can read sensitive note openings and persist encrypted wallet state, but never submits a transaction.
+Without `--execute`, live scripts exit before reading account configuration, environment inputs, opening databases, or connecting to RPC. Running with it can read sensitive note openings and persist encrypted wallet state, but existing Note/Credit scenarios never submit a transaction.
 
 ## Public Wallet initialization
 
@@ -52,7 +52,7 @@ Each wallet response repeats `version`, `id`, `ownerAddress`, and `method` and c
 
 Funding and address registration use separate EVM typed-data requests. Their printed arrays contain an application `id`, `kind`, and the SDK's EIP-712 request. Have the host review and sign that request, then paste `[{"id":"the-printed-id","signature":"0x..."}]`. These application envelopes are not additional native-wallet protocol methods. The SDK checks returned signatures against the retained intent. Caller-funded transactions instead require submission by their specified payer. Token balances, ERC20 allowance, gas, and submission remain host responsibilities; no script approves or broadcasts automatically.
 
-The final output is an unsigned transaction. Review its chain, target, value, calldata, and required caller before host submission. The broadcaster example obtains a verified fee quote and exports the resulting calldata; it does not call the broadcaster's submit endpoint.
+The final output is an unsigned transaction. Review its chain, target, value, calldata, and required caller before host submission. The broadcaster example obtains a verified fee quote and exports the resulting calldata; it does not call the broadcaster's submit endpoint. The separate `07-provenance` walkthrough demonstrates that endpoint with `--submit`.
 
 ## Scenarios
 
@@ -102,3 +102,7 @@ Submit and confirm each exported transaction through the host before running a d
 Each main visibly opens the encrypted store, refreshes with native arrays, selects role-bound Credit state, prepares the managed operation, and exports unsigned calldata. The store snapshot supplies current grant references; Session preparation independently rechecks chain state and reserves the consumed grant across both roles. No second ephemeral discovery scan is needed. Amounts are token base units; these examples use zero fees.
 
 The account controls the default database (`examples/accounts/<account>-session.sqlite`) and namespace (`<account>-local-experiments`). A `WALLET_DB` override is supported. Use the same account, namespace, database and host storage key for recovery. Set `HOST_TRANSACTIONS_JSON` to map saved operation IDs to the host-submitted transaction hashes, then run `example:session:4`. Exported operations remain reserved until canonical reconciliation: do not recreate a draw after a timeout or expect creating/updating a grant to credit your Note balance.
+
+## Provenance
+
+[`07-provenance`](07-provenance/README.md) shows local recognized-tree replay, real source proving, policy-bound Broadcaster quote/optional submission, and confirmed-transaction source-proof submission/publication waiting. These examples add an explicit `--submit` switch; the existing examples still only export unsigned transactions.

@@ -39,7 +39,9 @@
     "example:session:5": "tsx 05-wallet-session/05-create-credit.ts",
     "example:session:6": "tsx 05-wallet-session/06-draw-credit.ts",
     "example:session:7": "tsx 05-wallet-session/07-update-credit.ts",
-    "example:session:8": "tsx 05-wallet-session/08-revoke-credit.ts"
+    "example:session:8": "tsx 05-wallet-session/08-revoke-credit.ts",
+    "example:provenance:1": "tsx 07-provenance/01-prove-and-broadcast.ts",
+    "example:provenance:2": "tsx 07-provenance/02-confirm-source.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",
