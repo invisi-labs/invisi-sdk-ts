@@ -62,7 +62,7 @@ export async function transact(
                 BigInt(c.tokenAddress),
                 amount
             );
-            check(commitment === p.params.outputCommitments[i], "output commitment mismatch");
+            check(commitment === p.params.noteCommitments[i], "output commitment mismatch");
             return { identity, amount };
         })
     );

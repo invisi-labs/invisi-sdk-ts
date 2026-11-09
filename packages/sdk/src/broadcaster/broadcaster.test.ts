@@ -18,7 +18,7 @@ function calldata(proof = "0x1234", signature = "0x") {
                 token: "0x" + "33".repeat(20),
                 sources: [{ treeId: 0n, merkleRoot: ZeroHash }],
                 nullifiers: ["0x" + "44".repeat(32)],
-                outputCommitments: [],
+                noteCommitments: [],
                 withdrawalAddress: signer.address,
                 withdrawalAmount: 100n,
                 deadline: 9999999999n,

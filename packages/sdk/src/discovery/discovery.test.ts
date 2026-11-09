@@ -108,7 +108,7 @@ it("routes a Credit draw ordinary Note separately from its successor states", ()
                 outputTreeId: 1n,
                 params: {
                     token,
-                    stateCommitments: [vectors.credit.commitment],
+                    creditCommitments: [vectors.credit.commitment],
                     noteCommitment: vectors.note.commitment,
                 },
                 leafIndices: [0, 1],
@@ -183,7 +183,7 @@ it("decodes packed atomic batch output deliveries with their explicit tokens", (
                 startLeafIndex: 0,
                 firstOutputOffset: 0n,
                 tokens: [token],
-                commitments: [vectors.note.commitment],
+                noteCommitments: [vectors.note.commitment],
                 packedDeliveries: packed,
             },
         };

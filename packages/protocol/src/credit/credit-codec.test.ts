@@ -51,7 +51,7 @@ describe("deferred Credit independent protocol vectors", () => {
             expect(api.encodeCreditDrawTypedData(context, f.params, f.deliveries)).toEqual(
                 f.typedData
             );
-            expect(f.params.stateCommitments).toHaveLength(n);
+            expect(f.params.creditCommitments).toHaveLength(n);
             expect(f.deliveries).toHaveLength(2 * n + 1);
         }
     );
@@ -78,7 +78,7 @@ describe("deferred Credit independent protocol vectors", () => {
             { ...f.params, payers: [{ payer: f.params.payers[0].payer, amount: 0n }] },
             {
                 ...f.params,
-                stateCommitments: [f.params.noteCommitment, f.params.stateCommitments[1]],
+                creditCommitments: [f.params.noteCommitment, f.params.creditCommitments[1]],
             },
         ])
             expect(() => api.creditDrawPublicInputs(context, p, f.deliveries)).toThrow();

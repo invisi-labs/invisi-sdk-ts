@@ -97,7 +97,7 @@ it("draws deferred receipts into successor states and one ordinary Note", async 
         decoded = iface.parseTransaction(await ready.exportTransaction())!;
     expect(decoded.name).toBe("creditDraw");
     expect(decoded.args[1].payers).toHaveLength(1);
-    expect(decoded.args[1].stateCommitments).toHaveLength(1);
+    expect(decoded.args[1].creditCommitments).toHaveLength(1);
     expect(decoded.args[1].noteCommitment).toBe(ready.getOutputs()[0]!.commitment);
     expect(decoded.args[2]).toHaveLength(3);
 });

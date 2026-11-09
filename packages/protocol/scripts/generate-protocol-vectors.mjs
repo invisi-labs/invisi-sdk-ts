@@ -48,7 +48,7 @@ for (const count of [1, 15, 57, 113]) {
             token: context.tokenAddress,
             sources: [{ treeId: 1n, merkleRoot: w(1) }],
             nullifiers: [w(2)],
-            outputCommitments: Array.from({ length: count }, (_, i) => w(i + 3)),
+            noteCommitments: Array.from({ length: count }, (_, i) => w(i + 3)),
             withdrawalAddress: zeroFunding.payer,
             withdrawalAmount: 0n,
             feeRecipient: zeroFunding.payer,
@@ -114,7 +114,7 @@ for (const count of [1, 2, 6, 11, 21, 31, 41, 51, 61, 71, 80]) {
                 slot: BigInt(i),
             })),
             nullifiers: Array.from({ length: count }, (_, i) => w(i + 2)),
-            stateCommitments: Array.from({ length: count }, (_, i) => w(i + 1000)),
+            creditCommitments: Array.from({ length: count }, (_, i) => w(i + 1000)),
             recoveryAmounts: Array(count).fill(w(1)),
             noteCommitment: w(9000),
             totalAmount: BigInt(count) * 7n,
@@ -151,21 +151,21 @@ const iface = new Interface(
 const output = { identity: w(3), amount: 100n },
     shieldParams = {
         token: context.tokenAddress,
-        outputCommitments: [
+        noteCommitments: [
             await n.noteCommitment(context, { ownerAddress: 1n, amount: 100n, nonce: 1n }),
         ],
         deadline: 900n,
         feeRecipient: zeroFunding.payer,
         feeAmount: 0n,
     };
-shieldParams.outputCommitments = [
+shieldParams.noteCommitments = [
     w(await n.poseidon2([3n, context.chainId, 3n, BigInt(context.tokenAddress), 100n])),
 ];
 const shieldHash = keccak256(
     AbiCoder.defaultAbiCoder().encode(
         [
             "bytes32",
-            "tuple(address token,bytes32[] outputCommitments,uint256 deadline,address feeRecipient,uint256 feeAmount)",
+            "tuple(address token,bytes32[] noteCommitments,uint256 deadline,address feeRecipient,uint256 feeAmount)",
             "bytes32",
             "bytes32",
         ],

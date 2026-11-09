@@ -38,7 +38,7 @@ export function transactFundingRequestHash(
         token: p.token,
         merkleRoot: p.sources[0]?.merkleRoot ?? word(0n),
         nullifiers: p.nullifiers,
-        outputCommitments: p.outputCommitments,
+        noteCommitments: p.noteCommitments,
         inputTreeId: p.sources[0]?.treeId ?? 0n,
         withdrawalAddress: p.withdrawalAddress,
         withdrawalAmount: p.withdrawalAmount,

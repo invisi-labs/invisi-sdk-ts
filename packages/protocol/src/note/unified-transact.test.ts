@@ -15,7 +15,7 @@ it("encodes a single source in the canonical two-argument direct request", () =>
         token: "0x2222222222222222222222222222222222222222" as const,
         sources: [{ treeId: 1n, merkleRoot: word(1) }],
         nullifiers: [word(2)],
-        outputCommitments: [word(3)],
+        noteCommitments: [word(3)],
         withdrawalAddress: "0x0000000000000000000000000000000000000000" as const,
         withdrawalAmount: 0n,
         deadline: 100n,
@@ -37,7 +37,7 @@ it("encodes a single source in the canonical two-argument direct request", () =>
                 source.toObject()
             ),
             nullifiers: [...request.params.nullifiers],
-            outputCommitments: [...request.params.outputCommitments],
+            noteCommitments: [...request.params.noteCommitments],
         },
         deliveries: request.deliveries.map((delivery: import("ethers").Result) =>
             delivery.toObject()
@@ -51,7 +51,7 @@ it("encodes a single source in the canonical two-argument direct request", () =>
             token: "0x2222222222222222222222222222222222222222" as const,
             sources: [{ treeId: 1n, merkleRoot: word(1) }],
             nullifiers: params.nullifiers,
-            outputCommitments: params.outputCommitments,
+            noteCommitments: params.noteCommitments,
             withdrawalAddress: params.withdrawalAddress,
             withdrawalAmount: 0n,
             deadline: 100n,

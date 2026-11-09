@@ -21,7 +21,7 @@ it("builds funded witnesses from randomized output identities without note openi
             )
         )
     );
-    const build = (outputCommitments = commitments) =>
+    const build = (noteCommitments = commitments) =>
         new WitnessBuilder(new TokenProtocol(context)).transact({
             inputs: [],
             outputs,
@@ -30,7 +30,7 @@ it("builds funded witnesses from randomized output identities without note openi
                 token: context.tokenAddress,
                 sources: [],
                 nullifiers: [],
-                outputCommitments,
+                noteCommitments,
                 withdrawalAddress: "0x0000000000000000000000000000000000000000",
                 withdrawalAmount: 0n,
                 deadline: 100n,

@@ -36,7 +36,7 @@ function batch(packed: string, commitments: string[]): DeliveryEventLog {
             tokens: commitments.map(() => token),
             treeId: 1n,
             startLeafIndex: 0,
-            commitments,
+            noteCommitments: commitments,
             packedDeliveries: packed,
         },
     };

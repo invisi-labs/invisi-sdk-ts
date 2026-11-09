@@ -129,7 +129,7 @@ export function extractDeliveryCandidates(
         const a = object(log.args),
             tree = integer(a.treeId),
             start = index(a.startLeafIndex),
-            leaves = array(a.commitments);
+            leaves = array(log.eventName === "BatchOutputs" ? a.noteCommitments : a.commitments);
         check(tree > 0n && tree < 1n << 64n, "invalid insertion tree");
         check(start + leaves.length <= 65536, "insertion exceeds tree capacity");
         for (const [i, leaf] of leaves.entries()) {
@@ -205,7 +205,7 @@ export function extractDeliveryCandidates(
             check(start + ds.length <= 65536, "shield exceeds tree capacity");
             ds.forEach((d, i) => add(log, tree, start + i, undefined, "funds", d));
         } else if (log.eventName === "Transact" || log.eventName === "CrossTreeTransact") {
-            const cs = array(a.outputCommitments),
+            const cs = array(a.noteCommitments),
                 ds = array(a.deliveries),
                 leaves = array(a.leafIndices),
                 tree = integer(a.outputTreeId);
@@ -216,7 +216,7 @@ export function extractDeliveryCandidates(
             cs.forEach((c, i) => add(log, tree, index(leaves[i]), c, "funds", ds[i]));
         } else if (log.eventName === "BatchOutputs") {
             const tokens = array(a.tokens);
-            const cs = array(a.commitments),
+            const cs = array(a.noteCommitments),
                 tree = integer(a.treeId),
                 start = index(a.startLeafIndex),
                 packed = a.packedDeliveries;
@@ -247,7 +247,7 @@ export function extractDeliveryCandidates(
         else if (log.eventName === "CreditUpdated") creation(log, a, object(a.params));
         else if (log.eventName === "CreditDraw") {
             const p = object(a.params),
-                cs = array(p.stateCommitments),
+                cs = array(p.creditCommitments),
                 ds = array(a.deliveries),
                 leaves = array(a.leafIndices),
                 tree = integer(a.outputTreeId);

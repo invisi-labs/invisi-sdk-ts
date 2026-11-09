@@ -25,7 +25,7 @@ export function buildTransactCalldata(p: BuildTransactCalldataParams) {
             token: r.tokenAddress,
             sources: r.sources,
             nullifiers: r.nullifiers,
-            outputCommitments: r.outputCommitments,
+            noteCommitments: r.noteCommitments,
             withdrawalAddress: r.withdrawalAddress,
             withdrawalAmount: r.withdrawalAmount,
             deadline: r.deadline,

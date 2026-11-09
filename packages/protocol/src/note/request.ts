@@ -54,7 +54,7 @@ export function normalizeTransactRequest(
         "token",
         "sources",
         "nullifiers",
-        "outputCommitments",
+        "noteCommitments",
         "withdrawalAddress",
         "withdrawalAmount",
         "deadline",
@@ -62,7 +62,7 @@ export function normalizeTransactRequest(
         "feeAmount",
     ]);
     const ns = notes(p.nullifiers, "nullifiers"),
-        os = notes(p.outputCommitments, "outputCommitments"),
+        os = notes(p.noteCommitments, "noteCommitments"),
         capacity = selectTransactCapacity(ns.length, os.length);
     const sources = normalizeSources(p.sources, ns.length, capacity),
         deliveries = dense(cs, "deliveries").map((v) =>
@@ -89,7 +89,7 @@ export function normalizeTransactRequest(
         capacity,
         sources,
         nullifiers: ns,
-        outputCommitments: os,
+        noteCommitments: os,
         inputCount: ns.length,
         outputCount: os.length,
         sourceCount: sources.length,

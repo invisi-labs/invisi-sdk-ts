@@ -420,7 +420,7 @@ export class CreditPreparation<Result> {
                 payers,
                 grantRefs,
                 nullifiers: members.map((m) => m.nullifier),
-                stateCommitments: outputs.map((o) => o.commitment),
+                creditCommitments: outputs.map((o) => o.commitment),
                 recoveryAmounts,
                 noteCommitment: ordinary.commitment,
                 totalAmount,

@@ -25,7 +25,7 @@ it("uses payer/grant arrays and one ordinary Note commitment in draw tuples", ()
         "payers",
         "grantRefs",
         "nullifiers",
-        "stateCommitments",
+        "creditCommitments",
         "recoveryAmounts",
         "noteCommitment",
         "totalAmount",

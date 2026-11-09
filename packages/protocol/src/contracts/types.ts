@@ -30,7 +30,7 @@ export interface FundingParams {
 }
 export interface ShieldParams {
     token: Address;
-    outputCommitments: readonly Hex[];
+    noteCommitments: readonly Hex[];
     deadline: bigint;
     feeRecipient?: Address;
     feeAmount?: bigint;
@@ -47,7 +47,7 @@ export interface CrossTreeTransactParams {
     token: Address;
     sources: readonly InputSource[];
     nullifiers: readonly Hex[];
-    outputCommitments: readonly Hex[];
+    noteCommitments: readonly Hex[];
     withdrawalAddress: Address;
     withdrawalAmount: bigint;
     deadline: bigint;
@@ -84,7 +84,7 @@ export interface CreditDrawParams {
     payers: readonly CreditPayer[];
     grantRefs: readonly CreditGrantRef[];
     nullifiers: readonly Hex[];
-    stateCommitments: readonly Hex[];
+    creditCommitments: readonly Hex[];
     recoveryAmounts: readonly Hex[];
     noteCommitment: Hex;
     totalAmount: bigint;

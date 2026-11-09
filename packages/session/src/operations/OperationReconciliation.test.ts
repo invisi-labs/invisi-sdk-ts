@@ -174,7 +174,7 @@ it("late confirmation updates a previously discovered change note to its current
                 inputTreeId: 1n,
                 outputTreeId: 1n,
                 nullifiers: plan.params!.nullifiers,
-                outputCommitments: [output.commitment],
+                noteCommitments: [output.commitment],
                 leafIndices: [1],
                 deliveries: [output.delivery],
                 withdrawalAddress: signer.address,

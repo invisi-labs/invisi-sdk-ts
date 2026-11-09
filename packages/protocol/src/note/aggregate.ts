@@ -25,7 +25,7 @@ export interface BuildTransactAggregateCalldataParams {
 export function buildTransactAggregateCalldata(p: BuildTransactAggregateCalldataParams) {
     const route = selectAggregateRoute(
         dense<TransactRequest>(p.requests, "requests").map((r) =>
-            selectTransactCapacity(r.params.nullifiers.length, r.params.outputCommitments.length)
+            selectTransactCapacity(r.params.nullifiers.length, r.params.noteCommitments.length)
         )
     );
     const requests = p.requests.map((request) => {
@@ -77,7 +77,7 @@ export type AggregateMemberInput = Pick<TransactRequest, "params" | "deliveries"
 export function aggregateMemberRequestHash(c: TransactionContext, r: AggregateMemberInput) {
     const capacity = selectTransactCapacity(
         r.params.nullifiers.length,
-        r.params.outputCommitments.length
+        r.params.noteCommitments.length
     );
     if (capacity > 10) throw Error("aggregate supports C1..C10");
     return keccak256(
@@ -99,7 +99,7 @@ export function aggregatePublicInputs(
 ) {
     selectAggregateRoute(
         dense<AggregateMemberInput>(requests, "requests").map((r) =>
-            selectTransactCapacity(r.params.nullifiers.length, r.params.outputCommitments.length)
+            selectTransactCapacity(r.params.nullifiers.length, r.params.noteCommitments.length)
         )
     );
     return requests.flatMap((r) => {
@@ -110,7 +110,7 @@ export function aggregatePublicInputs(
                 BigInt(
                     selectTransactCapacity(
                         r.params.nullifiers.length,
-                        r.params.outputCommitments.length
+                        r.params.noteCommitments.length
                     )
                 )
             ),

@@ -154,13 +154,13 @@ export abstract class InventoryProcessor {
                 const args = event.args!;
                 const params = args.params as {
                     nullifiers: readonly Hex[];
-                    stateCommitments: readonly Hex[];
+                    creditCommitments: readonly Hex[];
                     recoveryAmounts: readonly Hex[];
                 };
                 const indices = args.leafIndices as readonly number[];
                 check(
                     Array.isArray(params.nullifiers) &&
-                        params.nullifiers.length === params.stateCommitments.length &&
+                        params.nullifiers.length === params.creditCommitments.length &&
                         params.nullifiers.length === params.recoveryAmounts.length &&
                         params.nullifiers.length + 1 === indices.length,
                     "invalid draw recovery slots"
@@ -170,16 +170,16 @@ export abstract class InventoryProcessor {
                         const successor = await recoverCreditState(context, previous.state.note, {
                             timestamp: block.timestamp,
                             creditNullifier: nullifier,
-                            stateCommitment: params.stateCommitments[index]!,
+                            stateCommitment: params.creditCommitments[index]!,
                             recoveryAmount: BigInt(params.recoveryAmounts[index]!),
                         });
                         // Financial recovery alone cannot establish uncommitted child metadata.
                         const child = foundByKey.get(
-                            params.stateCommitments[index]! + ":" + previous.role
+                            params.creditCommitments[index]! + ":" + previous.role
                         );
                         const payload = child?.state.note.payload;
                         const record: StoredCredit = {
-                            commitment: params.stateCommitments[index]!,
+                            commitment: params.creditCommitments[index]!,
                             treeId: BigInt(args.outputTreeId as bigint),
                             leafIndex: Number(indices[index]),
                             blockNumber: event.blockNumber!,

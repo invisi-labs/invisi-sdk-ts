@@ -474,7 +474,7 @@ it.each([
                             payers: [{ payer: ownerHex(p.ownerWalletIdentity), amount: 30n }],
                             grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
                             nullifiers: [p.nullifier],
-                            stateCommitments: [p.draw.stateCommitment],
+                            creditCommitments: [p.draw.stateCommitment],
                             recoveryAmounts: [p.draw.recoveryAmount],
                             noteCommitment: ordinary,
                             totalAmount: 30n,

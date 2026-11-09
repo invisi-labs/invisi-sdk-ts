@@ -357,7 +357,7 @@ export const invisiProtocolAbi = [
             "internalType": "bytes32[]"
           },
           {
-            "name": "stateCommitments",
+            "name": "creditCommitments",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
           },
@@ -590,10 +590,10 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "function",
-    "name": "isCommitmentPaid",
+    "name": "isCommitmentRegistered",
     "inputs": [
       {
-        "name": "noteCommitment",
+        "name": "commitment",
         "type": "bytes32",
         "internalType": "bytes32"
       }
@@ -837,7 +837,7 @@ export const invisiProtocolAbi = [
             "internalType": "address"
           },
           {
-            "name": "outputCommitments",
+            "name": "noteCommitments",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
           },
@@ -1002,7 +1002,7 @@ export const invisiProtocolAbi = [
                 "internalType": "bytes32[]"
               },
               {
-                "name": "outputCommitments",
+                "name": "noteCommitments",
                 "type": "bytes32[]",
                 "internalType": "bytes32[]"
               },
@@ -1162,7 +1162,7 @@ export const invisiProtocolAbi = [
                 "internalType": "bytes32[]"
               },
               {
-                "name": "outputCommitments",
+                "name": "noteCommitments",
                 "type": "bytes32[]",
                 "internalType": "bytes32[]"
               },
@@ -1467,7 +1467,7 @@ export const invisiProtocolAbi = [
         "internalType": "address[]"
       },
       {
-        "name": "commitments",
+        "name": "noteCommitments",
         "type": "bytes32[]",
         "indexed": false,
         "internalType": "bytes32[]"
@@ -1828,7 +1828,7 @@ export const invisiProtocolAbi = [
             "internalType": "bytes32[]"
           },
           {
-            "name": "stateCommitments",
+            "name": "creditCommitments",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
           },
@@ -2088,7 +2088,7 @@ export const invisiProtocolAbi = [
         "internalType": "bytes32[]"
       },
       {
-        "name": "outputCommitments",
+        "name": "noteCommitments",
         "type": "bytes32[]",
         "indexed": false,
         "internalType": "bytes32[]"
@@ -2348,7 +2348,7 @@ export const invisiProtocolAbi = [
         "internalType": "bytes32[]"
       },
       {
-        "name": "outputCommitments",
+        "name": "noteCommitments",
         "type": "bytes32[]",
         "indexed": false,
         "internalType": "bytes32[]"
@@ -2483,7 +2483,7 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
-    "name": "CommitmentAlreadyPaid",
+    "name": "CommitmentAlreadyRegistered",
     "inputs": [
       {
         "name": "commitment",

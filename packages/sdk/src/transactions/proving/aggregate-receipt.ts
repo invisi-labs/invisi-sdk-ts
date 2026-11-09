@@ -33,7 +33,7 @@ export function matchesAggregateTransaction(
                     source.toObject(true)
                 );
                 member.params.nullifiers = request.params.nullifiers.toArray(true);
-                member.params.outputCommitments = request.params.outputCommitments.toArray(true);
+                member.params.noteCommitments = request.params.noteCommitments.toArray(true);
                 member.deliveries = request.deliveries.map((delivery: Result) =>
                     delivery.toObject(true)
                 );

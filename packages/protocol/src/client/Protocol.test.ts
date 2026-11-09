@@ -33,7 +33,7 @@ describe("deployment scoped protocol objects", () => {
                 { treeId: 1n, merkleRoot: fixture.params.sources[0]!.merkleRoot as `0x${string}` },
             ],
             nullifiers: fixture.params.nullifiers as `0x${string}`[],
-            outputCommitments: fixture.params.outputCommitments as `0x${string}`[],
+            noteCommitments: fixture.params.noteCommitments as `0x${string}`[],
             withdrawalAddress: fixture.params.withdrawalAddress as `0x${string}`,
             withdrawalAmount: 0n,
             deadline: 900n,

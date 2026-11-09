@@ -53,7 +53,7 @@ export function validateCreditDrawRequest(
         "payers",
         "grantRefs",
         "nullifiers",
-        "stateCommitments",
+        "creditCommitments",
         "recoveryAmounts",
         "noteCommitment",
         "totalAmount",
@@ -66,12 +66,12 @@ export function validateCreditDrawRequest(
         profile = selectCreditDrawCircuit(ns.length),
         sources = normalizeSources(p.sources, ns.length, profile.capacity);
     if (getAddress(p.token) !== ctx.tokenAddress) throw Error("token context mismatch");
-    for (const k of ["stateCommitments", "recoveryAmounts"] as const)
+    for (const k of ["creditCommitments", "recoveryAmounts"] as const)
         if (dense(p[k], k).length !== ns.length) throw Error(`${k} count mismatch`);
-    const stateCommitments = p.stateCommitments.map(nonzero),
+    const creditCommitments = p.creditCommitments.map(nonzero),
         recoveryAmounts = p.recoveryAmounts.map((v) => word(field(v))),
         noteCommitment = nonzero(p.noteCommitment);
-    if (new Set([...stateCommitments, noteCommitment]).size !== ns.length + 1)
+    if (new Set([...creditCommitments, noteCommitment]).size !== ns.length + 1)
         throw Error("duplicate commitment");
     let prev = 0n;
     if (!dense(p.payers, "payers").length || p.payers.length > ns.length)
@@ -124,7 +124,7 @@ export function validateCreditDrawRequest(
         payers,
         grantRefs,
         nullifiers: ns,
-        stateCommitments,
+        creditCommitments,
         recoveryAmounts,
         noteCommitment,
         totalAmount,
@@ -179,7 +179,7 @@ export function creditDrawBaseInputs(
             n
         ),
         ...pad(r.nullifiers.map(BigInt), n),
-        ...pad(r.stateCommitments.map(BigInt), n),
+        ...pad(r.creditCommitments.map(BigInt), n),
         ...pad(r.recoveryAmounts.map(BigInt), n),
         BigInt(r.noteCommitment),
         r.totalAmount,

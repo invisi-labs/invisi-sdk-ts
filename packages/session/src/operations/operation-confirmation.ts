@@ -185,7 +185,7 @@ export async function confirmOperation(
                 receipt.block
             );
             await verifyMembership(reader, plan.context, receipt.block, input, proof);
-            const index = plan.credit?.draw?.stateCommitments.indexOf(output.commitment);
+            const index = plan.credit?.draw?.creditCommitments.indexOf(output.commitment);
             const parent = plan.credit?.update
                 ? plan.credit.inputs[0]
                 : index !== undefined && index >= 0

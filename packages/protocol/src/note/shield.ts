@@ -39,10 +39,10 @@ export async function validateShieldRequest(p: BuildShieldCalldataParams) {
     normalizeContext(p.context);
     if ((getAddress(p.params.token) as Hex) !== (getAddress(p.context.tokenAddress) as Hex))
         throw new Error("request token mismatch");
-    known(p.params, ["token", "outputCommitments", "deadline", "feeRecipient", "feeAmount"]);
+    known(p.params, ["token", "noteCommitments", "deadline", "feeRecipient", "feeAmount"]);
     checkDeadline(p.context, p.params.deadline);
     const outputs = dense(p.outputs, "outputs"),
-        commitments = notes(p.params.outputCommitments, "outputCommitments"),
+        commitments = notes(p.params.noteCommitments, "noteCommitments"),
         cs = dense(p.deliveries, "deliveries"),
         f = normalizeFunding(p.funding);
     if (
@@ -120,7 +120,7 @@ export function shieldFundingRequestHash(
         AbiCoder.defaultAbiCoder().encode(
             [
                 "bytes32",
-                "(address token,bytes32[] outputCommitments,uint256 deadline,address feeRecipient,uint256 feeAmount)",
+                "(address token,bytes32[] noteCommitments,uint256 deadline,address feeRecipient,uint256 feeAmount)",
                 "bytes32",
                 "bytes32",
             ].map((parameter) => ParamType.from(parameter)),

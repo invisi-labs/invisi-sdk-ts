@@ -18,7 +18,7 @@ export function requiresAuthorization(plan: OperationPlan): boolean {
         plan.inputs.length > 0 &&
         plan.outputs.length === 0 &&
         plan.params !== undefined &&
-        plan.params.outputCommitments.length === 0 &&
+        plan.params.noteCommitments.length === 0 &&
         (plan.params.feeAmount ?? 0n) === 0n &&
         BigInt(plan.params.feeRecipient ?? 0n) === 0n &&
         (plan.funding.amount ?? 0n) === 0n &&

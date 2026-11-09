@@ -31,7 +31,7 @@ export async function drawCredit(w: WitnessContext, p: DrawCreditWitnessParams) 
             const next = await deriveCreditState(n, p.amounts[i]!, p.timestamp);
             check(
                 next.nullifier === p.params.nullifiers[i] &&
-                    next.stateCommitment === p.params.stateCommitments[i] &&
+                    next.stateCommitment === p.params.creditCommitments[i] &&
                     next.recoveryAmount === BigInt(p.params.recoveryAmounts[i]!),
                 "draw public fields mismatch"
             );

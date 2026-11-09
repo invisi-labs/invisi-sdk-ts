@@ -123,11 +123,13 @@ export class WalletUpdater extends InventoryProcessor {
             for (const event of logs) {
                 if (event.eventName !== "CommitmentsInserted" && event.eventName !== "BatchOutputs")
                     continue;
-                const { treeId, startLeafIndex, commitments } = event.args as {
+                const { treeId, startLeafIndex } = event.args as {
                     treeId: bigint;
                     startLeafIndex: bigint;
-                    commitments: Hex[];
                 };
+                const commitments = (event.args as Record<string, unknown>)[
+                    event.eventName === "BatchOutputs" ? "noteCommitments" : "commitments"
+                ] as Hex[];
                 for (const [i, commitment] of commitments.entries()) {
                     const key = position(treeId, Number(startLeafIndex) + i);
                     check(

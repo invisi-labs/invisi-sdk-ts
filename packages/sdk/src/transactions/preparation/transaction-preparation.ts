@@ -135,7 +135,7 @@ export class TransactionPreparation<Result> {
             token: context.tokenAddress,
             sources: selection.sources,
             nullifiers: selection.nullifiers,
-            outputCommitments: outputs.map((output) => output.commitment),
+            noteCommitments: outputs.map((output) => output.commitment),
             withdrawalAddress,
             withdrawalAmount,
             deadline,
@@ -203,7 +203,7 @@ export class TransactionPreparation<Result> {
                 token: frame.context.tokenAddress,
                 feeRecipient: copied.fee?.recipient ?? ZERO_ADDRESS,
                 feeAmount: copied.fee?.amount ?? 0n,
-                outputCommitments: outputs.map((output) => output.commitment),
+                noteCommitments: outputs.map((output) => output.commitment),
                 deadline: frame.deadline,
             },
             shieldOutputs: outputs.map((output) => ({

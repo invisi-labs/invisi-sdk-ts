@@ -21,7 +21,7 @@ const params = {
     token: "0x2222222222222222222222222222222222222222" as const,
     sources: [{ treeId: 1n, merkleRoot: word(1n) }],
     nullifiers: [word(2n)],
-    outputCommitments: [word(3n)],
+    noteCommitments: [word(3n)],
     withdrawalAddress: "0x0000000000000000000000000000000000000000",
     withdrawalAmount: 0n,
     deadline: 900n,

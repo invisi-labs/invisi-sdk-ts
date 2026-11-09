@@ -47,8 +47,8 @@ it.each(["shield", "transfer"] as const)(
         const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
         const commitment =
             kind === "shield"
-                ? decoded.args[0].outputCommitments[0]
-                : decoded.args[1].params.outputCommitments[0];
+                ? decoded.args[0].noteCommitments[0]
+                : decoded.args[1].params.noteCommitments[0];
         const delivery = kind === "shield" ? decoded.args[2][0] : decoded.args[1].deliveries[0];
         const note = await h.bob.getViewer().decryptNote(delivery.ciphertext, {
             chainId: h.context.chainId,
@@ -64,7 +64,7 @@ it.each(["shield", "transfer"] as const)(
                     chainId: h.context.chainId,
                     protocolAddress: BigInt(h.context.protocolAddress),
                     tokenAddress: BigInt(h.context.tokenAddress),
-                    outputCommitment: decoded.args[1].params.outputCommitments[1],
+                    outputCommitment: decoded.args[1].params.noteCommitments[1],
                 });
             expect(change.payload).toEqual(new Uint8Array());
         }
@@ -105,8 +105,8 @@ it.each(["shield", "transfer"] as const)(
         const delivery = kind === "shield" ? decoded.args[2][0] : decoded.args[1].deliveries[0];
         const outputCommitment =
             kind === "shield"
-                ? decoded.args[0].outputCommitments[0]
-                : decoded.args[1].params.outputCommitments[0];
+                ? decoded.args[0].noteCommitments[0]
+                : decoded.args[1].params.noteCommitments[0];
         expect(delivery.ciphertext.slice(0, 4)).toBe("0x01");
         const received = await h.bob.getViewer().decryptNote(delivery.ciphertext, {
             chainId: h.context.chainId,
