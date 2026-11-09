@@ -1,5 +1,4 @@
 import {
-    PublicWallet,
     Wallet,
     computeCreditCommitment,
     normalizeCreditPolicy,
@@ -47,7 +46,7 @@ async function creditSetup(
         commitment,
         input: { state, commitment, treeId: 1n, leafIndex: 1, role: "owner" as const },
         identity: {
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
         },
@@ -96,7 +95,7 @@ it("draws deferred receipts into successor states and one ordinary Note", async 
     const h = await creditSetup(),
         prepared = await h.invisi.prepareDrawCredit({
             ...h.identity,
-            wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
             creditInputs: [{ ...h.input, role: "spender" }],
             credits: [{ credit: h.commitment, amount: 30n }],
             recipient: h.wallet.getAddress(),
@@ -115,7 +114,7 @@ it("draws deferred receipts into successor states and one ordinary Note", async 
 it("revokes a public grant reference without its latest private state or a prover", async () => {
     const h = await setup(),
         prepared = await h.invisi.prepareRevokeCredit({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             shard: 1n,
@@ -133,7 +132,7 @@ it("revokes a public grant reference without its latest private state or a prove
 it("attaches an EOA owner revocation signature and rejects altered owners", async () => {
     const h = await setup(),
         options = {
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             shard: 1n,
@@ -167,7 +166,7 @@ it("rejects draw limits, wrong roles, token mismatch and policy expiration", asy
     await expect(
         h.invisi.prepareDrawCredit({
             ...h.identity,
-            wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
             creditInputs: [{ ...h.input, role: "spender" }],
             credits: [{ credit: h.commitment, amount: 51n }],
             recipient: h.wallet.getAddress(),
@@ -208,7 +207,7 @@ it("charges owner fees on authority operations and deducts a gross draw fee from
     }
     const draw = await h.invisi.prepareDrawCredit({
         ...h.identity,
-        wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+        wallet: Wallet.fromAddress(h.bob.getAddress()),
         creditInputs: [{ ...h.input, role: "spender" }],
         credits: [{ credit: h.commitment, amount: 30n }],
         recipient: h.wallet.getAddress(),
@@ -255,7 +254,7 @@ it("checks available credit against gross debits rather than the net recipient a
     await expect(
         h.invisi.prepareDrawCredit({
             ...h.identity,
-            wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
             creditInputs: [{ ...h.input, role: "spender" }],
             credits: [{ credit: h.commitment, amount: 30n }],
             recipient: h.wallet.getAddress(),
@@ -349,7 +348,7 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
         }),
         await h.invisi.prepareDrawCredit({
             ...h.identity,
-            wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
             creditInputs: [{ ...h.input, role: "spender" }],
             credits: [{ credit: h.commitment, amount: 30n }],
             recipient: h.wallet.getAddress(),
@@ -464,7 +463,7 @@ it("encodes Credit mode flags as canonical Noir fields while keeping state boole
     });
     const draw = await h.invisi.prepareDrawCredit({
         ...h.identity,
-        wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+        wallet: Wallet.fromAddress(h.bob.getAddress()),
         creditInputs: [{ ...h.input, role: "spender" }],
         credits: [{ credit: h.commitment, amount: 30n }],
         recipient: h.wallet.getAddress(),

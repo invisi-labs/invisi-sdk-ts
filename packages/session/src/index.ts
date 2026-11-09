@@ -42,3 +42,5 @@ export type {
 } from "./history/history";
 
 export { EncryptedWalletCodec } from "./storage/encrypted-codec";
+
+export type { PendingWalletRefresh, WalletRefreshResponse } from "./sync/WalletRefresh";

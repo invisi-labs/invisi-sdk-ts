@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { AddressRegistry, Invisi, InvisiError } from "@invisi-labs/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -69,7 +69,7 @@ describe("public preparation errors", () => {
         };
         const error = await new Invisi({ chainReader: reader })
             .prepareShield({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
             } as never)
             .catch((error: unknown) => error);
@@ -80,7 +80,7 @@ describe("public preparation errors", () => {
             cause,
         });
         const missing = await new Invisi()
-            .prepareRegistration({ wallet: PublicWallet.fromAddress(h.wallet.getAddress()) })
+            .prepareRegistration({ wallet: Wallet.fromAddress(h.wallet.getAddress()) })
             .catch((error: unknown) => error);
         expect(missing).toMatchObject({
             code: "MISSING_CAPABILITY",
@@ -118,7 +118,7 @@ describe("recipient preparation failures", () => {
         const h = await fixture();
         const error = await new Invisi({ chainReader: h.reader })
             .prepareShield({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
                 tokenAddress: h.context.tokenAddress,
                 outputs: [{ to: h.bob.ownerAddress, amount: 1n } as never],
@@ -137,7 +137,7 @@ describe("recipient preparation failures", () => {
         const { h, reader, protocol, protocolRpc } = await registryFixture("unregistered");
         const error = await new Invisi({ chainReader: reader, protocolRpc })
             .prepareCreateCredit({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 protocol,
                 tokenAddress: h.context.tokenAddress,
                 spender: h.bob.ownerAddress,

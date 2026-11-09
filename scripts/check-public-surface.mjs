@@ -4,7 +4,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const entries = {
-    core: [".", "./address", "./note", "./credit"],
+    core: [".", "./address", "./note", "./credit", "./local"],
+    "native-wallet": ["."],
     protocol: [".", "./contracts", "./note", "./credit"],
     prover: [".", "./native", "./wasm", "./aggregate"],
     rpc: ["."],
@@ -72,7 +73,6 @@ functions(
     core,
     [
         "Wallet",
-        "PublicWallet",
         "ViewingCapability",
         "Detector",
         "Disclosure",
@@ -103,15 +103,19 @@ functions(
     ["WitnessBuilder", "registrationTypedData", "registrationDigest", "buildRegistrationCalldata"],
     "protocol"
 );
-functions(core.Wallet, ["fromPrivateKey"], "Wallet");
-functions(core.PublicWallet, ["fromAddress"], "PublicWallet");
-functions(core.Wallet.prototype, ["getViewer", "getDetector", "exportAuthorization"], "Wallet");
-// Public identities cannot decrypt or authorize spending.
+const local = await import(resolve("packages/core/dist/local.js"));
+functions(local.LocalWallet, ["fromPrivateKey"], "LocalWallet");
+functions(
+    local.LocalWallet.prototype,
+    ["getViewer", "getDetector", "exportAuthorization", "execute"],
+    "LocalWallet"
+);
+functions(core.Wallet, ["fromAddress"], "Wallet");
+assert(!("LocalWallet" in core), "local execution leaked into business entry");
+assert(!("fromPrivateKey" in core.Wallet), "public wallet acquired private key restoration");
 for (const name of ["getViewer", "getDetector", "exportAuthorization"])
-    assert(
-        !(name in core.PublicWallet.prototype),
-        `public wallet acquired secret capability: ${name}`
-    );
+    assert(!(name in core.Wallet.prototype), `public wallet acquired secret capability: ${name}`);
+functions(core, ["prepareWalletRequest", "acceptWalletResponse"], "core");
 functions(sdk.Protocol, ["fromRpc"], "Protocol");
 functions(sdk.Protocol.prototype, ["forToken", "aggregate"], "Protocol");
 functions(rpc.ProtocolRpcClient, ["getChains"], "ProtocolRpcClient");

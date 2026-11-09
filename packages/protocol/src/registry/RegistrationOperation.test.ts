@@ -1,4 +1,5 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { LocalWallet } from "@invisi-labs/core/local";
+import { Wallet } from "@invisi-labs/core";
 import {
     Wallet as EthereumWallet,
     Interface,
@@ -10,7 +11,6 @@ import {
 import type { Hex } from "../contracts/index";
 import { invisiAddressRegistryAbi } from "../contracts/index";
 
-import { Wallet } from "@invisi-labs/core";
 import { expect, it, vi } from "vitest";
 import { AddressRegistry } from "./AddressRegistry";
 const context = {
@@ -24,7 +24,7 @@ const context = {
         timestamp: 2000000000n,
     };
 async function fixture() {
-    const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     let nonce = 0n;
     const reader = {
         getChainId: async () => context.chainId,
@@ -65,7 +65,7 @@ async function attachSignature(
 it("prepares and signs registry EIP-712 data without a prover in its independent nonce domain", async () => {
     const h = await fixture(),
         operation = await h.registry.prepareRegistration({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
         }),
         preview = operation.preview();
@@ -90,17 +90,17 @@ it("requires explicit write profiles and rechecks registry nonce before export",
     const h = await fixture();
     await expect(
         new AddressRegistry(context).prepareRegistration({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
         })
     ).rejects.toThrow(/profile/);
     const publicOnly = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     expect(publicOnly).not.toHaveProperty("authorize");
     const operation = await h.registry.prepareRegistration({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
         }),
         ready = await attachSignature(operation, h.signer);
@@ -109,7 +109,7 @@ it("requires explicit write profiles and rechecks registry nonce before export",
     expect(ready).not.toHaveProperty("submit");
     expect(ready).not.toHaveProperty("wait");
     const update = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
         update: true,
     });
@@ -123,7 +123,7 @@ it.each([false, true])(
     async (direct) => {
         const h = await fixture();
         const operation = await h.registry.prepareRegistration({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
         });
         const ready = direct
@@ -157,7 +157,7 @@ it.each([false, true])(
 it("associates an application-owned registry hash without providing a transaction sender", async () => {
     const h = await fixture();
     const prepared = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     const ready = await attachSignature(prepared, h.signer);
@@ -174,7 +174,7 @@ it("accepts arbitrary ERC-1271 signature bytes without EOA-only recovery", async
     const h = await fixture();
     h.reader.getCode.mockResolvedValue("0x6000");
     const prepared = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     const ready = await prepared.withSignature("0xaabb");
@@ -186,7 +186,7 @@ it("accepts arbitrary ERC-1271 signature bytes without EOA-only recovery", async
 it("direct owner authorization freezes an empty signature and rejects a different sender", async () => {
     const h = await fixture();
     const prepared = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     const ready = await prepared.authorizeDirect();
@@ -213,7 +213,7 @@ it("validates the deadline before preparing a direct owner call", async () => {
     const h = await fixture();
     await expect(
         h.registry.prepareRegistration({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             reader: h.reader,
             deadline: block.timestamp - 1n,
         })
@@ -223,7 +223,7 @@ it("validates the deadline before preparing a direct owner call", async () => {
 it("rejects a signature from a different owner and requires explicit direct authorization", async () => {
     const h = await fixture();
     const prepared = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     await expect(attachSignature(prepared, EthereumWallet.createRandom())).rejects.toThrow(
@@ -235,7 +235,7 @@ it("rejects a signature from a different owner and requires explicit direct auth
 it("rejects malformed, compact, high-s and mismatched EOA registry signatures before ready", async () => {
     const h = await fixture();
     const operation = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     const typed = operation.typedData();
@@ -258,7 +258,7 @@ it("requires the contract-owner ERC-1271 check and propagates verifier failures"
     const h = await fixture();
     h.reader.getCode.mockResolvedValue("0x6000");
     const operation = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     h.reader.isValidRegistrationSignature.mockResolvedValue(false);
@@ -270,7 +270,7 @@ it("requires the contract-owner ERC-1271 check and propagates verifier failures"
     await expect(
         (
             await h.registry.prepareRegistration({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 reader: withoutVerifier,
             })
         ).withSignature("0xaabb")
@@ -280,7 +280,7 @@ it("checks current nonce and deadline before exporting or accepting signatures",
     const h = await fixture();
     const sign = vi.spyOn(h.signer, "signTypedData");
     const operation = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     h.setNonce(1n);
@@ -290,7 +290,7 @@ it("checks current nonce and deadline before exporting or accepting signatures",
     expect(sign).not.toHaveBeenCalled();
     h.setNonce(0n);
     const short = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
         deadline: block.timestamp,
     });
@@ -305,7 +305,7 @@ it("accepts canonical EOA recovery for a delegated account even when it has code
     h.reader.getCode.mockResolvedValue("0x6000");
     h.reader.isValidRegistrationSignature.mockResolvedValue(false);
     const operation = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     expect((await attachSignature(operation, h.signer)).status).toBe("ready");
@@ -315,7 +315,7 @@ it("accepts canonical EOA recovery for a delegated account even when it has code
 it("exports JSON-safe registry data and attaches a remote signature without a signer", async () => {
     const h = await fixture();
     const operation = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     const request = JSON.parse(JSON.stringify(await operation.exportRegistrationAuthorization()));
@@ -337,7 +337,7 @@ it("exports JSON-safe registry data and attaches a remote signature without a si
 it("exposes only external signature attachment and direct caller authorization", async () => {
     const h = await fixture();
     const operation = await h.registry.prepareRegistration({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         reader: h.reader,
     });
     expect(operation).not.toHaveProperty("authorize");

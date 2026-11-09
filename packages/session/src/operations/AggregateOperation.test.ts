@@ -1,3 +1,4 @@
+import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { getBytes } from "ethers";
@@ -19,13 +20,13 @@ it("exports recursive operations only as public aggregate members and keeps thei
     };
     const session = new WalletSession(sessionOptions({ ...h.options, prover: backend })),
         operation = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
-            ).authorize()
+            )
         ).prove({ execution: "aggregate" });
     await expect(operation.exportTransaction()).rejects.toThrow(/aggregate|recursive/);
     const member = await operation.exportAggregateMember();
@@ -51,13 +52,13 @@ it("confirms an exported recursive member only when its exact request settled in
     };
     const session = new WalletSession(sessionOptions({ ...h.options, prover: backend })),
         operation = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
-            ).authorize()
+            )
         ).prove({ execution: "aggregate" }),
         member = await operation.exportAggregateMember(),
         requests = Array.from({ length: 4 }, (_, i) => ({

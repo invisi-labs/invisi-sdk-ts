@@ -1,6 +1,6 @@
 # Invisi TypeScript SDK
 
-A capability SDK for ordinary private Notes and deferred Credit grants. Eight workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
+A capability SDK for ordinary private Notes and deferred Credit grants. Workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
 
 | Package | Responsibility |
 | --- | --- |
@@ -10,6 +10,7 @@ A capability SDK for ordinary private Notes and deferred Credit grants. Eight wo
 | `@invisi-labs/rpc` | Protocol RPC APIv1 with independent Note/Credit query surfaces and canonical anchor checks. |
 | `@invisi-labs/sdk` | Stateless preparation, external signing requests, proofs, output factories and calldata. Note/Credit public subpaths retain separate business types. |
 | `@invisi-labs/session` | Inventory, selection, reservations, synchronization, history and operation recovery. |
+| `@invisi-labs/native-wallet` | React Native request transport; the host provides native account access. |
 | `@invisi-labs/react`, `@invisi-labs/vue` | Thin operation lifecycle bindings. |
 
 ## Ordinary Notes
@@ -19,14 +20,18 @@ import { Invisi, Wallet, NoteOutput, Protocol, ProtocolRpcClient } from "@invisi
 import { WalletSession } from "@invisi-labs/session";
 import { MemoryWalletStore } from "@invisi-labs/session/memory";
 
-const wallet = await Wallet.fromPrivateKey(evmPrivateKey);
+const wallet = Wallet.fromAddress(receivingAddress);
 const protocolRpc = new ProtocolRpcClient(protocolRpcUrl); // /v1 service
 const protocol = await Protocol.fromRpc(protocolRpc, provider);
 const invisi = new Invisi({ provider, protocolRpc, prover });
 const session = await WalletSession.connect({
   invisi, wallet, protocol, store: new MemoryWalletStore(), signer,
 });
-await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
+const refresh = await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
+const responses = await Promise.all(refresh.walletRequests.map(async (request) => ({
+  requestId: request.id, response: await nativeWallet.execute(request),
+})));
+await refresh.applyWalletResponses(responses); // Explicit null outcomes mark nonrecipients.
 const output = await NoteOutput.create({
   chainId: protocol.context.chainId,
   protocolAddress: protocol.context.protocolAddress,
@@ -36,7 +41,9 @@ const output = await NoteOutput.create({
 });
 const prepared = await session.prepareTransfer({ tokenAddress, outputs: [output] });
 const review = prepared.preview();
-const ready = await (await prepared.authorize()).prove();
+const request = await prepared.exportWalletRequest("transfer-authorization");
+const response = await nativeWallet.execute(request);
+const ready = await (await prepared.withWalletResponse(response)).prove();
 const transaction = await session.sendTransaction(ready);
 await transaction.wait();
 await (await session.resume(ready.id)).reconcile();
@@ -49,9 +56,10 @@ Applications that own their inventory call `invisi.prepareTransfer({wallet,proto
 Private authorization uses an external signing boundary:
 
 ```ts
-const request = await prepared.exportWalletAuthorization();
-const signature = await ownerSigner.signTypedData(request.domain, request.types, request.message);
-const ready = await (await prepared.withWalletSignature(signature)).prove();
+const request = await prepared.exportWalletRequest("spend-authorization-1");
+const response = await nativeWallet.execute(request);
+const authorized = await prepared.withWalletResponse(response);
+const ready = await authorized.prove();
 await transactionSigner.sendTransaction(await ready.exportTransaction());
 ```
 
@@ -63,7 +71,7 @@ Creation registers private authority without principal deposits or ordinary Note
 
 ```ts
 const grant = await invisi.prepareCreateCredit({
-  wallet: ownerPublicWallet, protocol, tokenAddress,
+  wallet: ownerWallet, protocol, tokenAddress,
   spender: merchantAddress, expiry,
   singleLimit: 100n, dailyLimit: 1000n,
   monthlyLimit: 10000n, availableCredit: 50000n, unlimited: false,
@@ -71,7 +79,7 @@ const grant = await invisi.prepareCreateCredit({
 // Export owner wallet authorization, attach its signature, then prove.
 
 const draw = await invisi.prepareDrawCredit({
-  wallet: merchantPublicWallet, protocol, tokenAddress,
+  wallet: merchantWallet, protocol, tokenAddress,
   creditInputs: selectedSpenderStates,
   credits: [{ credit: grantCommitment, amount: 30n }],
   recipient: recipientAddress,
@@ -117,3 +125,17 @@ pnpm check:session
 ```
 
 Artifact synchronization reads the current authenticated manifests and removes retired artifacts. Deterministic protocol/vector and documented-gas generators live in `scripts/` and `packages/protocol/scripts/`. Optional native/WASM integration tests use `BB_BINARY_PATH` and `INVISI_TEST_WASM=1`.
+
+## Native wallet boundary
+
+`Wallet` contains public receiving material only. Session and stateless callers use
+`prepareWalletRequest` and `acceptWalletResponse` for detection, decryption and private
+authorization. `WalletSession` receives no executor or transport;
+its staged refresh returns requests and accepts validated responses before an atomic store update.
+It never receives viewing or spending keys. The native host owns key storage, unlock and
+approval. EVM transaction signing remains a separate step after final calldata exists.
+
+Explicit Node/test key execution is available as `LocalWallet` from
+`@invisi-labs/core/local`. It is not the business Wallet and is not imported by the
+React Native transport. Decrypted Note/Credit data and proving witnesses can still enter
+JavaScript; the boundary protects key material rather than all financial plaintext.

@@ -1,4 +1,12 @@
 import {
+    Wallet,
+    prepareWalletRequest,
+    acceptWalletResponse,
+    type PreparedWalletRequest,
+    type WalletResponse,
+} from "@invisi-labs/core";
+import {
+    authorizationRequest,
     assertCreditUpdatePlan,
     revocationSigningRequest,
     acceptRevocationSignature,
@@ -8,7 +16,6 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     acceptFundingSignature,
     acceptWalletSignature,
-    authorizeOperation,
     getOperationGasReference,
     fundingSigningRequest,
     operationPreview,
@@ -54,6 +61,7 @@ export class Operation {
     readonly #runtime: OperationRuntime;
     readonly #saved: SavedOperation;
     readonly #authorization: AuthorizedStatement | undefined;
+    readonly #walletRequests = new Map<string, PreparedWalletRequest<"wallet.authorize">>();
     readonly status: OperationStatus;
 
     private constructor(
@@ -247,6 +255,62 @@ export class Operation {
             return { status: "ready" };
         });
     }
+    /** Export the same portable request used by managed native wallet transports. */
+    async exportWalletRequest(id: string, options: { signal?: AbortSignal } = {}) {
+        options.signal?.throwIfAborted();
+        await this.signingCurrent();
+        check(
+            requiresAuthorization(this.#saved.plan),
+            "operation does not require wallet authorization"
+        );
+        check(
+            ["prepared", "authorized"].includes(this.status),
+            "operation is not awaiting wallet authorization"
+        );
+        check(!this.#walletRequests.has(id), "wallet request id already exported");
+        const request = authorizationRequest(this.#saved.plan);
+        const prepared = prepareWalletRequest(
+            Wallet.fromAddress(this.#saved.plan.scope.ownerAddress),
+            id,
+            "wallet.authorize",
+            {
+                ...request,
+                words: request.words.map(String),
+                context: {
+                    chainId: request.context.chainId.toString(),
+                    protocolAddress: request.context.protocolAddress.toString(),
+                },
+            }
+        );
+        this.#walletRequests.set(id, prepared);
+        return structuredClone(prepared.request);
+    }
+
+    /** Independently validate host authorization against the retained request and frozen plan. */
+    async withWalletResponse(
+        response: WalletResponse,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<Operation> {
+        options.signal?.throwIfAborted();
+        await this.signingCurrent();
+        check(
+            requiresAuthorization(this.#saved.plan),
+            "operation does not require wallet authorization"
+        );
+        const prepared = this.#walletRequests.get(response.id);
+        check(prepared, "unknown wallet request response");
+        const authorization = await acceptWalletResponse(
+            prepared,
+            response as WalletResponse<"wallet.authorize">
+        );
+        return this.stage(
+            "wallet authorization",
+            ["prepared", "authorized"],
+            async () => ({ status: "authorized", authorization }),
+            options.signal
+        );
+    }
+
     /** Public EIP-712 request; signing transport and key custody belong to the caller. */
     async exportWalletAuthorization(options: { signal?: AbortSignal } = {}) {
         options.signal?.throwIfAborted();
@@ -321,27 +385,6 @@ export class Operation {
                     saved.call = await this.encode(saved);
                 }
                 return { status: "ready" };
-            },
-            options.signal
-        );
-    }
-
-    async authorize(options: { signal?: AbortSignal } = {}): Promise<Operation> {
-        check(
-            requiresAuthorization(this.#saved.plan),
-            "operation does not require wallet authorization"
-        );
-        const provider = this.#runtime.authorization();
-        check(
-            provider.ownerAddress === this.#runtime.scope.ownerAddress,
-            "wallet authorization capability mismatch"
-        );
-        return this.stage(
-            "wallet authorization",
-            ["prepared", "authorized"],
-            async (saved) => {
-                const authorization = await authorizeOperation(saved.plan, provider);
-                return { status: "authorized", authorization };
             },
             options.signal
         );

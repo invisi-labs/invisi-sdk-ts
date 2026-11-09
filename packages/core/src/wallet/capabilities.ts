@@ -222,6 +222,10 @@ export class WalletAuthorization implements WalletAuthorizationProvider {
         return new WalletAuthorization(identity(ownerAddress), privateBytes, publicBytes);
     }
 
+    getPublicKey(): Uint8Array {
+        return Uint8Array.from(this.#publicKey);
+    }
+
     async authorize(request: WalletAuthorizationRequest): Promise<AuthorizedStatement> {
         const frozen = { ...request, context: { ...request.context }, words: [...request.words] };
         const digest = computeWalletAuthorizationDigest(frozen);

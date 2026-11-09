@@ -1,3 +1,10 @@
+import {
+    Wallet,
+    prepareWalletRequest,
+    acceptWalletResponse,
+    type PreparedWalletRequest,
+    type WalletResponse,
+} from "@invisi-labs/core";
 import { revocationSigningRequest, acceptRevocationSignature } from "../signing/revocation";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { TransactionOutput } from "../../notes/TransactionOutput";
@@ -16,7 +23,7 @@ import type {
 import { publicProof } from "../proving/proof";
 import { sameStatement } from "../proving/proof-integrity";
 import type { OperationStatus } from "../records";
-import { requiresAuthorization, statement } from "../signing/statement";
+import { authorizationRequest, requiresAuthorization, statement } from "../signing/statement";
 import { encodeOperation } from "./calldata";
 import {
     acceptFundingSignature,
@@ -41,6 +48,7 @@ export class PreparedTransaction {
     readonly #runtime: Runtime;
     readonly #saved: SavedOperation;
     readonly #authorization: AuthorizedStatement | undefined;
+    readonly #walletRequests = new Map<string, PreparedWalletRequest<"wallet.authorize">>();
     readonly #lifecycle: Lifecycle;
     readonly status: OperationStatus;
     private constructor(
@@ -184,6 +192,62 @@ export class PreparedTransaction {
             return { status: "ready" };
         });
     }
+    /** Export the same portable request used by managed native wallet transports. */
+    async exportWalletRequest(id: string, options: { signal?: AbortSignal } = {}) {
+        options.signal?.throwIfAborted();
+        this.current();
+        check(
+            requiresAuthorization(this.#saved.plan),
+            "operation does not require wallet authorization"
+        );
+        check(
+            ["prepared", "authorized"].includes(this.status),
+            "operation is not awaiting wallet authorization"
+        );
+        check(!this.#walletRequests.has(id), "wallet request id already exported");
+        const request = authorizationRequest(this.#saved.plan);
+        const prepared = prepareWalletRequest(
+            Wallet.fromAddress(this.#saved.plan.scope.ownerAddress),
+            id,
+            "wallet.authorize",
+            {
+                ...request,
+                words: request.words.map(String),
+                context: {
+                    chainId: request.context.chainId.toString(),
+                    protocolAddress: request.context.protocolAddress.toString(),
+                },
+            }
+        );
+        this.#walletRequests.set(id, prepared);
+        return structuredClone(prepared.request);
+    }
+
+    /** Independently validate host authorization against the retained request and frozen plan. */
+    async withWalletResponse(
+        response: WalletResponse,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<PreparedTransaction> {
+        options.signal?.throwIfAborted();
+        this.current();
+        check(
+            requiresAuthorization(this.#saved.plan),
+            "operation does not require wallet authorization"
+        );
+        const prepared = this.#walletRequests.get(response.id);
+        check(prepared, "unknown wallet request response");
+        const authorization = await acceptWalletResponse(
+            prepared,
+            response as WalletResponse<"wallet.authorize">
+        );
+        return this.stage(
+            "wallet authorization",
+            ["prepared", "authorized"],
+            async () => ({ status: "authorized", authorization }),
+            options.signal
+        );
+    }
+
     /** Public EIP-712 request; signing transport and key custody belong to the caller. */
     async exportWalletAuthorization(options: { signal?: AbortSignal } = {}) {
         options.signal?.throwIfAborted();

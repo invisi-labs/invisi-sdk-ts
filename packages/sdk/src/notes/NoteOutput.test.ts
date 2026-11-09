@@ -1,4 +1,4 @@
-import { FIELD_MODULUS, PublicWallet, computeNoteIdentity, fundsV1 } from "@invisi-labs/core";
+import { FIELD_MODULUS, Wallet, computeNoteIdentity, fundsV1 } from "@invisi-labs/core";
 import { expect, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { Invisi } from "../client/Invisi";
@@ -14,7 +14,7 @@ it("creates a fixed output that survives preparation and structured cloning", as
     expect(output.identity).toBe(await computeNoteIdentity(BigInt(h.bob.ownerAddress), 42n));
     const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
     const prepared = await invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [output],
@@ -107,7 +107,7 @@ it("preserves output commitments during Broadcaster fee reconstruction", async (
     });
     const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
     const prepared = await invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [output],
@@ -153,7 +153,7 @@ it("supports factory outputs in private transfers and sessions while rejecting p
     });
     const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
     const prepared = await invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: Object.values((await h.store.readSnapshot(h.scope)).notes),
@@ -192,7 +192,7 @@ it("creates envelope-free EVM and opaque identity outputs without receiving-key 
     );
     const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
     const prepared = await invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [opaque],
@@ -201,7 +201,7 @@ it("creates envelope-free EVM and opaque identity outputs without receiving-key 
     expect(prepared.preview().outputs[0]!.amount).toBe(30n);
     await expect(
         invisi.prepareShield({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [opaque],

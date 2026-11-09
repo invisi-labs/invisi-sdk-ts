@@ -12,8 +12,6 @@ export function sessionOptions(options: WalletSessionInfrastructure): WalletSess
         namespace,
         store,
         signer,
-        viewing,
-        authorization,
         fundingSigner,
         coinSelector,
         ...infrastructure
@@ -25,8 +23,6 @@ export function sessionOptions(options: WalletSessionInfrastructure): WalletSess
         ...(namespace === undefined ? {} : { namespace }),
         ...(store ? { store } : {}),
         ...(signer ? { signer } : {}),
-        ...(viewing ? { viewing } : {}),
-        ...(authorization ? { authorization } : {}),
         ...(fundingSigner ? { fundingSigner } : {}),
         ...(coinSelector ? { coinSelector } : {}),
     };

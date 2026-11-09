@@ -99,8 +99,7 @@ export class PaymentNote implements PaymentNoteData {
         wallet: Wallet,
         options: PaymentNoteVerificationOptions | PaymentNoteVerificationSettings = {}
     ): Promise<SpendablePaymentNote> {
-        if (!(wallet instanceof Wallet))
-            throw new Error("Wallet spending authorization capability required");
+        if (!(wallet instanceof Wallet)) throw new Error("A public Wallet is required");
         const result = await verifyPaymentNote(
             this.data(),
             protocol,

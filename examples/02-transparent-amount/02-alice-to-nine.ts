@@ -1,6 +1,6 @@
 import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
-import { PublicWallet } from "@invisi-labs/sdk";
+import { Wallet } from "@invisi-labs/sdk";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
 import { erc20Abi } from "viem";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
@@ -60,7 +60,7 @@ try {
     );
 
     // 4. The SDK builds transparent-amount funding; ethers handles subsequent on-chain submission.
-    const aliceWallet = PublicWallet.fromAddress(alice.receivingAddress);
+    const aliceWallet = Wallet.fromAddress(alice.receivingAddress);
     const invisi = new Invisi({
         provider,
         protocolRpc,

@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { encodePaymentNote } from "./codec";
 import { PaymentNote } from "./PaymentNote";
@@ -54,25 +54,25 @@ it("simple verification validates confirmed membership without inspecting spent 
 });
 it("detailed verification produces a detached input for the owner", async () => {
     const { h, note, options } = await setup();
-    const verified = await note.verifySpendable(h.protocol, h.wallet, options);
+    const verified = await note.verifySpendable(h.protocol, h.options.wallet, options);
     expect(verified.toInput().commitment).toBe(h.leaf);
     expect(verified.toInput().note).toEqual(h.note);
     const copy = verified.toInput();
     copy.note.amount = 1n;
     expect(verified.toInput().note.amount).toBe(100n);
 });
-it("rejects spent Notes, another wallet and public-only wallets", async () => {
+it("accepts a public owner wallet and rejects spent Notes or another owner", async () => {
     const { h, note, options } = await setup();
-    await expect(note.verifySpendable(h.protocol, h.bob, options)).rejects.toThrow(/owner/);
     await expect(
-        note.verifySpendable(
-            h.protocol,
-            PublicWallet.fromAddress(h.wallet.getAddress()) as any,
-            options
-        )
-    ).rejects.toThrow(/capability/);
+        note.verifySpendable(h.protocol, Wallet.fromAddress(h.bob.getAddress()), options)
+    ).rejects.toThrow(/owner/);
+    await expect(
+        note.verifySpendable(h.protocol, Wallet.fromAddress(h.wallet.getAddress()), options)
+    ).resolves.toBeDefined();
     h.reader.isSpent = async () => [true];
-    await expect(note.verifySpendable(h.protocol, h.wallet, options)).rejects.toThrow(/spent/);
+    await expect(note.verifySpendable(h.protocol, h.options.wallet, options)).rejects.toThrow(
+        /spent/
+    );
 });
 it("rejects missing leaves, altered proofs, tokens and unknown roots", async () => {
     const { h, note, options, getNote, proof, output } = await setup();
@@ -121,7 +121,7 @@ it("exports final prepared outputs and rejects identity-only exports", async () 
         chainReader: h.reader,
         protocolRpc: h.membership,
     }).prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [output],
@@ -148,7 +148,7 @@ it("reuses a connected Protocol and rejects missing verification connections", a
     });
     expect(verified.membership.leaf).toBe(h.leaf);
     await expect(note.verifySpendable(h.protocol, undefined as any, options)).rejects.toThrow(
-        /capability/
+        /public Wallet/
     );
 });
 
@@ -209,7 +209,7 @@ it("checks spendability at the latest chain block while membership uses the conf
             ? original
             : { ...original, number, hash: `0x${number.toString(16).padStart(64, "0")}` };
     h.reader.isSpent = vi.fn(async () => [false]);
-    const verified = await note.verifySpendable(h.protocol, h.wallet, {
+    const verified = await note.verifySpendable(h.protocol, h.options.wallet, {
         ...options,
         confirmations: 2,
     });
@@ -221,7 +221,7 @@ it("checks spendability at the latest chain block while membership uses the conf
         expect.objectContaining({ number: 20n })
     );
     h.reader.isKnownRoot = async (_context, _tree, _root, block) => block.number < 20n;
-    await expect(note.verifySpendable(h.protocol, h.wallet, options)).rejects.toThrow(
+    await expect(note.verifySpendable(h.protocol, h.options.wallet, options)).rejects.toThrow(
         /no longer spendable/
     );
 });

@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { expect, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { Invisi } from "../client/Invisi";
@@ -71,7 +71,7 @@ it("keeps IPR through EVM resolution, snapshots and broadcaster rebuilding", asy
         chainReader: h.reader,
         protocolRpc: h.membership,
     }).prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [direct],

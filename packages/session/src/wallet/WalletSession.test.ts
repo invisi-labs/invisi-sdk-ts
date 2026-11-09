@@ -1,9 +1,4 @@
-import {
-    PublicWallet,
-    computeNoteCommitment,
-    computeNoteIdentity,
-    fundsV1,
-} from "@invisi-labs/core";
+import { Wallet, computeNoteCommitment, computeNoteIdentity, fundsV1 } from "@invisi-labs/core";
 import type { SavedOperation } from "@invisi-labs/sdk/session-support";
 import { expect, expectTypeOf, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -56,13 +51,11 @@ it("reserves inputs atomically between sessions and requires explicit state and 
     const viewOnly = new WalletSession(
         sessionOptions({
             ...h.options,
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
         })
     );
     await expect(viewOnly.prepareTransfer(input)).rejects.toThrow(/insufficient/i);
-    expect(PublicWallet.fromAddress(h.wallet.getAddress())).not.toHaveProperty(
-        "exportAuthorization"
-    );
+    expect(Wallet.fromAddress(h.wallet.getAddress())).not.toHaveProperty("exportAuthorization");
     const { store, ...withoutStore } = h.options;
     await expect(
         new WalletSession(sessionOptions(withoutStore)).prepareTransfer(input)
@@ -196,8 +189,6 @@ it("keeps derivable session capabilities out of the configuration surface", () =
         | "namespace"
         | "store"
         | "signer"
-        | "viewing"
-        | "authorization"
         | "fundingSigner"
         | "coinSelector"
     >();

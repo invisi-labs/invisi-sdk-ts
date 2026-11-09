@@ -1,5 +1,5 @@
 import type { Provider } from "ethers";
-import type { Protocol, ProtocolRpcClient, PublicWallet, ViewingCapability, NoteInput, Note } from "@invisi-labs/sdk";
+import type { Protocol, ProtocolRpcClient, Wallet, ViewingCapability, NoteInput, Note } from "@invisi-labs/sdk";
 
 // Return all unspent notes discovered for this owner and token in the scanned range, without filtering by amount.
 // Wrap only discovery, authenticated decryption, deduplication, and indexed spent-status filtering; do not select notes, sign, or submit transactions.
@@ -15,7 +15,7 @@ export async function discoverCandidates({
     provider: Provider;
     protocolRpc: ProtocolRpcClient;
     protocol: Protocol;
-    wallet: PublicWallet;
+    wallet: Wallet;
     viewer: ViewingCapability;
     tokenAddress: string;
 }): Promise<NoteInput[]> {

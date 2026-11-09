@@ -83,3 +83,30 @@ export function createClueFromSeed(clueKey: Uint8Array, seed32: Uint8Array): Uin
     if (y === 0n) throw new Error("Degenerate clue seed");
     return concatBytes(p, writeLE(y), Uint8Array.of(PRECISION), ciphertext);
 }
+
+/** Check a full-precision clue locally without exporting the detection key. */
+export function detectClue(detectionKey: Uint8Array, clue: Uint8Array): boolean {
+    const scalar = detectionScalar(detectionKey);
+    requireBytes(clue, 68, "Clue");
+    if (clue[64] !== PRECISION) return false;
+    const p = clue.slice(0, 32),
+        y = readLE(clue.slice(32, 64));
+    if (y === 0n || y >= FR) return false;
+    let point;
+    try {
+        point = decodePoint(p);
+    } catch {
+        return false;
+    }
+    if (isIdentity(point)) return false;
+    const ciphertext = clue.slice(65);
+    const m = hashScalar("sca", p, Uint8Array.of(PRECISION), ciphertext);
+    const q = encodePoint(multiply(generator, m).add(multiply(point, y)));
+    const clueKey = deriveClueKey(detectionKey);
+    for (let i = 0; i < PRECISION; i++) {
+        const child = (scalar + childOffset(clueKey, i)) % FR;
+        const bit = hashBit(p, encodePoint(multiply(point, child)), q);
+        if ((bit ^ ((ciphertext[i >> 3]! >> (i & 7)) & 1)) !== 1) return false;
+    }
+    return true;
+}

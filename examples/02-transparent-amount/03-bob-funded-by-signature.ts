@@ -1,6 +1,6 @@
 import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
-import { PublicWallet } from "@invisi-labs/sdk";
+import { Wallet } from "@invisi-labs/sdk";
 import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
 import { erc20Abi } from "viem";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
@@ -62,7 +62,7 @@ try {
 
     // 4. First build only the funding request, without injecting any signer into Invisi.
     // aliceWallet contains only public receiving information, with no Alice private key, and does not sign.
-    const aliceWallet = PublicWallet.fromAddress(alice.receivingAddress);
+    const aliceWallet = Wallet.fromAddress(alice.receivingAddress);
     const invisi = new Invisi({
         provider,
         protocolRpc,

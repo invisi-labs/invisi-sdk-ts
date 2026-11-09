@@ -1,4 +1,4 @@
-import type { PublicWallet } from "@invisi-labs/core";
+import type { Wallet } from "@invisi-labs/core";
 import { Interface, getBytes, hexlify, verifyTypedData } from "ethers";
 import type { Address, Hex } from "../contracts/index";
 
@@ -28,7 +28,7 @@ export interface RegistryReader extends Pick<
 }
 
 export interface RegistrationPreparation {
-    wallet: PublicWallet;
+    wallet: Wallet;
     reader: RegistryReader;
     deadline?: bigint;
     update?: boolean;

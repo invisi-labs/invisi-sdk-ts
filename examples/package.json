@@ -47,7 +47,8 @@
     "@invisi-labs/sdk": "workspace:*",
     "ethers": "6.17.0",
     "viem": "2.57.13",
-    "@invisi-labs/session": "workspace:*"
+    "@invisi-labs/session": "workspace:*",
+    "@invisi-labs/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,3 +1,4 @@
+import { LocalWallet } from "@invisi-labs/core/local";
 import { sessionOptions } from "./session-options";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { Interface, keccak256 } from "ethers";
@@ -15,8 +16,8 @@ const context = {
 };
 const block = { number: 12n, hash: word(12n), parentHash: word(11n), timestamp: 2000000000n };
 export async function fixture() {
-    const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1)),
-        bob = await Wallet.fromPrivateKey(new Uint8Array(32).fill(2)),
+    const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1)),
+        bob = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(2)),
         store = new MemoryWalletStore(),
         scope: WalletScope = {
             namespace: "operation-test",
@@ -91,7 +92,8 @@ export async function fixture() {
         },
     });
     const options = {
-        wallet,
+        wallet: Wallet.fromAddress(wallet.getAddress()),
+
         protocol,
         store,
         chainReader: reader,

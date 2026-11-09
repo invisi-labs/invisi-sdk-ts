@@ -1,5 +1,5 @@
+import { LocalWallet } from "@invisi-labs/core/local";
 import fs from "node:fs";
-import { Wallet } from "@invisi-labs/sdk";
 import { hexlify } from "ethers";
 
 // Derive receiving addresses and viewing keys only during explicit local wallet setup.
@@ -13,7 +13,7 @@ for (const account of Object.values(accounts) as {
     receivingAddress?: string;
     viewingPrivateKey?: `0x${string}`;
 }[]) {
-    const wallet = await Wallet.fromPrivateKey(account.privateKey);
+    const wallet = await LocalWallet.fromPrivateKey(account.privateKey);
     if (account.address.toLowerCase() !== wallet.ownerAddress.toLowerCase()) {
         throw new Error("EVM address does not match its private key");
     }

@@ -1,5 +1,5 @@
 import { settings } from "../settings.js";
-import { PublicWallet } from "@invisi-labs/sdk";
+import { Wallet } from "@invisi-labs/sdk";
 import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
 import { Invisi, InvisiError, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { getAccounts } from "../accounts.js";
@@ -21,7 +21,7 @@ try {
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
 
     // 2. Build a public wallet from an existing full 0i address and configure connections centrally in Invisi.
-    const bobWallet = PublicWallet.fromAddress(bob.receivingAddress);
+    const bobWallet = Wallet.fromAddress(bob.receivingAddress);
     const bobSigner = new EthereumWallet(bob.privateKey, provider);
     const invisi = new Invisi({
         provider,

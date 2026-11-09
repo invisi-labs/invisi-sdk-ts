@@ -1,3 +1,5 @@
+import { authorizeOperation } from "../../../../test-support/native-wallet";
+import { Wallet } from "@invisi-labs/core";
 import { it, expect } from "vitest";
 import { Interface, Wallet as EvmWallet } from "ethers";
 import {
@@ -70,7 +72,14 @@ async function creditFixture(
         commitment,
         prover,
         ownerSession: new WalletSession(sessionOptions({ ...h.options, prover })),
-        spenderSession: new WalletSession(sessionOptions({ ...h.options, wallet: h.bob, prover })),
+        spenderSession: new WalletSession(
+            sessionOptions({
+                ...h.options,
+                wallet: Wallet.fromAddress(h.bob.getAddress()),
+
+                prover,
+            })
+        ),
     };
 }
 it("creates unfunded authority without reserving ordinary Notes", async () => {
@@ -89,7 +98,7 @@ it("creates unfunded authority without reserving ordinary Notes", async () => {
     expect(saved.plan.fundingMode).toBe("none");
     expect(snapshot.reservations).toEqual({});
     expect(saved.plan.credit!.outputs[0]!.state.note.totalSpent).toBe(0n);
-    const ready = await (await operation.authorize()).prove();
+    const ready = await (await authorizeOperation(operation)).prove();
     expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe("createCredit");
 });
 it("reserves consumed Credit state for an owner update while preserving grant usage", async () => {
@@ -105,7 +114,7 @@ it("reserves consumed Credit state for an owner update while preserving grant us
     expect(snapshot.reservations["credit:" + h.commitment]).toBe(operation.id);
     expect(saved.plan.credit!.outputs[0]!.state.note.totalSpent).toBe(h.state.note.totalSpent);
     expect(saved.plan.credit!.outputs[0]!.state.note.revocationSlot).toBe(0n);
-    const ready = await (await operation.authorize()).prove();
+    const ready = await (await authorizeOperation(operation)).prove();
     expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe("updateCredit");
 });
 it("builds a spender draw with a deferred payer receipt, successor and ordinary recipient Note", async () => {
@@ -124,7 +133,7 @@ it("builds a spender draw with a deferred payer receipt, successor and ordinary 
     expect(saved.plan.outputs).toHaveLength(1);
     expect(saved.plan.outputs[0]!.amount).toBe(30n);
     expect(saved.plan.credit!.deliveries).toHaveLength(3);
-    const ready = await (await operation.authorize()).prove();
+    const ready = await (await authorizeOperation(operation)).prove();
     expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe("creditDraw");
 });
 it("serializes reservations to reject concurrent draws of the same Credit state", async () => {

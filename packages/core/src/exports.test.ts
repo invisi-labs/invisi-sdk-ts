@@ -8,12 +8,11 @@ it("provides current Note, Credit and wallet capability primitives", async () =>
         "computeCreditCommitment",
         "recoverCreditState",
         "Wallet",
-        "PublicWallet",
         "ViewingCapability",
         "Detector",
         "Disclosure",
     ] as const)
         expect(typeof api[name]).toBe("function");
-    expect(typeof api.Wallet.fromPrivateKey).toBe("function");
-    expect(typeof api.PublicWallet.fromAddress).toBe("function");
+    expect("fromPrivateKey" in api.Wallet).toBe(false);
+    expect(typeof api.Wallet.fromAddress).toBe("function");
 });

@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { Wallet as EvmWallet, Interface, getAddress } from "ethers";
 import { expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { externallyAuthorize, setup } from "./ExplicitTransaction-fixtures";
 it("binds an immediate public fee and withdrawal while conserving private change", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -29,7 +29,7 @@ it("binds an immediate public fee and withdrawal while conserving private change
 it("never treats a fee-bearing owner withdrawal as an unsigned sweep", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -45,7 +45,7 @@ it("includes the fee in insufficient-funds selection", async () => {
     const h = await setup();
     await expect(
         h.invisi.prepareTransfer({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
@@ -59,7 +59,7 @@ it("includes the fee in insufficient-funds selection", async () => {
 it("exports a non-sendable frozen public intent before authorization for a firm quote", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -149,7 +149,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
         transport
     );
     const original = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -173,7 +173,7 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     const original = await h.invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
@@ -218,7 +218,7 @@ it("rejects excessive or unstable broadcaster fees before signing and preserves 
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -254,7 +254,7 @@ it("requests an app-owned permit once after the gross funding amount stabilizes"
         s: `0x${"22".repeat(32)}` as `0x${string}`,
     };
     const original = await h.invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
@@ -283,7 +283,7 @@ it("re-quotes from the original public funding intent without accumulating fees"
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     const original = await h.invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
@@ -304,7 +304,7 @@ it("broadcasts a zero-input funded transfer while preserving its business paymen
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     const original = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: [],
@@ -332,7 +332,7 @@ it("uses existing private change before increasing mixed public funding", async 
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -355,7 +355,7 @@ it("refreshes caller-only zero nonce and deadline when attaching a broadcaster",
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     h.reader.getFundingNonce = async () => 7n;
     const prepared = await h.invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
@@ -379,7 +379,7 @@ it("stops fee iteration when rebuilt intent pays at least its recalculated fee",
     let calls = 0;
     const client = quoteClient(h.context, () => [10n, 20n, 10n][calls++] ?? 10n);
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,

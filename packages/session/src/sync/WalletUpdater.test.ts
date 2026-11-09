@@ -1,5 +1,10 @@
 import {
-    PublicWallet,
+    applyRefresh,
+    refreshSession,
+    executeWalletRequest,
+} from "../../../../test-support/native-wallet";
+import {
+    Wallet,
     ReceivingAddress,
     ViewingCapability,
     applyCreditDrawUsage,
@@ -109,11 +114,10 @@ async function harness() {
     });
     const store = new MemoryWalletStore();
     const options = {
-        wallet: PublicWallet.fromAddress(ReceivingAddress.fromIdentity(identity).toString()),
+        wallet: Wallet.fromAddress(ReceivingAddress.fromIdentity(identity).toString()),
         protocol,
         store,
         chainReader: reader,
-        viewing,
     };
     const membership: Membership = {
         block: block(),
@@ -613,7 +617,7 @@ it("composes both RPCs and refreshes owned inventory without delegating wallet s
             },
         })
     );
-    const result = await session.refresh({ fromBlock: 12n, detectionKey: key });
+    const result = await refreshSession(session, { fromBlock: 12n, detectionKey: key });
     expect(result.notes).toBe(1);
     expect((await session.balance(token)).availableKnown).toBe(70n);
     expect(getMembership).toHaveBeenCalledTimes(1);
@@ -687,6 +691,70 @@ it("serializes entire multi-page refreshes while a provider request is pending",
     const results = await Promise.all([first, second]);
     expect(results.map((result) => result.block.number)).toEqual([13n, 13n]);
     expect(calls).toEqual(["status", "page:12", "page:13", "status", "page:12", "page:13"]);
+    await applyRefresh(results[0]!);
+    await expect(applyRefresh(results[1]!)).rejects.toThrow(/wallet changed/);
     expect((await session.balance(token)).availableKnown).toBe(70n);
     expect(Object.keys((await h.store.readSnapshot(session.scope)).notes)).toHaveLength(1);
+});
+
+it("stages native requests without writes and validates all responses before committing", async () => {
+    const h = await harness();
+    const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
+    expect(pending.walletRequests).toHaveLength(1);
+    expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
+    const request = pending.walletRequests[0]!;
+    const response = await executeWalletRequest(JSON.parse(JSON.stringify(request)));
+    const bad = structuredClone(response);
+    bad.id = "another-request";
+    await expect(
+        pending.applyWalletResponses([{ requestId: request.id, response: bad }])
+    ).rejects.toThrow(/mismatch/);
+    expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
+    await expect(pending.applyWalletResponses([])).rejects.toThrow(/required/);
+    const forged = structuredClone(
+        response
+    ) as import("@invisi-labs/core").WalletResponse<"wallet.decryptNote">;
+    const bytes = Buffer.from(forged.result.plaintext.slice(2), "hex");
+    bytes[47] = bytes[47]! ^ 1;
+    forged.result.plaintext = `0x${bytes.toString("hex")}`;
+    await expect(
+        pending.applyWalletResponses([{ requestId: request.id, response: forged }])
+    ).rejects.toThrow(/commitment/);
+    expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
+
+    const result = await pending.applyWalletResponses([{ requestId: request.id, response }]);
+    expect(result.notes).toBe(1);
+    expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(1);
+    await expect(
+        pending.applyWalletResponses([{ requestId: request.id, response }])
+    ).rejects.toThrow(/applied/);
+});
+
+it("requires fresh preparation after state changes or canonical history changes", async () => {
+    const h = await harness();
+    const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
+    await h.store.transaction(h.session.scope, (state) => {
+        state.operations.changed = { id: "changed", status: "prepared", inputs: [] };
+    });
+    await expect(applyRefresh(pending)).rejects.toThrow(/wallet changed/);
+    const fresh = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
+    h.reorg();
+    await expect(applyRefresh(fresh)).rejects.toThrow(/canonical|reorg/);
+    const state = await h.store.readSnapshot(h.session.scope);
+    expect(state.notes).toEqual({});
+    expect(state.discoveryThrough).toBeUndefined();
+    expect(state.revision).toBe(1);
+});
+
+it("accepts explicit no-match responses and rejects simultaneous apply attempts", async () => {
+    const h = await harness();
+    const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
+    const responses = pending.walletRequests.map((request) => ({
+        requestId: request.id,
+        response: null,
+    }));
+    const first = pending.applyWalletResponses(responses);
+    await expect(pending.applyWalletResponses(responses)).rejects.toThrow(/applying/);
+    expect((await first).notes).toBe(0);
+    expect((await h.store.readSnapshot(h.session.scope)).notes).toEqual({});
 });

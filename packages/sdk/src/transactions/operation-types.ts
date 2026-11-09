@@ -1,4 +1,4 @@
-import type { PublicWallet, CreditUpdateChanges } from "@invisi-labs/core";
+import type { CreditUpdateChanges } from "@invisi-labs/core";
 import type {
     Address,
     RevokeCreditParams,
@@ -196,7 +196,7 @@ export interface SavedOperation {
     claim?: { stage: string; token: string };
 }
 export interface TransactionInfrastructure {
-    wallet: Wallet | PublicWallet;
+    wallet: Wallet;
     protocol: Protocol;
     chainReader?: ChainReader;
     protocolRpc?: ProtocolDataProvider;

@@ -1,4 +1,5 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { authorizeOperation } from "../../../../test-support/native-wallet";
+import { Wallet } from "@invisi-labs/core";
 import { expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
@@ -7,7 +8,7 @@ import { WalletSession } from "../wallet/WalletSession";
 
 it("prepares an owner-only sweep without exporting a spending key", async () => {
     const h = await fixture();
-    const publicWallet = PublicWallet.fromAddress(h.wallet.getAddress());
+    const publicWallet = Wallet.fromAddress(h.wallet.getAddress());
     const session = new WalletSession(sessionOptions({ ...h.options, wallet: publicWallet }));
     expect(typeof session.prepareTransfer).toBe("function");
     const op = await session.prepareTransfer({
@@ -20,7 +21,7 @@ it("prepares an owner-only sweep without exporting a spending key", async () => 
     expect(op.preview().withdrawalAmount).toBe(100n);
     expect(BigInt(op.preview().withdrawalAddress!)).toBe(BigInt(h.wallet.ownerAddress));
     expect(op.preview().outputs).toEqual([]);
-    await expect(op.authorize()).rejects.toThrow(/does not require/);
+    await expect(authorizeOperation(op)).rejects.toThrow(/does not require/);
 });
 
 it("rejects duplicate and unavailable sweep inputs", async () => {
@@ -64,7 +65,7 @@ it("builds ready sweep calldata through the public-wallet operation without auth
     const session = new WalletSession(
         sessionOptions({
             ...h.options,
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             prover: { prove, verify: vi.fn(async () => true) },
         })
     );
@@ -90,7 +91,7 @@ it.each(["different-owner", "partial", "private-output", "cash-input"] as const)
     "requires spending authorization for %s payouts",
     async (scenario) => {
         const h = await fixture();
-        const wallet = PublicWallet.fromAddress(h.wallet.getAddress());
+        const wallet = Wallet.fromAddress(h.wallet.getAddress());
         const session = new WalletSession(sessionOptions({ ...h.options, wallet }));
         const operation = await session.prepareTransfer({
             tokenAddress: h.context.tokenAddress,
@@ -159,7 +160,7 @@ it("atomically replaces one managed reservation after a firm quote and fences th
     const snapshot = await h.store.readSnapshot(h.scope);
     expect(Object.keys(snapshot.operations)).toEqual([quoted.id]);
     expect(snapshot.reservations[h.leaf]).toBe(quoted.id);
-    await expect(original.authorize()).rejects.toThrow(/stale/);
+    await expect(authorizeOperation(original)).rejects.toThrow(/stale/);
 });
 
 it("retains managed reservations on quote failure and commits only one competing attachment", async () => {

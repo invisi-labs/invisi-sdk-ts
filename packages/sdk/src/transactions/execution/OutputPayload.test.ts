@@ -1,4 +1,4 @@
-import { PublicWallet, fundsV1 } from "@invisi-labs/core";
+import { Wallet, fundsV1 } from "@invisi-labs/core";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import { expect, it } from "vitest";
@@ -15,7 +15,7 @@ it.each(["shield", "transfer"] as const)(
             memo: "input metadata must not be inherited",
         });
         const common = {
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [
@@ -78,7 +78,7 @@ it.each(["shield", "transfer"] as const)(
         const payload = new Uint8Array([255, 99, 0, 128]);
         const expectedPayload = payload.slice();
         const common = {
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n, payload })],

@@ -1,4 +1,5 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { authorizeOperation } from "../../../../test-support/native-wallet";
+import { Wallet } from "@invisi-labs/core";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { expect, it } from "vitest";
 import { canonicalBlock, fixture, receiptLog } from "../../../../test-support/operation-fixture";
@@ -10,13 +11,13 @@ it("reconciles spent facts at the latest canonical block when confirming an olde
     const h = await fixture(),
         session = new WalletSession(sessionOptions({ ...h.options, prover: prover() })),
         ready = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
-            ).authorize()
+            )
         ).prove(),
         call = await ready.exportTransaction(),
         hash = `0x${"77".repeat(32)}` as const,
@@ -57,14 +58,14 @@ it.each(["observedThrough"] as const)(
         const h = await fixture(),
             session = new WalletSession(sessionOptions({ ...h.options, prover: prover() })),
             ready = await (
-                await (
+                await authorizeOperation(
                     await session.prepareTransfer({
                         tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                         deadline: 2000000050n,
                         outputs: [],
                         withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                     })
-                ).authorize()
+                )
             ).prove();
         await ready.exportTransaction();
         const original = h.reader.getBlock;
@@ -111,13 +112,13 @@ it("late confirmation updates a previously discovered change note to its current
     const h = await fixture(),
         session = new WalletSession(sessionOptions({ ...h.options, prover: prover() })),
         ready = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: signer.address, amount: 30n },
                 })
-            ).authorize()
+            )
         ).prove(),
         call = await ready.exportTransaction(),
         hash = `0x${"a1".repeat(32)}` as const;
@@ -208,7 +209,7 @@ it("tracks an application transaction hash without broadcasting and keeps reserv
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
-    const ready = await (await prepared.authorize()).prove();
+    const ready = await (await authorizeOperation(prepared)).prove();
     const call = await ready.exportTransaction();
     expect(call.to).toBe(h.protocol.context.protocolAddress);
     const hash = `0x${"ab".repeat(32)}`;
@@ -233,7 +234,7 @@ it("reconciles an ethers replacement hash only after independently checking the 
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
-    const ready = await (await prepared.authorize()).prove();
+    const ready = await (await authorizeOperation(prepared)).prove();
     const call = await ready.exportTransaction();
     const hash = `0x${"88".repeat(32)}` as const;
     const replacement = `0x${"99".repeat(32)}` as const;
@@ -266,7 +267,7 @@ it("checks protocol facts before export without taking responsibility for EVM fe
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
-    const ready = await (await prepared.authorize()).prove();
+    const ready = await (await authorizeOperation(prepared)).prove();
     await expect(ready.trackTransaction("invalid hash")).rejects.toThrow(/hash/);
     h.reader.isSpent = async (_, values) => values.map(() => true);
     await expect(ready.exportTransaction()).rejects.toThrow(/spent/);
@@ -289,7 +290,7 @@ it("recovers a known unencrypted owned opening on confirmation without inventing
     const session = new WalletSession(
         sessionOptions({
             ...h.options,
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
         })
     );
     const ready = await (

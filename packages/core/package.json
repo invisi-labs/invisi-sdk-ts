@@ -26,6 +26,11 @@
       "types": "./dist/credit.d.ts",
       "import": "./dist/credit.js",
       "require": "./dist/credit.cjs"
+    },
+    "./local": {
+      "types": "./dist/local.d.ts",
+      "import": "./dist/local.js",
+      "require": "./dist/local.cjs"
     }
   },
   "scripts": {

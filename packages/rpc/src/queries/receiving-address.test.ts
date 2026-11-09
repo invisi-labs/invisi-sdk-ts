@@ -1,4 +1,5 @@
-import { ReceivingAddress, Wallet } from "@invisi-labs/core";
+import { LocalWallet } from "@invisi-labs/core/local";
+import { ReceivingAddress } from "@invisi-labs/core";
 import { hexlify } from "ethers";
 import { describe, expect, it } from "vitest";
 import { ProtocolRpcClient } from "../client/ProtocolRpcClient";
@@ -17,7 +18,7 @@ const deployment = {
 const block = { number: 12, hash: h(12), parentHash: h(11), timestamp: 123 };
 
 async function fixture() {
-    const wallet = await Wallet.fromPrivateKey(h(3));
+    const wallet = await LocalWallet.fromPrivateKey(h(3));
     const keys = ReceivingAddress.parse(wallet.getAddress()).getReceivingKeys();
     return {
         ownerAddress: owner,

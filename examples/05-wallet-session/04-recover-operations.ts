@@ -1,3 +1,5 @@
+import { refreshFromHost } from "./host-refresh.js";
+import { LocalWallet } from "@invisi-labs/core/local";
 import { WalletSession } from "@invisi-labs/session";
 import { settings } from "../settings.js";
 import { hkdfSync } from "node:crypto";
@@ -31,8 +33,9 @@ try {
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const tokenAddress = settings.tokenAddress;
-    // The Session holds the current account's signing and viewing capabilities; recipients still need only a public address.
-    const wallet = await Wallet.fromPrivateKey(alice.privateKey);
+    // This Node example uses an explicit local executor; mobile hosts execute requests in native code.
+    const localExecutor = await LocalWallet.fromPrivateKey(alice.privateKey);
+    const wallet = Wallet.fromAddress(localExecutor.getAddress());
     const signer = new EthereumWallet(alice.privateKey, provider);
 
     // This local experiment derives a storage key, not a protocol key; production wallets obtain a CryptoKey from the host's key management system.
@@ -69,7 +72,7 @@ try {
         // If the preceding operation was verified, wait for the RPC index to reach its confirmation block before running this example.
         // Synchronize the inventory before reconciling operations; reconciliation may observe a chain head newer than the RPC index.
         // Do not refresh again immediately after reconciliation while the RPC index is still catching up.
-        await session.refresh({
+        await refreshFromHost(session, localExecutor, {
             fromBlock: initial.invalidated
                 ? protocol.deployment.protocol.fromBlock
                 : (initial.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock),
@@ -92,7 +95,7 @@ try {
                     throw error;
                 }
                 // If reconciliation discovers a reorg, rebuild before restoring the handle; retry reconciliation only, without resending the payment.
-                await session.refresh({
+                await refreshFromHost(session, localExecutor, {
                     fromBlock: protocol.deployment.protocol.fromBlock,
                     reset: true,
                 });

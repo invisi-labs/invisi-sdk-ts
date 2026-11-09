@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import type { Prover } from "@invisi-labs/prover";
 import { Wallet as EvmWallet, Interface } from "ethers";
@@ -27,7 +27,7 @@ describe("explicit transactions without a wallet store", () => {
         ).toThrow(/WalletSession.*store/);
         const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
         const prepared = await invisi.prepareTransfer({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs,
@@ -66,7 +66,7 @@ describe("explicit transactions without a wallet store", () => {
 it("authorizes, proves, verifies and exports without any store", async () => {
     const h = await setup();
     const options = {
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -93,7 +93,7 @@ it("authorizes, proves, verifies and exports without any store", async () => {
 it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", async () => {
     const h = await setup();
     const options = {
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -102,7 +102,7 @@ it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", 
     await expect(
         h.invisi.prepareTransfer({
             ...options,
-            wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
         })
     ).rejects.toThrow(/identity/);
     await expect(
@@ -127,7 +127,7 @@ it("rejects other-wallet inputs, duplicates, spent leaves and modified proofs", 
 it("uses all explicit inputs even when public funding covers the requested output", async () => {
     const h = await setup();
     const op = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -141,7 +141,7 @@ it("uses all explicit inputs even when public funding covers the requested outpu
 it("supports full owner-only sweeps and recursive member export", async () => {
     const h = await setup();
     const identity = {
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -156,7 +156,7 @@ it("supports full owner-only sweeps and recursive member export", async () => {
     expect((await swept.exportTransaction()).to).toBe(h.context.protocolAddress);
     const recursive = await h.invisi.prepareTransfer({
         ...identity,
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const ready = await (await externallyAuthorize(recursive)).prove({ execution: "aggregate" });
@@ -169,7 +169,7 @@ it.each([undefined, "single", "aggregate"] as const)(
     async (execution) => {
         const h = await setup();
         const prepared = await h.invisi.prepareTransfer({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
@@ -198,7 +198,7 @@ it.each([undefined, "single", "aggregate"] as const)(
 it("rejects unsupported execution modes without invoking the prover", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -214,7 +214,7 @@ it("rejects unsupported execution modes without invoking the prover", async () =
 it("rejects aggregation above10 slots without invoking the prover", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -235,7 +235,7 @@ it.each(["evm", "noir-recursive", null, "invalid"])(
     async (execution) => {
         const h = await setup();
         const prepared = await h.invisi.prepareTransfer({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,
@@ -256,7 +256,7 @@ it("supports public shield and signature-funded outputs using independent EVM au
             (await payer.signTypedData(typed.domain, typed.types, typed.message)) as `0x${string}`,
     };
     const identity = {
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
     };
@@ -285,14 +285,14 @@ it("supports public shield and signature-funded outputs using independent EVM au
 it("freezes each operation independently when one Invisi serves multiple wallets", async () => {
     const h = await setup();
     const first = await h.invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.wallet.getAddress(), amount: 1n })],
         funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
     });
     const second = await h.invisi.prepareShield({
-        wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+        wallet: Wallet.fromAddress(h.bob.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 2n })],
@@ -306,7 +306,7 @@ it("freezes each operation independently when one Invisi serves multiple wallets
 it("checks explicit note preimages, token scope and canonical paths", async () => {
     const h = await setup();
     const request = {
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -346,7 +346,7 @@ it("checks explicit note preimages, token scope and canonical paths", async () =
 it("cancels local work and fences concurrent or stale handles", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,
@@ -391,7 +391,7 @@ it("cancels local work and fences concurrent or stale handles", async () => {
 it("respects explicit sweep subsets rather than creating unsigned change", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
-        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         inputs: h.inputs,

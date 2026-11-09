@@ -1,3 +1,4 @@
+import { authorizeOperation } from "../../../../test-support/native-wallet";
 import type { ProofBundle } from "@invisi-labs/prover";
 import { expect, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -19,13 +20,13 @@ it("fences a stale proving worker after explicit operation recovery", async () =
         });
     };
     const session = new WalletSession(sessionOptions({ ...h.options, prover: backend })),
-        op = await (
+        op = await authorizeOperation(
             await session.prepareTransfer({
                 tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                 outputs: [],
                 withdrawal: { to: h.bob.ownerAddress, amount: 100n },
             })
-        ).authorize(),
+        ),
         pending = op.prove();
     await begun;
     const recovered = await session.resume(op.id);
@@ -39,13 +40,13 @@ it("does not release a live authorization after a reverted transaction and relea
     const h = await fixture(),
         session = new WalletSession(sessionOptions({ ...h.options, prover: prover() }));
     const ready = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
-            ).authorize()
+            )
         ).prove(),
         call = await ready.exportTransaction(),
         hash = `0x${"12".repeat(32)}` as const;
@@ -76,13 +77,13 @@ it("invalidates operation observations and restores locks after a canonical reor
     const h = await fixture(),
         session = new WalletSession(sessionOptions({ ...h.options, prover: prover() }));
     const ready = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
-            ).authorize()
+            )
         ).prove(),
         call = await ready.exportTransaction(),
         hash = `0x${"33".repeat(32)}` as const;

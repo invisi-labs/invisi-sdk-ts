@@ -1,4 +1,4 @@
-import type { CreditDeliveryState, Note, PublicWallet } from "@invisi-labs/core";
+import type { CreditDeliveryState, Note, Wallet } from "@invisi-labs/core";
 import type { Protocol } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import type {
@@ -24,7 +24,7 @@ export interface CreditInput {
     role: "owner" | "spender";
 }
 export interface TransactionIdentity {
-    wallet: PublicWallet & {
+    wallet: Wallet & {
         getViewer?: never;
         getDetector?: never;
         exportAuthorization?: never;

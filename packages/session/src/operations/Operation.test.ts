@@ -1,4 +1,5 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { authorizeOperation } from "../../../../test-support/native-wallet";
+import { Wallet } from "@invisi-labs/core";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import { expect, it, vi } from "vitest";
@@ -17,7 +18,7 @@ it("authorizes exactly the frozen statement, verifies the local proof, and retur
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     await expect(prepared.prove()).rejects.toThrow(/authoriz/);
-    const authorized = await prepared.authorize(),
+    const authorized = await authorizeOperation(prepared),
         ready = await authorized.prove();
     expect(ready.status).toBe("ready");
     expect(backend.verify).toHaveBeenCalledOnce();
@@ -50,7 +51,7 @@ it("rejects proof metadata and statement changes even when a custom verifier ret
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
-    await expect((await op.authorize()).prove()).rejects.toThrow(/proof/);
+    await expect((await authorizeOperation(op)).prove()).rejects.toThrow(/proof/);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(op.id);
 });
 
@@ -66,7 +67,7 @@ it("proofs precede EVM funding signatures; public funding needs no private walle
     const session = new WalletSession(
         sessionOptions({
             ...h.options,
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             prover: backend,
             fundingSigner,
         })
@@ -93,13 +94,13 @@ it("confirms only exact canonical calldata and records operation facts without c
     const h = await fixture(),
         session = new WalletSession(sessionOptions({ ...h.options, prover: prover() }));
     const ready = await (
-            await (
+            await authorizeOperation(
                 await session.prepareTransfer({
                     tokenAddress: "0x2222222222222222222222222222222222222222" as const,
                     outputs: [],
                     withdrawal: { to: h.bob.ownerAddress, amount: 100n },
                 })
-            ).authorize()
+            )
         ).prove(),
         call = await ready.exportTransaction(),
         hash = `0x${"13".repeat(32)}` as const;
@@ -142,7 +143,7 @@ it("requires one explicit caller-funded shield encoding and never broadcasts an 
         session = new WalletSession(
             sessionOptions({
                 ...h.options,
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
             })
         );
     const prepared = await session.prepareShield({
@@ -193,8 +194,8 @@ it("derives nullifiers automatically while using an external authorization provi
         session = new WalletSession(
             sessionOptions({
                 ...h.options,
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-                authorization: h.wallet.exportAuthorization(),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
+
                 prover: prover(),
             })
         );
@@ -203,7 +204,7 @@ it("derives nullifiers automatically while using an external authorization provi
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 100n },
     });
-    expect((await (await prepared.authorize()).prove()).status).toBe("ready");
+    expect((await (await authorizeOperation(prepared)).prove()).status).toBe("ready");
 });
 
 it("uses an explicitly injected ERC-1271 verifier for a contract payer funding grant", async () => {
@@ -218,7 +219,7 @@ it("uses an explicitly injected ERC-1271 verifier for a contract payer funding g
         session = new WalletSession(
             sessionOptions({
                 ...h.options,
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 prover: prover(),
                 fundingSigner,
                 fundingVerifier,
@@ -257,7 +258,7 @@ it.each(["funding-nonce", "funding-expiry", "unknown-root"] as const)(
                 outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 120n })],
                 funding: { payer: signer.address, amount: 20n, deadline: 2000000050n },
             }),
-            ready = await (await (await prepared.authorize()).prove()).authorizeFunding();
+            ready = await (await (await authorizeOperation(prepared)).prove()).authorizeFunding();
         await ready.exportTransaction();
         if (mode === "funding-nonce") h.reader.getFundingNonce = async () => 1n;
         if (mode === "unknown-root") h.reader.isKnownRoot = async () => false;

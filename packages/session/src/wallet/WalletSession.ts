@@ -1,4 +1,5 @@
 import { Wallet } from "@invisi-labs/core";
+import { prepareWalletRefresh } from "../sync/WalletRefresh";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     configureTransactionInfrastructure,
@@ -26,8 +27,7 @@ import type {
 } from "../operations/operation-types";
 import { walletBalance, type WalletScope } from "../storage/state";
 import { scopeKey } from "../storage/store";
-import { refreshWallet, type RefreshOptions } from "../sync/refresh";
-import { WalletUpdater } from "../sync/WalletUpdater";
+import { type RefreshOptions } from "../sync/refresh";
 
 /** Native ethers transaction options; the exported business call and session chain remain fixed. */
 export type SessionTransactionOptions = Omit<
@@ -38,7 +38,6 @@ export type SessionTransactionOptions = Omit<
 /** Wallet state and operations, with infrastructure and permissions explicitly injected. */
 export class WalletSession {
     readonly #options: WalletSessionInfrastructure;
-    #updater: WalletUpdater | undefined;
     readonly #listeners = new Set<() => void>();
     readonly #sending = new Set<string>();
     #refreshQueue: Promise<unknown> = Promise.resolve();
@@ -71,8 +70,6 @@ export class WalletSession {
             "namespace",
             "store",
             "signer",
-            "viewing",
-            "authorization",
             "fundingSigner",
             "coinSelector",
         ];
@@ -82,6 +79,8 @@ export class WalletSession {
                     `Unknown session option: ${key}; configure infrastructure on Invisi`
                 );
         }
+        if (!(configuration.wallet instanceof Wallet))
+            throw new TypeError("public Wallet required");
         const { invisi, ...local } = configuration;
         const options: WalletSessionInfrastructure = configureTransactionInfrastructure({
             ...invisi.getInfrastructure(),
@@ -193,37 +192,7 @@ export class WalletSession {
             scope: this.scope,
             store: options.store,
             reader: options.chainReader,
-            authorization: () => {
-                if (options.authorization) return options.authorization;
-                if (options.wallet instanceof Wallet) return options.wallet.exportAuthorization();
-                throw new MissingCapabilityError("wallet authorization");
-            },
         };
-    }
-
-    private updater(): WalletUpdater {
-        if (this.#updater) return this.#updater;
-        const options = this.#options;
-        if (!options.store || !options.chainReader || !options.protocolRpc)
-            throw new MissingCapabilityError("wallet store, chain reader and Protocol RPC");
-        const viewing =
-            options.viewing ??
-            (options.wallet instanceof Wallet ? options.wallet.getViewer() : undefined);
-        if (!viewing) throw new MissingCapabilityError("viewing");
-        const receivingAddress = options.wallet.getReceivingAddress();
-        const receivingKeys =
-            receivingAddress.kind === "long" ? receivingAddress.getReceivingKeys() : undefined;
-        this.#updater = new WalletUpdater({
-            protocol: options.protocol,
-            scope: this.scope,
-            store: options.store,
-            reader: options.chainReader,
-            viewing,
-
-            protocolRpc: options.protocolRpc,
-            ...(receivingKeys ? { receivingKeys } : {}),
-        });
-        return this.#updater;
     }
 
     /** Local session commits only. Host applications own cross-tab/store subscriptions. */
@@ -257,50 +226,21 @@ export class WalletSession {
         return walletBalance(await store.readSnapshot(this.scope), getAddress(tokenAddress) as Hex);
     }
 
-    /** Pull explicitly selected indexed pages; no chain scanning or public tree reconstruction. */
+    /** Stage indexed pages and return native requests; apply explicit responses to commit state. */
     async refresh(options: RefreshOptions) {
         await this.ready();
         const provider = this.#options.protocolRpc;
         const reader = this.#options.chainReader;
         if (!reader) throw new MissingCapabilityError("chain reader");
         if (!provider) throw new MissingCapabilityError("Protocol RPC");
-        const updater = this.updater();
+        if (!this.#options.store) throw new MissingCapabilityError("wallet store");
         const request = {
             ...options,
             ...(options.detectionKey ? { detectionKey: options.detectionKey.slice() } : {}),
         };
-        const task = this.#refreshQueue.then(async () => {
-            const result = await refreshWallet(
-                {
-                    provider,
-                    reader,
-                    context: this.protocol.context,
-                    fromBlock: this.protocol.deployment.protocol.fromBlock,
-                    apply: (batch, settings) => updater.applyUpdates(batch, settings),
-                },
-                request
-            );
-            // Advance discovery only after every requested page succeeds. Reconciliation may
-            // observe newer blocks without enumerating any incoming transactions.
-            await this.#options.store!.transaction(this.scope, (state) => {
-                request.signal?.throwIfAborted();
-                if (state.invalidated) throw new Error("wallet requires canonical resync");
-                const previous = state.discoveryThrough;
-                const start = previous
-                    ? previous.number + 1n
-                    : this.protocol.deployment.protocol.fromBlock;
-                if (
-                    request.fromBlock <= start &&
-                    (!previous || result.block.number >= previous.number)
-                ) {
-                    state.discoveryThrough = {
-                        number: result.block.number,
-                        hash: result.block.hash,
-                    };
-                }
-            });
-            return result;
-        });
+        const task = this.#refreshQueue.then(() =>
+            prepareWalletRefresh(this.#options, this.scope, request)
+        );
         this.#refreshQueue = task.catch(() => {});
         return task;
     }

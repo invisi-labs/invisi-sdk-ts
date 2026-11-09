@@ -1,3 +1,4 @@
+import { LocalWallet } from "@invisi-labs/core/local";
 import { WalletSession } from "@invisi-labs/session";
 import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
@@ -33,8 +34,9 @@ try {
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const tokenAddress = settings.tokenAddress;
-    // The Session holds the current account's signing and viewing capabilities; recipients still need only a public address.
-    const wallet = await Wallet.fromPrivateKey(alice.privateKey);
+    // This Node example uses an explicit local executor; mobile hosts execute requests in native code.
+    const localExecutor = await LocalWallet.fromPrivateKey(alice.privateKey);
+    const wallet = Wallet.fromAddress(localExecutor.getAddress());
     const signer = new EthereumWallet(alice.privateKey, provider);
 
     // This local experiment derives a storage key, not a protocol key; production wallets obtain a CryptoKey from the host's key management system.

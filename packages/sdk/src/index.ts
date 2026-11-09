@@ -1,10 +1,11 @@
 export {
+    acceptWalletResponse,
+    prepareWalletRequest,
     Detector,
     Disclosure,
     MAX_MEMO_BYTES,
     MissingCapabilityError,
     NullifierCapability,
-    PublicWallet,
     ViewingCapability,
     Wallet,
     WalletAuthorization,
@@ -17,6 +18,13 @@ export {
     fundsV1,
 } from "@invisi-labs/core";
 export type {
+    WalletRequest,
+    WalletResponse,
+    WalletRequestProvider,
+    WalletMethod,
+    WalletParams,
+    WalletResults,
+    PreparedWalletRequest,
     Address,
     CreditDataV1,
     CreditDeliveryState,

@@ -78,13 +78,6 @@ export async function verifyPaymentNote(
     await protocol.validateDeployment(reader);
     if (wallet && getAddress(wallet.ownerAddress) !== getAddress(data.ownerAddress))
         throw new Error("Payment note owner mismatch");
-    if (wallet) {
-        if (typeof wallet.exportAuthorization !== "function")
-            throw new Error("Wallet spending authorization capability required");
-        const authorization = wallet.exportAuthorization();
-        if (getAddress(authorization.ownerAddress) !== getAddress(data.ownerAddress))
-            throw new Error("Wallet authorization owner mismatch");
-    }
     const latest = await reader.getLatestBlockNumber();
     const number = latest - BigInt(confirmations - 1);
     if (number < protocol.deployment.protocol.fromBlock)

@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { expect, it } from "vitest";
 import { testOutput } from "../../../../../test-support/test-output";
 import { externallyAuthorize, setup } from "./ExplicitTransaction-fixtures";
@@ -11,7 +11,7 @@ realNativeProof(
         const { NativeProver } = await import("@invisi-labs/prover/native");
         const prover = new NativeProver({ bbBin: process.env.BB_BINARY_PATH!, threads: 4 });
         const prepared = await h.invisi.prepareTransfer({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
             inputs: h.inputs,

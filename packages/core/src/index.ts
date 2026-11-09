@@ -89,7 +89,7 @@ export type {
     WalletBytes,
     WalletOperation,
 } from "./wallet/wallet";
-export { PublicWallet, Wallet } from "./wallet/wallet-object";
+export { Wallet } from "./wallet/wallet-object";
 
 export type { Address, Hex } from "./crypto/primitives";
 
@@ -113,3 +113,18 @@ export { AGGREGATE_ROUTES, selectAggregateRoute } from "./note/aggregate-routes"
 export type { AggregateRoute } from "./note/aggregate-routes";
 
 export type { CreditUpdateChanges } from "./credit/state";
+
+export { prepareWalletRequest, acceptWalletResponse } from "./wallet/wallet-wire";
+export type {
+    WalletAcceptedResults,
+    WalletHex,
+    WalletMethod,
+    WalletWireContext,
+    WalletDecryptContext,
+    WalletParams,
+    WalletResults,
+    WalletRequest,
+    WalletResponse,
+    WalletRequestProvider,
+    PreparedWalletRequest,
+} from "./wallet/wallet-wire";

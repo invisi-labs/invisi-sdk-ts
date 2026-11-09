@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { expect, it } from "vitest";
 import { fixture } from "../../../../../test-support/operation-fixture";
 import { testOutput } from "../../../../../test-support/test-output";
@@ -22,7 +22,7 @@ it("rejects a full wallet rather than inheriting its private authority", async (
             outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 1n })],
             funding: { payer: h.wallet.ownerAddress, amount: 1n, authorization: "caller" },
         })
-    ).rejects.toThrow(/PublicWallet|public wallet/i);
+    ).rejects.toThrow(/Wallet|public wallet/i);
 });
 
 it.each(["authorization", "signer", "fundingSigner", "viewing"])(
@@ -32,7 +32,7 @@ it.each(["authorization", "signer", "fundingSigner", "viewing"])(
         const invisi = new Invisi({ chainReader: h.reader, protocolRpc: h.membership });
         await expect(
             invisi.prepareShield({
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
                 tokenAddress: h.context.tokenAddress,
                 outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 1n })],

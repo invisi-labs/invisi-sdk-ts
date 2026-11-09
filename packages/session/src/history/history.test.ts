@@ -1,3 +1,5 @@
+import { refreshSession } from "../../../../test-support/native-wallet";
+import { Wallet } from "@invisi-labs/core";
 import { Invisi } from "@invisi-labs/sdk/session-support";
 import { expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -67,7 +69,8 @@ it("connects explicit session signers without enabling infrastructure signer def
     const session = await WalletSession.connect({
         invisi,
         store: h.store,
-        wallet: h.wallet,
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+
         protocol: h.protocol,
         signer: signer as never,
     });
@@ -148,7 +151,7 @@ it("restores history and reservations through a newly opened encrypted store", a
 it("does not confuse chain observations with successfully scanned history ranges", async () => {
     const h = await fixture();
     expect((await h.session.getHistory()).checkedThrough).toBeNull();
-    await h.session.refresh({ fromBlock: 0n, toBlock: 12n });
+    await refreshSession(h.session, { fromBlock: 0n, toBlock: 12n });
     expect((await h.session.getHistory()).checkedThrough?.number).toBe(12n);
     await h.store.transaction(h.scope, (state) => {
         state.observedThrough = { number: 100n, hash: state.observedThrough!.hash };
@@ -158,7 +161,7 @@ it("does not confuse chain observations with successfully scanned history ranges
 
 it("does not advance discovery over gaps or after a partially failed range", async () => {
     const h = await fixture();
-    await h.session.refresh({ fromBlock: 1n, toBlock: 12n });
+    await refreshSession(h.session, { fromBlock: 1n, toBlock: 12n });
     expect((await h.session.getHistory()).checkedThrough).toBeNull();
     vi.spyOn(h.membership, "getCreditTransitions").mockImplementation(async (_, range) => ({
         block: { ...(await h.reader.getBlock(range.toBlock)), number: range.toBlock },
@@ -170,9 +173,9 @@ it("does not advance discovery over gaps or after a partially failed range", asy
         const block = { ...(await h.reader.getBlock(range.toBlock)), number: range.toBlock };
         return { block, notes: [] };
     });
-    await expect(h.session.refresh({ fromBlock: 0n, toBlock: 12n, pageSize: 5 })).rejects.toThrow(
-        /indexer unavailable/
-    );
+    await expect(
+        refreshSession(h.session, { fromBlock: 0n, toBlock: 12n, pageSize: 5 })
+    ).rejects.toThrow(/indexer unavailable/);
     expect(pages).toBe(2);
     expect((await h.session.getHistory()).checkedThrough).toBeNull();
 });

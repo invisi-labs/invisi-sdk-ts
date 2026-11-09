@@ -1,7 +1,8 @@
+import { LocalWallet } from "./local-wallet";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { describe, expect, it } from "vitest";
-import { Wallet, signWalletAuthorization, verifyWalletAuthorization } from "../index";
+import { signWalletAuthorization, verifyWalletAuthorization } from "../index";
 import vectors from "./testdata/wallet-kdf-vectors.json";
 import { deriveWallet } from "./wallet";
 
@@ -35,8 +36,9 @@ describe("EVM account key restoration", () => {
         const row = vectors.vectors[0]!;
         const input = hexToBytes(row.privateKey.slice(2));
         const before = input.slice();
-        const wallet = await Wallet.fromPrivateKey(input);
-        const restore: (privateKey: string | Uint8Array) => Promise<Wallet> = Wallet.fromPrivateKey;
+        const wallet = await LocalWallet.fromPrivateKey(input);
+        const restore: (privateKey: string | Uint8Array) => Promise<LocalWallet> =
+            LocalWallet.fromPrivateKey;
         const restored = await restore(row.privateKey);
         expect(wallet.getAddress()).toBe(restored.getAddress());
         expect(wallet.ownerAddress).toBe(restored.ownerAddress);
@@ -86,7 +88,7 @@ describe("EVM account key restoration", () => {
             "0x1",
             `0x${secp256k1.CURVE.n.toString(16)}`,
         ]) {
-            await expect(Wallet.fromPrivateKey(input)).rejects.toThrow();
+            await expect(LocalWallet.fromPrivateKey(input)).rejects.toThrow();
         }
     });
 });

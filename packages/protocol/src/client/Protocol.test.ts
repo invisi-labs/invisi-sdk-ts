@@ -1,3 +1,4 @@
+import { LocalWallet } from "@invisi-labs/core/local";
 import { ReceivingAddress, Wallet } from "@invisi-labs/core";
 import { describe, expect, it } from "vitest";
 import { AddressRegistry, TokenProtocol } from "../index";
@@ -56,7 +57,7 @@ describe("deployment scoped protocol objects", () => {
 });
 
 it("resolves address strings to a full address string without exposing parsing objects", async () => {
-    const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     let calls = 0;
     const registry = new AddressRegistry(
         { chainId: context.chainId, registryAddress: context.protocolAddress },
@@ -75,7 +76,7 @@ it("resolves address strings to a full address string without exposing parsing o
 });
 
 it("rejects malformed strings and unresolved short addresses", async () => {
-    const wallet = await Wallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const registry = new AddressRegistry({
         chainId: context.chainId,
         registryAddress: context.protocolAddress,

@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/core";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import { Invisi, InvisiError, NoteOutput } from "@invisi-labs/sdk";
 import { Interface, type Provider } from "ethers";
@@ -8,7 +8,7 @@ import { sessionOptions } from "../../../../test-support/session-options";
 import { WalletSession } from "./WalletSession";
 
 const shield = (h: Awaited<ReturnType<typeof registryFixture>>, output: NoteOutput) => ({
-    wallet: PublicWallet.fromAddress(h.h.wallet.getAddress()),
+    wallet: Wallet.fromAddress(h.h.wallet.getAddress()),
     protocol: h.protocol,
     tokenAddress: h.h.context.tokenAddress,
     outputs: [output],

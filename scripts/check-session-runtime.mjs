@@ -46,7 +46,7 @@ for (const format of ["js", "cjs"]) {
         },
     });
     const invisi = new sdk.Invisi({ chainReader: reader });
-    const wallet = sdk.PublicWallet.fromAddress(ownerAddress);
+    const wallet = sdk.Wallet.fromAddress(ownerAddress);
     const store = new memory.MemoryWalletStore();
     const managed = await session.WalletSession.connect({ invisi, wallet, protocol, store });
     const output = await sdk.NoteOutput.create({

@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import {
-    PublicWallet,
+    Wallet,
     computeCreditCommitment,
     normalizeCreditPolicy,
     type CreditDeliveryState,
@@ -48,7 +48,7 @@ real(
         const unlimitedCommitment = await computeCreditCommitment(unlimitedState.note);
         await h.tree.insert(BigInt(unlimitedCommitment));
         const identity = {
-                wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+                wallet: Wallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
                 tokenAddress: h.context.tokenAddress,
             },
@@ -72,7 +72,7 @@ real(
             }),
             draw = await h.invisi.prepareDrawCredit({
                 ...identity,
-                wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+                wallet: Wallet.fromAddress(h.bob.getAddress()),
                 creditInputs: [{ ...input, role: "spender" }],
                 credits: [{ credit: commitment, amount: 30n }],
                 recipient: h.wallet.getAddress(),

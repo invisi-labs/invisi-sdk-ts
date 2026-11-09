@@ -5,7 +5,7 @@ import {
     type CreditInput,
     type Protocol,
     type ProtocolRpcClient,
-    type PublicWallet,
+    type Wallet,
     type ViewingCapability,
     type IndexedCreditState,
 } from "@invisi-labs/sdk";
@@ -44,7 +44,7 @@ export async function discoverCredits({
     provider: Provider;
     protocolRpc: ProtocolRpcClient;
     protocol: Protocol;
-    wallet: PublicWallet;
+    wallet: Wallet;
     viewer: ViewingCapability;
     tokenAddress: `0x${string}`;
     role: "owner" | "spender";

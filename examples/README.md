@@ -12,7 +12,7 @@ pnpm build
 pnpm examples wallet
 ```
 
-`wallet` is entirely offline and uses a public test mnemonic. Never fund its accounts. On-chain examples require Node.js 22.13 or newer for `node:sqlite`, a funded EVM testnet, and a matching deployed protocol. Chain 97 is the verified default, not a restriction.
+`wallet` is entirely offline and uses a public test private key. Never fund its accounts. On-chain examples require Node.js 22.13 or newer for `node:sqlite`, a funded EVM testnet, and a matching deployed protocol. Chain 97 is the verified default, not a restriction.
 
 ### Customize connections and token
 
@@ -181,3 +181,5 @@ const input = spendable.toInput();
 The sections above are separate recipient/payer steps, using the selected protocol, token and amount from the payment examples. They are not one additional executable scenario. IPN can be exported before submission, but only chain verification establishes receipt. `getOutputs()` includes generated change, so select the intended recipient's output. EVM recipients can also export IPN, with or without a chain envelope; identity-only recipients cannot. IPN contains private Note data and no wallet keys. Neither verification method signs or submits a transaction.
 
 For encoding layouts, nonce overrides and explicit verification connections, see [IPR](../README.md#portable-note-payment-requests-ipr) and [IPN](../README.md#offline-payment-notes-ipn).
+
+Node examples use `LocalWallet` from `@invisi-labs/core/local` as an explicit request executor. Production mobile applications use their native wallet transport with the same public `Wallet` and request/response API.

@@ -1,4 +1,3 @@
-import type { ViewingCapability, WalletAuthorizationProvider } from "@invisi-labs/core";
 import type { Invisi } from "@invisi-labs/sdk";
 import type {
     FundingSigner,
@@ -15,8 +14,6 @@ export interface WalletSessionOptions {
     namespace?: string;
     store?: WalletStore;
     signer?: Signer;
-    viewing?: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
-    authorization?: WalletAuthorizationProvider;
     fundingSigner?: FundingSigner;
     coinSelector?: NonNullable<TransactionInfrastructure["coinSelector"]>;
 }
@@ -24,8 +21,6 @@ export interface WalletSessionInfrastructure extends TransactionInfrastructure {
     namespace?: string;
     store?: WalletStore;
     signer?: Signer;
-    viewing?: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
-    authorization?: WalletAuthorizationProvider;
     fundingSigner?: FundingSigner;
 }
 export interface OperationRuntime extends Omit<TransactionRuntime, "options"> {
@@ -33,5 +28,4 @@ export interface OperationRuntime extends Omit<TransactionRuntime, "options"> {
         protocol: TransactionRuntime["options"]["protocol"];
     };
     store: WalletStore;
-    authorization: () => WalletAuthorizationProvider;
 }

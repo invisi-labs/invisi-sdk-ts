@@ -1,3 +1,5 @@
+import { refreshFromHost } from "./host-refresh.js";
+import { LocalWallet } from "@invisi-labs/core/local";
 import { WalletSession } from "@invisi-labs/session";
 import { NoteOutput } from "@invisi-labs/sdk";
 import { settings } from "../settings.js";
@@ -39,8 +41,9 @@ try {
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const tokenAddress = settings.tokenAddress;
-    // The Session holds the current account's signing and viewing capabilities; recipients still need only a public address.
-    const wallet = await Wallet.fromPrivateKey(alice.privateKey);
+    // This Node example uses an explicit local executor; mobile hosts execute requests in native code.
+    const localExecutor = await LocalWallet.fromPrivateKey(alice.privateKey);
+    const wallet = Wallet.fromAddress(localExecutor.getAddress());
     const signer = new EthereumWallet(alice.privateKey, provider);
 
     // This local experiment derives a storage key, not a protocol key; production wallets obtain a CryptoKey from the host's key management system.
@@ -70,7 +73,7 @@ try {
     });
 
     const history = await session.getHistory();
-    await session.refresh({
+    await refreshFromHost(session, localExecutor, {
         fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
     });
     const balance = await session.balance(tokenAddress);
@@ -97,8 +100,10 @@ try {
     console.log("Automatic note selection and change:", prepared.preview());
     console.log("Balance after reserving inputs:", await session.balance(tokenAddress));
 
-    // The Session signs with the current wallet's local spending capability; the application need not pass the request manually.
-    const authorized = await prepared.authorize();
+    // The host executes the same authorization request as a stateless caller.
+    const request = await prepared.exportWalletRequest("transfer-authorization");
+    const response = await localExecutor.execute(request);
+    const authorized = await prepared.withWalletResponse(response);
     const proved = await authorized.prove();
     const transaction = await session.sendTransaction(proved);
     console.log("Payment transaction:", transaction.hash);

@@ -1,4 +1,4 @@
-import { PublicWallet } from "@invisi-labs/sdk";
+import { Wallet } from "@invisi-labs/sdk";
 import fs from "node:fs";
 
 export interface Account {
@@ -7,7 +7,7 @@ export interface Account {
     privateKey: `0x${string}`;
     receivingAddress: string;
     viewingPrivateKey: `0x${string}`;
-    publicWallet: PublicWallet;
+    publicWallet: Wallet;
 }
 
 // Read application-owned local accounts. Never create or replace keys while sending.
@@ -25,6 +25,6 @@ export function getAccounts(): Account[] {
         privateKey: saved[name].privateKey,
         receivingAddress: saved[name].receivingAddress,
         viewingPrivateKey: saved[name].viewingPrivateKey,
-        publicWallet: PublicWallet.fromAddress(saved[name].receivingAddress),
+        publicWallet: Wallet.fromAddress(saved[name].receivingAddress),
     }));
 }

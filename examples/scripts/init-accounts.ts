@@ -1,6 +1,6 @@
+import { LocalWallet } from "@invisi-labs/core/local";
 import fs from "node:fs";
 import { Wallet as EthereumWallet, hexlify } from "ethers";
-import { Wallet } from "@invisi-labs/sdk";
 
 // Explicit local setup only. Existing files are never overwritten.
 if (!process.argv.includes("--execute")) {
@@ -15,7 +15,7 @@ const names = ["alice", "bob", "charlie", "dave", "eve", "frank", "grace", "heid
 const accounts: Record<string, unknown> = {};
 for (const name of names) {
     const ethereum = EthereumWallet.createRandom();
-    const wallet = await Wallet.fromPrivateKey(ethereum.privateKey);
+    const wallet = await LocalWallet.fromPrivateKey(ethereum.privateKey);
     const viewingKey = wallet.getViewer().exportKey();
     accounts[name] = {
         address: ethereum.address,

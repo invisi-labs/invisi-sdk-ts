@@ -1,4 +1,4 @@
-import { MissingCapabilityError, PublicWallet } from "@invisi-labs/core";
+import { MissingCapabilityError, Wallet } from "@invisi-labs/core";
 import type { RegistrationOperation, RegistrationPreparation } from "@invisi-labs/protocol";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { prepareWithErrors } from "../errors";
@@ -114,11 +114,11 @@ export class Invisi {
     private assertPublicIdentity(options: Pick<TransactionIdentity, "wallet">): void {
         const { wallet } = options;
         if (
-            !(wallet instanceof PublicWallet) ||
+            !(wallet instanceof Wallet) ||
             ["getViewer", "getDetector", "exportAuthorization"].some((key) => key in wallet)
         ) {
             throw new Error(
-                "Independent preparation requires a PublicWallet without private capabilities"
+                "Independent preparation requires a Wallet without private capabilities"
             );
         }
         for (const key of ["authorization", "signer", "fundingSigner", "viewing"]) {
