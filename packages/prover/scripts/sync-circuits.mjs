@@ -165,6 +165,7 @@ try {
                         credit: {
                             version: manifests[1].version,
                             formatVersion: manifests[1].formatVersion,
+                            manifestSha256: release.manifests[1].sha256,
                         },
                     },
                     null,

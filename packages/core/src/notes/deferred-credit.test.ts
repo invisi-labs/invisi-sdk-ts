@@ -1,18 +1,19 @@
 import { it, expect } from "vitest";
-import { applyCreditDrawUsage, normalizeCreditPolicy } from "../credit/state";
+import { applyCreditDrawUsage, normalizeCreditUsage } from "../credit/state";
 it("accumulates lifetime usage and resets UTC counters", () => {
     const policy = {
         singleLimit: 100n,
         dailyLimit: 100n,
         monthlyLimit: 200n,
-        lifetimeLimit: 250n,
+        availableCredit: 10n,
+        unlimited: false,
         lastDay: 1n,
         dailySpent: 20n,
         lastMonth: 1n,
         monthlySpent: 40n,
         totalSpent: 240n,
     };
-    expect(() => applyCreditDrawUsage(policy, 11n, 2000000000n)).toThrow(/lifetime/);
+    expect(() => applyCreditDrawUsage(policy, 11n, 2000000000n)).toThrow(/available/);
     expect(applyCreditDrawUsage(policy, 10n, 2000000000n)).toMatchObject({
         dailySpent: 10n,
         monthlySpent: 10n,
@@ -21,7 +22,11 @@ it("accumulates lifetime usage and resets UTC counters", () => {
 });
 it("retains usage with disabled limits", () => {
     expect(
-        applyCreditDrawUsage(normalizeCreditPolicy({ totalSpent: 99n }), 1n, 2000000000n).totalSpent
+        applyCreditDrawUsage(
+            { ...normalizeCreditUsage({ totalSpent: 99n }), availableCredit: 0n, unlimited: true },
+            1n,
+            2000000000n
+        ).totalSpent
     ).toBe(100n);
 });
 import raw from "./deferred-credit-vectors.json";
@@ -33,14 +38,16 @@ import {
     recoverCreditState,
 } from "../credit/state";
 import type { CreditState } from "../types";
-const toState = (s: Record<string, string>): CreditState =>
+const toState = (s: Record<string, string | boolean>): CreditState =>
     ({
         ...Object.fromEntries(
             Object.entries(s).map(([k, v]) => [
                 k,
-                k.endsWith("Identity")
-                    ? `0x${BigInt(v).toString(16).padStart(40, "0")}`
-                    : BigInt(v),
+                typeof v === "boolean"
+                    ? v
+                    : k.endsWith("Identity")
+                      ? `0x${BigInt(v).toString(16).padStart(40, "0")}`
+                      : BigInt(v),
             ])
         ),
         chainId: BigInt(raw.context.chainId),

@@ -1,4 +1,9 @@
-import { type AuthorizedStatement, type CreditDeliveryState, type Note } from "@invisi-labs/core";
+import {
+    type AuthorizedStatement,
+    type CreditDeliveryState,
+    type CreditUpdateChanges,
+    type Note,
+} from "@invisi-labs/core";
 import { type ProofTarget } from "@invisi-labs/prover";
 import type {
     CreateCreditParams,
@@ -50,6 +55,7 @@ export interface DrawCreditWitnessParams {
     authorization: AuthorizedStatement;
 }
 export interface UpdateCreditWitnessParams {
+    changes: CreditUpdateChanges;
     params: UpdateCreditParams;
     deliveries: readonly Delivery[];
     input: CreditMembership;

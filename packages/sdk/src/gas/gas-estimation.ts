@@ -21,7 +21,7 @@ export function getOperationGasReference(plan: OperationPlan, _protocol?: TokenP
             sourceTrees: operationSources(plan).length,
             noteOutputs: 1,
             creditOutputs: credit.outputs.length,
-            creditCiphertextBytes: 484,
+            creditCiphertextBytes: 485,
             noteCiphertextBytes: 160,
             clueBytes: 68,
             scenario: "distinct-payers",
@@ -60,7 +60,7 @@ export function getOperationGasReference(plan: OperationPlan, _protocol?: TokenP
     }
     if (
         plan.outputs.some((o) => (o.delivery.ciphertext.length - 2) / 2 !== 160) ||
-        credit?.outputs.some((o) => o.deliveries.some((d) => (d.ciphertext.length - 2) / 2 !== 484))
+        credit?.outputs.some((o) => o.deliveries.some((d) => (d.ciphertext.length - 2) / 2 !== 485))
     )
         return getDocumentedGasReference({ kind: "unmeasured-delivery-size" });
     return getDocumentedGasReference(query);

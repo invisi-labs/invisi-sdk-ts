@@ -66,7 +66,7 @@ const grant = await invisi.prepareCreateCredit({
   wallet: ownerPublicWallet, protocol, tokenAddress,
   spender: merchantAddress, expiry,
   singleLimit: 100n, dailyLimit: 1000n,
-  monthlyLimit: 10000n, lifetimeLimit: 50000n,
+  monthlyLimit: 10000n, availableCredit: 50000n, unlimited: false,
 });
 // Export owner wallet authorization, attach its signature, then prove.
 
@@ -79,11 +79,13 @@ const draw = await invisi.prepareDrawCredit({
 // Export merchant wallet authorization, attach its signature, then prove.
 ```
 
-`prepareUpdateCredit` changes limits/expiry while preserving all five usage fields and immutable identities, key and revocation namespace. Zero disables a limit; usage continues accumulating. Day/month counters reset only at UTC period rollover. Both old and new expiry must cover the request deadline. Every Credit operation accepts optional `fee: {recipient, amount}`; draw usage/limits count the gross debit, while the recipient Note receives `totalAmount - feeAmount`. Fees accrue through the same beneficiary fee accounting as ordinary transactions.
+`CreditState` stores uint128 `availableCredit` and strict boolean `unlimited`, separately from three single/day/month limits and five usage counters. Finite zero is exhausted. Draw debits gross available credit; unlimited states always store zero available credit but still accumulate gross usage and totalSpent. Day/month counters reset only at UTC period rollover.
+
+`prepareUpdateCredit` accepts mutually exclusive uint128 `increaseAvailableCredit` / `decreaseAvailableCredit` deltas, never an absolute balance. Both may be zero. Usage, including historical totalSpent, remains unchanged. Unlimited mode defaults to the input mode: unlimited results require zero deltas and clear the balance; switching to finite starts from zero plus this update's increase and may remain exhausted. Finite decreases cannot exceed the old balance, and arithmetic fits uint128. Three limits and expiry remain owner-editable; zero disables a limit without disabling usage tracking. Both expiries cover the request deadline. Optional owner create/update/revoke fees do not consume grant quota; draws produce `totalAmount - feeAmount` while charging gross usage and quota. Quoting/retrying preserves the original delta and frozen input, never reapplies it to a prepared successor.
 
 `prepareRevokeCredit({wallet,protocol,tokenAddress,shard,slot,...})` needs no latest private state. Use public `exportRevocationAuthorization()` / `withRevocationSignature()` or specify the direct owner `caller` and call `ready()`. Revocation needs no ZK proof, remains available during pauses and cannot reclaim already issued Notes. It has no principal refund. Optional `fee: {recipient, amount}` is bound into owner authorization and pulled from the owner wallet. Public owner/token/shard/slot references link grant activity; private policy and spender fields stay private.
 
-`CreditState` is a scoped private grant preimage. `computeCreditCommitment(state)` and `recoverCreditState` live in the Credit module. Credit role envelopes retain both receiving-key snapshots; recovery authenticates masked debits even when successor deliveries cannot be decrypted. Credit uses envelope0x82 (minimum484 bytes), while ordinary Notes use0x01 (minimum160 bytes). Opaque application payloads are copied unchanged and never interpreted as financial fields.
+`CreditState` is a scoped private grant preimage. `computeCreditCommitment(state)` and `recoverCreditState` live in the Credit module. Credit role envelopes retain both receiving-key snapshots; recovery authenticates masked debits even when successor deliveries cannot be decrypted. Credit uses envelope0x82 (minimum485 bytes), while ordinary Notes use0x01 (minimum160 bytes). Opaque application payloads are copied unchanged and never interpreted as financial fields.
 
 ## Proving and aggregation
 
@@ -95,7 +97,7 @@ After Note wallet authorization, `prove({execution:"aggregate"})` selects the re
 
 Protocol RPC APIv1 separates Note and Credit data. Credit indexed states retain two role deliveries per physical leaf. Session discovery combines candidate transaction references internally and verifies canonical Chain RPC receipts, commitments, role decryption, membership and consumption. Detection is explicit, untrusted filtering; observed or indexed history is not a completeness proof. Keep uncertain inputs reserved until canonical settlement or genuine expiry is established.
 
-`prepared.getGasReference()` returns a documented scenario reference, with source conditions and `available:false` when unsupported. `getDocumentedGasReference(shape)` exposes the curated exact reference catalog from protocol-docs sections5.1..5.6. Documented medians do not contain raw receipt fingerprints. Draw measurements cover distinct payers only; same-payer and current aggregate costs are unavailable. No arbitrary shape extrapolation is performed.
+`prepared.getGasReference()` returns a documented scenario reference, with source conditions and `available:false` when unsupported. Credit references require the full measured Credit manifest SHA256 to match the packaged manifest, in addition to version/format; missing hashes cannot match. `getDocumentedGasReference(shape)` exposes the curated exact reference catalog from protocol-docs sections5.1..5.6. Documented medians do not contain raw receipt fingerprints. Draw measurements cover distinct payers only; same-payer and current aggregate costs are unavailable. No arbitrary shape extrapolation is performed.
 
 `await ready.estimateGas({from?})` uses the configured ethers provider on the final transaction and returns `{source:"rpc",gasUnits}`. It requires a ready handle. Applications separately choose current fee prices and transaction budgets.
 

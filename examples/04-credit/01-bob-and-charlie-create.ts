@@ -29,7 +29,8 @@ try {
             singleLimit: 100n,
             dailyLimit: 1000n,
             monthlyLimit: 10000n,
-            lifetimeLimit: 50000n,
+            availableCredit: 50000n,
+            unlimited: false,
         });
 
         const authorization = await prepared.exportWalletAuthorization();

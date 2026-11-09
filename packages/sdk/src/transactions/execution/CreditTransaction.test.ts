@@ -3,6 +3,7 @@ import {
     Wallet,
     computeCreditCommitment,
     normalizeCreditPolicy,
+    normalizeCreditUsage,
     type CreditDeliveryState,
 } from "@invisi-labs/core";
 import { Interface, Wallet as EvmWallet } from "ethers";
@@ -10,7 +11,13 @@ import { it, expect, vi } from "vitest";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
 const iface = new Interface(invisiProtocolAbi);
-async function creditSetup(policy: Partial<import("@invisi-labs/core").CreditPolicy> = {}) {
+async function creditSetup(
+    policy: Partial<
+        import("@invisi-labs/core").CreditPolicy &
+            import("@invisi-labs/core").CreditUsage &
+            Pick<import("@invisi-labs/core").CreditState, "availableCredit" | "unlimited">
+    > = {}
+) {
     const h = await setup(),
         state: CreditDeliveryState = {
             note: {
@@ -24,7 +31,10 @@ async function creditSetup(policy: Partial<import("@invisi-labs/core").CreditPol
                 nonce: 456n,
                 expiry: 2000003600n,
                 creditSharedKey: 789n,
-                ...normalizeCreditPolicy({ singleLimit: 50n, lifetimeLimit: 100n, ...policy }),
+                availableCredit: policy.availableCredit ?? 100n,
+                unlimited: policy.unlimited ?? false,
+                ...normalizeCreditPolicy({ singleLimit: 50n, ...policy }),
+                ...normalizeCreditUsage(policy),
             },
             ownerReceivingKeys: h.wallet.getReceivingAddress().getReceivingKeys(),
             spenderReceivingKeys: h.bob.getReceivingAddress().getReceivingKeys(),
@@ -49,7 +59,8 @@ it("creates Credit authority without notes, cash, change or funding authorizatio
             ...h.identity,
             spender: h.bob.getAddress(),
             expiry: 2000003600n,
-            lifetimeLimit: 100n,
+            availableCredit: 100n,
+            unlimited: false,
             payload: Uint8Array.from([1, 0, 255]),
         });
     expect(prepared.preview()).toMatchObject({
@@ -74,7 +85,7 @@ it("updates private limits and expiry while preserving usage and grant identity"
             creditInputs: [h.input],
             credit: h.commitment,
             singleLimit: 10n,
-            lifetimeLimit: 75n,
+            decreaseAvailableCredit: 25n,
             expiry: 2000007200n,
         });
     expect(prepared.preview().fundingAmount).toBe(0n);
@@ -239,8 +250,8 @@ it("binds public owner revocation fees before accepting an EOA signature", async
     await expect(changed.withRevocationSignature(signature as `0x${string}`)).rejects.toThrow();
 });
 
-it("checks lifetime limits against gross debits rather than the net recipient amount", async () => {
-    const h = await creditSetup({ lifetimeLimit: 29n });
+it("checks available credit against gross debits rather than the net recipient amount", async () => {
+    const h = await creditSetup({ availableCredit: 29n });
     await expect(
         h.invisi.prepareDrawCredit({
             ...h.identity,
@@ -250,7 +261,7 @@ it("checks lifetime limits against gross debits rather than the net recipient am
             recipient: h.wallet.getAddress(),
             fee: { recipient: h.bob.ownerAddress, amount: 3n },
         })
-    ).rejects.toThrow(/lifetime/);
+    ).rejects.toThrow(/available/);
 });
 it("accepts an explicit ERC1271 public revocation verifier without calling a prover", async () => {
     const h = await creditSetup(),
@@ -364,4 +375,117 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
             original.withBroadcaster(client, { maxFeeAmount: 3n, feeSource: "public-funding" })
         ).rejects.toThrow(/Credit fees/);
     }
+});
+
+it("keeps update deltas stable across fee stabilization and repeated quotes", async () => {
+    const h = await creditSetup({ availableCredit: 20n, totalSpent: 7n });
+    const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+    let calls = 0;
+    const client = quoteClient(h.context, () => (++calls === 1 ? 1n : 2n));
+    const prepared = await h.invisi.prepareUpdateCredit({
+        ...h.identity,
+        creditInputs: [h.input],
+        credit: h.commitment,
+        increaseAvailableCredit: 10n,
+    });
+    const first = await prepared.withBroadcaster(client, { maxFeeAmount: 3n });
+    expect(first.preview().creditOutputs![0]).toMatchObject({
+        availableCredit: 30n,
+        unlimited: false,
+        totalSpent: 7n,
+    });
+    expect(first.preview().creditUpdate).toMatchObject({ increaseAvailableCredit: 10n });
+    const again = await first.withBroadcaster(client, { maxFeeAmount: 3n });
+    expect(again.preview().creditOutputs![0]).toMatchObject({
+        availableCredit: 30n,
+        totalSpent: 7n,
+    });
+    expect(calls).toBeGreaterThan(3);
+    const authorized = await externallyAuthorize(again);
+    await expect(authorized.withBroadcaster(client, { maxFeeAmount: 3n })).rejects.toThrow(
+        /unsigned/
+    );
+});
+
+it("does not revive discarded balances when requoting a switch from unlimited to finite", async () => {
+    const h = await creditSetup({ availableCredit: 0n, unlimited: true, totalSpent: 7n });
+    const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+    const prepared = await h.invisi.prepareUpdateCredit({
+        ...h.identity,
+        creditInputs: [h.input],
+        credit: h.commitment,
+        unlimited: false,
+        increaseAvailableCredit: 5n,
+    });
+    const quoted = await prepared.withBroadcaster(
+        quoteClient(h.context, () => 3n),
+        { maxFeeAmount: 3n }
+    );
+    expect(quoted.preview().creditOutputs![0]).toMatchObject({
+        availableCredit: 5n,
+        unlimited: false,
+        totalSpent: 7n,
+    });
+    const clearing = await h.invisi.prepareUpdateCredit({
+        ...h.identity,
+        creditInputs: [h.input],
+        credit: h.commitment,
+        unlimited: true,
+    });
+    expect(clearing.preview().creditOutputs![0]).toMatchObject({
+        availableCredit: 0n,
+        unlimited: true,
+        totalSpent: 7n,
+    });
+    await expect(
+        h.invisi.prepareUpdateCredit({
+            ...h.identity,
+            creditInputs: [h.input],
+            credit: h.commitment,
+            availableCredit: 10n,
+        } as never)
+    ).rejects.toThrow(/unsupported/);
+});
+
+it("encodes Credit mode flags as canonical Noir fields while keeping state boolean", async () => {
+    const h = await creditSetup({ availableCredit: 0n, unlimited: true });
+    const create = await h.invisi.prepareCreateCredit({
+        ...h.identity,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+        unlimited: true,
+    });
+    const update = await h.invisi.prepareUpdateCredit({
+        ...h.identity,
+        creditInputs: [h.input],
+        credit: h.commitment,
+        unlimited: false,
+        increaseAvailableCredit: 40n,
+    });
+    const draw = await h.invisi.prepareDrawCredit({
+        ...h.identity,
+        wallet: PublicWallet.fromAddress(h.bob.getAddress()),
+        creditInputs: [{ ...h.input, role: "spender" }],
+        credits: [{ credit: h.commitment, amount: 30n }],
+        recipient: h.wallet.getAddress(),
+    });
+    const expected = [
+        { unlimited: 1n },
+        { old_unlimited: 1n, new_unlimited: 0n },
+        { unlimited_flags: [1n] },
+    ];
+    const originalProve = h.prover.prove.bind(h.prover);
+    let index = 0;
+    h.prover.prove = async (request, options) => {
+        await request.witness.withInputs(async (inputs) => {
+            expect(inputs).toMatchObject(expected[index++]!);
+        });
+        return originalProve(request, options);
+    };
+    for (const prepared of [create, update, draw]) {
+        const signer = new EvmWallet(`0x${(prepared === draw ? "02" : "01").repeat(32)}`);
+        await (await externallyAuthorize(prepared, signer)).prove(h.prover);
+    }
+    expect(index).toBe(3);
+    expect(draw.preview().creditOutputs![0]!.unlimited).toBe(true);
 });

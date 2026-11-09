@@ -67,7 +67,8 @@ export function normalizeCreditDeliveryState(state: CreditDeliveryState): Credit
         "singleLimit",
         "dailyLimit",
         "monthlyLimit",
-        "lifetimeLimit",
+        "availableCredit",
+        "unlimited",
         "lastDay",
         "dailySpent",
         "lastMonth",
@@ -138,7 +139,8 @@ const creditWireFields = [
     ["singleLimit", 16],
     ["dailyLimit", 16],
     ["monthlyLimit", 16],
-    ["lifetimeLimit", 16],
+    ["availableCredit", 16],
+    ["unlimited", 1],
     ["lastDay", 8],
     ["dailySpent", 16],
     ["lastMonth", 8],
@@ -148,7 +150,7 @@ const creditWireFields = [
 export const creditEnvelopeV2 = {
     kind: "credit" as const,
     version: 2,
-    minimum: 484,
+    minimum: 485,
     maximum: 4096,
     encode(input: CreditDeliveryState) {
         const state = normalizeCreditDeliveryState(input);
@@ -170,7 +172,9 @@ export const creditEnvelopeV2 = {
         };
         for (const [k, size] of creditWireFields) {
             const n = decode(plain.slice(offset, offset + size));
-            note[k] = k.endsWith("Identity") ? hexField(n) : n;
+            if (k === "unlimited" && n !== 0n && n !== 1n)
+                throw Error("invalid Credit unlimited byte");
+            note[k] = k === "unlimited" ? n === 1n : k.endsWith("Identity") ? hexField(n) : n;
             offset += size;
         }
         const keys = () => {

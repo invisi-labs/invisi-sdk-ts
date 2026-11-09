@@ -251,6 +251,8 @@ it("reloads raw encrypted memo metadata through the record codec without aliasin
                     nonce: 2n,
                     expiry: 2000000000n,
                     creditSharedKey: 3n,
+                    availableCredit: 10n,
+                    unlimited: false,
                     payload: fundsV1.encode({ memo }),
                 },
                 ownerReceivingKeys: keys("owner"),

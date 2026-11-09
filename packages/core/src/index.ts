@@ -41,6 +41,7 @@ export { createClue, createClueFromSeed, deriveClueKey, validateClueKey } from "
 export { computeNoteCommitment, computeNoteIdentity } from "./notes/commitment";
 export {
     CREDIT_POLICY_FIELDS,
+    CREDIT_USAGE_FIELDS,
     deriveCreditState,
     deriveCreditUpdate,
     applyCreditDrawUsage,
@@ -51,6 +52,7 @@ export {
     creditPeriods,
     deriveCreditStateNonce,
     normalizeCreditPolicy,
+    normalizeCreditUsage,
     normalizeCreditState,
     recoverCreditState,
 } from "./credit/state";
@@ -59,6 +61,7 @@ export type {
     CreditDeliveryState,
     CreditState,
     CreditPolicy,
+    CreditUsage,
     CreditStateRecovery,
     Note,
     ProtocolContext,
@@ -108,3 +111,5 @@ export { creditV1, fundsV1 } from "./delivery/payload";
 export type { CreditDataV1, FundsDataV1 } from "./types";
 export { AGGREGATE_ROUTES, selectAggregateRoute } from "./note/aggregate-routes";
 export type { AggregateRoute } from "./note/aggregate-routes";
+
+export type { CreditUpdateChanges } from "./credit/state";

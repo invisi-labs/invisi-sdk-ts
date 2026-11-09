@@ -10,7 +10,7 @@ import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
 const real = process.env.BB_BINARY_PATH || process.env.INVISI_TEST_WASM === "1" ? it : it.skip;
 real(
-    "proves current create/update/draw fee witnesses with owner pulls, net Notes and gross usage",
+    "proves current quota deltas, both mode switches and gross draw fees with net Notes",
     async () => {
         const h = await setup(),
             prover =
@@ -32,13 +32,21 @@ real(
                     nonce: 456n,
                     expiry: 2000003600n,
                     creditSharedKey: 789n,
-                    ...normalizeCreditPolicy({ singleLimit: 50n, lifetimeLimit: 100n }),
+                    availableCredit: 100n,
+                    unlimited: false,
+                    ...normalizeCreditPolicy({ singleLimit: 50n }),
                 },
                 ownerReceivingKeys: h.wallet.getReceivingAddress().getReceivingKeys(),
                 spenderReceivingKeys: h.bob.getReceivingAddress().getReceivingKeys(),
             },
             commitment = await computeCreditCommitment(state.note);
         await h.tree.insert(BigInt(commitment));
+        const unlimitedState = {
+            ...state,
+            note: { ...state.note, availableCredit: 0n, unlimited: true, nonce: 457n },
+        };
+        const unlimitedCommitment = await computeCreditCommitment(unlimitedState.note);
+        await h.tree.insert(BigInt(unlimitedCommitment));
         const identity = {
                 wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol: h.protocol,
@@ -50,6 +58,8 @@ real(
                 ...identity,
                 spender: h.bob.getAddress(),
                 expiry: state.note.expiry,
+                availableCredit: 100n,
+                unlimited: false,
                 fee,
             }),
             update = await h.invisi.prepareUpdateCredit({
@@ -57,6 +67,7 @@ real(
                 creditInputs: [input],
                 credit: commitment,
                 singleLimit: 10n,
+                increaseAvailableCredit: 10n,
                 fee,
             }),
             draw = await h.invisi.prepareDrawCredit({
@@ -67,7 +78,30 @@ real(
                 recipient: h.wallet.getAddress(),
                 fee,
             });
-        for (const prepared of [create, update, draw]) {
+        const clear = await h.invisi.prepareUpdateCredit({
+            ...identity,
+            creditInputs: [input],
+            credit: commitment,
+            unlimited: true,
+            fee,
+        });
+        const finite = await h.invisi.prepareUpdateCredit({
+            ...identity,
+            creditInputs: [
+                {
+                    state: unlimitedState,
+                    commitment: unlimitedCommitment,
+                    treeId: 1n,
+                    leafIndex: 2,
+                    role: "owner",
+                },
+            ],
+            credit: unlimitedCommitment,
+            unlimited: false,
+            increaseAvailableCredit: 15n,
+            fee,
+        });
+        for (const prepared of [create, update, draw, clear, finite]) {
             const signer = new EvmWallet(
                     `0x${(prepared.kind === "draw-credit" ? "02" : "01").repeat(32)}`
                 ),
@@ -77,6 +111,18 @@ real(
                 await ready.exportTransaction()
             )!;
             expect(decoded.args[1].feeAmount).toBe(3n);
+            if (prepared === update)
+                expect(ready.preview().creditOutputs![0]!.availableCredit).toBe(110n);
+            if (prepared === clear)
+                expect(ready.preview().creditOutputs![0]).toMatchObject({
+                    availableCredit: 0n,
+                    unlimited: true,
+                });
+            if (prepared === finite)
+                expect(ready.preview().creditOutputs![0]).toMatchObject({
+                    availableCredit: 15n,
+                    unlimited: false,
+                });
             if (prepared.kind === "draw-credit") {
                 expect(ready.getOutputs()[0]!.amount).toBe(27n);
                 expect(decoded.args[1].totalAmount).toBe(30n);

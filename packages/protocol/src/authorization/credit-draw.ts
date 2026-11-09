@@ -1,4 +1,9 @@
-import { computeNoteIdentity, deriveCreditState, normalizeCreditPolicy } from "@invisi-labs/core";
+import {
+    computeNoteIdentity,
+    deriveCreditState,
+    normalizeCreditPolicy,
+    normalizeCreditUsage,
+} from "@invisi-labs/core";
 import type { CircuitName } from "@invisi-labs/prover";
 import { creditDrawPublicInputs, selectCreditDrawCircuit } from "../credit/credit-lifecycle";
 import { check, pad, provingRequest, zeros } from "./common";
@@ -71,18 +76,26 @@ export async function drawCredit(w: WitnessContext, p: DrawCreditWitnessParams) 
             input_source_indices: pad(sourceIndices, capacity, () => 0n),
             draw_amounts: pad(p.amounts, capacity, () => 0n),
             limits: pad(
-                policy.map((n) => [n.singleLimit, n.dailyLimit, n.monthlyLimit, n.lifetimeLimit]),
+                policy.map((n) => [n.singleLimit, n.dailyLimit, n.monthlyLimit]),
                 capacity,
-                () => [0n, 0n, 0n, 0n]
+                () => [0n, 0n, 0n]
+            ),
+            available_credits: array((i) => ns[i]!.availableCredit),
+            unlimited_flags: pad(
+                ns.map((n) => BigInt(n.unlimited)),
+                capacity,
+                () => 0n
             ),
             usages: pad(
-                policy.map((n) => [
-                    n.lastDay,
-                    n.dailySpent,
-                    n.lastMonth,
-                    n.monthlySpent,
-                    n.totalSpent,
-                ]),
+                ns
+                    .map(normalizeCreditUsage)
+                    .map((n) => [
+                        n.lastDay,
+                        n.dailySpent,
+                        n.lastMonth,
+                        n.monthlySpent,
+                        n.totalSpent,
+                    ]),
                 capacity,
                 () => [0n, 0n, 0n, 0n, 0n]
             ),

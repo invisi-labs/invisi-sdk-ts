@@ -31,7 +31,8 @@ const creditState = {
                     "singleLimit",
                     "dailyLimit",
                     "monthlyLimit",
-                    "lifetimeLimit",
+                    "availableCredit",
+                    "unlimited",
                     "lastDay",
                     "dailySpent",
                     "lastMonth",
@@ -41,7 +42,11 @@ const creditState = {
             )
             .map(([k, v]) => [
                 k,
-                k.endsWith("Identity") ? ownerHex(v as string) : BigInt(v as string),
+                k === "unlimited"
+                    ? v
+                    : k.endsWith("Identity")
+                      ? ownerHex(v as string)
+                      : BigInt(v as string),
             ])
     ),
 } as import("@invisi-labs/core").CreditState;
@@ -85,7 +90,7 @@ describe("verifyCreditCommitment", () => {
             "nonce",
             "revocationShard",
             "revocationSlot",
-            "lifetimeLimit",
+            "availableCredit",
             "totalSpent",
             "protocolAddress",
         ] as const)

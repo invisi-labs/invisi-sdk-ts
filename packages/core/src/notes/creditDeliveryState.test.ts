@@ -4,7 +4,7 @@ it("keeps deferred Credit delivery separate from Note delivery", () => {
     expect(deliveryCodec(0x82)).toMatchObject({
         kind: "credit",
         version: 2,
-        minimum: 484,
+        minimum: 485,
         maximum: 4096,
         domain: "Invisi.CreditDelivery.v2",
     });

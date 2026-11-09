@@ -32,7 +32,8 @@ const credit: core.CreditState = {
                     "singleLimit",
                     "dailyLimit",
                     "monthlyLimit",
-                    "lifetimeLimit",
+                    "availableCredit",
+                    "unlimited",
                     "lastDay",
                     "dailySpent",
                     "lastMonth",
@@ -42,7 +43,11 @@ const credit: core.CreditState = {
             )
             .map(([k, v]) => [
                 k,
-                k.endsWith("Identity") ? address(v as string) : BigInt(v as string),
+                k === "unlimited"
+                    ? v
+                    : k.endsWith("Identity")
+                      ? address(v as string)
+                      : BigInt(v as string),
             ])
     ),
     payload: new Uint8Array(),
@@ -131,9 +136,9 @@ describe("current authenticated delivery envelopes", () => {
                 cc(role)
             );
             expect(envelope[0]).toBe(0x82);
-            expect(envelope).toHaveLength(484);
+            expect(envelope).toHaveLength(485);
             const plain = independentlyOpen(envelope, role);
-            expect(plain).toHaveLength(406);
+            expect(plain).toHaveLength(407);
             expect(plain.subarray(-2)).toEqual(Buffer.alloc(2));
             expect(
                 await core.decryptCreditState(

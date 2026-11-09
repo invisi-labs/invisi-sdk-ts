@@ -1,4 +1,4 @@
-import { normalizeCreditPolicy, deriveCreditUpdate } from "@invisi-labs/core";
+import { normalizeCreditPolicy, normalizeCreditUsage, deriveCreditUpdate } from "@invisi-labs/core";
 import { updateCreditPublicInputs } from "../credit/credit-lifecycle";
 import { check, provingRequest } from "./common";
 import type { UpdateCreditWitnessParams } from "./types";
@@ -8,17 +8,7 @@ export async function updateCredit(w: WitnessContext, p: UpdateCreditWitnessPara
         next = p.state.note,
         old = normalizeCreditPolicy(n),
         fresh = normalizeCreditPolicy(next),
-        derived = await deriveCreditUpdate(
-            n,
-            {
-                singleLimit: fresh.singleLimit,
-                dailyLimit: fresh.dailyLimit,
-                monthlyLimit: fresh.monthlyLimit,
-                lifetimeLimit: fresh.lifetimeLimit,
-                expiry: next.expiry,
-            },
-            p.params.deadline
-        ),
+        derived = await deriveCreditUpdate(n, p.changes, p.params.deadline),
         words = updateCreditPublicInputs(w.protocol.context, p.params, p.deliveries);
     check(
         n.ownerWalletIdentity === p.params.owner &&
@@ -45,14 +35,17 @@ export async function updateCredit(w: WitnessContext, p: UpdateCreditWitnessPara
             old_expiry: n.expiry,
             new_expiry: next.expiry,
             credit_shared_key: n.creditSharedKey,
-            old_limits: [old.singleLimit, old.dailyLimit, old.monthlyLimit, old.lifetimeLimit],
-            new_limits: [
-                fresh.singleLimit,
-                fresh.dailyLimit,
-                fresh.monthlyLimit,
-                fresh.lifetimeLimit,
-            ],
-            usage: [old.lastDay, old.dailySpent, old.lastMonth, old.monthlySpent, old.totalSpent],
+            old_limits: [old.singleLimit, old.dailyLimit, old.monthlyLimit],
+            new_limits: [fresh.singleLimit, fresh.dailyLimit, fresh.monthlyLimit],
+            old_available_credit: n.availableCredit,
+            old_unlimited: BigInt(n.unlimited),
+            new_unlimited: BigInt(next.unlimited),
+            increase_available_credit: p.changes.increaseAvailableCredit ?? 0n,
+            decrease_available_credit: p.changes.decreaseAvailableCredit ?? 0n,
+            usage: (() => {
+                const u = normalizeCreditUsage(n);
+                return [u.lastDay, u.dailySpent, u.lastMonth, u.monthlySpent, u.totalSpent];
+            })(),
             leaf_index: BigInt(p.input.leafIndex),
             merkle_path: [...p.input.path],
         },

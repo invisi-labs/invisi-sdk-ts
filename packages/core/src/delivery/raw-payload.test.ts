@@ -91,7 +91,7 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
                     ? state.note.ownerWalletIdentity
                     : state.note.spenderWalletIdentity,
         };
-        const payload = new Uint8Array(3612).fill(255);
+        const payload = new Uint8Array(3611).fill(255);
         const envelope = await core.encryptCreditState(
             publicKey,
             { ...state, note: { ...state.note, payload } },
@@ -109,7 +109,7 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
         await expect(
             core.encryptCreditState(
                 publicKey,
-                { ...state, note: { ...state.note, payload: new Uint8Array(3613) } },
+                { ...state, note: { ...state.note, payload: new Uint8Array(3612) } },
                 scope
             )
         ).rejects.toThrow(/length/);

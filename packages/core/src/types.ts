@@ -19,19 +19,24 @@ export interface Note extends ProtocolContext {
     payload?: Uint8Array;
 }
 
-/** Deployment-scoped private Credit note, with a shared nonzero random secret. */
+/** Single/day/month gross-debit limits; zero disables the corresponding check. */
 export interface CreditPolicy {
     singleLimit: bigint;
     dailyLimit: bigint;
     monthlyLimit: bigint;
-    lifetimeLimit: bigint;
+}
+/** Historical gross usage; owner updates never reset it. */
+export interface CreditUsage {
     lastDay: bigint;
     dailySpent: bigint;
     lastMonth: bigint;
     monthlySpent: bigint;
     totalSpent: bigint;
 }
-export interface CreditState extends ProtocolContext, Partial<CreditPolicy> {
+export interface CreditState extends ProtocolContext, Partial<CreditPolicy>, Partial<CreditUsage> {
+    /** Remaining spending authority, not held token funds; finite zero is exhausted. */
+    availableCredit: bigint;
+    unlimited: boolean;
     spenderWalletIdentity: `0x${string}`;
     ownerWalletIdentity: `0x${string}`;
     revocationShard: bigint;

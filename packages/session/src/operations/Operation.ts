@@ -1,4 +1,5 @@
 import {
+    assertCreditUpdatePlan,
     revocationSigningRequest,
     acceptRevocationSignature,
 } from "@invisi-labs/sdk/session-support";
@@ -131,6 +132,7 @@ export class Operation {
             delete saved.claim;
             return new Operation(runtime, saved, record.status);
         });
+        await assertCreditUpdatePlan(result.#saved.plan);
         if (result.#saved.call) {
             const expected = await result.encode(result.#saved);
             check(

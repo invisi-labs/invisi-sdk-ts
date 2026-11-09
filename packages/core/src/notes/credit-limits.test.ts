@@ -1,11 +1,15 @@
 import { expect, it } from "vitest";
-import { applyCreditDrawUsage, creditPeriods, normalizeCreditPolicy } from "../credit/state";
+import {
+    applyCreditDrawUsage,
+    creditPeriods,
+    normalizeCreditPolicy,
+    normalizeCreditUsage,
+} from "../credit/state";
 it("validates canonical period sentinels and the u126/u128/u64 ranges", () => {
-    expect(normalizeCreditPolicy({})).toEqual({
+    expect({ ...normalizeCreditPolicy({}), ...normalizeCreditUsage({}) }).toEqual({
         singleLimit: 0n,
         dailyLimit: 0n,
         monthlyLimit: 0n,
-        lifetimeLimit: 0n,
         lastDay: 0n,
         dailySpent: 0n,
         lastMonth: 0n,
@@ -19,12 +23,14 @@ it("validates canonical period sentinels and the u126/u128/u64 ranges", () => {
         { singleLimit: 1n << 126n },
         { dailyLimit: 1n, lastDay: 1n << 64n },
     ])
-        expect(() => normalizeCreditPolicy(p)).toThrow();
+        expect(() => ({ ...normalizeCreditPolicy(p), ...normalizeCreditUsage(p) })).toThrow();
 });
 it("debits both calendar counters, resets only on rollover and applies full-balance limits", () => {
     const t = BigInt(Date.parse("2024-02-29T23:59:59Z")) / 1000n,
         periods = creditPeriods(t);
     const n = {
+        availableCredit: 1000n,
+        unlimited: false,
         singleLimit: 40n,
         dailyLimit: 50n,
         monthlyLimit: 60n,
@@ -46,7 +52,9 @@ it("debits both calendar counters, resets only on rollover and applies full-bala
     });
     expect(() => applyCreditDrawUsage(n, 1n, t - 86400n)).toThrow("rollback");
     for (const p of [{ singleLimit: 99n }, { dailyLimit: 99n }, { monthlyLimit: 99n }])
-        expect(() => applyCreditDrawUsage({ ...p }, 100n, t)).toThrow();
+        expect(() =>
+            applyCreditDrawUsage({ ...p, availableCredit: 1000n, unlimited: false }, 100n, t)
+        ).toThrow();
 });
 it("computes Gregorian calendar periods for epoch, leap day and the entire uint64 timestamp range", () => {
     expect(creditPeriods(0n)).toEqual({ currentDay: 1n, currentMonth: 1n });
@@ -56,16 +64,22 @@ it("computes Gregorian calendar periods for epoch, leap day and the entire uint6
     expect(() => creditPeriods(undefined!)).toThrow();
 });
 
-import type { CreditPolicy } from "../types";
+import type { CreditPolicy, CreditUsage, CreditState } from "../types";
 import vectors from "../wallet/testdata/wallet-note-vectors.json";
-it.each(vectors.creditPolicyCases)("matches independent policy case $name", (c) => {
-    const policy = Object.fromEntries(
-        Object.entries(c.policy).map(([k, v]) => [k, BigInt(v)])
-    ) as unknown as CreditPolicy;
-    const draw = () => applyCreditDrawUsage(policy, BigInt(c.drawAmount), BigInt(c.timestamp));
+it.each(vectors.creditStateCases)("matches independent Credit state case $name", (c) => {
+    const fields = Object.fromEntries(
+        Object.entries(c.fields).map(([k, v]) => [k, typeof v === "boolean" ? v : BigInt(v)])
+    ) as unknown as Partial<CreditPolicy & CreditUsage> &
+        Pick<CreditState, "availableCredit" | "unlimited">;
+    const draw = () => applyCreditDrawUsage(fields, BigInt(c.drawAmount), BigInt(c.timestamp));
     if (c.reject) expect(draw).toThrow();
     else
         expect(draw()).toEqual(
-            Object.fromEntries(Object.entries(c.expected!).map(([k, v]) => [k, BigInt(v!)]))
+            Object.fromEntries(
+                Object.entries(c.expected!).map(([k, v]) => [
+                    k,
+                    typeof v === "boolean" ? v : BigInt(v!),
+                ])
+            )
         );
 });

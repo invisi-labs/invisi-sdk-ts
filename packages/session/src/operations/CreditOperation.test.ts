@@ -3,6 +3,7 @@ import { Interface, Wallet as EvmWallet } from "ethers";
 import {
     computeCreditCommitment,
     normalizeCreditPolicy,
+    normalizeCreditUsage,
     type CreditDeliveryState,
 } from "@invisi-labs/core";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
@@ -12,7 +13,14 @@ import { sessionOptions } from "../../../../test-support/session-options";
 import { backend } from "../../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
 import { WalletSession } from "../wallet/WalletSession";
 const iface = new Interface(invisiProtocolAbi);
-async function creditFixture() {
+async function creditFixture(
+    changes: Partial<
+        Pick<
+            import("@invisi-labs/core").CreditState,
+            "availableCredit" | "unlimited" | "totalSpent"
+        >
+    > = {}
+) {
     const h = await fixture(),
         state: CreditDeliveryState = {
             note: {
@@ -26,7 +34,10 @@ async function creditFixture() {
                 nonce: 456n,
                 expiry: 2000003600n,
                 creditSharedKey: 789n,
-                ...normalizeCreditPolicy({ singleLimit: 50n, lifetimeLimit: 100n }),
+                availableCredit: changes.availableCredit ?? 100n,
+                unlimited: changes.unlimited ?? false,
+                ...normalizeCreditPolicy({ singleLimit: 50n }),
+                ...normalizeCreditUsage(changes),
             },
             ownerReceivingKeys: h.wallet.getReceivingAddress().getReceivingKeys(),
             spenderReceivingKeys: h.bob.getReceivingAddress().getReceivingKeys(),
@@ -68,7 +79,8 @@ it("creates unfunded authority without reserving ordinary Notes", async () => {
             tokenAddress: h.context.tokenAddress,
             spender: h.bob.getAddress(),
             expiry: 2000003600n,
-            lifetimeLimit: 100n,
+            availableCredit: 100n,
+            unlimited: false,
         });
     const snapshot = await h.store.readSnapshot(h.scope),
         saved = snapshot.operations[operation.id]!.payload as SavedOperation;
@@ -86,7 +98,7 @@ it("reserves consumed Credit state for an owner update while preserving grant us
             tokenAddress: h.context.tokenAddress,
             credit: h.commitment,
             singleLimit: 10n,
-            lifetimeLimit: 75n,
+            decreaseAvailableCredit: 25n,
         });
     const snapshot = await h.store.readSnapshot(h.scope),
         saved = snapshot.operations[operation.id]!.payload as SavedOperation;
@@ -165,4 +177,35 @@ it("rechecks canonical revocation bits and deadline-covering expiry before priva
             credit: h.commitment,
         })
     ).rejects.toThrow(/revoked/);
+});
+
+it("persists the original update delta across resume and quotes and rejects a changed successor", async () => {
+    const h = await creditFixture({ availableCredit: 20n, totalSpent: 7n });
+    const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+    const prepared = await h.ownerSession.prepareUpdateCredit({
+        tokenAddress: h.context.tokenAddress,
+        credit: h.commitment,
+        increaseAvailableCredit: 10n,
+    });
+    const resumed = await h.ownerSession.resume(prepared.id);
+    let calls = 0;
+    const client = quoteClient(h.context, () => (++calls === 1 ? 1n : 2n));
+    const quoted = await resumed.withBroadcaster(client, { maxFeeAmount: 3n });
+    const restored = await h.ownerSession.resume(quoted.id);
+    const requoted = await restored.withBroadcaster(client, { maxFeeAmount: 3n });
+    expect(requoted.preview().creditOutputs![0]).toMatchObject({
+        availableCredit: 30n,
+        unlimited: false,
+        totalSpent: 7n,
+    });
+    const snapshot = await h.store.readSnapshot(h.scope);
+    const saved = snapshot.operations[requoted.id]!.payload as SavedOperation;
+    expect(saved.plan.credit!.updateChanges).toMatchObject({ increaseAvailableCredit: 10n });
+    expect(saved.plan.credit!.updateChanges).not.toHaveProperty("availableCredit");
+    expect(saved.plan.intent!.options).toMatchObject({ increaseAvailableCredit: 10n });
+    await h.store.transaction(h.scope, (draft) => {
+        const record = draft.operations[requoted.id]!.payload as SavedOperation;
+        record.plan.credit!.outputs[0]!.state.note.availableCredit = 40n;
+    });
+    await expect(h.ownerSession.resume(requoted.id)).rejects.toThrow(/adjustment/);
 });

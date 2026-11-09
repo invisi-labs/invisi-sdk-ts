@@ -1,3 +1,4 @@
+import { assertCreditUpdatePlan } from "../credit/state";
 import { getAddress } from "ethers";
 import type {
     RevokeCreditPreparation,
@@ -59,6 +60,7 @@ export async function prepareBroadcasterPlan(
     options: WithBroadcasterOptions
 ): Promise<{ plan: OperationPlan; quote: SignedBroadcasterQuote }> {
     if (!plan.intent) throw new Error("operation has no supported preparation intent");
+    await assertCreditUpdatePlan(plan);
     const intent = structuredClone(plan.intent);
     intent.options.deadline = plan.deadline;
     const maxFee = options.maxFeeAmount;
@@ -85,6 +87,7 @@ export async function prepareBroadcasterPlan(
             const request = structuredClone(intent);
             request.options.fee = { recipient, amount };
             current = await reprepare(request);
+            await assertCreditUpdatePlan(current);
             if (current.credit?.revocation)
                 current.credit.revocationCaller = client.configuration.quoteSigner as `0x${string}`;
             const data = exportBroadcasterIntent(current).data;

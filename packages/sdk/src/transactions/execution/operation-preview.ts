@@ -1,4 +1,4 @@
-import { normalizeCreditPolicy } from "@invisi-labs/core";
+import { normalizeCreditPolicy, normalizeCreditUsage } from "@invisi-labs/core";
 import { normalizeFunding } from "@invisi-labs/protocol";
 import type { OperationPlan } from "../operation-types";
 import { inputFacts } from "../preparation/inputs";
@@ -37,6 +37,8 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
                 owner: input.state.note.ownerWalletIdentity,
                 spender: input.state.note.spenderWalletIdentity,
                 expiry: input.state.note.expiry,
+                availableCredit: input.state.note.availableCredit,
+                unlimited: input.state.note.unlimited,
                 role: input.role,
                 treeId: input.treeId,
                 leafIndex: input.leafIndex,
@@ -58,7 +60,11 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
             owner: output.state.note.ownerWalletIdentity,
             spender: output.state.note.spenderWalletIdentity,
             ...normalizeCreditPolicy(output.state.note),
+            availableCredit: output.state.note.availableCredit,
+            unlimited: output.state.note.unlimited,
+            ...normalizeCreditUsage(output.state.note),
         })),
+        creditUpdate: p.credit?.updateChanges ? structuredClone(p.credit.updateChanges) : undefined,
         creditDraw: p.credit?.draw
             ? {
                   grossAmount: p.credit.draw.totalAmount,

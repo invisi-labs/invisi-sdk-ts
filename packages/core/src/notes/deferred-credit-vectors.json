@@ -17,57 +17,60 @@
     "singleLimit": "1000",
     "dailyLimit": "10000",
     "monthlyLimit": "100000",
-    "lifetimeLimit": "1000000",
+    "availableCredit": "1000000",
+    "unlimited": false,
     "lastDay": "0",
     "dailySpent": "0",
     "lastMonth": "0",
     "monthlySpent": "0",
     "totalSpent": "0"
   },
-  "commitment": "0x0d14f0c862d9dbdedb659405c7a007a4456505658a9d1d79b44779f7c68daf73",
+  "commitment": "0x007a3615026a785fdb5bd0eb0933241b79d219304e80884f45938dcccce5351f",
   "draw": {
-    "nullifier": "0x02f67055d36dab801bf94d694b13a42364a08d9f0e3f983f1d20882c4d83687a",
+    "nullifier": "0x15afc336e279a093e3b00dd851b4864c7375bdf9c75350a279314364ba1f629f",
     "state": {
       "spenderWalletIdentity": "3",
       "ownerWalletIdentity": "4",
       "revocationShard": "1",
       "revocationSlot": "0",
-      "nonce": "3012051224469662082536468226326366121666670169541660175583943019568149995599",
+      "nonce": "20970324702834800332788802131568401604010771199458148323683486072662111177544",
       "expiry": "2050000000",
       "creditSharedKey": "6",
       "singleLimit": "1000",
       "dailyLimit": "10000",
       "monthlyLimit": "100000",
-      "lifetimeLimit": "1000000",
+      "availableCredit": "999993",
       "lastDay": "23149",
       "dailySpent": "7",
       "lastMonth": "761",
       "monthlySpent": "7",
-      "totalSpent": "7"
+      "totalSpent": "7",
+      "unlimited": false
     },
-    "stateCommitment": "0x0ccc68fbc5c2746394721d6adc179bea81d508ea58692d35525430f7b2c15613",
-    "recoveryAmount": "0x112a0cb3599eae0b8ab09d97cc5142f2523cc0646d196970f3d4e5954e5b0572"
+    "stateCommitment": "0x27c1bf052097ec9076885455d8c9fb059d99917d4b585d93643e4e25afa4b85c",
+    "recoveryAmount": "0x1de36787682437a2d10b65351416e27e8eb6d5be28aa50ded3298dd663676307"
   },
   "update": {
-    "nullifier": "0x19b8458d5048285ab9a726c20c5ff033217adb17cf0b9bf7c3c4acf1ba44c2b9",
+    "nullifier": "0x280e3c296c5f4bb9cb0fea41bafdfd139fd265133e301304e8279047cffb4dea",
     "state": {
       "spenderWalletIdentity": "3",
       "ownerWalletIdentity": "4",
       "revocationShard": "1",
       "revocationSlot": "0",
-      "nonce": "17756094992669209304227557973828113155871228415037406813834287316545842970266",
+      "nonce": "11753051414193055736063549418898057585192857641622594679528236153668632619210",
       "expiry": "2060000000",
       "creditSharedKey": "6",
       "singleLimit": "10",
       "dailyLimit": "40",
       "monthlyLimit": "60",
-      "lifetimeLimit": "100",
+      "availableCredit": "999893",
       "lastDay": "23149",
       "dailySpent": "7",
       "lastMonth": "761",
       "monthlySpent": "7",
-      "totalSpent": "7"
+      "totalSpent": "7",
+      "unlimited": false
     },
-    "stateCommitment": "0x0b2ef85d850b3a5a4a22f2748b66c1c35d35c287700e387c00680886dcb64391"
+    "stateCommitment": "0x2831e75cd8aabdc7bc76523e2571895ca2399291f567a95182426b1b1d303ba9"
   }
 }

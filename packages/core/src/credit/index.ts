@@ -4,4 +4,12 @@ export {
     decryptCreditState,
     normalizeCreditDeliveryState,
 } from "../delivery/encryption";
-export type { CreditState, CreditPolicy, CreditDeliveryState, CreditStateRecovery } from "../types";
+export type {
+    CreditState,
+    CreditPolicy,
+    CreditUsage,
+    CreditDeliveryState,
+    CreditStateRecovery,
+} from "../types";
+
+export * from "./state";

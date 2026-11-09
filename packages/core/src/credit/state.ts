@@ -7,14 +7,17 @@ import {
 } from "../crypto/domains";
 import { poseidonHash } from "../crypto/poseidon";
 import { FIELD_MODULUS } from "../crypto/random";
-import type { CreditState, CreditPolicy, CreditStateRecovery, ProtocolContext } from "../types";
+import type {
+    CreditState,
+    CreditPolicy,
+    CreditUsage,
+    CreditStateRecovery,
+    ProtocolContext,
+} from "../types";
 import { assertNoteContext } from "../notes/noteContext";
 
-export const CREDIT_POLICY_FIELDS = [
-    "singleLimit",
-    "dailyLimit",
-    "monthlyLimit",
-    "lifetimeLimit",
+export const CREDIT_POLICY_FIELDS = ["singleLimit", "dailyLimit", "monthlyLimit"] as const;
+export const CREDIT_USAGE_FIELDS = [
     "lastDay",
     "dailySpent",
     "lastMonth",
@@ -22,30 +25,35 @@ export const CREDIT_POLICY_FIELDS = [
     "totalSpent",
 ] as const;
 export function normalizeCreditPolicy(value: Partial<CreditPolicy> = {}): CreditPolicy {
-    const policy = Object.fromEntries(
+    return Object.fromEntries(
         CREDIT_POLICY_FIELDS.map((key) => {
             const n = value[key] ?? 0n;
-            if (typeof n !== "bigint") throw new TypeError(`${key} must be bigint`);
-            uint(
-                n,
-                key === "lastDay" || key === "lastMonth"
-                    ? 64
-                    : key === "dailySpent" || key === "monthlySpent" || key === "totalSpent"
-                      ? 128
-                      : 126,
-                key
-            );
+            uint(n, 126, key);
             return [key, n];
         })
     ) as unknown as CreditPolicy;
+}
+export function normalizeCreditUsage(value: Partial<CreditUsage> = {}): CreditUsage {
+    const usage = Object.fromEntries(
+        CREDIT_USAGE_FIELDS.map((key) => {
+            const n = value[key] ?? 0n;
+            uint(n, key === "lastDay" || key === "lastMonth" ? 64 : 128, key);
+            return [key, n];
+        })
+    ) as unknown as CreditUsage;
     for (const [period, spent] of [
         ["lastDay", "dailySpent"],
         ["lastMonth", "monthlySpent"],
-    ] as const) {
-        if (policy[period] === 0n && policy[spent] !== 0n)
-            throw new Error("noncanonical Credit usage");
-    }
-    return policy;
+    ] as const)
+        if (usage[period] === 0n && usage[spent] !== 0n) throw Error("noncanonical Credit usage");
+    return usage;
+}
+function balance(value: Pick<CreditState, "availableCredit" | "unlimited">) {
+    uint(value.availableCredit, 128, "availableCredit");
+    if (typeof value.unlimited !== "boolean") throw TypeError("unlimited must be boolean");
+    if (value.unlimited && value.availableCredit !== 0n)
+        throw Error("unlimited Credit must have zero available credit");
+    return { availableCredit: value.availableCredit, unlimited: value.unlimited };
 }
 /** UTC Gregorian periods from explicit uint64 chain seconds, without wall-clock defaults. */
 export function creditPeriods(timestamp: bigint): { currentDay: bigint; currentMonth: bigint } {
@@ -65,11 +73,15 @@ export function creditPeriods(timestamp: bigint): { currentDay: bigint; currentM
 }
 /** Accumulate actual debits even when limits are disabled. */
 export function applyCreditDrawUsage(
-    note: Partial<CreditPolicy>,
+    note: Partial<CreditPolicy & CreditUsage> & Pick<CreditState, "availableCredit" | "unlimited">,
     amount: bigint,
     timestamp: bigint
-): CreditPolicy {
-    const policy = normalizeCreditPolicy(note),
+): CreditPolicy & CreditUsage & Pick<CreditState, "availableCredit" | "unlimited"> {
+    const policy = {
+            ...normalizeCreditPolicy(note),
+            ...normalizeCreditUsage(note),
+            ...balance(note),
+        },
         periods = creditPeriods(timestamp);
     uint(amount, 126, "draw amount");
     if (amount === 0n) throw new Error("draw amount must be positive");
@@ -89,8 +101,10 @@ export function applyCreditDrawUsage(
     }
     policy.totalSpent += amount;
     uint(policy.totalSpent, 128, "totalSpent");
-    if (policy.lifetimeLimit !== 0n && policy.totalSpent > policy.lifetimeLimit)
-        throw new Error("lifetime limit exceeded");
+    if (!policy.unlimited) {
+        if (amount > policy.availableCredit) throw Error("available credit exceeded");
+        policy.availableCredit -= amount;
+    }
     return policy;
 }
 
@@ -113,6 +127,9 @@ export function normalizeCreditState(state: CreditState): CreditState {
         "expiry",
         "creditSharedKey",
         ...CREDIT_POLICY_FIELDS,
+        ...CREDIT_USAGE_FIELDS,
+        "availableCredit",
+        "unlimited",
         "payload",
     ];
     if (!state || typeof state !== "object" || Object.keys(state).some((k) => !allowed.includes(k)))
@@ -139,6 +156,8 @@ export function normalizeCreditState(state: CreditState): CreditState {
     return {
         ...state,
         ...normalizeCreditPolicy(state),
+        ...normalizeCreditUsage(state),
+        ...balance(state),
         ...(state.payload !== undefined ? { payload: Uint8Array.from(state.payload) } : {}),
     };
 }
@@ -177,6 +196,9 @@ export async function computeCreditCommitment(
         state.expiry,
         BigInt(hash),
         ...CREDIT_POLICY_FIELDS.map((k) => normalizeCreditPolicy(state)[k]),
+        balance(state).availableCredit,
+        state.unlimited ? 1n : 0n,
+        ...CREDIT_USAGE_FIELDS.map((k) => normalizeCreditUsage(state)[k]),
     ]);
 }
 
@@ -315,18 +337,57 @@ export async function deriveCreditState(
         recoveryAmount: (debit + mask) % FIELD_MODULUS,
     };
 }
+export interface CreditUpdateChanges extends Partial<CreditPolicy> {
+    expiry?: bigint;
+    unlimited?: boolean;
+    increaseAvailableCredit?: bigint;
+    decreaseAvailableCredit?: bigint;
+}
 export async function deriveCreditUpdate(
     previous: CreditState,
-    changes: Partial<
-        Pick<CreditPolicy, "singleLimit" | "dailyLimit" | "monthlyLimit" | "lifetimeLimit">
-    > & { expiry?: bigint },
+    changes: CreditUpdateChanges,
     deadline: bigint
 ) {
     for (const key of Object.keys(changes))
-        if (!["singleLimit", "dailyLimit", "monthlyLimit", "lifetimeLimit", "expiry"].includes(key))
+        if (
+            ![
+                ...CREDIT_POLICY_FIELDS,
+                "expiry",
+                "unlimited",
+                "increaseAvailableCredit",
+                "decreaseAvailableCredit",
+            ].includes(key)
+        )
             throw Error("unsupported Credit update field");
+    const old = normalizeCreditState(previous),
+        increase =
+            changes.increaseAvailableCredit === undefined ? 0n : changes.increaseAvailableCredit,
+        decrease =
+            changes.decreaseAvailableCredit === undefined ? 0n : changes.decreaseAvailableCredit;
+    uint(increase, 128, "increaseAvailableCredit");
+    uint(decrease, 128, "decreaseAvailableCredit");
+    if (increase !== 0n && decrease !== 0n)
+        throw Error("Credit increase and decrease are mutually exclusive");
+    const unlimited = changes.unlimited === undefined ? old.unlimited : changes.unlimited;
+    if (typeof unlimited !== "boolean") throw TypeError("unlimited must be boolean");
+    let availableCredit = 0n;
+    if (unlimited) {
+        if (increase !== 0n || decrease !== 0n)
+            throw Error("unlimited update cannot adjust available credit");
+    } else {
+        if (decrease > old.availableCredit)
+            throw Error("available credit decrease exceeds balance");
+        availableCredit = old.availableCredit + increase - decrease;
+        uint(availableCredit, 128, "availableCredit");
+    }
     uint(deadline, 64, "deadline");
-    const next = { ...previous, ...changes, ...normalizeCreditPolicy({ ...previous, ...changes }) };
+    const next = {
+        ...old,
+        ...normalizeCreditPolicy({ ...old, ...changes }),
+        expiry: changes.expiry ?? old.expiry,
+        availableCredit,
+        unlimited,
+    };
     if (previous.expiry < deadline || next.expiry < deadline)
         throw Error("expiry before request deadline");
     const nullifier = await computeCreditNullifier(

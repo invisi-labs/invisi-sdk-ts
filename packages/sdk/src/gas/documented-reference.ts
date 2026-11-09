@@ -1,7 +1,7 @@
 import { CIRCUIT_RELEASE } from "@invisi-labs/prover";
 import catalog from "./data/documented-references.json";
 export type DocumentedReleaseIdentity =
-    | { creditManifestVersion: number; creditFormatVersion: number }
+    | { creditManifestVersion: number; creditFormatVersion: number; creditManifestSha256?: string }
     | { userManifestVersion: number; userFormatVersion: number };
 export type DocumentedGasShape = Readonly<Record<string, string | number | boolean>>;
 export type DocumentedGasReference =
@@ -35,11 +35,14 @@ export function getDocumentedGasReference(query: DocumentedGasShape): Documented
     });
     if (!row)
         return { source: "documented-reference", available: false, reason: "shape-not-covered" };
-    const identity = row.releaseIdentity;
+    const identity = row.releaseIdentity as DocumentedReleaseIdentity;
     if (
         "creditManifestVersion" in identity &&
         (identity.creditManifestVersion !== CIRCUIT_RELEASE.credit.version ||
-            identity.creditFormatVersion !== CIRCUIT_RELEASE.credit.formatVersion)
+            identity.creditFormatVersion !== CIRCUIT_RELEASE.credit.formatVersion ||
+            !/^[a-f0-9]{64}$/.test(identity.creditManifestSha256 ?? "") ||
+            !/^[a-f0-9]{64}$/.test(CIRCUIT_RELEASE.credit.manifestSha256) ||
+            identity.creditManifestSha256 !== CIRCUIT_RELEASE.credit.manifestSha256)
     )
         return { source: "documented-reference", available: false, reason: "release-not-covered" };
     const source = catalog.sources.find((s) => s.path === row.source)!;

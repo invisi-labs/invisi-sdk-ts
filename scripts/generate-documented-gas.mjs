@@ -3,7 +3,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolve, join } from "node:path";
-const root = resolve(process.argv[2] ?? "../protocol-docs");
+const vectorsOnly = process.argv.includes("--vectors-only");
+const root = resolve(
+    process.argv.slice(2).find((arg) => !arg.startsWith("--")) ?? "../protocol-docs"
+);
 const files = [
     "5.1-credit-create.md",
     "5.2-credit-update.md",
@@ -17,7 +20,7 @@ const conditions = [
     "First owner/token grant allocation at shard1/slot0, empty protocol tree, two Credit deliveries. See the hashed source for exact fee and policy configuration.",
     "Update after a successful debit of7 base units; preserve all usage fields and change limits/expiry. Preparation transactions excluded. See the hashed source for exact fee configuration.",
     "Owner direct, EOA relay or reference ERC1271/EIP7702 relay; first bitmap-word write or an already nonempty word. Three successful receipt medians per scenario; preparation and delegation excluded.",
-    "Local Anvil31337, Prague, real verifiers, MockERC20Permit, owners preminted and max-approved. Each distinct payer contributes7 base units; one spender, one ordinary recipient Note. Inputs in tree1, cursor=N; timestamp2000000000, deadline+86400. Credit ciphertext484 bytes, Note160, clue68. No memo/FMD. One independently verified proof per statement reused across three successful snapshot-isolated transactions with distinct gasPrice/transaction hashes. Block30m, transaction budget16777216; preparation/mint/approve excluded. See the hashed source for exact fee and private limits.",
+    "Local Anvil31337, Prague, real verifiers, MockERC20Permit, owners preminted and max-approved. Each distinct payer contributes7 base units; one spender, one ordinary recipient Note. Inputs in tree1, cursor=N; timestamp2000000000, deadline+86400. Credit ciphertext size/layout from the hashed measured source, Note160, clue68. No memo/FMD. One independently verified proof per statement reused across three successful snapshot-isolated transactions with distinct gasPrice/transaction hashes. Block30m, transaction budget16777216; preparation/mint/approve excluded. See the hashed source for exact fee and private limits.",
     "2026-11-08, source eb5b88705227e61383e8620d7a34887a61617e08. Local Anvil31337, Prague, Solidity0.8.38 optimizer200, real verifiers, MockERC20Permit, direct caller funding without Permit; at most one depth16 Note tree without rollover. Ciphertext160 plus clue68 per output, empty memo. Three receipt medians from identical snapshots. N=input+output slots; choose the higher public-funding/mixed median at each N. Mixed recipe: one10UNIT input,4UNIT deposit,9UNIT private outputs,3UNIT withdrawal,2UNIT accrued fee; C1 withdraws12UNIT plus2UNIT fee. UNIT=10^16. Excludes deployment/mint/approve/input shielding.",
     "Same environment and accounting as5.5. C2/C10/C190 compare public-funding0->C, private1->C-1 and withdrawalC->0 using real Notes. Three successful receipt medians per workload; see the hashed source for fee configuration.",
 ];
@@ -30,15 +33,27 @@ const sources = files.map((path, index) => {
         text,
     };
 });
-const creditHeader = sources[3].text.match(/Credit manifest(\d+)\/format(\d+)/);
+const measuredCreditText = sources[3].text.split("## ")[0];
+const creditHeader = measuredCreditText.match(/Credit manifest(\d+)\/format(\d+)/);
 if (!creditHeader) throw Error("Credit manifest/format provenance missing from5.4");
+const measuredCreditSha = measuredCreditText.match(
+    /creditManifestSha256\s*[:=]\s*[`"]?([a-f0-9]{64})/i
+)?.[1];
+const measuredCreditBytes = Number(
+    measuredCreditText.match(/creditCiphertextBytes\s*[:=]\s*(\d+)/i)?.[1] ??
+        measuredCreditText.match(/\u6388\u4fe1\u5bc6\u6587\u5404\s*(\d+)B/)?.[1]
+);
+if (!Number.isInteger(measuredCreditBytes))
+    throw Error("Credit ciphertext byte provenance missing");
 const creditIdentity = {
+    ...(measuredCreditSha ? { creditManifestSha256: measuredCreditSha } : {}),
     creditManifestVersion: Number(creditHeader[1]),
     creditFormatVersion: Number(creditHeader[2]),
 };
 const packaged = JSON.parse(readFileSync("packages/prover/circuits/manifest.json", "utf8"));
 const packagedCredit = packaged.manifests.find((m) => m.name === "credit");
 const packagedCreditIdentity = {
+    creditManifestSha256: packagedCredit.sha256,
     creditManifestVersion: packagedCredit.version,
     creditFormatVersion: packagedCredit.formatVersion,
 };
@@ -91,7 +106,7 @@ for (const [index, source] of sources.entries()) {
                 sourceTrees: 1,
                 noteOutputs: 1,
                 creditOutputs: n,
-                creditCiphertextBytes: 484,
+                creditCiphertextBytes: measuredCreditBytes,
                 noteCiphertextBytes: 160,
                 clueBytes: 68,
                 scenario: "distinct-payers",
@@ -150,21 +165,26 @@ for (const [index, source] of sources.entries()) {
         }
     }
 }
-const catalog = {
-    formatVersion: 1,
-    kind: "documented-reference",
-    docsCommit: execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-    sources: sources.map(({ text, ...s }) => s),
-    assumptions: [
-        "Local Anvil31337, Prague, real verifiers and reference token; not a live chain gas estimate.",
-        "Medians transcribed from documentation; raw receipts and artifact fingerprints are not included.",
-        "Credit draw samples use distinct payers only. Same-payer batches are not covered.",
-        "No extrapolation; aggregate documents 5.7 and 5.8 describe historical experiments and are excluded.",
-    ],
-    references: rows,
-};
+const catalog = vectorsOnly
+    ? JSON.parse(readFileSync("packages/sdk/src/gas/data/documented-references.json", "utf8"))
+    : {
+          formatVersion: 1,
+          kind: "documented-reference",
+          docsCommit: execFileSync("git", ["-C", root, "rev-parse", "HEAD"], {
+              encoding: "utf8",
+          }).trim(),
+          sources: sources.map(({ text, ...s }) => s),
+          assumptions: [
+              "Local Anvil31337, Prague, real verifiers and reference token; not a live chain gas estimate.",
+              "Medians transcribed from documentation; raw receipts and artifact fingerprints are not included.",
+              "Credit draw samples use distinct payers only. Same-payer batches are not covered.",
+              "No extrapolation; aggregate documents 5.7 and 5.8 describe historical experiments and are excluded.",
+          ],
+          references: rows,
+      };
 const target = "packages/sdk/src/gas/data/";
-writeFileSync(target + "documented-references.json", JSON.stringify(catalog, null, 2) + "\n");
+if (!vectorsOnly)
+    writeFileSync(target + "documented-references.json", JSON.stringify(catalog, null, 2) + "\n");
 writeFileSync(
     target + "documented-reference-vectors.json",
     JSON.stringify(
@@ -172,11 +192,17 @@ writeFileSync(
             formatVersion: 1,
             catalogSha256: sha(JSON.stringify(catalog)),
             packagedCreditIdentity,
-            vectors: rows.map((r) => ({
+            vectors: catalog.references.map((r) => ({
                 query: r.shape,
                 available:
                     r.shape.kind === "transact" ||
-                    JSON.stringify(r.releaseIdentity) === JSON.stringify(packagedCreditIdentity),
+                    (!!r.releaseIdentity.creditManifestSha256 &&
+                        r.releaseIdentity.creditManifestSha256 ===
+                            packagedCreditIdentity.creditManifestSha256 &&
+                        r.releaseIdentity.creditManifestVersion ===
+                            packagedCreditIdentity.creditManifestVersion &&
+                        r.releaseIdentity.creditFormatVersion ===
+                            packagedCreditIdentity.creditFormatVersion),
                 gasUnits: r.gasUnits,
             })),
             unsupported: [

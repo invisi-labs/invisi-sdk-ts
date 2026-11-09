@@ -184,7 +184,8 @@ export class CreditPreparation<Result> {
                     "singleLimit",
                     "dailyLimit",
                     "monthlyLimit",
-                    "lifetimeLimit",
+                    "availableCredit",
+                    "unlimited",
                     "tokenAddress",
                     "spender",
                     "expiry",
@@ -224,6 +225,9 @@ export class CreditPreparation<Result> {
                     revocationShard: allocation.shard,
                     revocationSlot: BigInt(allocation.slot),
                     ...normalizeCreditPolicy(options),
+                    availableCredit:
+                        options.availableCredit === undefined ? 0n : options.availableCredit,
+                    unlimited: options.unlimited === undefined ? false : options.unlimited,
                     payload: copyApplicationPayload(options.payload),
                     expiry,
                     nonce: generateNonce(),
@@ -267,7 +271,9 @@ export class CreditPreparation<Result> {
                     "singleLimit",
                     "dailyLimit",
                     "monthlyLimit",
-                    "lifetimeLimit",
+                    "increaseAvailableCredit",
+                    "decreaseAvailableCredit",
+                    "unlimited",
                     "tokenAddress",
                     "credit",
                     "expiry",
@@ -281,7 +287,17 @@ export class CreditPreparation<Result> {
             n = previous.input.state.note;
         const changes = {
             ...Object.fromEntries(
-                (["singleLimit", "dailyLimit", "monthlyLimit", "lifetimeLimit", "expiry"] as const)
+                (
+                    [
+                        "singleLimit",
+                        "dailyLimit",
+                        "monthlyLimit",
+                        "unlimited",
+                        "increaseAvailableCredit",
+                        "decreaseAvailableCredit",
+                        "expiry",
+                    ] as const
+                )
                     .filter((k) => options[k] !== undefined)
                     .map((k) => [k, options[k]])
             ),
@@ -317,6 +333,7 @@ export class CreditPreparation<Result> {
             outputs: [output],
             deliveries: output.deliveries,
             update: params,
+            updateChanges: structuredClone(changes),
         };
         plan.statement = WitnessBuilder.statement(
             "credit_update",

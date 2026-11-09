@@ -1,4 +1,8 @@
-import { normalizeCreditDeliveryState, normalizeCreditPolicy } from "@invisi-labs/core";
+import {
+    normalizeCreditDeliveryState,
+    normalizeCreditPolicy,
+    normalizeCreditUsage,
+} from "@invisi-labs/core";
 import { createCreditPublicInputs } from "../credit/credit-create";
 import { check, provingRequest } from "./common";
 import type { CreateCreditWitnessParams } from "./types";
@@ -16,7 +20,7 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
         "Credit creation mismatch"
     );
     for (const k of ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"] as const)
-        check(policy[k] === 0n, "initial Credit usage must be zero");
+        check(normalizeCreditUsage(n)[k] === 0n, "initial Credit usage must be zero");
     return provingRequest(
         "create_credit",
         {
@@ -31,12 +35,9 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
             credit_nonce: n.nonce,
             expiry: n.expiry,
             credit_shared_key: n.creditSharedKey,
-            limits: [
-                policy.singleLimit,
-                policy.dailyLimit,
-                policy.monthlyLimit,
-                policy.lifetimeLimit,
-            ],
+            limits: [policy.singleLimit, policy.dailyLimit, policy.monthlyLimit],
+            available_credit: n.availableCredit,
+            unlimited: BigInt(n.unlimited),
         },
         words
     );

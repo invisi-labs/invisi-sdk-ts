@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 const sdk = resolve(import.meta.dirname, "..");
 const protocol = resolve(process.argv[2] ?? join(sdk, "../invisi-protocol"));
 const source = join(protocol, "scripts/create-credit-client.mjs");
-const { encryptCreditNote } = await import(pathToFileURL(source).href);
+const { encryptCreditNote, creditCommitment } = await import(pathToFileURL(source).href);
 const file = join(sdk, "packages/core/src/wallet/testdata/wallet-note-vectors.json");
 const vectors = JSON.parse(readFileSync(file, "utf8"));
 const clueKey = "0xc69480518ea88f8cb925fbcd8f5100b1ebc46cc4d8cbe19e0478936567e6b211";
@@ -22,14 +22,17 @@ const fields = [
     "singleLimit",
     "dailyLimit",
     "monthlyLimit",
-    "lifetimeLimit",
     "lastDay",
     "dailySpent",
     "lastMonth",
     "monthlySpent",
     "totalSpent",
 ];
-const note = Object.fromEntries(fields.map((field) => [field, BigInt(vectors.credit[field])]));
+const note = {
+    ...Object.fromEntries(fields.map((field) => [field, BigInt(vectors.credit[field])])),
+    availableCredit: 1000000n,
+    unlimited: false,
+};
 const state = {
     note,
     ownerReceivingKeys: { viewingPublicKey: vectors.owner.viewingPublicKey, clueKey },
@@ -38,8 +41,40 @@ const state = {
 const context = {
     ...vectors.context,
     chainId: BigInt(vectors.context.chainId),
-    outputCommitment: vectors.credit.commitment,
+    timestamp: BigInt(vectors.context.timestamp),
 };
+context.outputCommitment = await creditCommitment(context, note);
+const { creditNullifier, deriveCreditState, applyCreditDrawUsage, creditPeriods } = await import(
+    pathToFileURL(join(protocol, "scripts/credit-lifecycle-client.mjs")).href
+);
+vectors.credit = {
+    ...note,
+    commitment: context.outputCommitment,
+    nullifier: await creditNullifier(context, note),
+    draw: await deriveCreditState(context, note, 30n),
+};
+vectors.source =
+    "Independent protocol Node ECDH/HKDF/AES-GCM and Poseidon2; public test keys only; mode-B Credit available balance with canonical unlimited flag and opaque payload.";
+for (const entry of vectors.creditStateCases ?? []) {
+    const fields = Object.fromEntries(
+        Object.entries(entry.fields).map(([key, value]) => [
+            key,
+            typeof value === "boolean" ? value : BigInt(value),
+        ])
+    );
+    entry.fields = fields;
+    try {
+        entry.expected = applyCreditDrawUsage(
+            { ...note, ...fields },
+            BigInt(entry.drawAmount),
+            creditPeriods(BigInt(entry.timestamp))
+        );
+        entry.reject = false;
+    } catch {
+        delete entry.expected;
+        entry.reject = true;
+    }
+}
 for (const [role, code] of [
     ["owner", 1],
     ["spender", 2],
@@ -129,5 +164,8 @@ for (const vector of vectors.memoVectors ?? []) {
     );
     vector.ciphertext = "0x" + envelope.toString("hex");
 }
-writeFileSync(file, JSON.stringify(vectors, null, 2) + "\n");
+writeFileSync(
+    file,
+    JSON.stringify(vectors, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2) + "\n"
+);
 console.log("Refreshed funds and Credit payloadLength envelopes from the protocol implementation.");

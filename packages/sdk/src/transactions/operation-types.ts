@@ -1,4 +1,4 @@
-import type { PublicWallet } from "@invisi-labs/core";
+import type { PublicWallet, CreditUpdateChanges } from "@invisi-labs/core";
 import type {
     Address,
     RevokeCreditParams,
@@ -105,7 +105,8 @@ export interface CreateCreditPreparation {
     singleLimit?: bigint;
     dailyLimit?: bigint;
     monthlyLimit?: bigint;
-    lifetimeLimit?: bigint;
+    availableCredit?: bigint;
+    unlimited?: boolean;
     tokenAddress: Address;
     spender: string;
     expiry: bigint;
@@ -125,7 +126,9 @@ export interface UpdateCreditPreparation {
     singleLimit?: bigint;
     dailyLimit?: bigint;
     monthlyLimit?: bigint;
-    lifetimeLimit?: bigint;
+    increaseAvailableCredit?: bigint;
+    decreaseAvailableCredit?: bigint;
+    unlimited?: boolean;
     tokenAddress: Address;
     credit: Hex;
     expiry?: bigint;
@@ -156,6 +159,7 @@ export interface CreditPlan {
     creation?: CreateCreditParams;
     draw?: CreditDrawParams;
     update?: UpdateCreditParams;
+    updateChanges?: CreditUpdateChanges;
     revocation?: RevokeCreditParams;
     revocationSignature?: Hex;
     revocationCaller?: Hex;

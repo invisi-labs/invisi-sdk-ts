@@ -15,12 +15,16 @@ import {
     computeCreditCommitment,
     computeCreditSharedKeyHash,
     normalizeCreditPolicy,
+    normalizeCreditUsage,
 } from "../credit/state";
-import type { CreditState, CreditPolicy, Note } from "../types";
+import type { CreditState, CreditPolicy, CreditUsage, Note } from "../types";
 
 /** A Credit commitment opening excludes encrypted memos and the shared recovery/nullifier secret. */
 export interface CreditOpening
-    extends Omit<CreditState, "creditSharedKey" | "memo" | keyof CreditPolicy>, CreditPolicy {
+    extends
+        Omit<CreditState, "creditSharedKey" | "memo" | keyof CreditPolicy | keyof CreditUsage>,
+        CreditPolicy,
+        CreditUsage {
     creditSharedKeyHash: `0x${string}`;
 }
 
@@ -64,7 +68,8 @@ const CREDIT_FIELDS = [
     "singleLimit",
     "dailyLimit",
     "monthlyLimit",
-    "lifetimeLimit",
+    "availableCredit",
+    "unlimited",
     "lastDay",
     "dailySpent",
     "lastMonth",
@@ -133,6 +138,9 @@ async function creditOpening(note: CreditState): Promise<CreditOpening> {
     return {
         ...context(copied),
         ...normalizeCreditPolicy(copied),
+        ...normalizeCreditUsage(copied),
+        availableCredit: number(copied.availableCredit, 128, "availableCredit"),
+        unlimited: copied.unlimited,
         spenderWalletIdentity: owner(copied.spenderWalletIdentity, "spender identity"),
         ownerWalletIdentity: owner(copied.ownerWalletIdentity, "owner identity"),
         revocationShard: number(copied.revocationShard, 64, "revocation shard"),
@@ -195,7 +203,12 @@ export class Disclosure {
 
     static async fromCredit(value: CreditState): Promise<Disclosure> {
         const note = await creditOpening(value);
-        const data = Object.fromEntries(CREDIT_FIELDS.map((key) => [key, note[key].toString()]));
+        const data = Object.fromEntries(
+            CREDIT_FIELDS.map((key) => [
+                key,
+                key === "unlimited" ? (note.unlimited ? "1" : "0") : note[key].toString(),
+            ])
+        );
         return new Disclosure({
             version: 1,
             kind: "credit",
@@ -317,16 +330,23 @@ export class Disclosure {
                     key.endsWith("Identity") || key === "ownerAddress"
                         ? owner(raw[key], key)
                         : hash(raw[key], key, key !== "payloadKey");
+            } else if (key === "unlimited") {
+                if (raw[key] !== "0" && raw[key] !== "1")
+                    throw Error("invalid disclosure unlimited");
+                data[key] = raw[key] as string;
             } else {
-                const bits = key.endsWith("Payout")
-                    ? 160
-                    : key === "expiry"
-                      ? 64
-                      : key === "amount"
-                        ? root.kind === "note"
-                            ? 128
-                            : 126
-                        : 254;
+                const bits =
+                    key === "availableCredit"
+                        ? 128
+                        : key.endsWith("Payout")
+                          ? 160
+                          : key === "expiry"
+                            ? 64
+                            : key === "amount"
+                              ? root.kind === "note"
+                                  ? 128
+                                  : 126
+                              : 254;
                 const parsed = decimal(raw[key], bits, key);
                 if (key === "nonce") nonce(parsed);
                 data[key] = parsed.toString();
@@ -451,19 +471,18 @@ export class Disclosure {
             expiry: BigInt(data.expiry!),
             ...normalizeCreditPolicy(
                 Object.fromEntries(
-                    [
-                        "singleLimit",
-                        "dailyLimit",
-                        "monthlyLimit",
-                        "lifetimeLimit",
-                        "lastDay",
-                        "dailySpent",
-                        "lastMonth",
-                        "monthlySpent",
-                        "totalSpent",
-                    ].map((k) => [k, BigInt(data[k]!)])
+                    ["singleLimit", "dailyLimit", "monthlyLimit"].map((k) => [k, BigInt(data[k]!)])
                 )
             ),
+            ...normalizeCreditUsage(
+                Object.fromEntries(
+                    ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"].map(
+                        (k) => [k, BigInt(data[k]!)]
+                    )
+                )
+            ),
+            availableCredit: BigInt(data.availableCredit!),
+            unlimited: data.unlimited === "1",
             creditSharedKeyHash: data.creditSharedKeyHash as `0x${string}`,
         };
         if ((await commitment(note)) !== material.context.outputCommitment)

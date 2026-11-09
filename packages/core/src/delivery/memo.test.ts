@@ -98,7 +98,8 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
             singleLimit: BigInt(vectors.credit.singleLimit),
             dailyLimit: BigInt(vectors.credit.dailyLimit),
             monthlyLimit: BigInt(vectors.credit.monthlyLimit),
-            lifetimeLimit: BigInt(vectors.credit.lifetimeLimit),
+            availableCredit: BigInt(vectors.credit.availableCredit),
+            unlimited: vectors.credit.unlimited,
             lastDay: BigInt(vectors.credit.lastDay),
             dailySpent: BigInt(vectors.credit.dailySpent),
             lastMonth: BigInt(vectors.credit.lastMonth),
@@ -146,7 +147,7 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         memo.fill(0);
         const envelope = await pending;
         expect(envelope[0]).toBe(130);
-        expect(envelope).toHaveLength(741);
+        expect(envelope).toHaveLength(742);
         const decoded = await core.decryptCreditState(privateKey, envelope, scoped);
         expect(core.creditV1.decode(decoded.note.payload!).memo).toEqual(
             new Uint8Array(256).fill(255)
@@ -203,7 +204,8 @@ it("decrypts every independently generated text and opaque shared memo vector", 
                 singleLimit: BigInt(vectors.credit.singleLimit),
                 dailyLimit: BigInt(vectors.credit.dailyLimit),
                 monthlyLimit: BigInt(vectors.credit.monthlyLimit),
-                lifetimeLimit: BigInt(vectors.credit.lifetimeLimit),
+                availableCredit: BigInt(vectors.credit.availableCredit),
+                unlimited: vectors.credit.unlimited,
                 lastDay: BigInt(vectors.credit.lastDay),
                 dailySpent: BigInt(vectors.credit.dailySpent),
                 lastMonth: BigInt(vectors.credit.lastMonth),

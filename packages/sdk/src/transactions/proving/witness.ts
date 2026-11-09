@@ -1,3 +1,4 @@
+import { assertCreditUpdatePlan } from "../../credit/state";
 import { type AuthorizedStatement } from "@invisi-labs/core";
 import { WitnessBuilder, type TokenProtocol } from "@invisi-labs/protocol";
 import type { ProvingRequest } from "@invisi-labs/prover";
@@ -14,14 +15,18 @@ export async function witnessFor(
     if (credit) {
         if (!authorization) throw new Error("private Credit wallet authorization required");
 
-        if (credit.update)
+        if (credit.update) {
+            await assertCreditUpdatePlan(plan);
+            if (!credit.updateChanges) throw Error("Credit update adjustment required");
             return builder.updateCredit({
                 params: credit.update,
                 deliveries: credit.deliveries,
                 input: credit.inputs[0]!,
                 state: credit.outputs[0]!.state,
+                changes: credit.updateChanges,
                 authorization,
             });
+        }
         if (credit.creation)
             return builder.createCredit({
                 params: credit.creation,
