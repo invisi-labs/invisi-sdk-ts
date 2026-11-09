@@ -1,0 +1,9 @@
+import {spawnSync} from 'node:child_process';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {dirname,join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+if(process.env.INVISI_PROVENANCE_LIVE!=='1'||!process.env.INVISI_PROVENANCE_TRUST)throw Error('Explicit LIVE=1 and INVISI_PROVENANCE_TRUST are required');
+const lab=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),fixture=JSON.parse(readFileSync(process.env.INVISI_PROVENANCE_TRUST,'utf8'));
+const report={format:'invisi.provenance.sdk-live.v1',startedAt:new Date().toISOString(),endpoint:fixture.endpoint,scope:fixture.scope,manifestSha256:fixture.manifestSha256,jobId:fixture.jobId,rootId:fixture.rootId,realHTTP:true,mocks:false,cases:[]};
+for(const [sdk,command,args,cwd]of [['typescript','pnpm',['--filter','@invisi-labs/core','exec','vitest','run','src/provenance/live.test.ts'],join(lab,'invisi-sdk-ts')],['go','go',['test','-race','-count=1','-run','^TestProvenanceLiveService$','-v','./provenance'],join(lab,'invisi-sdk-go')],['rust','cargo',['test','--test','provenance_live','--','--nocapture'],join(lab,'invisi-sdk-rust')]]){const started=Date.now();console.log(`LIVE SDK ${sdk}`);const result=spawnSync(command,args,{cwd,env:process.env,stdio:'inherit',timeout:180000});report.cases.push({sdk,exitCode:result.status,elapsedMilliseconds:Date.now()-started});if(result.status!==0){report.error=`${sdk} live integration failed`;report.completedAt=new Date().toISOString();writeFileSync(join(dirname(process.env.INVISI_PROVENANCE_TRUST),'sdk-live-validation.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});throw Error(report.error);}}
+report.complete=true;report.completedAt=new Date().toISOString();writeFileSync(join(dirname(process.env.INVISI_PROVENANCE_TRUST),'sdk-live-validation.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});

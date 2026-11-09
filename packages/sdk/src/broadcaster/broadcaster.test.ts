@@ -301,3 +301,65 @@ it("rejects zero Credit service fees and binds positive protocol fees", async ()
         ).toThrow();
     }
 });
+
+import { provenanceIntentHash } from "@invisi-labs/core/provenance";
+it("binds configured provenance policy to signed quote and rejects policy downgrade", async () => {
+    const data = calldata(),
+        policy = "0x" + "77".repeat(32),
+        quote = {
+            token: "0x" + "33".repeat(20),
+            feeRecipient: signer.address,
+            feeAmount: "2",
+            deadline: "9999999999",
+            maxGas: "1000000",
+            requestHash: provenanceIntentHash(broadcasterRequestHash(data), policy),
+        };
+    const signed = {
+        quote,
+        signature: await signer.signTypedData(
+            broadcasterQuoteDomain(trust),
+            broadcasterQuoteTypes,
+            quote
+        ),
+        provenancePolicyId: policy,
+        requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
+    };
+    expect(() =>
+        verifyBroadcasterQuote(signed, { ...trust, provenancePolicyId: policy }, data, 0n)
+    ).not.toThrow();
+    expect(() => verifyBroadcasterQuote(signed, trust, data, 0n)).toThrow("policy");
+    expect(() =>
+        verifyBroadcasterQuote(
+            { ...signed, provenancePolicyId: "0x" + "78".repeat(32) },
+            { ...trust, provenancePolicyId: policy },
+            data,
+            0n
+        )
+    ).toThrow("policy");
+    const { provenancePolicyId: _, ...missing } = signed;
+    expect(() =>
+        verifyBroadcasterQuote(missing, { ...trust, provenancePolicyId: policy }, data, 0n)
+    ).toThrow("policy");
+    const transport = vi.fn(async (request) => ({
+        jsonrpc: "2.0",
+        id: request.id,
+        result:
+            request.method === "broadcaster_getQuote"
+                ? signed
+                : { id: "policy-job", state: "pending" },
+    }));
+    const client = new BroadcasterClient(
+        {
+            endpoint: "https://example.test",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+            provenancePolicyId: policy,
+        },
+        transport
+    );
+    const bound = await client.quote(data, trust, []);
+    await client.submit(data, bound, "policy-job", []);
+    expect(
+        (transport.mock.calls[0]![0].params as { proofSidecars: unknown[] }[])[0]!.proofSidecars
+    ).toEqual([]);
+});

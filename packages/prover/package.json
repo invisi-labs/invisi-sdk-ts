@@ -25,6 +25,10 @@
       "types": "./dist/aggregate.d.ts",
       "import": "./dist/aggregate.js",
       "require": "./dist/aggregate.cjs"
+    },
+    "./provenance": {
+      "types": "./dist/provenance.d.ts",
+      "import": "./dist/provenance.js"
     }
   },
   "engines": {
@@ -53,7 +57,8 @@
   },
   "files": [
     "dist",
-    "circuits"
+    "circuits",
+    "provenance"
   ],
   "repository": {
     "type": "git",

@@ -1,3 +1,5 @@
+import { provenanceIntentHash, proofSidecarToWire } from "@invisi-labs/core/provenance";
+import type { ProofSidecar } from "@invisi-labs/core/provenance";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { AbiCoder, getAddress, Interface, keccak256, verifyTypedData } from "ethers";
 
@@ -22,12 +24,15 @@ export interface BroadcasterQuote {
 export interface SignedBroadcasterQuote {
     quote: BroadcasterQuote;
     signature: string;
+    provenancePolicyId?: string;
+    requestHashFormat?: string;
     context?: { chainId: bigint; protocol: string };
 }
 export interface BroadcasterTrust {
     chainId: bigint;
     protocol: string;
     signer: string;
+    provenancePolicyId?: string;
 }
 export function broadcasterQuoteDomain(trust: BroadcasterTrust) {
     return {
@@ -119,10 +124,22 @@ export function verifyBroadcasterQuote(
     now = BigInt(Math.floor(Date.now() / 1000))
 ) {
     const { quote } = signed;
+    const policy = trust.provenancePolicyId;
+    if (
+        policy === undefined
+            ? signed.provenancePolicyId !== undefined || signed.requestHashFormat !== undefined
+            : !/^0x[0-9a-fA-F]{64}$/.test(policy) ||
+              signed.provenancePolicyId?.toLowerCase() !== policy.toLowerCase() ||
+              signed.requestHashFormat !== "invisi-broadcaster-provenance-intent-v1"
+    )
+        throw new Error("broadcaster provenance policy mismatch");
+    const originalHash = broadcasterRequestHash(data);
+    const expectedHash =
+        policy === undefined ? originalHash : provenanceIntentHash(originalHash, policy);
     const { request } = decodeBroadcasterIntent(data);
     const p = request.params;
     if (
-        quote.requestHash !== broadcasterRequestHash(data) ||
+        quote.requestHash !== expectedHash ||
         getAddress(quote.token) !== getAddress(p.token) ||
         getAddress(quote.feeRecipient) !== getAddress(p.feeRecipient) ||
         BigInt(quote.feeAmount) !== p.feeAmount ||
@@ -173,6 +190,7 @@ export interface BroadcasterConfiguration {
     endpoint: string;
     quoteSigner: string;
     feeRecipient: string;
+    provenancePolicyId?: string;
 }
 export class BroadcasterClient {
     readonly configuration: Readonly<BroadcasterConfiguration>;
@@ -181,6 +199,9 @@ export class BroadcasterClient {
     private requestId = 0;
     constructor(configuration: BroadcasterConfiguration, transport?: BroadcasterTransport) {
         this.configuration = Object.freeze({
+            ...(configuration.provenancePolicyId === undefined
+                ? {}
+                : { provenancePolicyId: configuration.provenancePolicyId }),
             endpoint: configuration.endpoint,
             quoteSigner: getAddress(configuration.quoteSigner),
             feeRecipient: getAddress(configuration.feeRecipient),
@@ -190,6 +211,11 @@ export class BroadcasterClient {
             BigInt(this.configuration.feeRecipient) === 0n
         )
             throw new Error("invalid broadcaster configuration");
+        if (
+            configuration.provenancePolicyId !== undefined &&
+            !/^0x[0-9a-fA-F]{64}$/.test(configuration.provenancePolicyId)
+        )
+            throw new Error("invalid broadcaster provenance policy");
         this.url = configuration.endpoint;
         const base = new URL(this.url);
         if (base.protocol !== "https:" || base.username || base.password)
@@ -286,29 +312,56 @@ export class BroadcasterClient {
     }
     async quote(
         data: string,
-        context: { chainId: bigint; protocol: string }
+        context: { chainId: bigint; protocol: string },
+        proofSidecars: readonly ProofSidecar[] = []
     ): Promise<SignedBroadcasterQuote> {
         const signed = (await this.call("broadcaster_getQuote", {
             data,
+            ...(this.configuration.provenancePolicyId === undefined
+                ? {}
+                : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
         })) as SignedBroadcasterQuote;
         verifyBroadcasterQuote(
             signed,
-            { ...context, signer: this.configuration.quoteSigner },
+            {
+                ...context,
+                signer: this.configuration.quoteSigner,
+                ...(this.configuration.provenancePolicyId === undefined
+                    ? {}
+                    : { provenancePolicyId: this.configuration.provenancePolicyId }),
+            },
             data
         );
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
-        return { quote: signed.quote, signature: signed.signature, context: { ...context } };
+        return {
+            quote: signed.quote,
+            signature: signed.signature,
+            context: { ...context },
+            ...(signed.provenancePolicyId === undefined
+                ? {}
+                : { provenancePolicyId: signed.provenancePolicyId }),
+            ...(signed.requestHashFormat === undefined
+                ? {}
+                : { requestHashFormat: signed.requestHashFormat }),
+        };
     }
     async submit(
         data: string,
         signed: SignedBroadcasterQuote,
-        idempotencyKey: string
+        idempotencyKey: string,
+        proofSidecars: readonly ProofSidecar[] = []
     ): Promise<BroadcasterStatus> {
         if (!signed.context) throw new Error("missing verified quote context");
         verifyBroadcasterQuote(
             signed,
-            { ...signed.context, signer: this.configuration.quoteSigner },
+            {
+                ...signed.context,
+                signer: this.configuration.quoteSigner,
+                ...(this.configuration.provenancePolicyId === undefined
+                    ? {}
+                    : { provenancePolicyId: this.configuration.provenancePolicyId }),
+            },
             data,
             0n
         );
@@ -320,6 +373,9 @@ export class BroadcasterClient {
                 quote: signed.quote,
                 signature: signed.signature,
                 idempotencyKey,
+                ...(this.configuration.provenancePolicyId === undefined
+                    ? {}
+                    : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
             }),
             idempotencyKey
         );

@@ -26,3 +26,6 @@ examples/*.sqlite*
 # Local example keys, encrypted inventory and native prover binaries
 /examples/accounts
 /examples/bin/
+
+# Authenticated local provenance artifacts (independent of main circuit assets)
+.cache/provenance/
