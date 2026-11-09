@@ -53,13 +53,19 @@ describe("wallet-owned note vectors", () => {
         expect(BigInt(identity)).toBe(BigInt(vectors.note.identity));
         const commitment = await computeNoteCommitment(
             note.chainId,
+            BigInt(note.protocolAddress),
             identity,
             note.tokenAddress,
             note.amount
         );
         expect(commitment).toBe(vectors.note.commitment);
         expect(
-            await computeNoteNullifier(note.chainId, BigInt(vectors.note.nonce), commitment)
+            await computeNoteNullifier(
+                note.chainId,
+                BigInt(note.protocolAddress),
+                BigInt(vectors.note.nonce),
+                commitment
+            )
         ).toBe(vectors.note.nullifier);
     });
 

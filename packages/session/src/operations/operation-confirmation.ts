@@ -244,7 +244,12 @@ export async function confirmOperation(
             plan.context,
             await Promise.all(
                 notes.map((note) =>
-                    nullifier!.compute(plan.context.chainId, note.commitment, note.note.nonce)
+                    nullifier!.compute(
+                        plan.context.chainId,
+                        BigInt(plan.context.protocolAddress),
+                        note.commitment,
+                        note.note.nonce
+                    )
                 )
             ),
             spentBlock

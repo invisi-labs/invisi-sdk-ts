@@ -31,8 +31,8 @@ describe("EVM owner receipt and authorization", () => {
 
     it("fixes a nullifier using the note opening instead of a selectable wallet secret", async () => {
         const commitment = ("0x" + "02".repeat(32)) as `0x${string}`;
-        expect(await computeNoteNullifier(31337n, 0n, commitment)).toBe(
-            await poseidonHash([4n, 31337n, 0n, BigInt(commitment)])
+        expect(await computeNoteNullifier(31337n, 0x1234n, 0n, commitment)).toBe(
+            await poseidonHash([4n, 31337n, 0x1234n, 0n, BigInt(commitment)])
         );
     });
 });

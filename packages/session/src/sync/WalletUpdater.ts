@@ -219,6 +219,7 @@ export class WalletUpdater extends InventoryProcessor {
                     id,
                     nullifier: await nullifier.compute(
                         scope.chainId,
+                        BigInt(scope.protocolAddress),
                         record.commitment,
                         record.note.nonce
                     ),

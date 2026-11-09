@@ -206,6 +206,7 @@ export class NoteOutput {
         }
         const commitment = await computeNoteCommitment(
             context.chainId,
+            BigInt(context.protocolAddress),
             identity,
             BigInt(context.tokenAddress),
             options.amount
@@ -364,6 +365,7 @@ export async function materializeNoteOutput(
         output.amount >= 1n << 128n ||
         (await computeNoteCommitment(
             context.chainId,
+            BigInt(context.protocolAddress),
             output.identity,
             BigInt(context.tokenAddress),
             output.amount

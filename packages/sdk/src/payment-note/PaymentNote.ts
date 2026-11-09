@@ -74,6 +74,7 @@ export class PaymentNote implements PaymentNoteData {
         const identity = await computeNoteIdentity(BigInt(data.ownerAddress), data.nonce);
         const commitment = await computeNoteCommitment(
             data.chainId,
+            BigInt(data.protocolAddress),
             identity,
             BigInt(data.tokenAddress),
             data.amount

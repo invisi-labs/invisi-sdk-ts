@@ -360,6 +360,7 @@ it.each([
         await outputTree.insert(BigInt(p.draw.stateCommitment));
         const ordinary = await computeNoteCommitment(
             context.chainId,
+            BigInt(context.protocolAddress),
             await computeNoteIdentity(BigInt(p.spenderWalletIdentity), 12345n),
             BigInt(token),
             30n

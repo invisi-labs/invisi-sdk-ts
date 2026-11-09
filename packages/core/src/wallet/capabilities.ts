@@ -153,8 +153,13 @@ export class NullifierCapability {
         return new NullifierCapability(ownerAddress);
     }
 
-    compute(chainId: bigint, commitment: Identity, nonce: bigint): Promise<Identity> {
-        return computeNoteNullifier(chainId, nonce, commitment);
+    compute(
+        chainId: bigint,
+        protocolAddress: bigint,
+        commitment: Identity,
+        nonce: bigint
+    ): Promise<Identity> {
+        return computeNoteNullifier(chainId, protocolAddress, nonce, commitment);
     }
 
     toJSON() {

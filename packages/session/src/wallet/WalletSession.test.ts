@@ -100,6 +100,7 @@ it("shares a deployment scope while selecting, reserving and reporting each toke
     const note = { ...h.note, tokenAddress: BigInt(otherToken), amount: 50n, nonce: 456n };
     const commitment = await core.computeNoteCommitment(
         h.context.chainId,
+        BigInt(h.context.protocolAddress),
         await core.computeNoteIdentity(BigInt(h.wallet.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount
@@ -159,6 +160,7 @@ it("pins a shared root across multiple inputs from one tree", async () => {
     const note = { ...h.note, nonce: 124n };
     const commitment = await computeNoteCommitment(
         note.chainId,
+        BigInt(note.protocolAddress),
         await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount

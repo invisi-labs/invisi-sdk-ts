@@ -136,7 +136,12 @@ export async function discoverCandidates({
                 // Historical disclosure may include spent notes; payment inventory must exclude them.
                 const nullifier = await wallet
                     .exportNullifier()
-                    .compute(note.chainId, output.commitment, note.nonce);
+                    .compute(
+                        note.chainId,
+                        BigInt(note.protocolAddress),
+                        output.commitment,
+                        note.nonce
+                    );
                 if (
                     !includeSpent &&
                     (await rpc.isNoteSpent(protocol.context, nullifier, status.indexedHead))

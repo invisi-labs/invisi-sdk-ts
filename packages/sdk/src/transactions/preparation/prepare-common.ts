@@ -284,6 +284,7 @@ export class Preparation<Result> {
                 note.tokenAddress !== BigInt(c.tokenAddress) ||
                 (await computeNoteCommitment(
                     c.chainId,
+                    BigInt(c.protocolAddress),
                     await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
                     note.tokenAddress,
                     note.amount
@@ -306,7 +307,12 @@ export class Preparation<Result> {
                 path,
             });
             nullifiers.push(
-                await nullifier!.compute(c.chainId, input.commitment, input.note.nonce)
+                await nullifier!.compute(
+                    c.chainId,
+                    BigInt(c.protocolAddress),
+                    input.commitment,
+                    input.note.nonce
+                )
             );
         }
         await this.assertUnspent(nullifiers, frame);

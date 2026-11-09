@@ -59,6 +59,7 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
         };
         const commitment = await computeNoteCommitment(
             note.chainId,
+            BigInt(note.protocolAddress),
             await computeNoteIdentity(BigInt(ownerAddress), note.nonce),
             note.tokenAddress,
             note.amount

@@ -13,11 +13,13 @@ export interface VerifyNoteCommitmentParams {
     nonce: `0x${string}`;
     noteCommitment: `0x${string}`;
     chainId: bigint;
+    protocolAddress: `0x${string}`;
 }
 
 export async function verifyNoteCommitment(params: VerifyNoteCommitmentParams): Promise<boolean> {
     const expected = await computeNoteCommitment(
         params.chainId,
+        BigInt(params.protocolAddress),
         await computeNoteIdentity(BigInt(params.ownerAddress), BigInt(params.nonce)),
         BigInt(params.tokenAddress),
         params.amount

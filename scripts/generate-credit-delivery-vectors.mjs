@@ -106,6 +106,27 @@ vectors.credit.deliverySource = {
 };
 const fundsSource = join(protocol, "scripts/private-transfer-client.mjs");
 const { encryptPrivateTransferNote } = await import(pathToFileURL(fundsSource).href);
+const { noteCommitment, noteNullifier } = await import(
+    pathToFileURL(join(protocol, "scripts/wallet-client.mjs")).href
+);
+const commitment = await noteCommitment(
+    context.chainId,
+    BigInt(context.protocolAddress),
+    BigInt(vectors.note.ownerAddress),
+    BigInt(context.tokenAddress),
+    BigInt(vectors.note.amount),
+    BigInt(vectors.note.nonce)
+);
+const hexField = (value) => "0x" + BigInt(value).toString(16).padStart(64, "0");
+vectors.note.commitment = hexField(commitment);
+vectors.note.nullifier = hexField(
+    await noteNullifier(
+        context.chainId,
+        BigInt(context.protocolAddress),
+        BigInt(vectors.note.nonce),
+        commitment
+    )
+);
 const fundsEnvelope = await encryptPrivateTransferNote(
     vectors.owner.viewingPublicKey,
     {

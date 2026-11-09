@@ -129,7 +129,12 @@ export async function verifyPaymentNote(
     if (wallet) {
         // Spendability concerns current state, not just the confirmed historical anchor.
         const current = await reader.getBlock(await reader.getLatestBlockNumber());
-        const nullifier = await computeNoteNullifier(data.chainId, data.nonce, data.commitment);
+        const nullifier = await computeNoteNullifier(
+            data.chainId,
+            BigInt(data.protocolAddress),
+            data.nonce,
+            data.commitment
+        );
         const spent = await reader.isSpent(protocol.context, [nullifier], current);
         if (spent.length !== 1 || spent[0] !== false)
             throw new Error("Payment note is already spent");

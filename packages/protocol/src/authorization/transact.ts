@@ -58,6 +58,7 @@ export async function transact(
             }
             const commitment = await computeNoteCommitment(
                 c.chainId,
+                BigInt(c.protocolAddress),
                 word(identity),
                 BigInt(c.tokenAddress),
                 amount

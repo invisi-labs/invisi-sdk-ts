@@ -159,7 +159,16 @@ const output = { identity: w(3), amount: 100n },
         feeAmount: 0n,
     };
 shieldParams.noteCommitments = [
-    w(await n.poseidon2([3n, context.chainId, 3n, BigInt(context.tokenAddress), 100n])),
+    w(
+        await n.poseidon2([
+            3n,
+            context.chainId,
+            BigInt(context.protocolAddress),
+            3n,
+            BigInt(context.tokenAddress),
+            100n,
+        ])
+    ),
 ];
 const shieldHash = keccak256(
     AbiCoder.defaultAbiCoder().encode(
@@ -370,3 +379,15 @@ writeFileSync(
         " as const;\n"
 );
 console.log("Generated current Note/Credit formatting and executable witness vectors");
+
+const { format, resolveConfig } = await import("prettier");
+for (const name of ["test-fixtures.ts", "zero-input-fixture.ts"]) {
+    const file = new URL("../../prover/src/testing/" + name, import.meta.url);
+    writeFileSync(
+        file,
+        await format(readFileSync(file, "utf8"), {
+            ...(await resolveConfig(file.pathname)),
+            parser: "typescript",
+        })
+    );
+}

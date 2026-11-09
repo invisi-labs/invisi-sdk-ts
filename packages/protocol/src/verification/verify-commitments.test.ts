@@ -7,6 +7,7 @@ const chainId = BigInt(vectors.context.chainId);
 const tokenAddress = vectors.context.tokenAddress as `0x${string}`;
 const note = {
     chainId,
+    protocolAddress: vectors.context.protocolAddress as `0x${string}`,
     tokenAddress,
     ownerAddress: ownerHex(vectors.note.ownerAddress),
     amount: BigInt(vectors.note.amount),

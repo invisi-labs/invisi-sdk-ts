@@ -15,6 +15,7 @@ it("builds funded witnesses from randomized output identities without note openi
         outputs.map((o) =>
             computeNoteCommitment(
                 context.chainId,
+                BigInt(context.protocolAddress),
                 o.identity,
                 BigInt(context.tokenAddress),
                 o.amount

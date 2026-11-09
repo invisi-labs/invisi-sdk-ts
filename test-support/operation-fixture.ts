@@ -34,6 +34,7 @@ export async function fixture() {
         },
         leaf = await computeNoteCommitment(
             context.chainId,
+            BigInt(context.protocolAddress),
             await computeNoteIdentity(BigInt(wallet.ownerAddress), 123n),
             note.tokenAddress,
             100n

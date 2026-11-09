@@ -157,6 +157,7 @@ async function commitment(note: Note | CreditOpening): Promise<`0x${string}`> {
     }
     return computeNoteCommitment(
         note.chainId,
+        BigInt(note.protocolAddress),
         await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount

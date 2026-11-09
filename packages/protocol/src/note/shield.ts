@@ -62,6 +62,7 @@ export async function validateShieldRequest(p: BuildShieldCalldataParams) {
         if (
             (await computeNoteCommitment(
                 p.context.chainId,
+                BigInt(p.context.protocolAddress),
                 o.identity,
                 BigInt(p.context.tokenAddress),
                 o.amount

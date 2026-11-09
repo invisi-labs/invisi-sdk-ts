@@ -27,6 +27,7 @@ export async function noteCommitment(context: NoteEncryptionContext, note: Note)
     validateNote(note);
     const commitment = await computeNoteCommitment(
         context.chainId,
+        BigInt(context.protocolAddress),
         await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
         note.tokenAddress,
         note.amount

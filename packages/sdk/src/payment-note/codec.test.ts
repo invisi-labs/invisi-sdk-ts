@@ -38,6 +38,7 @@ it("validates commitment preimages before exposing a PaymentNote", async () => {
     const identity = await computeNoteIdentity(BigInt(address), data.nonce);
     const commitment = await computeNoteCommitment(
         data.chainId,
+        BigInt(data.protocolAddress),
         identity,
         BigInt(address),
         data.amount

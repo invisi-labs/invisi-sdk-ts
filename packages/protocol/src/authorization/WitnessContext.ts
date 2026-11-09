@@ -91,6 +91,7 @@ export class WitnessContext {
         this.context(note);
         return computeNoteCommitment(
             note.chainId,
+            BigInt(note.protocolAddress),
             await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
             note.tokenAddress,
             note.amount
@@ -113,8 +114,12 @@ export class WitnessContext {
                 check(input.note.ownerAddress === identity, "input wallet mismatch");
                 const leaf = await this.noteLeaf(input.note);
                 check(
-                    (await computeNoteNullifier(input.note.chainId, input.note.nonce, leaf)) ===
-                        nullifiers[i],
+                    (await computeNoteNullifier(
+                        input.note.chainId,
+                        BigInt(input.note.protocolAddress),
+                        input.note.nonce,
+                        leaf
+                    )) === nullifiers[i],
                     "input nullifier mismatch"
                 );
                 return BigInt(await this.membership(leaf, input, sources));
