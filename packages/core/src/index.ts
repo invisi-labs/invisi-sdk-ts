@@ -72,14 +72,11 @@ export {
     Detector,
     NullifierCapability,
     ViewingCapability,
-    WalletAuthorization,
 } from "./wallet/capabilities";
-export type { WalletAuthorizationProvider } from "./wallet/capabilities";
 export {
     WALLET_AUTHORIZATION_TYPES,
     computeOwnerAddress,
     computeWalletAuthorizationDigest,
-    signWalletAuthorization,
     verifyWalletAuthorization,
     walletAuthorizationTypedData,
 } from "./wallet/wallet";
@@ -114,7 +111,15 @@ export type { AggregateRoute } from "./note/aggregate-routes";
 
 export type { CreditUpdateChanges } from "./credit/state";
 
-export { prepareWalletRequest, acceptWalletResponse } from "./wallet/wallet-wire";
+export {
+    prepareWalletRequest,
+    acceptWalletResponse,
+    acceptWalletResponses,
+    validateWalletBatch,
+    validateWalletResponses,
+    NativeWalletError,
+    MAX_WALLET_BATCH_BYTES,
+} from "./wallet/wallet-wire";
 export type {
     WalletAcceptedResults,
     WalletHex,
@@ -125,6 +130,6 @@ export type {
     WalletResults,
     WalletRequest,
     WalletResponse,
-    WalletRequestProvider,
+    NativeWalletClient,
     PreparedWalletRequest,
 } from "./wallet/wallet-wire";

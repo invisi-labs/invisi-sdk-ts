@@ -1,5 +1,9 @@
 export {
     acceptWalletResponse,
+    acceptWalletResponses,
+    validateWalletBatch,
+    validateWalletResponses,
+    NativeWalletError,
     prepareWalletRequest,
     Detector,
     Disclosure,
@@ -8,7 +12,6 @@ export {
     NullifierCapability,
     ViewingCapability,
     Wallet,
-    WalletAuthorization,
     computeCreditNullifier,
     creditPeriods,
     creditV1,
@@ -20,7 +23,7 @@ export {
 export type {
     WalletRequest,
     WalletResponse,
-    WalletRequestProvider,
+    NativeWalletClient,
     WalletMethod,
     WalletParams,
     WalletResults,
@@ -39,7 +42,6 @@ export type {
     Memo,
     Note,
     ReceivingKeys,
-    WalletAuthorizationProvider,
 } from "@invisi-labs/core";
 export { RegistrationOperation } from "@invisi-labs/protocol";
 export type {

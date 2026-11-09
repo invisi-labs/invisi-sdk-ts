@@ -2,7 +2,7 @@ import { ReceivingAddress } from "../address/receiving-address";
 import { MissingCapabilityError } from "../errors";
 import { NullifierCapability } from "./capabilities";
 
-/** Public identity and receiving keys shared by both wallet types. */
+/** Public identity and receiving keys. */
 export class WalletAddress {
     readonly #address: ReceivingAddress;
 

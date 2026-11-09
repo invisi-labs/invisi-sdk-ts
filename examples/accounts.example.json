@@ -1,42 +1,42 @@
 {
-    "alice": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "bob": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "charlie": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "dave": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "eve": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "frank": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "grace": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "heidi": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "ivan": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    },
-    "judy": {
-        "address": "0xYOUR_EVM_ADDRESS",
-        "privateKey": "0xYOUR_32_BYTE_PRIVATE_KEY"
-    }
+  "alice": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "bob": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "charlie": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "dave": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "eve": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "frank": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "grace": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "heidi": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "ivan": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  },
+  "judy": {
+    "address": "0xYOUR_PUBLIC_EVM_ADDRESS",
+    "receivingAddress": "0iYOUR_PUBLIC_RECEIVING_ADDRESS"
+  }
 }

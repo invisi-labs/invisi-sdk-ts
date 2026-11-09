@@ -1,99 +1,71 @@
-import { NoteOutput } from "@invisi-labs/sdk";
+import { JsonRpcProvider, Contract, parseUnits } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
-import { Wallet } from "@invisi-labs/sdk";
-import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
-import { erc20Abi } from "viem";
-import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { getAccounts } from "../accounts.js";
+import { json } from "../host-transport.js";
 
-// Bob has registered his address and provides only a 0x address; Alice looks up the registration and sends 1 token.
+// Alice sends Bob 1 token and explicitly selects chain-based receiving-key lookup.
+// This choice is attached to the output rather than injected as a global resolver.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run");
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
 }
 
 const accounts = getAccounts();
-const [alice] = accounts;
-const bobAddress = "0x057a50e0224131676dDD82e5cE02395680c0c1AC";
+const alice = accounts[0];
+const bob = accounts[1];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-
 try {
-    // 1. Connect ethers to the chain and connect and validate the Protocol through the SDK.
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
 
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const aliceSigner = new EthereumWallet(alice.privateKey, provider);
-
-    // 2. Connect to the ERC20 token with ethers.
     const tokenAddress = settings.tokenAddress;
-    const token = new Contract(tokenAddress, erc20Abi, aliceSigner);
-
-    // 3. Set the transfer amount using the token decimals.
-    const amount = parseUnits("1", Number(await token.decimals()));
-    const total = amount;
-
-    // 4. The payer approves the required amount.
-    const allowance = await token.allowance(alice.address, protocol.context.protocolAddress);
-
-    if (allowance < total) {
-        // Support ERC20 tokens that require resetting an existing allowance to zero first.
-        if (allowance > 0n) {
-            const reset = await token.approve(protocol.context.protocolAddress, 0n);
-            console.log("Allowance reset transaction:", reset.hash);
-            await reset.wait();
-        }
-
-        const approval = await token.approve(protocol.context.protocolAddress, total);
-        console.log("Approval transaction:", approval.hash);
-        await approval.wait();
-    }
-
-    // 5. Select direct chain lookup for this recipient only.
-    // Preparation validates the Protocol registry and reads its current receiving keys.
-    // No custom resolver or lookup option belongs on the Invisi constructor.
-    const outputs = [
-        await NoteOutput.create({
-            chainId: protocol.context.chainId,
-            protocolAddress: protocol.context.protocolAddress,
-            tokenAddress,
-            amount: amount,
-            recipient: { type: "evm", address: bobAddress, addressLookup: "chain" },
-        }),
-    ];
-
-    const aliceWallet = Wallet.fromAddress(alice.receivingAddress);
     const invisi = new Invisi({
         provider,
         protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
     });
+
+    // 2. Read token decimals; receiving addresses carry public delivery keys only.
+    const token = new Contract(
+        tokenAddress,
+        ["function decimals() view returns (uint8)"],
+        provider
+    );
+    const amount = parseUnits("1", Number(await token.decimals()));
+    const outputs = [
+        await NoteOutput.create({
+            ...protocol.context,
+            tokenAddress,
+            amount,
+            recipient: {
+                type: "evm" as const,
+                address: bob.address,
+                envelope: true,
+                addressLookup: "chain" as const,
+            },
+        }),
+    ];
     const prepared = await invisi.prepareShield({
-        wallet: aliceWallet,
+        wallet: alice.publicWallet,
         protocol,
         tokenAddress,
         outputs,
-        funding: {
-            payer: alice.address,
-            amount: total,
-            // caller: the payer and on-chain submitter must match; both are Alice here.
-            // The contract checks payer === msg.sender; no separate EIP-712 funding signature is needed.
-            // Encode with ready(), then have Alice sign and submit the on-chain transaction with ethers.
-            // This mode still requires sufficient ERC20 allowance and does not replace approve.
-            authorization: "caller",
-        },
+        funding: { payer: alice.address, amount, authorization: "caller" },
     });
 
-    // Alice funds the transfer herself, so call ready directly; transparent-amount shield requires no proof.
+    // 3. Shield exposes its amount, so caller funding needs neither a ZK proof nor spend signature.
     const ready = await prepared.ready();
-    const call = await ready.exportTransaction();
-
-    // 6. Alice submits the transaction with ethers and pays gas.
-    const transaction = await aliceSigner.sendTransaction(call);
-    console.log("Privacy transfer transaction:", transaction.hash);
-
-    const receipt = await transaction.wait();
-    console.log("Confirmed block:", receipt?.blockNumber);
+    // Export does not approve tokens or submit; the host reviews the required caller and gas.
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
+    console.log(
+        "Host must review funding balance and ERC20 allowance requirements before submission."
+    );
 } finally {
     provider.destroy();
 }

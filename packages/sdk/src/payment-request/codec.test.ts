@@ -1,4 +1,4 @@
-import { LocalWallet } from "@invisi-labs/core/local";
+import { TestWallet } from "../../../../test-support/test-wallet";
 import { FIELD_MODULUS } from "@invisi-labs/core";
 import { getBytes } from "ethers";
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ const context = {
     amount: 70n,
 };
 const owner = `0x${"33".repeat(20)}` as const;
-const address = (await LocalWallet.fromPrivateKey(`0x${"01".repeat(32)}`)).getAddress();
+const address = (await TestWallet.fromPrivateKey(`0x${"01".repeat(32)}`)).getAddress();
 const requests: PaymentRequest[] = [
     { ...context, recipient: { type: "evm", address: owner, envelope: false } },
     { ...context, recipient: { type: "evm", address: owner } },

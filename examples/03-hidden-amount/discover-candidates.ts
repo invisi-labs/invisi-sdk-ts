@@ -1,79 +1,146 @@
 import type { Provider } from "ethers";
-import type { Protocol, ProtocolRpcClient, Wallet, ViewingCapability, NoteInput, Note } from "@invisi-labs/sdk";
-
-// Return all unspent notes discovered for this owner and token in the scanned range, without filtering by amount.
-// Wrap only discovery, authenticated decryption, deduplication, and indexed spent-status filtering; do not select notes, sign, or submit transactions.
-// Results are indexed observations; prepare must still validate the latest on-chain spent status and membership paths.
+import {
+    DisclosureVerifier,
+    type Protocol,
+    type ProtocolRpcClient,
+    type Wallet,
+    type NoteInput,
+    type DisclosureReference,
+} from "@invisi-labs/sdk";
+import { EthersChainReader } from "@invisi-labs/sdk/ethers";
+import {
+    prepareWalletRequest,
+    acceptWalletResponse,
+    NativeWalletError,
+    type NativeWalletClient,
+    type WalletResponse,
+} from "@invisi-labs/core";
+/** Discover and authenticate inventory; selection and authorization remain in each scenario. */
 export async function discoverCandidates({
     provider,
     protocolRpc,
     protocol,
     wallet,
-    viewer,
+    nativeWallet,
     tokenAddress,
+    includeSpent = false,
 }: {
     provider: Provider;
     protocolRpc: ProtocolRpcClient;
     protocol: Protocol;
     wallet: Wallet;
-    viewer: ViewingCapability;
-    tokenAddress: string;
-}): Promise<NoteInput[]> {
+    nativeWallet: NativeWalletClient;
+    tokenAddress: `0x${string}`;
+    includeSpent?: boolean;
+}): Promise<
+    (NoteInput & {
+        reference: DisclosureReference;
+    })[]
+> {
     const rpc = protocolRpc.withProvider(provider);
     const status = await rpc.getStatus(protocol.context);
     if (!status.indexedHead) {
-        throw new Error("Protocol RPC has not indexed any blocks yet");
+        throw Error("Protocol RPC has no indexed head");
     }
-    const candidates: NoteInput[] = [];
-    const seen = new Map<string, string>();
-    const seenPositions = new Map<string, string>();
-    // Scan at most 100 blocks per page; the starting block can be replaced with the application's saved sync height.
-    const scanFromBlock = protocol.deployment.protocol.fromBlock;
-    const ranges: { fromBlock: bigint; toBlock: bigint }[] = [];
-    for (let fromBlock = scanFromBlock; fromBlock <= status.indexedHead.number; fromBlock += 100n) {
-        const toBlock = fromBlock + 99n < status.indexedHead.number ? fromBlock + 99n : status.indexedHead.number;
-        ranges.push({ fromBlock, toBlock });
-    }
-    // Request up to eight pages concurrently per batch, then process them in block order while retaining full scanning, deduplication, and authentication.
-    for (let offset = 0; offset < ranges.length; offset += 8) {
-        const pages = await Promise.all(ranges.slice(offset, offset + 8).map((range) => rpc.getNoteUpdates(protocol.context, range)));
-        for (const page of pages) {
-            for (const output of page.notes) {
-                // Compare all public fields normalized by the SDK; ignore exact duplicate records.
-                const fingerprint = JSON.stringify(output, (_, value) => {
-                    return typeof value === "bigint" ? value.toString() : value;
-                });
-                const position = `${output.treeId}:${output.leafIndex}`;
-                const previous = seen.get(output.commitment);
-                const previousPosition = seenPositions.get(position);
-                if (
-                    (previous !== undefined && previous !== fingerprint) ||
-                    (previousPosition !== undefined && previousPosition !== fingerprint)
-                ) {
-                    throw new Error("Protocol RPC returned conflicting note contents or tree positions");
-                }
-                if (previous !== undefined) {
-                    continue;
-                }
-                seen.set(output.commitment, fingerprint);
-                seenPositions.set(position, fingerprint);
-                if (BigInt(output.tokenAddress) !== BigInt(tokenAddress)) {
-                    continue;
-                }
-                let note: Note;
-                try {
-                    // Authenticated decryption validates the owner, token, and commitment; ciphertext for other recipients fails.
-                    note = await viewer.decryptNote(output.ciphertext, {
-                        chainId: protocol.context.chainId,
-                        protocolAddress: BigInt(protocol.context.protocolAddress),
-                        tokenAddress: BigInt(tokenAddress),
+    const verifier = new DisclosureVerifier({
+        protocol: protocol.forToken(tokenAddress),
+        reader: new EthersChainReader(provider),
+        confirmations: 1,
+    });
+    const candidates: (NoteInput & {
+        reference: DisclosureReference;
+    })[] = [];
+    const commitments = new Map<string, string>(),
+        positions = new Map<string, string>();
+    for (
+        let fromBlock = protocol.deployment.protocol.fromBlock;
+        fromBlock <= status.indexedHead.number;
+        fromBlock += 100n
+    ) {
+        const toBlock =
+            fromBlock + 99n < status.indexedHead.number
+                ? fromBlock + 99n
+                : status.indexedHead.number;
+        const page = await rpc.getNoteUpdates(protocol.context, { fromBlock, toBlock });
+        const outputs = page.notes.filter((output) => {
+            const fingerprint = JSON.stringify(output, (_, value) =>
+                typeof value === "bigint" ? value.toString() : value
+            );
+            const position = `${output.treeId}:${output.leafIndex}`;
+            const previous = commitments.get(output.commitment),
+                previousPosition = positions.get(position);
+            if (
+                (previous !== undefined && previous !== fingerprint) ||
+                (previousPosition !== undefined && previousPosition !== fingerprint)
+            ) {
+                throw Error("Conflicting note contents or positions");
+            }
+            if (previous !== undefined) {
+                return false;
+            }
+            commitments.set(output.commitment, fingerprint);
+            positions.set(position, fingerprint);
+            return BigInt(output.tokenAddress) === BigInt(tokenAddress);
+        });
+        // Each native batch is one owner and at most 1,024 structurally validated requests.
+        for (let offset = 0; offset < outputs.length; offset += 1024) {
+            const batch = outputs.slice(offset, offset + 1024);
+            const prepared = batch.map((output) =>
+                prepareWalletRequest(wallet, crypto.randomUUID(), "wallet.decryptNote", {
+                    envelope: output.ciphertext,
+                    context: {
+                        chainId: protocol.context.chainId.toString(),
+                        protocolAddress: BigInt(protocol.context.protocolAddress).toString(),
+                        tokenAddress: BigInt(tokenAddress).toString(),
                         outputCommitment: output.commitment,
-                    });
-                } catch {
-                    continue;
+                    },
+                })
+            );
+            const responses = await nativeWallet.execute(prepared.map((item) => item.request));
+            for (let index = 0; index < prepared.length; index++) {
+                const request = prepared[index]!,
+                    output = batch[index]!;
+                const response = responses.find((item) => item.id === request.request.id);
+                if (!response) {
+                    throw Error("Missing native note response");
                 }
-                const nullifier = await wallet.exportNullifier().compute(note.chainId, output.commitment, note.nonce);
-                if (await rpc.isNoteSpent(protocol.context, nullifier, status.indexedHead)) {
+                let note;
+                try {
+                    note = await acceptWalletResponse(
+                        request,
+                        response as WalletResponse<"wallet.decryptNote">
+                    );
+                } catch (error) {
+                    if (
+                        error instanceof NativeWalletError &&
+                        error.code === "WALLET_NOT_RECIPIENT"
+                    ) {
+                        continue;
+                    }
+                    throw error;
+                }
+                const reference: DisclosureReference = {
+                    transactionHash: output.transactionHash,
+                    treeId: output.treeId,
+                    leafIndex: output.leafIndex,
+                    role: "funds",
+                };
+                const evidence = await verifier.readOutput(reference);
+                if (
+                    evidence.output.outputCommitment !== output.commitment ||
+                    evidence.output.ciphertext !== output.ciphertext ||
+                    evidence.block.hash !== output.block.hash
+                ) {
+                    throw Error("Indexed note differs from canonical receipt");
+                }
+                // Historical disclosure may include spent notes; payment inventory must exclude them.
+                const nullifier = await wallet
+                    .exportNullifier()
+                    .compute(note.chainId, output.commitment, note.nonce);
+                if (
+                    !includeSpent &&
+                    (await rpc.isNoteSpent(protocol.context, nullifier, status.indexedHead))
+                ) {
                     continue;
                 }
                 candidates.push({
@@ -81,6 +148,7 @@ export async function discoverCandidates({
                     commitment: output.commitment,
                     treeId: output.treeId,
                     leafIndex: output.leafIndex,
+                    reference,
                 });
             }
         }

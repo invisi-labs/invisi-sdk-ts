@@ -1,4 +1,4 @@
-import { LocalWallet } from "@invisi-labs/core/local";
+import { TestWallet } from "../../../../test-support/test-wallet";
 import { Wallet } from "@invisi-labs/core";
 import {
     Wallet as EthereumWallet,
@@ -24,7 +24,7 @@ const context = {
         timestamp: 2000000000n,
     };
 async function fixture() {
-    const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const wallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     let nonce = 0n;
     const reader = {
         getChainId: async () => context.chainId,

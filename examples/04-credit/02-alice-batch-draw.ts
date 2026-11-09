@@ -1,51 +1,73 @@
-import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
-import { Invisi, Protocol, ProtocolRpcClient, ViewingCapability } from "@invisi-labs/sdk";
+import { JsonRpcProvider } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
 import { discoverCredits } from "./discover-credits.js";
 
-if (!process.argv.includes("--execute")) throw Error("Review the example, then pass --execute");
+// Alice draws 7 base units from each of up to two current grants into her private note.
+// Different owners remain distinct payers; limits and usage count gross debit, including fees.
+if (!process.argv.includes("--execute")) {
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
+}
 
+const accounts = getAccounts();
+const alice = accounts[0];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
 try {
-    if ((await provider.getNetwork()).chainId !== settings.chainId) throw Error("Configured chain mismatch");
+    if ((await provider.getNetwork()).chainId !== settings.chainId) {
+        throw Error("Configured chain mismatch");
+    }
+
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const prover = new NativeProver({ bbBin: settings.bbBin });
-    const invisi = new Invisi({ provider, protocolRpc, prover });
-    const alice = getAccounts()[0]!;
-    const signer = new EthereumWallet(alice.privateKey, provider);
-    const viewer = new ViewingCapability(alice.address, alice.viewingPrivateKey, alice.publicWallet.viewingPublicKey);
-    const states = await discoverCredits({
+    const tokenAddress = settings.tokenAddress;
+    const invisi = new Invisi({
         provider,
         protocolRpc,
-        protocol,
-        wallet: alice.publicWallet,
-        viewer,
-        tokenAddress: settings.tokenAddress,
-        role: "spender",
+        prover: new NativeProver({ bbBin: settings.bbBin }),
     });
-    if (!states.length) throw Error("No unrevoked current Credit states discovered");
-    const selected = states.slice(0, 2);
+
+    // 2. Current authenticated state determines remaining authority and revocation location.
+    const selected = (
+        await discoverCredits({
+            provider,
+            protocolRpc,
+            protocol,
+            wallet: alice.publicWallet,
+            nativeWallet,
+            tokenAddress,
+            role: "spender",
+        })
+    ).slice(0, 2);
+    if (!selected.length) {
+        throw Error("No current spender Credit found; run the grant-creation example first");
+    }
+    // With no fee here, gross owner debit equals Alice's net receipt.
+    // Adding a fee increases gross policy/usage consumption even if the net receipt is unchanged.
     const prepared = await invisi.prepareDrawCredit({
         wallet: alice.publicWallet,
         protocol,
-        tokenAddress: settings.tokenAddress,
+        tokenAddress,
         creditInputs: selected,
-        credits: selected.map((state) => ({ credit: state.commitment, amount: 7n })),
+        credits: selected.map((input) => ({ credit: input.commitment, amount: 7n })),
         recipient: alice.receivingAddress,
     });
 
-    const authorization = await prepared.exportWalletAuthorization();
-    const signature = await signer.signTypedData(authorization.domain, authorization.types, authorization.message);
-    const authorized = await prepared.withWalletSignature(signature);
+    // 3. Match the host response by ID and validate it against the retained statement.
+    const request = await prepared.exportWalletRequest(crypto.randomUUID());
+    const responses = await nativeWallet.execute([request]);
+    const response = responses.find((item) => item.id === request.id);
+    if (!response) {
+        throw Error("Missing wallet response");
+    }
+    const authorized = await prepared.withWalletResponse(response);
     const ready = await authorized.prove();
-    const call = await ready.exportTransaction();
-    const transaction = await signer.sendTransaction(call);
-    console.log("Batch draw transaction:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (receipt?.status !== 1) throw Error("Credit draw failed");
+    // Export does not approve tokens or submit; the host reviews the required caller and gas.
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
 } finally {
     provider.destroy();
 }

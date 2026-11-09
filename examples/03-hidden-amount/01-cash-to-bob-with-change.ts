@@ -1,125 +1,75 @@
-import { NoteOutput } from "@invisi-labs/sdk";
+import { JsonRpcProvider, Contract, parseUnits } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
-import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
-import { erc20Abi } from "viem";
-import { Invisi, InvisiError, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
-import { NativeProver, checkBBAvailable } from "@invisi-labs/prover/native";
 import { getAccounts } from "../accounts.js";
+import { json } from "../host-transport.js";
 
-// Fund with 10 cash: Bob receives 3 and Alice automatically receives 7 token in change.
+// Alice funds 10 tokens: Bob receives 3 and Alice receives 7 as private change.
+// No existing note is spent; public cash funding and EVM submission remain host-owned.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run");
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
 }
 
-// The SDK requires BB 6.0.0; check before connecting or approving, and adjust the path to your local installation.
-// Resolve the project bin/bb relative to this example, independently of the working directory.
-const bbBin = settings.bbBin;
-if (!(await checkBBAvailable(bbBin))) {
-    throw new Error(
-        "Barretenberg 6.0.0 is required; install it and update bbBin first. No network connection or transaction has been made"
-    );
-}
-
-const [alice, bob] = getAccounts();
+const accounts = getAccounts();
+const alice = accounts[0];
+const bob = accounts[1];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-
 try {
-    // 1. Connect to the configured chain and validate the deployment provided by Protocol RPC.
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
 
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const tokenAddress = settings.tokenAddress;
-    const aliceSigner = new EthereumWallet(alice.privateKey, provider);
-    const token = new Contract(tokenAddress, erc20Abi, aliceSigner);
-    const decimals = Number(await token.decimals());
-    const aliceWallet = alice.publicWallet;
-    const prover = new NativeProver({
-        bbBin,
-    });
     const invisi = new Invisi({
         provider,
         protocolRpc,
-        prover,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
     });
 
-    // Public cash funding of 10 token requires a separate ERC20 allowance.
+    // 2. Fund 10 whole tokens and send 3; the SDK creates Alice's 7-token change output.
+    const token = new Contract(
+        tokenAddress,
+        ["function decimals() view returns (uint8)"],
+        provider
+    );
+    const decimals = Number(await token.decimals());
     const cashAmount = parseUnits("10", decimals);
-    const allowance = await token.allowance(alice.address, protocol.context.protocolAddress);
-    if (allowance < cashAmount) {
-        // Support standard ERC20 tokens that require resetting an existing allowance to zero first.
-        if (allowance > 0n) {
-            const reset = await token.approve(protocol.context.protocolAddress, 0n);
-            console.log("Allowance reset transaction:", reset.hash);
-            await reset.wait();
-        }
-        const approval = await token.approve(protocol.context.protocolAddress, cashAmount);
-        console.log("Approval transaction:", approval.hash);
-        await approval.wait();
-    }
+    const outputs = [
+        await NoteOutput.create({
+            ...protocol.context,
+            tokenAddress,
+            amount: parseUnits("3", decimals),
+            recipient: { type: "invisi", address: bob.receivingAddress },
+        }),
+    ];
 
-    // Allow one hour for local proving; the SDK still checks on-chain time and state.
+    // Native approval and local proving may take time; on-chain time still bounds validity.
     const latestBlock = await provider.getBlock("latest");
     if (!latestBlock) {
-        throw new Error("Unable to retrieve the latest on-chain block");
+        throw Error("Missing latest block");
     }
     const deadline = BigInt(latestBlock.timestamp) + 3600n;
 
-    // Build hidden-amount outputs with prepareTransfer rather than the transparent-amount prepareShield.
-    const outputs = [
-        await NoteOutput.create({
-            chainId: protocol.context.chainId,
-            protocolAddress: protocol.context.protocolAddress,
-            tokenAddress,
-            amount: parseUnits("3", decimals),
-            recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
-        }),
-    ];
-    // From 10 cash minus 3 for Bob, the SDK automatically creates 7 token in change for Alice.
+    // 3. Caller funding requires Alice to submit and provide ERC20 allowance separately.
     const prepared = await invisi.prepareTransfer({
-        wallet: aliceWallet,
+        wallet: alice.publicWallet,
         protocol,
         tokenAddress,
+        deadline,
         inputs: [],
         outputs,
-        deadline,
-        funding: {
-            payer: alice.address,
-            amount: cashAmount,
-            // caller: Alice funds and submits the transaction herself; no separate EIP-712 funding authorization is needed, but approve is still required.
-            authorization: "caller",
-        },
+        funding: { payer: alice.address, amount: cashAmount, authorization: "caller" },
     });
-
-    // Without existing notes, no private spending authorization is needed, but a hidden-amount transfer still requires a proof.
-    const proved = await prepared.prove({
-        onProgress: (event) => {
-            console.log("Local proving phase:", event.phase);
-        },
-    });
-    const call = await proved.exportTransaction();
-
-    // Alice submits the transaction with ethers and pays gas; transaction signing is separate from protocol authorization.
-    const transaction = await aliceSigner.sendTransaction(call);
-    console.log("Transaction hash:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (!receipt || receipt.status !== 1) {
-        throw new Error("Transaction was not confirmed successfully");
-    }
-    console.log("Confirmed block:", receipt.blockNumber);
-} catch (error) {
-    if (error instanceof InvisiError) {
-        console.error("SDK preparation failed:", error.code);
-        console.error("Reason:", error.message);
-        if (error.outputIndex !== undefined) {
-            console.error("Recipient with error (number", error.outputIndex + 1, ")");
-        }
-        process.exitCode = 1;
-    } else {
-        throw error;
-    }
+    // No existing notes are spent, so no private spending authorization is needed.
+    // Hidden amounts still require a proof; this differs from transparent Shield.
+    const ready = await prepared.prove();
+    // Export does not approve tokens or submit; the host reviews the required caller and gas.
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
 } finally {
     provider.destroy();
 }

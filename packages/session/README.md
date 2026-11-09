@@ -16,9 +16,7 @@ const session = await WalletSession.connect({
     store: new MemoryWalletStore(),
 });
 const pending = await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
-const responses = await Promise.all(pending.walletRequests.map(async (request) => ({
-    requestId: request.id, response: await nativeWallet.execute(request),
-})));
+const responses = await nativeWallet.execute(pending.walletRequests);
 await pending.applyWalletResponses(responses);
 const balance = await session.balance(tokenAddress);
 ```
@@ -34,13 +32,17 @@ The SDK keeps ordinary Note inventory and deferred Credit states separate. Credi
 
 Private Noir wallet authorization signatures and witnesses are not persisted. Public funding/revocation signatures embedded in final calldata may remain in the encrypted operation journal so recovery can reconcile the exact request; this public authorization material is a separate persistence boundary.
 
-Session owns no native executor. Each refresh returns a staged handle containing serializable
-`walletRequests`. The host supplies one `{requestId, response}` per request; explicit
-`response: null` means the host determined a ciphertext is not for this account. Transport
-or unlock failures should be retried rather than converted to nonrecipient outcomes.
-No inventory or checkpoint changes before apply. Apply validates all results, rechecks
-canonical chain data and commits atomically if the original store revision is unchanged.
-An empty request list still requires `applyWalletResponses([])` to finalize.
+Session owns no native executor. Refresh returns serializable `walletRequests`; the host
+passes the array to `nativeWallet.execute` and supplies its response array directly to
+`applyWalletResponses`. Response order is untrusted: IDs, owner and methods must match
+exactly, with no missing or duplicate entries. Each entry has either `result` or
+`error: {code}`. Only `WALLET_NOT_RECIPIENT` for decryption is a nonmatch; locked accounts,
+rejected approvals and all other failures leave the entire refresh pending.
 
-Private authorization uses `operation.exportWalletRequest(id)` followed by host execution
+A native batch allows at most 1,024 requests and 16 MiB encoded JSON in each direction.
+Oversized refreshes reject before state changes; use a smaller block range. Apply rechecks
+canonical chain data and commits atomically with the original store revision. Empty
+request lists still require `applyWalletResponses([])` to finalize.
+
+Private authorization uses `operation.exportWalletRequest(id)`, host execution of `[request]`,
 and `operation.withWalletResponse(response)`, identical to detached SDK preparation.

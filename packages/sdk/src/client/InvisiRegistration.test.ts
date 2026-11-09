@@ -1,4 +1,4 @@
-import { LocalWallet } from "@invisi-labs/core/local";
+import { TestWallet } from "../../../../test-support/test-wallet";
 import { Wallet } from "@invisi-labs/core";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
@@ -11,7 +11,7 @@ const registryAddress = "0x2222222222222222222222222222222222222222";
 const abi = new Interface(invisiAddressRegistryAbi);
 async function setup(nonce = 0n) {
     const signer = new EthereumWallet(word(3));
-    const local = await LocalWallet.fromPrivateKey(signer.privateKey);
+    const local = await TestWallet.fromPrivateKey(signer.privateKey);
     const wallet = Wallet.fromAddress(local.getAddress());
     const block = { number: 10, hash: word(10), parentHash: word(9), timestamp: 1000 };
     const provider = {
@@ -154,7 +154,7 @@ describe("Invisi registry composition", () => {
 
 it("rejects a full wallet before preparing registry authorization", async () => {
     const { invisi, signer } = await setup();
-    const wallet = await LocalWallet.fromPrivateKey(signer.privateKey);
+    const wallet = await TestWallet.fromPrivateKey(signer.privateKey);
     await expect(
         invisi.prepareRegistration({
             // @ts-expect-error Registration accepts public identity only.

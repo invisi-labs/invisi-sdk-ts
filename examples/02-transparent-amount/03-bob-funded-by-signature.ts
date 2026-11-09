@@ -1,107 +1,83 @@
-import { NoteOutput } from "@invisi-labs/sdk";
+import { JsonRpcProvider, Contract, parseUnits } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
-import { Wallet } from "@invisi-labs/sdk";
-import { Contract, JsonRpcProvider, Wallet as EthereumWallet, parseUnits } from "ethers";
-import { erc20Abi } from "viem";
-import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { getAccounts } from "../accounts.js";
+import { json, readHostJson, hostSignature } from "../host-transport.js";
 
-// Bob funds 9 token and signs protocol authorization; Alice submits and the other nine participants each receive 1 token.
+// Bob funds 9 tokens; the other nine participants each receive 1 token.
+// Bob authorizes the funding and supplies ERC20 allowance; Alice can submit and pay gas.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run");
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
 }
 
 const accounts = getAccounts();
-const [alice, bob] = accounts;
+const alice = accounts[0];
+const bob = accounts[1];
+const charlie = accounts[2];
+const dave = accounts[3];
+const eve = accounts[4];
+const frank = accounts[5];
+const grace = accounts[6];
+const heidi = accounts[7];
+const ivan = accounts[8];
+const judy = accounts[9];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-
 try {
-    // 1. Connect ethers to the chain and connect and validate the Protocol through the SDK.
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
 
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const aliceSigner = new EthereumWallet(alice.privateKey, provider);
-    const bobSigner = new EthereumWallet(bob.privateKey, provider);
-
-    // 2. Read ERC20 decimals with ethers; the payer approves the required amount.
     const tokenAddress = settings.tokenAddress;
-    const token = new Contract(tokenAddress, erc20Abi, bobSigner);
-    const amount = parseUnits("1", Number(await token.decimals()));
-    const total = amount * 9n;
-    const allowance = await token.allowance(bob.address, protocol.context.protocolAddress);
-
-    if (allowance < total) {
-        // Support ERC20 tokens that require resetting an existing allowance to zero first.
-        if (allowance > 0n) {
-            const reset = await token.approve(protocol.context.protocolAddress, 0n);
-            console.log("Allowance reset transaction:", reset.hash);
-            await reset.wait();
-        }
-
-        const approval = await token.approve(protocol.context.protocolAddress, total);
-        console.log("Approval transaction:", approval.hash);
-        await approval.wait();
-    }
-
-    // 3. Use each recipient's provided 0i privacy address and send 1 token to each.
-    const outputs = await Promise.all(
-        accounts.slice(1).map(
-            async (recipient) =>
-                await NoteOutput.create({
-                    chainId: protocol.context.chainId,
-                    protocolAddress: protocol.context.protocolAddress,
-                    tokenAddress,
-                    amount: amount,
-                    recipient: { type: "invisi", address: recipient.receivingAddress },
-                })
-        )
-    );
-
-    // 4. First build only the funding request, without injecting any signer into Invisi.
-    // aliceWallet contains only public receiving information, with no Alice private key, and does not sign.
-    const aliceWallet = Wallet.fromAddress(alice.receivingAddress);
     const invisi = new Invisi({
         provider,
         protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
     });
+
+    // 2. Read token decimals; receiving addresses carry public delivery keys only.
+    const token = new Contract(
+        tokenAddress,
+        ["function decimals() view returns (uint8)"],
+        provider
+    );
+    const amount = parseUnits("1", Number(await token.decimals()));
+    const recipients = [alice, charlie, dave, eve, frank, grace, heidi, ivan, judy];
+    const outputs = await Promise.all(
+        recipients.map((recipient) =>
+            NoteOutput.create({
+                ...protocol.context,
+                tokenAddress,
+                amount,
+                recipient: { type: "invisi", address: recipient.receivingAddress },
+            })
+        )
+    );
     const prepared = await invisi.prepareShield({
-        wallet: aliceWallet,
+        wallet: alice.publicWallet,
         protocol,
         tokenAddress,
         outputs,
-        funding: {
-            payer: bob.address,
-            amount: total,
-            // signature: payer and submitter may differ; Bob funds and Alice submits here.
-            // Bob must separately sign EIP-712 funding authorization for the SDK-exported request.
-            // After the SDK validates the signature, Alice signs and submits the on-chain transaction and pays gas.
-            // Authorization binds this request, amount, nonce, and deadline; submission is not restricted to Alice.
-            // This signature still requires sufficient ERC20 allowance and does not replace Bob's approve.
-            authorization: "signature",
-        },
+        funding: { payer: bob.address, amount: amount * 9n, authorization: "signature" },
     });
 
-    // 5. Alice exports the signing request to Bob's device; request can be serialized directly as JSON for transport.
-    const request = await prepared.exportFundingAuthorization();
-
-    // 6. Bob signs EIP-712 data on his own device without sharing his private key with Alice.
-    // This demonstration uses a local ethers signer; it can be replaced with a hardware wallet, MPC, or remote signer.
-    const signature = await bobSigner.signTypedData(request.domain, request.types, request.message);
-
-    // 7. Alice passes the received signature to the SDK for validation; the SDK binds it to the original funding request.
-    const ready = await prepared.withFundingSignature(signature);
-    const call = await ready.exportTransaction();
-
-    // 8. Alice: receive the call containing Bob's authorization and sign the on-chain transaction with her own wallet.
-    // Alice only needs call, not Bob's private key; in practice these are two separate wallet signing steps.
-    const transaction = await aliceSigner.sendTransaction(call);
-    console.log("Privacy transfer transaction:", transaction.hash);
-
-    const receipt = await transaction.wait();
-    console.log("Confirmed block:", receipt?.blockNumber);
+    // 3. Funding authorization is separate from both ERC20 allowance and gas payment.
+    const fundingRequest = await prepared.exportFundingAuthorization();
+    const id = crypto.randomUUID();
+    console.log(
+        "Host EVM typed-data requests:",
+        json([{ id, kind: "funding", ...fundingRequest }])
+    );
+    const ready = await prepared.withFundingSignature(hostSignature(await readHostJson(), id));
+    // Export does not approve tokens or submit; the host reviews the required caller and gas.
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
+    console.log(
+        "Host must review funding balance and ERC20 allowance requirements before submission."
+    );
 } finally {
     provider.destroy();
 }

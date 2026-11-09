@@ -72,10 +72,9 @@ export type WalletResponse<M extends WalletMethod = WalletMethod> = {
     id: string;
     ownerAddress: WalletHex;
     method: M;
-    result: WalletResults[M];
-};
-export interface WalletRequestProvider {
-    execute(request: WalletRequest): Promise<WalletResponse>;
+} & ({ result: WalletResults[M]; error?: never } | { error: { code: string }; result?: never });
+export interface NativeWalletClient {
+    execute(requests: readonly WalletRequest[]): Promise<WalletResponse[]>;
 }
 export interface PreparedWalletRequest<M extends WalletMethod = WalletMethod> {
     readonly request: WalletRequest<M>;
@@ -241,7 +240,8 @@ async function acceptResponse(
         safe.method !== request.method
     )
         throw new Error("wallet response envelope mismatch");
-    exactKeys(safe, ["version", "id", "ownerAddress", "method", "result"]);
+    validateWalletResponses([request], [safe]);
+    if ("error" in safe) throw new NativeWalletError(safe.error!.code);
     const result = safe.result as any;
     exactKeys(
         result,
@@ -335,4 +335,117 @@ async function acceptResponse(
         return state;
     }
     return result;
+}
+
+/** Native errors contain machine-readable codes only. */
+export class NativeWalletError extends Error {
+    constructor(readonly code: string) {
+        super(code);
+        this.name = "NativeWalletError";
+    }
+}
+export const MAX_WALLET_BATCH_BYTES = 16 * 1024 * 1024;
+function boundedJson(value: unknown): void {
+    const json = JSON.stringify(value);
+    if (typeof json !== "string" || new TextEncoder().encode(json).length > MAX_WALLET_BATCH_BYTES)
+        throw new Error("wallet batch exceeds encoded size limit");
+}
+export function validateWalletBatch(requests: readonly WalletRequest[]): void {
+    if (!Array.isArray(requests) || requests.length > 1024) throw new Error("invalid wallet batch");
+    boundedJson(requests);
+    const ids = new Set<string>();
+    for (const request of requests) {
+        validateWalletRequest(request);
+        if (ids.has(request.id)) throw new Error("duplicate wallet request id");
+        if (request.ownerAddress !== requests[0]!.ownerAddress)
+            throw new Error("mixed wallet batch owners");
+        ids.add(request.id);
+    }
+}
+/** Check every envelope before returning responses in request order. */
+export function validateWalletResponses(
+    requests: readonly WalletRequest[],
+    responses: readonly WalletResponse[]
+): WalletResponse[] {
+    validateWalletBatch(requests);
+    if (!Array.isArray(responses) || responses.length !== requests.length)
+        throw new Error("wallet response batch length mismatch");
+    boundedJson(responses);
+    const expected = new Map(requests.map((request) => [request.id, request]));
+    const found = new Map<string, WalletResponse>();
+    for (const response of responses) {
+        if (!response || typeof response !== "object") throw new Error("invalid wallet response");
+        const request = expected.get(response.id);
+        if (
+            !request ||
+            found.has(response.id) ||
+            response.version !== 1 ||
+            response.method !== request.method ||
+            response.ownerAddress !== request.ownerAddress
+        )
+            throw new Error("wallet response envelope mismatch");
+        if (Object.hasOwn(response, "error")) {
+            exactKeys(response, ["version", "id", "ownerAddress", "method", "error"]);
+            exactKeys(response.error, ["code"]);
+            if (
+                typeof response.error?.code !== "string" ||
+                !/^[A-Z][A-Z0-9_]{0,127}$/.test(response.error.code)
+            )
+                throw new Error("invalid native wallet error");
+        } else {
+            exactKeys(response, ["version", "id", "ownerAddress", "method", "result"]);
+            if (
+                !response.result ||
+                typeof response.result !== "object" ||
+                Array.isArray(response.result)
+            )
+                throw new Error("invalid wallet result");
+            const result = response.result as any;
+            exactKeys(
+                result,
+                request.method === "wallet.public"
+                    ? ["viewingPublicKey", "spendingPublicKey", "clueKey"]
+                    : request.method === "wallet.authorize"
+                      ? ["spendingPublicKey", "signature", "digest"]
+                      : request.method === "wallet.detect"
+                        ? ["matches"]
+                        : ["plaintext"]
+            );
+            if (request.method === "wallet.public") {
+                walletBytes(result.viewingPublicKey, 33);
+                walletBytes(result.spendingPublicKey, 65);
+                walletBytes(result.clueKey, 32);
+            } else if (request.method === "wallet.authorize") {
+                walletBytes(result.spendingPublicKey, 65);
+                walletBytes(result.signature, 64);
+                walletBytes(result.digest, 32);
+            } else if (request.method === "wallet.detect") {
+                if (
+                    !Array.isArray(result.matches) ||
+                    result.matches.length !==
+                        (request.params as WalletParams["wallet.detect"]).clues.length ||
+                    result.matches.some((value: unknown) => typeof value !== "boolean")
+                )
+                    throw new Error("invalid detection response");
+            } else {
+                walletBytes(result.plaintext);
+            }
+        }
+        found.set(response.id, response);
+    }
+    return requests.map((request) => found.get(request.id)!);
+}
+export async function acceptWalletResponses(
+    prepared: readonly PreparedWalletRequest[],
+    responses: readonly WalletResponse[]
+): Promise<unknown[]> {
+    for (const item of prepared) {
+        if (!retainedWallets.has(item))
+            throw new Error("wallet request was not prepared by this SDK instance");
+    }
+    const ordered = validateWalletResponses(
+        prepared.map((item) => item.request),
+        structuredClone(responses)
+    );
+    return Promise.all(prepared.map((item, index) => acceptWalletResponse(item, ordered[index]!)));
 }

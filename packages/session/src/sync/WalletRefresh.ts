@@ -1,6 +1,9 @@
 import { hexlify } from "ethers";
 import {
     acceptWalletResponse,
+    validateWalletResponses,
+    validateWalletBatch,
+    NativeWalletError,
     prepareWalletRequest,
     type PreparedWalletRequest,
     type WalletRequest,
@@ -22,15 +25,10 @@ import {
 import { WalletUpdater, type CandidatePage, type ApplyPageOptions } from "./WalletUpdater";
 import { refreshWallet, type RefreshOptions, type RefreshResult } from "./refresh";
 
-/** Null explicitly marks a delivery that the host could not decrypt. */
-export interface WalletRefreshResponse {
-    requestId: string;
-    response: WalletResponse | null;
-}
 export interface PendingWalletRefresh {
     readonly block: RefreshResult["block"];
     readonly walletRequests: readonly WalletRequest[];
-    applyWalletResponses(responses: readonly WalletRefreshResponse[]): Promise<RefreshResult>;
+    applyWalletResponses(responses: readonly WalletResponse[]): Promise<RefreshResult>;
 }
 function memoryStore(initial: WalletState) {
     let state = structuredClone(initial);
@@ -129,6 +127,11 @@ export async function prepareWalletRefresh(
     collecting = false;
     let state: "pending" | "applying" | "applied" = "pending";
     const walletRequests = [...prepared.values()].map((value) => structuredClone(value.request));
+    try {
+        validateWalletBatch(walletRequests);
+    } catch {
+        throw new Error("refresh exceeds native wallet batch limits; use a smaller block range");
+    }
     return {
         block: structuredClone(result.block),
         walletRequests,
@@ -139,20 +142,26 @@ export async function prepareWalletRefresh(
                 settings.signal?.throwIfAborted();
                 if ((await store.readSnapshot(scope)).revision !== base.revision)
                     throw new Error("wallet changed during refresh; prepare again");
-                if (responses.length !== prepared.size)
-                    throw new Error("one wallet response or explicit null is required per request");
-                const byId = new Map(responses.map((value) => [value.requestId, value.response]));
-                if (byId.size !== prepared.size)
-                    throw new Error("duplicate wallet response request id");
+                const retained = [...prepared.values()];
+                const ordered = validateWalletResponses(
+                    retained.map((value) => value.request),
+                    responses
+                );
                 decoded.clear();
-                for (const [key, retained] of prepared) {
-                    if (!byId.has(retained.request.id))
-                        throw new Error("missing wallet response request id");
-                    const response = byId.get(retained.request.id)!;
-                    decoded.set(
-                        key,
-                        response === null ? null : await acceptWalletResponse(retained, response)
-                    );
+                for (const [index, [key, request]] of [...prepared.entries()].entries()) {
+                    const response = ordered[index]!;
+                    if ("error" in response && response.error) {
+                        if (
+                            response.error.code !== "WALLET_NOT_RECIPIENT" ||
+                            (request.request.method !== "wallet.decryptNote" &&
+                                request.request.method !== "wallet.decryptCredit")
+                        ) {
+                            throw new NativeWalletError(response.error.code);
+                        }
+                        decoded.set(key, null);
+                    } else {
+                        decoded.set(key, await acceptWalletResponse(request, response));
+                    }
                 }
                 const final = memoryStore(base);
                 const processor = updater(final.store);

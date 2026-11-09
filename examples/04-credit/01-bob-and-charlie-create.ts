@@ -1,29 +1,47 @@
-import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
+import { JsonRpcProvider } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
 
-if (!process.argv.includes("--execute")) throw Error("Review the example, then pass --execute");
+// Bob and Charlie each grant Alice finite authority with limits and a one-day expiry.
+// A grant does not move principal; owners retain funds and provide allowance before draw.
+if (!process.argv.includes("--execute")) {
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
+}
 
+const accounts = getAccounts();
+const alice = accounts[0];
+const bob = accounts[1];
+const charlie = accounts[2];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
 try {
-    if ((await provider.getNetwork()).chainId !== settings.chainId) throw Error("Configured chain mismatch");
+    if ((await provider.getNetwork()).chainId !== settings.chainId) {
+        throw Error("Configured chain mismatch");
+    }
+
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const prover = new NativeProver({ bbBin: settings.bbBin });
-    const invisi = new Invisi({ provider, protocolRpc, prover });
-    const [alice, bob, charlie] = getAccounts();
+    const tokenAddress = settings.tokenAddress;
+    const invisi = new Invisi({
+        provider,
+        protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
+    });
 
-    // Creating a grant registers authority; its principal stays in the owner's wallet until draw.
+    // 2. Each owner grants separately; expiry and policy bind Alice's later draws.
     for (const owner of [bob, charlie]) {
-        const signer = new EthereumWallet(owner.privateKey, provider);
         const block = await provider.getBlock("latest");
-        if (!block) throw Error("Missing latest block");
+        if (!block) {
+            throw Error("Missing latest block");
+        }
         const prepared = await invisi.prepareCreateCredit({
             wallet: owner.publicWallet,
             protocol,
-            tokenAddress: settings.tokenAddress,
+            tokenAddress,
             spender: alice.receivingAddress,
             expiry: BigInt(block.timestamp) + 86400n,
             singleLimit: 100n,
@@ -33,17 +51,24 @@ try {
             unlimited: false,
         });
 
-        const authorization = await prepared.exportWalletAuthorization();
-        const signature = await signer.signTypedData(authorization.domain, authorization.types, authorization.message);
-        const authorized = await prepared.withWalletSignature(signature);
+        // 3. Match the host response by ID and validate it against the retained statement.
+        const request = await prepared.exportWalletRequest(crypto.randomUUID());
+        const responses = await nativeWallet.execute([request]);
+        const response = responses.find((item) => item.id === request.id);
+        if (!response) {
+            throw Error("Missing wallet response");
+        }
+        const authorized = await prepared.withWalletResponse(response);
         const ready = await authorized.prove();
-        const call = await ready.exportTransaction();
-        const transaction = await signer.sendTransaction(call);
-        console.log(`${owner.name} creation transaction:`, transaction.hash);
-        const receipt = await transaction.wait();
-        if (receipt?.status !== 1) throw Error("Credit creation failed");
+        // Export does not approve tokens or submit; the host reviews the required caller and gas.
+        console.log(
+            "Unsigned transaction for host submission:",
+            json(await ready.exportTransaction())
+        );
     }
-    console.log("Owners must separately provide balance and ERC20 allowance before draws.");
+    console.log(
+        "Owners retain principal and must independently supply token balance and allowance before draws."
+    );
 } finally {
     provider.destroy();
 }

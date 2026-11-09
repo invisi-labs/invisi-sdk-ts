@@ -1,30 +1,32 @@
 import { Wallet } from "@invisi-labs/sdk";
-import fs from "node:fs";
-
-export interface Account {
-    name: string;
-    address: `0x${string}`;
-    privateKey: `0x${string}`;
-    receivingAddress: string;
-    viewingPrivateKey: `0x${string}`;
-    publicWallet: Wallet;
-}
-
-// Read application-owned local accounts. Never create or replace keys while sending.
-// Stable order: Alice, Bob, Charlie, Dave, Eve, Frank, Grace, Heidi, Ivan, Judy.
-export function getAccounts(): Account[] {
-    const file = new URL("./accounts/accounts.json", import.meta.url);
-    if (!fs.existsSync(file)) {
-        throw new Error("Create accounts/accounts.json first; see examples/README.md.");
-    }
-    const saved = JSON.parse(fs.readFileSync(file, "utf8"));
-    const names = ["alice", "bob", "charlie", "dave", "eve", "frank", "grace", "heidi", "ivan", "judy"];
-    return names.map((name) => ({
-        name,
-        address: saved[name].address,
-        privateKey: saved[name].privateKey,
-        receivingAddress: saved[name].receivingAddress,
-        viewingPrivateKey: saved[name].viewingPrivateKey,
-        publicWallet: Wallet.fromAddress(saved[name].receivingAddress),
-    }));
+import { readFileSync } from "node:fs";
+import { getAddress } from "ethers";
+export function getAccounts() {
+    const saved = JSON.parse(
+        readFileSync(new URL("./accounts/accounts.json", import.meta.url), "utf8")
+    );
+    return [
+        "alice",
+        "bob",
+        "charlie",
+        "dave",
+        "eve",
+        "frank",
+        "grace",
+        "heidi",
+        "ivan",
+        "judy",
+    ].map((name) => {
+        const row = saved[name];
+        if (
+            !row ||
+            Object.keys(row).some((key) => !["address", "receivingAddress"].includes(key))
+        ) {
+            throw Error("Account configuration accepts public addresses only");
+        }
+        const address = getAddress(row.address) as `0x${string}`;
+        const publicWallet = Wallet.fromAddress(row.receivingAddress);
+        publicWallet.getAddress();
+        return { name, address, receivingAddress: publicWallet.getAddress(), publicWallet };
+    });
 }

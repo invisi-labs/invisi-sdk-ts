@@ -18,14 +18,6 @@
       "options": {
         "tabWidth": 2
       }
-    },
-    {
-      "files": [
-        "examples/**/*.{ts,tsx}"
-      ],
-      "options": {
-        "printWidth": 140
-      }
     }
   ]
 }

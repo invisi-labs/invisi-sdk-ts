@@ -1,37 +1,64 @@
-import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
+import { discoverCredits } from "./discover-credits.js";
+import { JsonRpcProvider } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
 
-if (!process.argv.includes("--execute")) throw Error("Review the example, then pass --execute");
-const shardText = process.argv.find((value) => value.startsWith("--shard="));
-const slotText = process.argv.find((value) => value.startsWith("--slot="));
-if (!shardText || !slotText) throw Error("Supply the intended public grant reference with --shard=N --slot=N");
+// Charlie discovers a current grant and revokes its public shard/slot as owner caller.
+// Owner revocation requires neither a private spend proof nor a separate signature.
+if (!process.argv.includes("--execute")) {
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
+}
 
+const accounts = getAccounts();
+const charlie = accounts[2];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
 try {
-    if ((await provider.getNetwork()).chainId !== settings.chainId) throw Error("Configured chain mismatch");
+    if ((await provider.getNetwork()).chainId !== settings.chainId) {
+        throw Error("Configured chain mismatch");
+    }
+
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const invisi = new Invisi({ provider, protocolRpc });
-    const charlie = getAccounts()[2]!;
-    const signer = new EthereumWallet(charlie.privateKey, provider);
+    const tokenAddress = settings.tokenAddress;
+    const invisi = new Invisi({
+        provider,
+        protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
+    });
+    const credits = await discoverCredits({
+        provider,
+        protocolRpc,
+        protocol,
+        wallet: charlie.publicWallet,
+        nativeWallet,
+        tokenAddress,
+        role: "owner",
+    });
 
-    // Owner submission needs no latest private state, separate revocation signature or ZK proof.
+    // 2. Current authenticated state determines remaining authority and revocation location.
+    const selected = credits[0];
+    if (!selected) {
+        throw Error("No current Charlie-owned Credit found; run the grant-creation example first");
+    }
+    const { revocationShard: shard, revocationSlot: slot } = selected.state.note;
     const prepared = await invisi.prepareRevokeCredit({
         wallet: charlie.publicWallet,
         protocol,
-        tokenAddress: settings.tokenAddress,
-        shard: BigInt(shardText.slice(8)),
-        slot: BigInt(slotText.slice(7)),
+        tokenAddress,
+        shard,
+        slot,
         caller: charlie.address,
     });
     const ready = await prepared.ready();
-    const call = await ready.exportTransaction();
-    const transaction = await signer.sendTransaction(call);
-    console.log("Revocation transaction:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (receipt?.status !== 1) throw Error("Credit revocation failed");
+    console.log(
+        "Unsigned owner-submitted revocation transaction:",
+        json(await ready.exportTransaction())
+    );
 } finally {
     provider.destroy();
 }

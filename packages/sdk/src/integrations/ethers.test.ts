@@ -79,7 +79,7 @@ it("uses ERC1271 arbitrary length signatures and propagates transport failures",
 });
 
 it("resolves a canonical EVM owner using padded registry ABI words", async () => {
-    const { LocalWallet: InvisiWallet } = await import("@invisi-labs/core/local");
+    const { TestWallet: InvisiWallet } = await import("../../../../test-support/test-wallet");
     const wallet = await InvisiWallet.fromPrivateKey(`0x${"01".padStart(64, "0")}`);
     const keys = wallet.getReceivingAddress().getReceivingKeys();
     const iface = new Interface(invisiAddressRegistryAbi);

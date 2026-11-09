@@ -706,28 +706,22 @@ it("stages native requests without writes and validates all responses before com
     const response = await executeWalletRequest(JSON.parse(JSON.stringify(request)));
     const bad = structuredClone(response);
     bad.id = "another-request";
-    await expect(
-        pending.applyWalletResponses([{ requestId: request.id, response: bad }])
-    ).rejects.toThrow(/mismatch/);
+    await expect(pending.applyWalletResponses([bad])).rejects.toThrow(/mismatch/);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
-    await expect(pending.applyWalletResponses([])).rejects.toThrow(/required/);
+    await expect(pending.applyWalletResponses([])).rejects.toThrow(/length|required/);
     const forged = structuredClone(
         response
     ) as import("@invisi-labs/core").WalletResponse<"wallet.decryptNote">;
-    const bytes = Buffer.from(forged.result.plaintext.slice(2), "hex");
+    const bytes = Buffer.from(forged.result!.plaintext.slice(2), "hex");
     bytes[47] = bytes[47]! ^ 1;
-    forged.result.plaintext = `0x${bytes.toString("hex")}`;
-    await expect(
-        pending.applyWalletResponses([{ requestId: request.id, response: forged }])
-    ).rejects.toThrow(/commitment/);
+    forged.result!.plaintext = `0x${bytes.toString("hex")}`;
+    await expect(pending.applyWalletResponses([forged])).rejects.toThrow(/commitment/);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
 
-    const result = await pending.applyWalletResponses([{ requestId: request.id, response }]);
+    const result = await pending.applyWalletResponses([response]);
     expect(result.notes).toBe(1);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(1);
-    await expect(
-        pending.applyWalletResponses([{ requestId: request.id, response }])
-    ).rejects.toThrow(/applied/);
+    await expect(pending.applyWalletResponses([response])).rejects.toThrow(/applied/);
 });
 
 it("requires fresh preparation after state changes or canonical history changes", async () => {
@@ -750,11 +744,38 @@ it("accepts explicit no-match responses and rejects simultaneous apply attempts"
     const h = await harness();
     const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
     const responses = pending.walletRequests.map((request) => ({
-        requestId: request.id,
-        response: null,
+        version: request.version,
+        id: request.id,
+        ownerAddress: request.ownerAddress,
+        method: request.method,
+        error: { code: "WALLET_NOT_RECIPIENT" },
     }));
     const first = pending.applyWalletResponses(responses);
     await expect(pending.applyWalletResponses(responses)).rejects.toThrow(/applying/);
     expect((await first).notes).toBe(0);
     expect((await h.store.readSnapshot(h.session.scope)).notes).toEqual({});
+});
+
+it("keeps an entire refresh pending when native account approval fails", async () => {
+    const h = await harness();
+    const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
+    const request = pending.walletRequests[0]!;
+    const responses = [
+        {
+            version: request.version,
+            id: request.id,
+            ownerAddress: request.ownerAddress,
+            method: request.method,
+            error: { code: "WALLET_ACCOUNT_LOCKED" },
+        },
+    ];
+    await expect(pending.applyWalletResponses(responses)).rejects.toMatchObject({
+        code: "WALLET_ACCOUNT_LOCKED",
+    });
+    const before = await h.store.readSnapshot(h.session.scope);
+    expect(before.revision).toBe(0);
+    expect(before.discoveryThrough).toBeUndefined();
+    expect(before.notes).toEqual({});
+    await applyRefresh(pending);
+    expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(1);
 });

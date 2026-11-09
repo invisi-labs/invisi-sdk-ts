@@ -1,208 +1,140 @@
-import { NoteOutput } from "@invisi-labs/sdk";
-import { settings } from "../settings.js";
 import { randomInt } from "node:crypto";
-import { Interface, JsonRpcProvider, Wallet as EthereumWallet, getBytes } from "ethers";
-import { Invisi, Protocol, ProtocolRpcClient, ViewingCapability, type OperationAggregateMember } from "@invisi-labs/sdk";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
-import { Aggregator } from "@invisi-labs/prover/aggregate";
-import { NativeProver, checkBBAvailable } from "@invisi-labs/prover/native";
+import { JsonRpcProvider } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
+import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
 import { discoverCandidates } from "./discover-candidates.js";
+import { Aggregator } from "@invisi-labs/prover/aggregate";
 
-// Bob and Charlie each build two independent transfers; Alice aggregates all four and submits them together.
+// Bob and Charlie each prepare two half-note transfers to Dave and Eve respectively.
+// Alice receives four public aggregate members and can submit their atomic aggregate.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run");
-}
-
-const bbBin = settings.bbBin;
-if (!(await checkBBAvailable(bbBin))) {
-    throw new Error("Barretenberg 6.0.0 is required; no network connection or transaction has been made");
+    console.log("Review the scenario, then pass --execute");
+    process.exit(0);
 }
 
 const [alice, bob, charlie, dave, eve] = getAccounts();
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-
 try {
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
 
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const tokenAddress = settings.tokenAddress;
-    const prover = new NativeProver({
-        bbBin,
-    });
+    const prover = new NativeProver({ bbBin: settings.bbBin });
     const invisi = new Invisi({
         provider,
         protocolRpc,
         prover,
     });
-    // Aggregation proofs can take time; allow one hour for all members. The contract still checks the actual deadline.
-    const deadline = BigInt(Math.floor(Date.now() / 1000)) + 3600n;
-
-    // 1. Bob: recover his notes and randomly select two distinct notes.
-    // The local account library is for demonstration; actual participants run separately and share only exportAggregateMember() results.
-    const bobSigner = new EthereumWallet(bob.privateKey);
-    const bobViewer = new ViewingCapability(bob.address, getBytes(bob.viewingPrivateKey), bob.publicWallet.viewingPublicKey);
+    // Allow an hour for four native approvals and recursive proofs; the contract checks expiry.
+    const latestBlock = await provider.getBlock("latest");
+    if (!latestBlock) {
+        throw Error("Missing latest block");
+    }
+    const deadline = BigInt(latestBlock.timestamp) + 3600n;
+    const members = [];
+    // 2. Bob selects two distinct notes; each member sends half and returns half as change.
     const bobCandidates = await discoverCandidates({
         provider,
         protocolRpc,
         protocol,
         wallet: bob.publicWallet,
-        viewer: bobViewer,
-        tokenAddress,
+        nativeWallet,
+        tokenAddress: settings.tokenAddress,
     });
     const bobEligible = bobCandidates.filter((input) => input.note.amount >= 2n);
     if (bobEligible.length < 2) {
-        throw new Error("Bob needs two unspent token notes worth at least 2 base units each");
+        throw Error("Fewer than two eligible Bob notes found; fund Bob first");
     }
-    // Remove selected notes from the candidate pool so two members cannot reuse the same note.
-    const bobInputs = [];
-    for (let index = 0; index < 2; index++) {
-        const selected = bobEligible.splice(randomInt(bobEligible.length), 1)[0]!;
-        bobInputs.push(selected);
-    }
-    const bobMembers: OperationAggregateMember[] = [];
+    const bobInputs = [
+        bobEligible.splice(randomInt(bobEligible.length), 1)[0]!,
+        bobEligible.splice(randomInt(bobEligible.length), 1)[0]!,
+    ];
     for (const input of bobInputs) {
+        const output = await NoteOutput.create({
+            ...protocol.context,
+            tokenAddress: settings.tokenAddress,
+            amount: input.note.amount / 2n,
+            recipient: { type: "invisi", address: dave.receivingAddress },
+        });
+
         const prepared = await invisi.prepareTransfer({
             wallet: bob.publicWallet,
             protocol,
-            tokenAddress,
-            inputs: [input],
-            outputs: [
-                await NoteOutput.create({
-                    chainId: protocol.context.chainId,
-                    protocolAddress: protocol.context.protocolAddress,
-                    tokenAddress,
-                    amount: input.note.amount / 2n,
-                    recipient: { type: "invisi", address: dave.publicWallet.getAddress() },
-                }),
-            ],
+            tokenAddress: settings.tokenAddress,
             deadline,
-            // Each transfer sends half to its recipient and automatically returns the remainder as change to the original owner.
-            // Use only existing notes, with no cash funding, approval, or funding authorization.
+            inputs: [input],
+            outputs: [output],
         });
-        const request = await prepared.exportWalletAuthorization();
-        const signature = await bobSigner.signTypedData(request.domain, request.types, request.message);
-        const authorized = await prepared.withWalletSignature(signature);
-        // Choose the submission mode at the proving stage; prepare and the spending request match single submission.
-        // aggregate exports an aggregate member; omit it or use single to generate a directly submittable transaction.
-        const proved = await authorized.prove({
-            execution: "aggregate",
-            onProgress: (event) => {
-                console.log("Bob member proving phase:", event.phase);
-            },
-        });
-        // Share only public requests, ciphertext, public proofs, and their identity metadata, never NoteInput or private keys.
-        // Recursive members cannot be submitted individually with exportTransaction().
-        bobMembers.push(proved.exportAggregateMember());
-    }
 
-    // 2. Charlie: recover his notes and randomly select two distinct notes.
-    // The local account library is for demonstration; actual participants run separately and share only exportAggregateMember() results.
-    const charlieSigner = new EthereumWallet(charlie.privateKey);
-    const charlieViewer = new ViewingCapability(
-        charlie.address,
-        getBytes(charlie.viewingPrivateKey),
-        charlie.publicWallet.viewingPublicKey
-    );
+        const request = await prepared.exportWalletRequest(crypto.randomUUID());
+        const responses = await nativeWallet.execute([request]);
+        const response = responses.find((item) => item.id === request.id);
+        if (!response) {
+            throw Error("Missing bob authorization response");
+        }
+        const authorized = await prepared.withWalletResponse(response);
+        // Recursive members cannot be submitted as individual transactions.
+        const proved = await authorized.prove({ execution: "aggregate" });
+        members.push(proved.exportAggregateMember());
+    }
+    // 3. Charlie selects two distinct notes; each member sends half and returns half as change.
     const charlieCandidates = await discoverCandidates({
         provider,
         protocolRpc,
         protocol,
         wallet: charlie.publicWallet,
-        viewer: charlieViewer,
-        tokenAddress,
+        nativeWallet,
+        tokenAddress: settings.tokenAddress,
     });
     const charlieEligible = charlieCandidates.filter((input) => input.note.amount >= 2n);
     if (charlieEligible.length < 2) {
-        throw new Error("Charlie needs two unspent token notes worth at least 2 base units each");
+        throw Error("Fewer than two eligible Charlie notes found; fund Charlie first");
     }
-    // Remove selected notes from the candidate pool so two members cannot reuse the same note.
-    const charlieInputs = [];
-    for (let index = 0; index < 2; index++) {
-        const selected = charlieEligible.splice(randomInt(charlieEligible.length), 1)[0]!;
-        charlieInputs.push(selected);
-    }
-    const charlieMembers: OperationAggregateMember[] = [];
+    const charlieInputs = [
+        charlieEligible.splice(randomInt(charlieEligible.length), 1)[0]!,
+        charlieEligible.splice(randomInt(charlieEligible.length), 1)[0]!,
+    ];
     for (const input of charlieInputs) {
+        const output = await NoteOutput.create({
+            ...protocol.context,
+            tokenAddress: settings.tokenAddress,
+            amount: input.note.amount / 2n,
+            recipient: { type: "invisi", address: eve.receivingAddress },
+        });
         const prepared = await invisi.prepareTransfer({
             wallet: charlie.publicWallet,
             protocol,
-            tokenAddress,
-            inputs: [input],
-            outputs: [
-                await NoteOutput.create({
-                    chainId: protocol.context.chainId,
-                    protocolAddress: protocol.context.protocolAddress,
-                    tokenAddress,
-                    amount: input.note.amount / 2n,
-                    recipient: { type: "invisi", address: eve.publicWallet.getAddress() },
-                }),
-            ],
+            tokenAddress: settings.tokenAddress,
             deadline,
-            // Each transfer sends half to its recipient and automatically returns the remainder as change to the original owner.
-            // Use only existing notes, with no cash funding, approval, or funding authorization.
+            inputs: [input],
+            outputs: [output],
         });
-        const request = await prepared.exportWalletAuthorization();
-        const signature = await charlieSigner.signTypedData(request.domain, request.types, request.message);
-        const authorized = await prepared.withWalletSignature(signature);
-        // Choose the submission mode at the proving stage; prepare and the spending request match single submission.
-        // aggregate exports an aggregate member; omit it or use single to generate a directly submittable transaction.
-        const proved = await authorized.prove({
-            execution: "aggregate",
-            onProgress: (event) => {
-                console.log("Charlie member proving phase:", event.phase);
-            },
-        });
-        // Share only public requests, ciphertext, public proofs, and their identity metadata, never NoteInput or private keys.
-        // Recursive members cannot be submitted individually with exportTransaction().
-        charlieMembers.push(proved.exportAggregateMember());
+        const request = await prepared.exportWalletRequest(crypto.randomUUID());
+        const responses = await nativeWallet.execute([request]);
+        const response = responses.find((item) => item.id === request.id);
+        if (!response) {
+            throw Error("Missing charlie authorization response");
+        }
+        const authorized = await prepared.withWalletResponse(response);
+        // Recursive members cannot be submitted as individual transactions.
+        const proved = await authorized.prove({ execution: "aggregate" });
+        members.push(proved.exportAggregateMember());
     }
-
-    // 3. Alice: receive only four public aggregate members, without reading plaintext notes or keys belonging to Bob or Charlie.
-    // In production, the two sections above run on their respective clients; Alice receives members via the application's own transport.
-    const members = [...bobMembers, ...charlieMembers];
-    const aggregator = new Aggregator({
-        prover,
-    });
-    // Four C1..C5 members use the current mixed outer; every request remains ordered and distinct.
-    // The aggregator validates each proof before constructing the outer proof; member order must match requests.
-    const proof = await aggregator.aggregate(members, {
-        onProgress: (event) => {
-            console.log("Alice aggregate proving phase:", event.phase);
-        },
-    });
+    console.log("Public aggregate submitter:", alice.address);
+    // 4. Verify and aggregate only public members, retaining their exact request order.
+    const aggregator = new Aggregator({ prover });
+    const proof = await aggregator.aggregate(members);
     const call = protocol.aggregate({
         proof: proof.proofHex,
         requests: members.map((member) => member.request),
     });
-
-    // 4. Alice estimates gas for the entire aggregate call, then submits with ethers and pays gas.
-    // Submitting does not grant Alice decryption capability; public on-chain fields remain visible to everyone.
-    const aliceSigner = new EthereumWallet(alice.privateKey, provider);
-    const gas = await aliceSigner.estimateGas(call);
-    console.log("Estimated gas for four aggregated transfers:", gas.toString());
-    const transaction = await aliceSigner.sendTransaction(call);
-    console.log("Aggregate transaction hash:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (!receipt || receipt.status !== 1) {
-        throw new Error("Aggregate transaction was not confirmed successfully");
-    }
-
-    // 5. Check this receipt for completion of all four atomic operations; failure of any member reverts the whole call.
-    // Receipt confirmation does not require RPC indexing to catch up or Alice to decrypt receipt contents.
-    const protocolInterface = new Interface(invisiProtocolAbi);
-    const events = receipt.logs
-        .filter((log) => log.address.toLowerCase() === call.to.toLowerCase())
-        .map((log) => protocolInterface.parseLog(log));
-    const aggregateEvent = events.find((event) => event?.name === "TransactAggregated");
-    const requestEvents = events.filter((event) => event?.name === "BatchRequest");
-    if (aggregateEvent?.args.requestCount !== 4n || requestEvents.length !== 4) {
-        throw new Error("The receipt is missing completion events for the four aggregated transfers");
-    }
-    console.log("Both Bob transfers and both Charlie transfers confirmed in block:", receipt.blockNumber);
+    console.log("Unsigned aggregate transaction:", json(call));
 } finally {
     provider.destroy();
 }

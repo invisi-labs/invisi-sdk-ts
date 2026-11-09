@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Wallet } from "./wallet-object";
-import { LocalWallet } from "./local-wallet";
+import { TestWallet } from "../../../../test-support/test-wallet";
 import { prepareWalletRequest, acceptWalletResponse } from "./wallet-wire";
 
 describe("wallet request boundary", () => {
     it("keeps business Wallet public and rejects response substitution", async () => {
-        const local = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+        const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
         const wallet = Wallet.fromAddress(local.getAddress());
         expect("fromPrivateKey" in Wallet).toBe(false);
         expect("getViewer" in wallet).toBe(false);
@@ -20,7 +20,7 @@ describe("wallet request boundary", () => {
 });
 
 it("verifies native authorization and rejects altered words, digest and owner", async () => {
-    const local = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
     const wallet = Wallet.fromAddress(local.getAddress());
     const prepared = prepareWalletRequest(wallet, "authorize", "wallet.authorize", {
         operation: "transact",
@@ -53,7 +53,7 @@ it("verifies native authorization and rejects altered words, digest and owner", 
 
 it("replays portable native JSON fixtures and checks decrypted commitment integrity", async () => {
     const { default: vectors } = await import("./testdata/wallet-wire-vectors.json");
-    const local = await LocalWallet.fromPrivateKey(vectors.privateKey);
+    const local = await TestWallet.fromPrivateKey(vectors.privateKey);
     const wallet = Wallet.fromAddress(local.getAddress());
     for (const row of vectors.cases) {
         expect(await local.execute(row.request as any)).toEqual(row.response);
@@ -84,7 +84,7 @@ it("replays portable native JSON fixtures and checks decrypted commitment integr
 });
 
 it("rejects unknown request fields instead of transporting secrets", async () => {
-    const local = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
     const wallet = Wallet.fromAddress(local.getAddress());
     expect(() =>
         prepareWalletRequest(wallet, "secret", "wallet.detect", {
@@ -95,8 +95,8 @@ it("rejects unknown request fields instead of transporting secrets", async () =>
 });
 
 it("binds native public receiving keys to a resolved wallet", async () => {
-    const local = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
-    const other = await LocalWallet.fromPrivateKey("0x" + "02".padStart(64, "0"));
+    const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const other = await TestWallet.fromPrivateKey("0x" + "02".padStart(64, "0"));
     const prepared = prepareWalletRequest(
         Wallet.fromAddress(local.getAddress()),
         "public",
@@ -113,8 +113,8 @@ it("binds native public receiving keys to a resolved wallet", async () => {
 
 it("detects full-precision clues without exporting a key in its response", async () => {
     const { createClueFromSeed } = await import("../fmd/fmd");
-    const local = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
-    const other = await LocalWallet.fromPrivateKey("0x" + "02".padStart(64, "0"));
+    const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const other = await TestWallet.fromPrivateKey("0x" + "02".padStart(64, "0"));
     const clues = [local, other].map(
         (wallet) =>
             "0x" +
@@ -137,7 +137,7 @@ it("detects full-precision clues without exporting a key in its response", async
 
 it("rejects non-ASCII request identifiers and uppercase ciphertext hex", async () => {
     const { default: vectors } = await import("./testdata/wallet-wire-vectors.json");
-    const local = await LocalWallet.fromPrivateKey(vectors.privateKey);
+    const local = await TestWallet.fromPrivateKey(vectors.privateKey);
     const wallet = Wallet.fromAddress(local.getAddress());
     expect(() => prepareWalletRequest(wallet, "unicode-\u96ea", "wallet.public", {})).toThrow();
     expect(() => prepareWalletRequest(wallet, "space id", "wallet.public", {})).toThrow();
@@ -148,7 +148,7 @@ it("rejects non-ASCII request identifiers and uppercase ciphertext hex", async (
 });
 
 it("returns false for malformed full-length clues while rejecting structural length errors", async () => {
-    const local = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
     const wallet = Wallet.fromAddress(local.getAddress());
     const malformed = new Uint8Array(68);
     malformed[64] = 24;
@@ -171,8 +171,8 @@ it("returns false for malformed full-length clues while rejecting structural len
 
 it("binds native Credit receiving snapshots to the resolved public Wallet", async () => {
     const { default: vectors } = await import("./testdata/wallet-wire-vectors.json");
-    const local = await LocalWallet.fromPrivateKey(vectors.privateKey);
-    const other = await LocalWallet.fromPrivateKey("0x" + "00".repeat(31) + "02");
+    const local = await TestWallet.fromPrivateKey(vectors.privateKey);
+    const other = await TestWallet.fromPrivateKey("0x" + "00".repeat(31) + "02");
     const wallet = Wallet.fromAddress(local.getAddress());
     const row = vectors.cases.find((item) => item.request.method === "wallet.decryptCredit")!;
     const prepared = prepareWalletRequest(
@@ -190,4 +190,32 @@ it("binds native Credit receiving snapshots to the resolved public Wallet", asyn
         result: { plaintext: "0x" + Buffer.from(plain).toString("hex") },
     };
     await expect(acceptWalletResponse(prepared, forged as any)).rejects.toThrow(/receiving/);
+});
+
+it("throws shared typed errors and validates batch errors before acceptance", async () => {
+    const { NativeWalletError, acceptWalletResponses, validateWalletBatch } =
+        await import("./wallet-wire");
+    const wallet = Wallet.fromAddress("0x1111111111111111111111111111111111111111");
+    const prepared = prepareWalletRequest(wallet, "locked", "wallet.public", {});
+    const error = {
+        version: 1 as const,
+        id: "locked",
+        method: "wallet.public" as const,
+        ownerAddress: prepared.request.ownerAddress,
+        error: { code: "WALLET_ACCOUNT_LOCKED" },
+    };
+    await expect(acceptWalletResponse(prepared, error)).rejects.toBeInstanceOf(NativeWalletError);
+    await expect(acceptWalletResponse(prepared, error)).rejects.toMatchObject({
+        code: "WALLET_ACCOUNT_LOCKED",
+    });
+    await expect(acceptWalletResponses([prepared, prepared], [error, error])).rejects.toThrow(
+        /duplicate/
+    );
+    expect(() => validateWalletBatch([{ ...prepared.request, id: "ü" }])).toThrow();
+});
+
+it("does not publish private account execution helpers", async () => {
+    const api = await import("../index");
+    expect(api).not.toHaveProperty("WalletAuthorization");
+    expect(api).not.toHaveProperty("signWalletAuthorization");
 });

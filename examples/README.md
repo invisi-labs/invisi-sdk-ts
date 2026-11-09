@@ -1,185 +1,53 @@
-# Invisi SDK examples
+# TypeScript examples
 
-Flat, independently readable TypeScript examples using the public SDK and ethers. Comments, logs and documentation are English. Business examples use external signing requests; only category 05 imports `@invisi-labs/session` for WalletSession and a persistent Store. Stateless examples import `@invisi-labs/sdk` without session or storage dependencies.
+Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline wallet example runs without `--execute`.
 
 ## Setup
-
-From the workspace root:
 
 ```sh
 pnpm install
 pnpm build
 pnpm examples wallet
-```
-
-`wallet` is entirely offline and uses a public test private key. Never fund its accounts. On-chain examples require Node.js 22.13 or newer for `node:sqlite`, a funded EVM testnet, and a matching deployed protocol. Chain 97 is the verified default, not a restriction.
-
-### Customize connections and token
-
-Edit [settings.ts](settings.ts):
-
-- `chainRpcUrl`: your Ethereum JSON-RPC endpoint with historical state access.
-- `protocolRpcUrl`: your trusted Protocol RPC deployment service.
-- `chainId`: expected chain ID, with matching Chain RPC and Protocol RPC deployment.
-- `nativeCurrencySymbol` / `nativeCurrencyDecimals`: native gas-token display and amount precision.
-- `suggestedGasBalance` / `helperGasBalance`: editable starting-balance suggestion and Charlie/Frank top-up target.
-- `tokenAddress`: your funded standard ERC20 test token. The default iUSD is an existing testnet token; no token deployment is required.
-- `bbBin`: path to Barretenberg 6.0.0 for real native proofs.
-
-The checked setup uses a local tunnel at `http://127.0.0.1:18565` to a self-hosted full node. Replace it with your own full/archive RPC; the private infrastructure and Teleport access are not required. A node returning `missing trie node` for historical calls cannot support wallet history verification. Do not skip verification to work around it. Protocol deployment addresses are obtained and validated through Protocol RPC, rather than copied into each example.
-
-Place the BB binary or a symlink at `examples/bin/bb`, or change `bbBin`. This directory is ignored by Git.
-
-### Customize local accounts
-
-Generate ten new local test accounts explicitly:
-
-```sh
-pnpm --filter @invisi-examples/scenarios accounts:init --execute
-pnpm --filter @invisi-examples/scenarios accounts
-```
-
-Initialization writes `examples/accounts/accounts.json` with owner-only file permissions and refuses to overwrite an existing file. Accounts are ordered Alice, Bob, Charlie, Dave, Eve, Frank, Grace, Heidi, Ivan and Judy. Public addresses are printed; keys are not.
-
-Alternatively, prepare your own local account file:
-
-```sh
 mkdir -p examples/accounts
-cp -n examples/accounts.example.json examples/accounts/accounts.json
-chmod 600 examples/accounts/accounts.json
+cp examples/accounts.example.json examples/accounts/accounts.json
 ```
 
-Replace every placeholder with your own test account's EVM address and private key, then derive receiving addresses and viewing keys locally:
+Fill the copied file with public EVM addresses and complete public `0i` receiving addresses. `accounts.ts` rejects additional fields. Edit `settings.ts` for your chain RPC, trusted Protocol RPC, token, and Barretenberg 6.0.0 binary. A historical-state chain RPC is required for independent verification. Shield and cash examples read ERC20 decimals for their token amounts; financial arithmetic uses integers throughout. Credit limits and draws are explicit token base units.
 
 ```sh
-pnpm --filter @invisi-examples/scenarios accounts:receiving
+pnpm --filter @invisi-examples/scenarios example:hidden:3 --execute
 ```
 
-The receiving-key script verifies existing derived fields before updating them; it never replaces EVM private keys. Keep account names and ordering. `getAccounts()` only reads this local file and creates public receiving wallets. A sender needs the recipient's public receiving address, not the recipient's private key.
+Without `--execute`, live scripts exit before reading account configuration, environment inputs, opening databases, or connecting to RPC. Running with it can read sensitive note openings and persist encrypted wallet state, but never submits a transaction.
 
-Account files, encrypted SQLite inventory and sidecar files are ignored by Git. The repository contains no funded account keys or wallet databases. These plaintext local accounts and example storage-key derivation are for isolated testnet experiments; integrate your own key management in a real wallet.
+## Host request and response boundaries
 
-### Fund the suite
+Private authorization and decryption use the five-method core wallet protocol. A scenario exports its retained request, calls `nativeWallet.execute([request])`, selects the response by ID, and attaches it with `withWalletResponse` or core `acceptWalletResponse`. The shared `host-transport.ts` contains only JSON/terminal framing: it prints the entire request array and reads one response-array line. Implement this boundary with your own native bridge in an application.
 
-Fund Alice and Bob with **the configured chain's native currency before running any on-chain examples**. ERC20 balances cannot pay gas. Charlie and Frank also submit transactions; the preparation script tops them up from Alice to `settings.helperGasBalance`.
+Each wallet response repeats `version`, `id`, `ownerAddress`, and `method` and contains exactly one of `result` or `error: { code }`. Errors remain explicit; only `WALLET_NOT_RECIPIENT` is a decryption nonmatch. The SDK validates complete batch envelopes before accepting cryptographic results. Never substitute `null` for failed requests.
 
-| Account | Why it needs native currency | Preparation |
-| --- | --- | --- |
-| Alice (A) | Most transfers, aggregation, session transactions, and funding Charlie/Frank | Fund manually; see `settings.suggestedGasBalance` |
-| Bob (B) | Registry registration/update and Credit creation/update | Fund manually; see `settings.suggestedGasBalance` |
-| Charlie (C) | Credit creation and public revocation | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
-| Frank (F) | Delegated sweep submission | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
-| Other recipients | Receive only in this suite | No native-token funding required |
+Funding and address registration use separate EVM typed-data requests. Their printed arrays contain an application `id`, `kind`, and the SDK's EIP-712 request. Have the host review and sign that request, then paste `[{"id":"the-printed-id","signature":"0x..."}]`. These application envelopes are not additional native-wallet protocol methods. The SDK checks returned signatures against the retained intent. Caller-funded transactions instead require submission by their specified payer. Token balances, ERC20 allowance, gas, and submission remain host responsibilities; no script approves or broadcasts automatically.
 
-The defaults use BSC Testnet 97 / tBNB, with a 0.1 starting suggestion and 0.01 helper target. Change all matching settings for another network, such as an ETH testnet. These are preparation amounts, not a gas-cost guarantee. The script prints all four gas balances and stops if Alice or Bob has no native currency. Gas prices and the selected transaction determine actual consumption. Also fund Alice with at least 100 units of the configured ERC20 and Bob with at least 100; adjust explicit example amounts for your token.
-```sh
-pnpm --filter @invisi-examples/scenarios prepare:suite --execute
-```
+The final output is an unsigned transaction. Review its chain, target, value, calldata, and required caller before host submission. The broadcaster example obtains a verified fee quote and exports the resulting calldata; it does not call the broadcaster's submit endpoint.
 
-This sends gas to Charlie and Frank if needed, and creates eight 1-token Alice notes plus four each for Bob and Charlie in two shield batches. Every explicit run creates new notes; run once before a fresh full-suite test. Existing account keys and token contracts are retained. Read the script before funding or executing it.
+## Scenarios
 
-## Run examples
+- `00-wallet`: offline validation of a public wallet profile and receiving address. The fixture contains public material only.
+- `01-address-registry`: initial registration and update, with external EVM authorization.
+- `02-transparent-amount`: shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, memo, and verified broadcaster quote.
+- `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
+- `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
+- `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted shield/transfer preparation, and operation reconciliation. There is no injected private executor or automatic signer.
+- `06-disclosure`: independently read canonical receipt evidence, request native decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the native-authenticated application payload without claiming its financial opening proves the memo.
 
-Read each file, then add `--execute` to opt into network access. Without it, on-chain examples stop before reading keys, opening a database or accessing the network. Each payment invocation is a new payment; do not rerun a payment to recover a pending transaction.
+## Automatic discovery and recovery
 
-```sh
-pnpm --filter @invisi-examples/scenarios example:transparent:1 --execute
-```
+Note and Credit examples discover outputs automatically through the configured Protocol RPC. You do not supply plaintext note input JSON. `discover-candidates.ts` and `discover-credits.ts` paginate indexed history, export native decryption batches, accept successful plaintext through core validation, and check the independent canonical receipt. They reject conflicting indexed rows and propagate every error except an explicit `WALLET_NOT_RECIPIENT` nonmatch. Indexed nullifiers and Credit revocation bitmaps filter current inventory; preparation independently checks current on-chain membership and eligibility again.
 
-| Category | Scripts | Coverage |
-| --- | --- | --- |
-| [00 Wallet](00-wallet/01-wallet.ts) | `example:wallet:1` | ethers mnemonic/private-key import, public wallet, viewer and detector capabilities |
-| [01 Registry](01-address-registry/01-register-bob.ts) | `example:registry:1`, `:2` | Bob registration and update through external EIP-712 requests |
-| [02 Transparent amounts](02-transparent-amount/01-alice-to-bob.ts) | `example:transparent:1`, `:1b`, `:1c`, `:2`, `:3`, `:4`, `:5` | Full receiving address, registered EVM address, explicit chain lookup, nine recipients, Bob funding authorization, raw memo payload, complete Shield broadcaster walkthrough |
-| [03 Hidden amounts](03-hidden-amount/01-cash-to-bob-with-change.ts) | `example:hidden:1`, `:1b`, `:2`, `:3`, `:4`, `:4b`, `:5`, `:6` | Cash/notes, separate funding/spending signatures, change, withdrawal, delegated owner-only sweep, four-member aggregation |
-| [04 Credit](04-credit/01-bob-and-charlie-create.ts) | `example:credit:1` through `:4` | Bob/Charlie create credit for Alice, multi-owner gross batch draw with one net Note, owner policy update, public grant revocation |
-| [05 WalletSession](05-wallet-session/01-restore-session.ts) | `example:session:1` through `:4` | Encrypted SQLite, incremental inventory, outgoing/incoming history, own cash/notes/gas, reopen and reconcile |
-| [06 Disclosure](06-disclosure/01-note-opening.ts) | `example:disclosure:1` through `:3` | Historical funds opening, single-output payload key and memo, credit opening; independent canonical receipt verification |
+Selection and amount calculations remain visible in each scenario. The cash-only examples create their own outputs; later note scenarios discover those receipts after host submission and indexing. Aggregation discovers each participant's notes separately, requests their authorization separately, and combines only their public proved aggregate members. Credit revocation discovers a current owner grant and uses its public revocation location.
 
-Run in table order after suite preparation. Within categories, use the script order listed above. Wait for a successful receipt and for Protocol RPC's `indexedHead` to cover that block before the next dependent example. Registration 01 is a first registration; it reports an error if the same owner is already registered. Use update 02 for registered owners.
+Disclosure examples discover historical outputs, including spent notes or consumed grants, and use canonical receipt evidence before exporting financial openings. The memo example decodes the host-authenticated application payload and explicitly states that a financial opening does not prove memo bytes to a third party. The current five-method native protocol exports plaintext, not a payload decryption key; these examples never introduce an unsupported native method or reconstruct a viewing key. Openings do not establish payer identity or current unspent status.
 
-Discovery helpers return all authenticated candidates; amount selection remains visible in each example. Exact duplicate RPC records are ignored, while conflicting content or tree positions fail. Preparation rechecks current chain state. Do not automatically replace consumed inputs or blindly retry a transaction.
+Session examples require Node.js 22.13+ and `STORE_ENCRYPTION_KEY_HEX`, a dedicated external 32-byte storage encryption key, plus optional `WALLET_DB` (default `examples/accounts/alice-session.sqlite`, resolved independently of the working directory). This key is solely for the encrypted store and must be supplied by host key management independently of account material. Use the same key, path, and namespace when restoring. Refresh remains visibly two steps: `nativeWallet.execute(pending.walletRequests)` and `pending.applyWalletResponses(responses)`. Keep exported operation IDs so a host can reconcile an existing submission rather than create a second payment.
 
-## Sessions and recovery
-
-Category 05 shares `examples/accounts/alice-session.sqlite` and a namespace scoped to the protocol deployment. Example 02 intentionally stops after the actual chain receipt, leaving the persisted operation for example 04 to reopen and independently reconcile. It does not send the payment again. Wait for RPC indexing before reopening; a refresh cannot use an anchor older than the wallet's already observed state.
-
-The sample HKDF storage key is separate from the spending key. A host wallet can supply its own `CryptoKey` to `EncryptedWalletCodec`, adapt a transactional Store, or use IndexedDB. Keep database and key management outside ordinary detached examples. Deleting the Store loses locally recorded outgoing private details; incoming notes can be rediscovered.
-
-## Payloads and disclosure
-
-Example 02-04 uses `fundsV1.encode()` / `decode()` explicitly. SDK envelopes use v1; `decryptNote()` returns raw application payload bytes. The comments show how an application can replace the codec with its own version and data format without injecting a codec into Invisi.
-
-Category 06 discovers historical outputs, including spent ones, and verifies their canonical receipts. It does not print, write or send disclosure material. Full funds openings and single-output payload keys also permit consumption tracking and unsigned full sweep back to the original owner; they are not strictly read-only capabilities. Credit openings expose a shared-key hash, not the recovery key. Verification proves the selected output's content and inclusion, not payer identity, current unspent state or complete wallet history.
-
-## Checks
-
-```sh
-pnpm --filter @invisi-examples/scenarios lint
-pnpm examples wallet
-pnpm lint
-```
-
-Keep SDK behavior tests in the owning packages. These examples use workspace packages and do not publish or install a released SDK version.
-
-## Local deployment
-
-Maintainers can use `pnpm deploy:local` with the sibling protocol repository and a fresh Anvil chain 31337. That tooling creates a separate deployment; changing example settings also requires a matching trusted Protocol RPC and funded accounts. The default walkthrough targets the deployed chain-97 protocol.
-
-### Optional paid broadcasting
-
-Start with [02-05 Shield via broadcaster](02-transparent-amount/05-shield-via-broadcaster.ts), the complete walkthrough. It shows business intent, `.withBroadcaster(client, { maxFeeAmount })`, final business/fee/gross amounts, ERC20 allowance, external funding signature, calldata export and submission. Shield needs neither a private-note authorization nor a ZK proof. Discover token-compatible clients with `protocol.getBroadcasters({ tokenAddress })`, choose a service, and set the final fee limit in `.withBroadcaster()`. A client can also be constructed directly from an RPC registration with `new BroadcasterClient(registration)`.
-
-
-The broadcaster attachment supports Transfer, Shield and all four Credit operations. Credit creation/update/revocation fees are pulled from the owner's ERC20 wallet; owners must provide allowance and balance. Credit draw keeps explicit gross grant debits unchanged and deducts the fee from the ordinary recipient Note; usage counts gross debits. Quotes bind the final public request and fees before authorization. Existing direct submission remains available. Repricing after authorization/proving is rejected. Ordinary Note funding, change and permit behavior remains unchanged.
-
-Approve the final gross funding amount separately, or supply `fundingPermit` to sign an exact final permit through your application once fee preparation stabilizes. An existing permit is rejected when its public funding amount would increase without that callback. Managed operations atomically replace reservations under one operation id; the former managed handle becomes stale. Detached originals remain usable for ordinary self-submission. Do not execute against a deployment until its fee-enabled ABI and authenticated circuits are installed.
-
-### Payment requests and offline Note delivery
-
-IPR carries a recipient's payment request. IPN carries one definite Note opening after the payer has selected its nonce. This changes how an output is created and delivered; signing, proving and submission follow the existing [transparent payment](02-transparent-amount/01-alice-to-bob.ts) or [private transfer](03-hidden-amount/03-notes-to-three-with-change.ts) example.
-
-```ts
-import { NoteOutput, PaymentNote, encodePaymentRequest } from "@invisi-labs/sdk";
-
-// 1. Recipient: publish a reusable request, for example in a QR code.
-const ipr = encodePaymentRequest({
-    ...protocol.context,
-    tokenAddress,
-    amount,
-    recipient: { type: "invisi", address: bobAddress },
-});
-
-// 2. Payer: replace direct object-based output creation with the received IPR.
-// No fixed request nonce means each payment chooses a fresh nonce.
-const output = await NoteOutput.create(ipr);
-// Pass outputs: [output] to prepareShield or prepareTransfer as in the existing examples.
-// Keep the final prepared handle after any broadcaster fee/change reconstruction.
-
-// 3. Payer: export only this recipient's output from the final prepared transaction.
-const recipientOutput = prepared.getOutputs().find(item => item.commitment === output.commitment);
-if (!recipientOutput) throw new Error("Payment output is missing from the final plan");
-const ipn = recipientOutput.exportPaymentNote();
-// Submit using the existing example's authorization/proof/ethers steps.
-// After confirmation, privately deliver ipn to Bob. Do not deliver your change Note.
-
-// 4. Bob: decode the opening and recompute its commitment.
-const note = await PaymentNote.from(ipn);
-if (BigInt(note.tokenAddress) !== BigInt(tokenAddress) || note.amount !== amount)
-    throw new Error("Payment does not match the requested token and amount");
-
-// 5. Public check: correct opening and confirmed on-chain membership; spent Notes may pass.
-// Protocol.fromRpc(protocolRpc, provider) supplies the verification connections.
-const verified = await note.verify(protocol);
-
-// 6. Owner check: Bob's spending Wallet and the latest unspent nullifier are also required.
-const spendable = await note.verifySpendable(protocol, bobWallet);
-const input = spendable.toInput();
-// Use inputs: [input] in a subsequent prepareTransfer; its authorization remains separate.
-```
-
-The sections above are separate recipient/payer steps, using the selected protocol, token and amount from the payment examples. They are not one additional executable scenario. IPN can be exported before submission, but only chain verification establishes receipt. `getOutputs()` includes generated change, so select the intended recipient's output. EVM recipients can also export IPN, with or without a chain envelope; identity-only recipients cannot. IPN contains private Note data and no wallet keys. Neither verification method signs or submits a transaction.
-
-For encoding layouts, nonce overrides and explicit verification connections, see [IPR](../README.md#portable-note-payment-requests-ipr) and [IPN](../README.md#offline-payment-notes-ipn).
-
-Node examples use `LocalWallet` from `@invisi-labs/core/local` as an explicit request executor. Production mobile applications use their native wallet transport with the same public `Wallet` and request/response API.
+After external submission, recovery optionally reads `HOST_TRANSACTIONS_JSON`, an object mapping persisted operation IDs to host transaction hashes. It attaches these hashes with `trackTransaction` and reconciles canonical receipts without resending or signing again.

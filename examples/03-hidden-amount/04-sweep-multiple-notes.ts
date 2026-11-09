@@ -1,127 +1,82 @@
-import { settings } from "../settings.js";
-import { discoverCandidates } from "./discover-candidates.js";
 import { randomInt } from "node:crypto";
-import { Contract, JsonRpcProvider, Wallet as EthereumWallet, formatUnits, getBytes } from "ethers";
-import { erc20Abi } from "viem";
-import { Invisi, InvisiError, Protocol, ProtocolRpcClient, ViewingCapability, type NoteInput } from "@invisi-labs/sdk";
-import { NativeProver, checkBBAvailable } from "@invisi-labs/prover/native";
+import { JsonRpcProvider } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
+import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
+import { discoverCandidates } from "./discover-candidates.js";
 
-// Randomly select two of Alice's notes and sweep their full amount back to Alice.
+// Alice samples two notes and withdraws their complete amount publicly to herself.
+// The exact full-owner, zero-fee withdrawal needs a proof but no private spend signature.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run");
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
 }
 
-// The SDK requires BB 6.0.0; check before connecting or approving, and adjust the path to your local installation.
-// Resolve the project bin/bb relative to this example, independently of the working directory.
-const bbBin = settings.bbBin;
-if (!(await checkBBAvailable(bbBin))) {
-    throw new Error(
-        "Barretenberg 6.0.0 is required; install it and update bbBin first. No network connection or transaction has been made"
-    );
-}
-
-const [alice] = getAccounts();
+const accounts = getAccounts();
+const alice = accounts[0];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-
 try {
-    // 1. Connect to the configured chain and validate the deployment provided by Protocol RPC.
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
 
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const tokenAddress = settings.tokenAddress;
-    const aliceSigner = new EthereumWallet(alice.privateKey, provider);
-    const token = new Contract(tokenAddress, erc20Abi, provider);
-    const decimals = Number(await token.decimals());
-    const aliceWallet = alice.publicWallet;
-    const prover = new NativeProver({
-        bbBin,
-    });
-    // Use viewing capability only to recover Alice's notes; prepare spending with a public wallet and no default signer.
-    const viewer = new ViewingCapability(alice.address, getBytes(alice.viewingPrivateKey), aliceWallet.viewingPublicKey);
     const invisi = new Invisi({
         provider,
         protocolRpc,
-        prover,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
     });
 
-    // 2. Discover Alice's candidate notes; random selection and amount calculations are shown below.
+    // 2. Discover all eligible notes first; selection stays explicit and local to this scenario.
     const candidates = await discoverCandidates({
         provider,
         protocolRpc,
         protocol,
-        wallet: aliceWallet,
-        viewer,
+        wallet: alice.publicWallet,
+        nativeWallet,
         tokenAddress,
     });
-    // Filter by the amounts required by this example; candidates retains all discovered results.
-    const eligibleCandidates = candidates.filter((input) => input.note.amount >= 1n);
-    if (eligibleCandidates.length < 2) {
-        throw new Error("Insufficient available notes; fund Alice first. Notes need not come from a specific example");
+    const eligible = candidates.filter((input) => input.note.amount >= 1n);
+    if (eligible.length < 2) {
+        throw Error("Fewer than two eligible notes found; fund Alice and wait for indexing first");
     }
-    // Sample uniformly without replacement, in memory only, without creating a Store or Session.
-    const inputs: NoteInput[] = [];
-    for (let index = 0; index < 2; index += 1) {
-        const selectedIndex = randomInt(eligibleCandidates.length);
-        inputs.push(eligibleCandidates.splice(selectedIndex, 1)[0]!);
-    }
+    const inputs = [
+        eligible.splice(randomInt(eligible.length), 1)[0]!,
+        eligible.splice(randomInt(eligible.length), 1)[0]!,
+    ];
     const inputAmount = inputs.reduce((total, input) => total + input.note.amount, 0n);
-    console.log("Number of real input notes:", inputs.length);
-    console.log("Selected note total (base units):", inputAmount.toString());
-    // RPC spent status is an indexed observation; prepare independently validates current membership paths and the latest on-chain spent status.
+    if (!inputAmount) {
+        throw Error("No unspent notes found; fund Alice and wait for indexing first");
+    }
+    const outputs: NoteOutput[] = [];
 
-    // Allow one hour for local proving; the SDK still checks on-chain time and state.
+    // Native approval and local proving may take time; on-chain time still bounds validity.
     const latestBlock = await provider.getBlock("latest");
     if (!latestBlock) {
-        throw new Error("Unable to retrieve the latest on-chain block");
+        throw Error("Missing latest block");
     }
     const deadline = BigInt(latestBlock.timestamp) + 3600n;
 
-    // 3. Sweep both randomly selected notes in full; the amount equals the input total and the recipient is fixed to Alice.
-    // The recipient cannot change, fees cannot be deducted, and no change is allowed, so Alice's private spending authorization is unnecessary.
-    // If another example has spent a note, prepare fails based on its latest spent status.
+    // 3. Freeze the financial intent; preparation rechecks membership and current spent state.
     const prepared = await invisi.prepareTransfer({
-        wallet: aliceWallet,
+        wallet: alice.publicWallet,
         protocol,
         tokenAddress,
-        inputs,
         deadline,
-        outputs: [],
+        inputs,
+        outputs,
         withdrawal: { to: alice.address, amount: inputAmount },
     });
-
-    // Sweeping the full amount to the original owner requires no private spending signature, but still requires a proof.
-    const proved = await prepared.prove({
-        onProgress: (event) => {
-            console.log("Local proving phase:", event.phase);
-        },
-    });
-    const call = await proved.exportTransaction();
-
-    // Alice submits the transaction with ethers and pays gas; transaction signing is separate from protocol authorization.
-    const transaction = await aliceSigner.sendTransaction(call);
-    console.log("Transaction hash:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (!receipt || receipt.status !== 1) {
-        throw new Error("Transaction was not confirmed successfully");
-    }
-    console.log("Confirmed block:", receipt.blockNumber);
-    console.log("Public withdrawal recipient:", alice.address);
-    console.log("Public withdrawal amount (token):", formatUnits(prepared.preview().withdrawalAmount, decimals));
-} catch (error) {
-    if (error instanceof InvisiError) {
-        console.error("SDK preparation failed:", error.code);
-        console.error("Reason:", error.message);
-        if (error.outputIndex !== undefined) {
-            console.error("Recipient with error (number", error.outputIndex + 1, ")");
-        }
-        process.exitCode = 1;
-    } else {
-        throw error;
-    }
+    // Full withdrawal goes only to the original owner, with no private outputs or fee.
+    // Changing any of those conditions would remove the signature exemption.
+    const ready = await prepared.prove();
+    // Export does not approve tokens or submit; the host reviews the required caller and gas.
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
 } finally {
     provider.destroy();
 }

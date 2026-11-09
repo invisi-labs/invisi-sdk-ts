@@ -1,4 +1,5 @@
-import { LocalWallet } from "./local-wallet";
+import { WalletAuthorization } from "./capabilities";
+import { TestWallet } from "../../../../test-support/test-wallet";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,7 +9,6 @@ import {
     Wallet,
     ReceivingAddress,
     ViewingCapability,
-    WalletAuthorization,
 } from "../index";
 import { deriveWallet } from "./wallet";
 
@@ -20,7 +20,7 @@ const request = {
 };
 describe("capability wallet objects", () => {
     it("restores the same protocol identity and receiving addresses without infrastructure", async () => {
-        const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+        const wallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
         const expected = await deriveWallet(new Uint8Array(32).fill(1));
         expect(wallet.ownerAddress).toBe(expected.ownerAddress);
         const address = ReceivingAddress.parse(wallet.getAddress());
@@ -31,12 +31,12 @@ describe("capability wallet objects", () => {
         });
         expect(wallet.getAddress()).toHaveLength(138);
         expect(wallet.ownerAddress).toHaveLength(42);
-        expect(
-            (await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(2))).ownerAddress
-        ).not.toBe(wallet.ownerAddress);
+        expect((await TestWallet.fromPrivateKey(new Uint8Array(32).fill(2))).ownerAddress).not.toBe(
+            wallet.ownerAddress
+        );
     });
     it("returns independent capabilities and copies without exposing keys through serialization", async () => {
-        const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+        const wallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
         const raw = await deriveWallet(new Uint8Array(32).fill(1));
         const viewing = wallet.getViewer(),
             detector = wallet.getDetector(),
@@ -68,7 +68,7 @@ describe("capability wallet objects", () => {
         expect(JSON.stringify(authorized)).not.toContain("signature");
     });
     it("resolves short addresses explicitly and fails missing permissions", async () => {
-        const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+        const wallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
         const short = ReceivingAddress.parse(wallet.ownerAddress);
         expect(() => short.getReceivingKeys()).toThrow(MissingCapabilityError);
         await expect(short.resolve(async () => null)).rejects.toThrow(/registered/i);
@@ -99,7 +99,7 @@ describe("capability wallet objects", () => {
         await expect(
             WalletAuthorization.fromMaterial(raw.ownerAddress, new Uint8Array(32).fill(2))
         ).rejects.toThrow(/owner address/i);
-        const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+        const wallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
         const authorized = await wallet.exportAuthorization().authorize(request);
         const signature = authorized.withWitness((witness) => [...witness.signature]);
         authorized.withWitness((witness) => {
@@ -145,7 +145,7 @@ it("exports an isolated detection key for server delegation", () => {
 });
 
 it("creates an address-only wallet from an unregistered short address without granting private capabilities", async () => {
-    const wallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const wallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const publicWallet = Wallet.fromAddress(wallet.ownerAddress);
 
     expect(publicWallet.ownerAddress).toBe(wallet.ownerAddress);
@@ -170,7 +170,7 @@ it("keeps canonical owner addresses while serializing the checksummed short addr
 
 it("exposes ownerAddress on public receiving material without a short-address method", async () => {
     const owner = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
-    const full = await LocalWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const full = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
     const publicWallet = Wallet.fromAddress(owner);
     const receiving = publicWallet.getReceivingAddress();
     expect(receiving.ownerAddress).toBe(owner.toLowerCase());
@@ -185,7 +185,7 @@ it("exposes ownerAddress on public receiving material without a short-address me
 });
 
 it("separates public and private factories", () => {
-    expect(LocalWallet).not.toHaveProperty("fromAddress");
+    expect(TestWallet).not.toHaveProperty("fromAddress");
     expect(Wallet).not.toHaveProperty("fromPrivateKey");
 });
 

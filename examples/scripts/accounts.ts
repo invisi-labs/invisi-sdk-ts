@@ -1,10 +1,10 @@
 import { getAccounts } from "../accounts.js";
-
-const accounts = getAccounts();
-
+if (!process.argv.includes("--execute")) {
+    console.log("Pass --execute to read public account configuration");
+    process.exit(0);
+}
 console.table(
-    accounts.map(({ name, address, receivingAddress }, index) => ({
-        index,
+    getAccounts().map(({ name, address, receivingAddress }) => ({
         name,
         address,
         receivingAddress,

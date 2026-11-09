@@ -1,118 +1,94 @@
-import { LocalWallet } from "@invisi-labs/core/local";
-import { WalletSession } from "@invisi-labs/session";
-import { NoteOutput } from "@invisi-labs/sdk";
-import { settings } from "../settings.js";
-import { hkdfSync } from "node:crypto";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { JsonRpcProvider, Wallet as EthereumWallet, getBytes, Contract, parseUnits } from "ethers";
-import { Invisi, Protocol, ProtocolRpcClient, Wallet } from "@invisi-labs/sdk";
-import { EncryptedWalletCodec } from "@invisi-labs/session";
+import { JsonRpcProvider, getBytes, Contract, parseUnits } from "ethers";
+import { createRequire } from "node:module";
+import { WalletSession, EncryptedWalletCodec } from "@invisi-labs/session";
 import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/session/sqlite";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { NativeProver } from "@invisi-labs/prover/native";
+import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { erc20Abi } from "viem";
+import { nativeWallet, json } from "../host-transport.js";
 
-// Exit before reading accounts, opening the database, or connecting to the network unless --execute is provided.
+// Persist Alice's cash-funded payment to Bob and export it for host submission.
+// Keep the operation ID so a later restart can reconcile rather than create a second payment.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run it");
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
 }
 
 const [alice, bob] = getAccounts();
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-// Resolve the database to an absolute project path so changing the working directory does not create a second wallet state.
-const databasePath = fileURLToPath(new URL("../accounts/alice-session.sqlite", import.meta.url));
-const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as {
-    DatabaseSync: new (path: string) => SQLiteConnection & { close(): void };
-};
-const database = new DatabaseSync(databasePath);
 
+// 1. Restore only encrypted local state using a dedicated host-managed storage key.
+const storageKey = getBytes(process.env.STORE_ENCRYPTION_KEY_HEX ?? "0x");
+if (storageKey.length !== 32) {
+    throw Error("Supply a dedicated 32-byte store encryption key from the host");
+}
+const codec = await EncryptedWalletCodec.fromBytes(storageKey);
+storageKey.fill(0);
+const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as {
+    DatabaseSync: new (path: string) => SQLiteConnection & {
+        close(): void;
+    };
+};
+// An absolute default avoids creating a second wallet state when the working directory changes.
+const databasePath =
+    process.env.WALLET_DB ??
+    fileURLToPath(new URL("../accounts/alice-session.sqlite", import.meta.url));
+const database = new DatabaseSync(databasePath);
 try {
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
-
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const tokenAddress = settings.tokenAddress;
-    // This Node example uses an explicit local executor; mobile hosts execute requests in native code.
-    const localExecutor = await LocalWallet.fromPrivateKey(alice.privateKey);
-    const wallet = Wallet.fromAddress(localExecutor.getAddress());
-    const signer = new EthereumWallet(alice.privateKey, provider);
-
-    // This local experiment derives a storage key, not a protocol key; production wallets obtain a CryptoKey from the host's key management system.
-    // Fixed domain separation distinguishes the storage key from the spending private key; neither store raw private keys in the database nor print keys.
-    const accountKey = getBytes(alice.privateKey);
-    const storageKey = new Uint8Array(
-        hkdfSync("sha256", accountKey, new Uint8Array(32), new TextEncoder().encode("Invisi.Example.WalletStore.v1"), 32)
-    );
-    accountKey.fill(0);
-    const codec = await EncryptedWalletCodec.fromBytes(storageKey);
-    storageKey.fill(0);
-    const store = new SQLiteWalletStore(database, codec);
     const invisi = new Invisi({
         provider,
         protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
     });
+    const store = new SQLiteWalletStore(database, codec);
     const session = await WalletSession.connect({
         invisi,
         store,
-        wallet,
+        wallet: alice.publicWallet,
         protocol,
         namespace: "alice-local-experiments",
-        // Only this Session submits transactions as Alice; the Invisi constructor still takes no signer.
-        signer,
     });
 
-    // Preparing first persists a construction record, so unsubmitted operations also appear in wallet history.
-    const token = new Contract(tokenAddress, erc20Abi, signer);
+    // 2. Revisit the saved checkpoint to detect reorgs before using inventory.
+    const history = await session.getHistory();
+    const pending = await session.refresh({
+        fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
+    });
+    // A malformed batch or operational error must not advance the persisted checkpoint.
+    const responses = await nativeWallet.execute(pending.walletRequests);
+    await pending.applyWalletResponses(responses);
+    const token = new Contract(
+        settings.tokenAddress,
+        ["function decimals() view returns (uint8)"],
+        provider
+    );
     const amount = parseUnits("1", Number(await token.decimals()));
-    const prepared = await session.prepareShield({
-        tokenAddress,
-        outputs: [
-            await NoteOutput.create({
-                chainId: protocol.context.chainId,
-                protocolAddress: protocol.context.protocolAddress,
-                tokenAddress,
-                amount: amount,
-                recipient: { type: "invisi", address: bob.publicWallet.getAddress() },
-            }),
-        ],
-        funding: {
-            payer: alice.address,
-            amount,
-            // caller: Alice supplies cash and submits the transaction herself; no additional EIP-712 deposit signature is needed, but ERC20 approval is still required.
-            authorization: "caller",
-        },
+    const output = await NoteOutput.create({
+        ...protocol.context,
+        tokenAddress: settings.tokenAddress,
+        amount,
+        recipient: { type: "invisi", address: bob.receivingAddress },
     });
-    console.log("Operation ID:", prepared.id);
-    console.log("Payment awaiting confirmation:", prepared.preview());
 
-    // ethers manages approval transactions; the Session manages persisted payment records.
-    const allowance = await token.allowance(alice.address, protocol.context.protocolAddress);
-    if (allowance < amount) {
-        if (allowance > 0n) {
-            const reset = await token.approve(protocol.context.protocolAddress, 0n);
-            console.log("Allowance reset transaction:", reset.hash);
-            await reset.wait();
-        }
-        const approval = await token.approve(protocol.context.protocolAddress, amount);
-        console.log("Approval transaction:", approval.hash);
-        await approval.wait();
-    }
-
-    // A transparent-amount cash transfer requires neither a ZK proof nor a spending signature for existing notes.
-    const ready = await prepared.ready();
-    const transaction = await session.sendTransaction(ready);
-    console.log("Payment transaction:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (!receipt) {
-        throw new Error("No transaction receipt is available yet; recover with example 04 instead of paying again");
-    }
-    // Simulate closing the wallet after receiving the receipt: retain the submitted state so example 04 can reopen the database and verify it independently.
-    // The on-chain payment is complete; do not rerun this example to recover it.
-    console.log("On-chain confirmation block:", receipt.blockNumber);
-    console.log("Run example 04 to recover and verify this operation:", ready.id);
-    console.log("Local outgoing history:", (await session.getHistory({ tokenAddress })).outgoing);
+    // 3. Persist preparation before exporting; transparent Shield needs no ZK proof.
+    const operation = await session.prepareShield({
+        tokenAddress: settings.tokenAddress,
+        outputs: [output],
+        funding: { payer: alice.address, amount, authorization: "caller" },
+    });
+    const ready = await operation.ready();
+    console.log("Persisted operation:", ready.id);
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
+    console.log(
+        "Retain the operation ID and use recovery after host submission; do not create a replacement payment."
+    );
 } finally {
     database.close();
     provider.destroy();

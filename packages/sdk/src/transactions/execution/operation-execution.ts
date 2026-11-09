@@ -4,7 +4,6 @@ import {
     computeWalletAuthorizationDigest,
     createSigningRequest,
     walletAuthorizationTypedData,
-    type WalletAuthorizationProvider,
 } from "@invisi-labs/core";
 import { WitnessBuilder, type TokenProtocol } from "@invisi-labs/protocol";
 import type { Prover } from "@invisi-labs/prover";
@@ -23,21 +22,6 @@ import { sameStatement } from "../proving/proof-integrity";
 import { witnessFor } from "../proving/witness";
 import { fundingTypedData } from "../signing/funding";
 import { authorizationRequest, statement } from "../signing/statement";
-
-/** Both managed and detached handles authorize the same frozen statement. */
-export async function authorizeOperation(
-    plan: OperationPlan,
-    provider: WalletAuthorizationProvider
-) {
-    if (provider.ownerAddress !== plan.scope.ownerAddress)
-        throw new Error("wallet authorization capability mismatch");
-    const request = authorizationRequest(plan);
-    const digest = computeWalletAuthorizationDigest(request);
-    const signed = await provider.authorize(structuredClone(request));
-    if (signed.ownerAddress !== plan.scope.ownerAddress || signed.digest !== digest)
-        throw new Error("wallet authorization statement mismatch");
-    return signed;
-}
 
 export async function proveOperation(
     protocol: TokenProtocol,

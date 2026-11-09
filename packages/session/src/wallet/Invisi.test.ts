@@ -1,4 +1,4 @@
-import { LocalWallet } from "@invisi-labs/core/local";
+import { TestWallet } from "../../../../test-support/test-wallet";
 import { Wallet } from "@invisi-labs/core";
 import { defineDeployment } from "@invisi-labs/rpc";
 import { Invisi, Protocol, type ChainReader } from "@invisi-labs/sdk";
@@ -39,7 +39,7 @@ function setup() {
 
 it("requires explicit chain infrastructure and validates before creating a session", async () => {
     const { protocol, chainReader } = setup();
-    const local = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const local = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const wallet = Wallet.fromAddress(local.getAddress());
     await expect(WalletSession.connect({ invisi: new Invisi(), wallet, protocol })).rejects.toThrow(
         /reader/i
@@ -58,7 +58,7 @@ it("requires explicit chain infrastructure and validates before creating a sessi
 
 it("keeps same-token instances' inventories, reservations and operations isolated", async () => {
     const { protocol, chainReader } = setup();
-    const localWallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const localWallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const wallet = Wallet.fromAddress(localWallet.getAddress());
     const store = new MemoryWalletStore();
     const invisi = new Invisi({ chainReader });
@@ -101,7 +101,7 @@ it("keeps same-token instances' inventories, reservations and operations isolate
 
 it("preserves viewing-only permissions without constructing a scanner", async () => {
     const { protocol, chainReader } = setup();
-    const local = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const local = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const invisi = new Invisi({ chainReader });
     const store = new MemoryWalletStore();
     const viewing = await WalletSession.connect({
@@ -118,7 +118,7 @@ it("preserves viewing-only permissions without constructing a scanner", async ()
 it("rejects a different runtime before touching wallet state", async () => {
     const { protocol, chainReader } = setup();
     chainReader.getCode = async () => "0x6001";
-    const localWallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const localWallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const wallet = Wallet.fromAddress(localWallet.getAddress());
     const store = new MemoryWalletStore();
     const read = vi.spyOn(store, "readSnapshot");
@@ -140,7 +140,7 @@ it("composes read-only provider infrastructure lazily without starting synchroni
     const invisi = new Invisi({ provider: provider as never });
     const store = new MemoryWalletStore();
     expect(provider.getNetwork).not.toHaveBeenCalled();
-    const local = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const local = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const session = await WalletSession.connect({
         invisi,
         store,
@@ -174,7 +174,7 @@ it("defines infrastructure capabilities independently of signing authority", () 
 it("validates the provider chain even when a custom reader is supplied", async () => {
     const { protocol, chainReader } = setup();
     const provider = { getNetwork: async () => ({ chainId: 1n }) };
-    const localWallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const localWallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const wallet = Wallet.fromAddress(localWallet.getAddress());
     await expect(
         WalletSession.connect({
@@ -202,7 +202,7 @@ it("separates connection permissions from shared runtime infrastructure", () => 
 
 it("rejects infrastructure overrides on connect before making a network request", async () => {
     const { protocol, chainReader } = setup();
-    const localWallet = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const localWallet = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const wallet = Wallet.fromAddress(localWallet.getAddress());
     const read = vi.spyOn(chainReader, "getChainId");
     await expect(
@@ -218,7 +218,7 @@ it("rejects infrastructure overrides on connect before making a network request"
 
 it("keeps direct construction lazy and validates before reading managed state", async () => {
     const { protocol, chainReader } = setup();
-    const local = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+    const local = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
     const store = new MemoryWalletStore();
     const read = vi.spyOn(store, "readSnapshot");
     const code = vi.fn(async () => "0x6001");
@@ -259,7 +259,7 @@ it.each(["walletProvider", "viewing", "authorization"])(
     "rejects injected wallet cryptography through %s",
     async (key) => {
         const { protocol, chainReader } = setup();
-        const local = await LocalWallet.fromPrivateKey(new Uint8Array(32).fill(1));
+        const local = await TestWallet.fromPrivateKey(new Uint8Array(32).fill(1));
         await expect(
             WalletSession.connect({
                 invisi: new Invisi({ chainReader }),

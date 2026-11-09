@@ -1,128 +1,57 @@
+import { JsonRpcProvider } from "ethers";
+import { Disclosure } from "@invisi-labs/core";
+import { Protocol, ProtocolRpcClient, DisclosureVerifier } from "@invisi-labs/sdk";
+import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import { settings } from "../settings.js";
-import { JsonRpcProvider, getBytes } from "ethers";
-import { Disclosure, DisclosureVerifier, Protocol, ProtocolRpcClient, ViewingCapability, type DisclosureReference } from "@invisi-labs/sdk";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
+import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 
-// Disclose the commitment opening of one of Alice note payment notes so a third party can independently verify its amount and on-chain output.
-// This example is read-only: it needs no signer, prover, or ERC20 approval and sends no on-chain transactions.
+// Discover a historical Alice note and export its financial opening for independent verification.
+// Spent notes remain disclosable; an opening proves contents, not current spendability.
 if (!process.argv.includes("--execute")) {
-    throw new Error("Review the code, then add --execute to run it");
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
 }
 
-const [alice] = getAccounts();
+const accounts = getAccounts();
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
-
 try {
-    // 1. Select a trusted RPC, validate the configured chain and the protocol deployment, then bind token.
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
-        throw new Error("Connected chain does not match settings.chainId");
+        throw Error("Configured chain mismatch");
     }
+
+    // 1. Pin the trusted deployment before discovering any historical financial opening.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const tokenAddress = settings.tokenAddress;
-    const tokenProtocol = protocol.forToken(tokenAddress);
+    const alice = accounts[0];
 
-    // 2. Holder side: read the selected output using only the local viewing key, without an EVM private key.
-    const viewer = new ViewingCapability(alice.address, getBytes(alice.viewingPrivateKey), alice.publicWallet.viewingPublicKey);
-    // Discover the holder's historical outputs from the current deployment, including spent notes, without manually entering a preceding transaction hash.
-    // Decryption only selects candidates; canonical-chain receipts below independently verify the output and its position.
-    const rpc = protocolRpc.withProvider(provider);
-    const status = await rpc.getStatus(protocol.context);
-    if (!status.indexedHead) {
-        throw new Error("Protocol RPC has not indexed any blocks yet");
-    }
-    let reference: DisclosureReference | undefined;
-    for (let fromBlock = protocol.deployment.protocol.fromBlock; fromBlock <= status.indexedHead.number && !reference; fromBlock += 100n) {
-        const toBlock = fromBlock + 99n < status.indexedHead.number ? fromBlock + 99n : status.indexedHead.number;
-        const page = await rpc.getNoteUpdates(protocol.context, { fromBlock, toBlock });
-        for (const output of page.notes) {
-            if (BigInt(output.tokenAddress) !== BigInt(tokenAddress)) {
-                continue;
-            }
-            try {
-                await viewer.decryptNote(output.ciphertext, {
-                    chainId: protocol.context.chainId,
-                    protocolAddress: BigInt(protocol.context.protocolAddress),
-                    tokenAddress: BigInt(tokenAddress),
-                    outputCommitment: output.commitment,
-                });
-                reference = {
-                    transactionHash: output.transactionHash,
-                    treeId: output.treeId,
-                    leafIndex: output.leafIndex,
-                    role: "funds",
-                };
-                break;
-            } catch {
-                // Ciphertexts for other recipients or roles do not belong to this holder; also skip outputs that do not match the application format.
-                continue;
-            }
-        }
-    }
-    if (!reference) {
-        throw new Error("No output is available for disclosure; run the preceding payment or credit examples and wait for indexing");
-    }
-
-    const outputReader = new DisclosureVerifier({
-        protocol: tokenProtocol,
+    // 2. Discover through native request/response; historical spent outputs remain eligible.
+    const candidates = await discoverCandidates({
         provider,
+        protocolRpc,
+        protocol,
+        wallet: alice.publicWallet,
+        nativeWallet,
+        tokenAddress: settings.tokenAddress,
+        includeSpent: true,
+    });
+    const selected = candidates[0];
+    if (!selected) {
+        throw Error("No matching historical note found; fund the account first");
+    }
+    const disclosure = await Disclosure.fromNote(selected.note);
+
+    // 3. The verifier receives the export and public reference, not the holder's capabilities.
+    const transferred = await Disclosure.fromExport(disclosure.export());
+    const verifier = new DisclosureVerifier({
+        protocol: protocol.forToken(settings.tokenAddress),
+        reader: new EthersChainReader(provider),
         confirmations: 1,
     });
-    // Read the successful transaction receipt and match the actual insertion event to verify the selected ciphertext, tree position, and canonical-chain block.
-    // Spent notes can also be disclosed, so do not use discovery functions that filter for unspent notes here.
-    const evidence = await outputReader.readOutput(reference);
-    const ciphertext = evidence.output.ciphertext;
-    if (!ciphertext) {
-        throw new Error("The on-chain output has no ciphertext");
-    }
-    const note = await viewer.decryptNote(ciphertext, {
-        chainId: evidence.output.chainId,
-        protocolAddress: evidence.output.protocolAddress,
-        tokenAddress: evidence.output.tokenAddress,
-        outputCommitment: evidence.output.outputCommitment,
-    });
-
-    // 3. The commitment opening verifies the amount, owner, and nonce without disclosing the ciphertext's memo.
-    const disclosure = await Disclosure.fromNote(note);
-    console.log("Disclosure scope:", disclosure.getScope());
-    // Full payment-note disclosure material permits spend tracking and sweeping the entire amount back to the original owner; it grants more than read-only access.
-    // Third parties still cannot freely transfer the funds to themselves; do not give disclosure material to unrelated parties.
-
-    // 4. Explicitly export to obtain transferable material. In-memory JSON simulates the handoff between the two parties here.
-    // Do not print, write to files, or externally send disclosure.export() or the handoff content below.
-    const message = JSON.stringify({
-        material: disclosure.export(),
-        reference: {
-            transactionHash: reference.transactionHash,
-            treeId: reference.treeId.toString(),
-            leafIndex: reference.leafIndex,
-            role: reference.role,
-        },
-    });
-
-    // 5. Third-party side: receive only the handoff content and use a trusted RPC and deployment; no private keys are needed.
-    // Reuse this example's validated connection to demonstrate the third-party flow below, without passing the holder's viewer.
-    const received = JSON.parse(message);
-    const imported = await Disclosure.fromExport(received.material);
-    const thirdPartyVerifier = new DisclosureVerifier({
-        protocol: tokenProtocol,
-        provider,
-        confirmations: 1,
-    });
-    const verified = await thirdPartyVerifier.verify(imported, {
-        transactionHash: received.reference.transactionHash,
-        treeId: BigInt(received.reference.treeId),
-        leafIndex: received.reference.leafIndex,
-        role: received.reference.role,
-    });
-    if (verified.result.kind !== "note") {
-        throw new Error("The disclosure material does not match the expected note type");
-    }
-    console.log("Verified amount (token base units):", verified.result.note.amount);
-    console.log("On-chain output commitment:", verified.output.commitment);
-    console.log("Verified block:", verified.block.number, verified.block.hash);
-    console.log("Confirmations:", verified.confirmations);
-    // The result proves the output contents match the canonical-chain record; it does not prove payer identity, source of funds, or current unspent status.
+    const verified = await verifier.verify(transferred, selected.reference);
+    console.log("Disclosure scope:", json(disclosure.getScope()));
+    console.log("Verified canonical output:", json(verified.output));
 } finally {
     provider.destroy();
 }

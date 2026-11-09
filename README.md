@@ -28,10 +28,8 @@ const session = await WalletSession.connect({
   invisi, wallet, protocol, store: new MemoryWalletStore(), signer,
 });
 const refresh = await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
-const responses = await Promise.all(refresh.walletRequests.map(async (request) => ({
-  requestId: request.id, response: await nativeWallet.execute(request),
-})));
-await refresh.applyWalletResponses(responses); // Explicit null outcomes mark nonrecipients.
+const responses = await nativeWallet.execute(refresh.walletRequests);
+await refresh.applyWalletResponses(responses);
 const output = await NoteOutput.create({
   chainId: protocol.context.chainId,
   protocolAddress: protocol.context.protocolAddress,
@@ -42,7 +40,7 @@ const output = await NoteOutput.create({
 const prepared = await session.prepareTransfer({ tokenAddress, outputs: [output] });
 const review = prepared.preview();
 const request = await prepared.exportWalletRequest("transfer-authorization");
-const response = await nativeWallet.execute(request);
+const [response] = await nativeWallet.execute([request]);
 const ready = await (await prepared.withWalletResponse(response)).prove();
 const transaction = await session.sendTransaction(ready);
 await transaction.wait();
@@ -57,7 +55,7 @@ Private authorization uses an external signing boundary:
 
 ```ts
 const request = await prepared.exportWalletRequest("spend-authorization-1");
-const response = await nativeWallet.execute(request);
+const [response] = await nativeWallet.execute([request]);
 const authorized = await prepared.withWalletResponse(response);
 const ready = await authorized.prove();
 await transactionSigner.sendTransaction(await ready.exportTransaction());
@@ -135,7 +133,7 @@ its staged refresh returns requests and accepts validated responses before an at
 It never receives viewing or spending keys. The native host owns key storage, unlock and
 approval. EVM transaction signing remains a separate step after final calldata exists.
 
-Explicit Node/test key execution is available as `LocalWallet` from
-`@invisi-labs/core/local`. It is not the business Wallet and is not imported by the
-React Native transport. Decrypted Note/Credit data and proving witnesses can still enter
-JavaScript; the boundary protects key material rather than all financial plaintext.
+The public SDK has no account-private-key wallet constructor or local executor.
+Native algorithms execute in the host; private-key simulation lives only in unpublished
+test support. Decrypted Note/Credit data and witnesses may enter JavaScript, while
+spending, viewing and detection keys remain in the native wallet.

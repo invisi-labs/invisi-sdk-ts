@@ -1,23 +1,17 @@
 # Native wallet transport
 
-`@invisi-labs/native-wallet` connects a host-provided native module to the SDK's portable wallet request protocol. It contains no private keys, native cryptography implementation, React Native registration, or platform-specific binary.
+`@invisi-labs/native-wallet` adapts a host-owned native JSON bridge. It contains no private-key wallet implementation and never receives account keys.
 
 ```ts
-import { createNativeWalletProvider } from "@invisi-labs/native-wallet";
+import { createNativeWalletClient } from "@invisi-labs/native-wallet";
 
-const walletProvider = createNativeWalletProvider({
-    executeWalletRequest: (requestJson) => nativeModule.executeWalletRequest(requestJson),
-});
+const nativeWallet = createNativeWalletClient(nativeModule);
+const responses = await nativeWallet.execute([prepared.request]);
+const result = await acceptWalletResponse(prepared, responses[0]!);
 ```
 
-The host must supply `nativeModule` using its own React Native module, mobile FFI binding, or Node integration. It keeps keys inside that implementation and executes the JSON request. Business code uses `Wallet` from `@invisi-labs/core`; local Node tooling may explicitly import `LocalWallet` from `@invisi-labs/core/local`.
+The host implements `executeWalletRequests(requests: string): Promise<string>`. Both strings encode JSON arrays. Requests use the core versioned wallet envelope. Each response repeats `version`, `id`, `ownerAddress`, and `method`, with exactly one of `result` or `error: { code: string }`. Native error codes contain no secret details. `WALLET_NOT_RECIPIENT` identifies a decryption nonmatch; other errors must remain failures.
 
-Requests and responses carry `version`, `id`, `ownerAddress`, and `method`. The SDK retains the prepared request and validates the returned envelope, authorization signature and digest, and decrypted financial commitments before accepting results. Integers are canonical decimal strings; byte arrays are lowercase `0x` hex. The transport does not authorize or validate financial results itself.
+Each batch accepts at most 1,024 requests with unique IDs and one owner, and each encoded request or response array is limited to 16 MiB. Empty batches return `[]` without contacting the host. The client validates every request before transport, rejects malformed response batches, and returns responses in request order even when the host changes their order. Per-item errors remain explicit responses; core acceptance throws `NativeWalletError` for them. Applications must accept successful responses through core's prepared-request validation before using their contents.
 
-Methods: `wallet.public`, `wallet.detect`, `wallet.decryptNote`, `wallet.decryptCredit`, and `wallet.authorize`. No method returns private viewing, detection, or spending keys. Public interoperability fixtures live in `packages/core/src/wallet/testdata/wallet-wire-vectors.json`.
-
-The provider is owned by the App, never passed to `WalletSession.connect`. Execute each
-request outside the Session and pass the response to its prepared handle. Native errors
-are surfaced as `NativeWalletError` with a machine-readable `code`; native diagnostic
-messages are not forwarded. Failed unlocks and rejected approvals leave the staged work
-pending. Only the host can explicitly classify a delivery as a nonrecipient (`null`).
+The host owns account selection, unlock and approval policy, native execution, and secret storage. Business code uses public `Wallet` objects from `@invisi-labs/core`.

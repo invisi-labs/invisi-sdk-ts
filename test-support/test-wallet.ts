@@ -1,5 +1,8 @@
-import { deliveryCodec, validateDeliveryCiphertext } from "../delivery/delivery-codec";
-import { detectClue } from "../fmd/fmd";
+import {
+    deliveryCodec,
+    validateDeliveryCiphertext,
+} from "../packages/core/src/delivery/delivery-codec";
+import { detectClue } from "../packages/core/src/fmd/fmd";
 import {
     validateWalletRequest,
     walletHex,
@@ -8,20 +11,19 @@ import {
     walletDecryptionContext,
     type WalletRequest,
     type WalletResponse,
-} from "./wallet-wire";
-import { ReceivingAddress } from "../address/receiving-address";
-import { MissingCapabilityError } from "../errors";
+} from "../packages/core/src/wallet/wallet-wire";
+import { ReceivingAddress } from "../packages/core/src/address/receiving-address";
 import {
     Detector,
     NullifierCapability,
     ViewingCapability,
     WalletAuthorization,
-} from "./capabilities";
-import { deriveWallet, type InvisiWallet } from "./wallet";
+} from "../packages/core/src/wallet/capabilities";
+import { deriveWallet, type InvisiWallet } from "../packages/core/src/wallet/wallet";
 
-import { WalletAddress } from "./wallet-object";
-/** Local wallet keys and explicit permission exports; no network or storage side effects. */
-export class LocalWallet extends WalletAddress {
+import { WalletAddress } from "../packages/core/src/wallet/wallet-object";
+/** Fixture-only account execution; excluded from published packages. */
+export class TestWallet extends WalletAddress {
     readonly #viewing: ViewingCapability;
     readonly #detection: Detector;
     readonly #nullifier: NullifierCapability;
@@ -44,10 +46,10 @@ export class LocalWallet extends WalletAddress {
         Object.freeze(this);
     }
 
-    private static async fromMaterial(raw: InvisiWallet): Promise<LocalWallet> {
+    private static async fromMaterial(raw: InvisiWallet): Promise<TestWallet> {
         try {
             const address = ReceivingAddress.from(raw);
-            return new LocalWallet(address, {
+            return new TestWallet(address, {
                 viewing: new ViewingCapability(
                     raw.ownerAddress,
                     raw.viewingPrivateKey,
@@ -69,8 +71,8 @@ export class LocalWallet extends WalletAddress {
     }
 
     /** Restore from the EVM account key; the caller owns mnemonic derivation and backup. */
-    static async fromPrivateKey(privateKey: string | Uint8Array): Promise<LocalWallet> {
-        return LocalWallet.fromMaterial(await deriveWallet(privateKey));
+    static async fromPrivateKey(privateKey: string | Uint8Array): Promise<TestWallet> {
+        return TestWallet.fromMaterial(await deriveWallet(privateKey));
     }
 
     async execute(request: WalletRequest): Promise<WalletResponse> {
@@ -91,7 +93,7 @@ export class LocalWallet extends WalletAddress {
             }
             case "wallet.detect": {
                 const params =
-                    scoped.params as import("./wallet-wire").WalletParams["wallet.detect"];
+                    scoped.params as import("../packages/core/src/wallet/wallet-wire").WalletParams["wallet.detect"];
                 const key = this.#detection.exportKey();
                 try {
                     result = {
@@ -105,7 +107,7 @@ export class LocalWallet extends WalletAddress {
             case "wallet.authorize": {
                 const authorized = await this.#authorization.authorize(
                     walletAuthorizationParams(
-                        scoped.params as import("./wallet-wire").WalletParams["wallet.authorize"]
+                        scoped.params as import("../packages/core/src/wallet/wallet-wire").WalletParams["wallet.authorize"]
                     )
                 );
                 result = authorized.withWitness((witness) => ({
@@ -131,7 +133,7 @@ export class LocalWallet extends WalletAddress {
                 } else {
                     const state = await this.#viewing.decryptCredit(
                         envelope,
-                        context as import("../delivery/types").CreditStateDecryptionContext
+                        context as import("../packages/core/src/delivery/types").CreditStateDecryptionContext
                     );
                     result = { plaintext: walletHex(codec.encode(state)) };
                 }

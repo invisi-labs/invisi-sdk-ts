@@ -1,39 +1,56 @@
-import { JsonRpcProvider, Wallet as EthereumWallet } from "ethers";
-import { Invisi, Protocol, ProtocolRpcClient, ViewingCapability } from "@invisi-labs/sdk";
+import { JsonRpcProvider } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
+import { nativeWallet, json } from "../host-transport.js";
 import { discoverCredits } from "./discover-credits.js";
 
-if (!process.argv.includes("--execute")) throw Error("Review the example, then pass --execute");
+// Bob updates his current grant to limits 10/40/60 and adds 100 base units of authority.
+// Available credit is a remaining balance; updates preserve historical gross usage.
+if (!process.argv.includes("--execute")) {
+    console.log("Review this scenario, then pass --execute");
+    process.exit(0);
+}
 
+const accounts = getAccounts();
+const bob = accounts[1];
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
 try {
-    if ((await provider.getNetwork()).chainId !== settings.chainId) throw Error("Configured chain mismatch");
+    if ((await provider.getNetwork()).chainId !== settings.chainId) {
+        throw Error("Configured chain mismatch");
+    }
+
+    // 1. Validate the chain and trusted deployment before constructing this intent.
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    const prover = new NativeProver({ bbBin: settings.bbBin });
-    const invisi = new Invisi({ provider, protocolRpc, prover });
-    const bob = getAccounts()[1]!;
-    const signer = new EthereumWallet(bob.privateKey, provider);
-    const viewer = new ViewingCapability(bob.address, bob.viewingPrivateKey, bob.publicWallet.viewingPublicKey);
-    const states = await discoverCredits({
+    const tokenAddress = settings.tokenAddress;
+    const invisi = new Invisi({
+        provider,
+        protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
+    });
+
+    // 2. Current authenticated state determines remaining authority and revocation location.
+    const selected = await discoverCredits({
         provider,
         protocolRpc,
         protocol,
         wallet: bob.publicWallet,
-        viewer,
-        tokenAddress: settings.tokenAddress,
+        nativeWallet,
+        tokenAddress,
         role: "owner",
     });
-    const selected = states[0];
-    if (!selected) throw Error("No current owner Credit state discovered");
+    if (!selected.length) {
+        throw Error("No current Bob-owned Credit found; run the grant-creation example first");
+    }
+    // Changing limits never resets day/month/total usage or rewrites historical delivery keys.
     const prepared = await invisi.prepareUpdateCredit({
         wallet: bob.publicWallet,
         protocol,
-        tokenAddress: settings.tokenAddress,
-        creditInputs: [selected],
-        credit: selected.commitment,
+        tokenAddress,
+        creditInputs: selected,
+        credit: selected[0].commitment,
         singleLimit: 10n,
         dailyLimit: 40n,
         monthlyLimit: 60n,
@@ -41,15 +58,17 @@ try {
         unlimited: false,
     });
 
-    const authorization = await prepared.exportWalletAuthorization();
-    const signature = await signer.signTypedData(authorization.domain, authorization.types, authorization.message);
-    const authorized = await prepared.withWalletSignature(signature);
+    // 3. Match the host response by ID and validate it against the retained statement.
+    const request = await prepared.exportWalletRequest(crypto.randomUUID());
+    const responses = await nativeWallet.execute([request]);
+    const response = responses.find((item) => item.id === request.id);
+    if (!response) {
+        throw Error("Missing wallet response");
+    }
+    const authorized = await prepared.withWalletResponse(response);
     const ready = await authorized.prove();
-    const call = await ready.exportTransaction();
-    const transaction = await signer.sendTransaction(call);
-    console.log("Update transaction:", transaction.hash);
-    const receipt = await transaction.wait();
-    if (receipt?.status !== 1) throw Error("Credit update failed");
+    // Export does not approve tokens or submit; the host reviews the required caller and gas.
+    console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
 } finally {
     provider.destroy();
 }
