@@ -15,19 +15,6 @@ export const verifierRouterAbi = [
   },
   {
     "type": "function",
-    "name": "getCreditCancelVerifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IVerifier"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getCreditDrawVerifier",
     "inputs": [
       {
@@ -47,7 +34,7 @@ export const verifierRouterAbi = [
   },
   {
     "type": "function",
-    "name": "getCreditTopUpVerifier",
+    "name": "getCreditUpdateVerifier",
     "inputs": [],
     "outputs": [
       {

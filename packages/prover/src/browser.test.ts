@@ -16,7 +16,7 @@ describe("browser assets", () => {
     it("rejects unpublished recursion before witness execution", async () => {
         await expect(
             generateProofBundle({
-                circuitName: "credit_cancel",
+                circuitName: "credit_update",
                 inputs: {},
                 target: "noir-recursive",
             })

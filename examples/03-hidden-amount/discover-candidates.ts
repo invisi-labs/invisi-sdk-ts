@@ -36,9 +36,9 @@ export async function discoverCandidates({
     }
     // Request up to eight pages concurrently per batch, then process them in block order while retaining full scanning, deduplication, and authentication.
     for (let offset = 0; offset < ranges.length; offset += 8) {
-        const pages = await Promise.all(ranges.slice(offset, offset + 8).map((range) => rpc.getOutputs(protocol.context, range)));
+        const pages = await Promise.all(ranges.slice(offset, offset + 8).map((range) => rpc.getNoteUpdates(protocol.context, range)));
         for (const page of pages) {
-            for (const output of page.outputs) {
+            for (const output of page.notes) {
                 // Compare all public fields normalized by the SDK; ignore exact duplicate records.
                 const fingerprint = JSON.stringify(output, (_, value) => {
                     return typeof value === "bigint" ? value.toString() : value;
@@ -73,7 +73,7 @@ export async function discoverCandidates({
                     continue;
                 }
                 const nullifier = await wallet.exportNullifier().compute(note.chainId, output.commitment, note.nonce);
-                if (await rpc.isSpent(protocol.context, nullifier)) {
+                if (await rpc.isNoteSpent(protocol.context, nullifier, status.indexedHead)) {
                     continue;
                 }
                 candidates.push({

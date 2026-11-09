@@ -1,32 +1,13 @@
 import {
     encodeAggregateFundingTypedData,
-    encodeCreateCreditFundingTypedData,
     encodeShieldFundingTypedData,
-    encodeTopUpCreditFundingTypedData,
     encodeTransactFundingTypedData,
 } from "@invisi-labs/protocol";
 import type { SavedOperation } from "../operation-types";
 
 export async function fundingTypedData(saved: SavedOperation) {
     const plan = saved.plan;
-    const credit = plan.credit;
-
-    if (credit?.topUp) {
-        return encodeTopUpCreditFundingTypedData(
-            plan.context,
-            credit.topUp,
-            credit.deliveries,
-            plan.funding
-        );
-    }
-    if (credit?.creation) {
-        return encodeCreateCreditFundingTypedData(
-            plan.context,
-            credit.creation,
-            credit.deliveries,
-            plan.funding
-        );
-    }
+    if (plan.credit) throw Error("Credit operations have no funding authorization");
     if (plan.kind === "shield") {
         return encodeShieldFundingTypedData({
             context: plan.context,

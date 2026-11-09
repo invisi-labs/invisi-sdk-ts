@@ -1,3 +1,4 @@
+import { selectAggregateRoute } from "@invisi-labs/core";
 import manifest from "../../circuits/manifest.json";
 import type {
     CircuitMetadata,
@@ -75,15 +76,17 @@ export function assertPublicInputs(
             throw new Error("Non-canonical public input");
     }
     const metadata = getCircuitMetadata(name);
-    if (name === "create_credit" || name.startsWith("credit_")) assertCreditStatement(actual, name);
+    if (name === "create_credit" || name === "credit_update" || name.startsWith("credit_"))
+        assertCreditStatement(actual, name);
     if (name.startsWith("transact_user_")) assertUserStatement(actual, metadata.capacity!);
     if (name.startsWith("transact_aggregate_")) {
-        if (!metadata.innerVkCommitment)
+        if (!metadata.innerVkCommitment && !metadata.innerVkCommitments)
             throw new Error("Missing authenticated aggregate inner key commitment");
         assertAggregateStatement(
             actual as readonly Hex[],
             metadata.count!,
-            metadata.innerVkCommitment
+            metadata.innerVkCommitments ?? metadata.innerVkCommitment!,
+            metadata.capacity ?? 0
         );
     }
     if (
@@ -142,17 +145,29 @@ export async function assertProofBundle(bundle: ProofBundle): Promise<void> {
 export async function aggregateCircuitPublicInputs(
     members: readonly ProofBundle[]
 ): Promise<Hex[]> {
-    if (![4, 8, 12].includes(members.length))
-        throw new Error("Aggregate requires 4, 8 or 12 members");
+    const capacities = members.map((member) => getCircuitMetadata(member.circuitName).capacity!),
+        route = selectAggregateRoute(capacities);
     for (const member of members) {
-        if (member.circuitName !== "transact_user_slots14" || member.target !== "noir-recursive")
-            throw new Error("Aggregate requires recursive slots14 members");
+        if (
+            !member.circuitName.startsWith("transact_user_slots") ||
+            member.target !== "noir-recursive"
+        )
+            throw Error("Aggregate requires recursive Note members");
         await assertProofBundle(member);
     }
-    const name = `transact_aggregate_14_${members.length}` as CircuitName;
-    const pin = getCircuitMetadata(name).innerVkCommitment;
-    if (!pin) throw new Error("Missing authenticated aggregate inner key commitment");
-    const inputs = [...members.flatMap((member) => member.publicInputs), pin];
-    assertPublicInputs(name, inputs);
+    const metadata = getCircuitMetadata(route.name as CircuitName),
+        pins = metadata.innerVkCommitments ?? [metadata.innerVkCommitment!];
+    const inputs: Hex[] =
+        route.kind === "dedicated"
+            ? [...members.flatMap((m) => m.publicInputs), ...pins]
+            : [
+                  ...capacities.map((c) => fieldHex(String(c))),
+                  ...members.flatMap((m) => [
+                      ...m.publicInputs,
+                      ...Array<Hex>(32 - m.publicInputs.length).fill(fieldHex("0")),
+                  ]),
+                  ...pins,
+              ];
+    assertPublicInputs(route.name as CircuitName, inputs);
     return inputs;
 }

@@ -7,19 +7,19 @@ import {
     type BuildCreateCreditCalldataParams,
 } from "../credit/credit-create";
 import {
-    buildCancelCreditCalldata,
+    buildRevokeCreditCalldata,
     buildCreditDrawCalldata,
-    buildTopUpCreditCalldata,
-    type BuildCancelCreditCalldataParams,
+    buildUpdateCreditCalldata,
+    type BuildRevokeCreditCalldataParams,
     type BuildCreditDrawCalldataParams,
-    type BuildTopUpCreditCalldataParams,
+    type BuildUpdateCreditCalldataParams,
 } from "../credit/credit-lifecycle";
 import {
     buildTransactAggregateCalldata,
     type BuildTransactAggregateCalldataParams,
-} from "../funds/aggregate";
-import { buildTransactCalldata, type BuildTransactCalldataParams } from "../funds/calldata";
-import { buildShieldCalldata, type BuildShieldCalldataParams } from "../funds/shield";
+} from "../note/aggregate";
+import { buildTransactCalldata, type BuildTransactCalldataParams } from "../note/calldata";
+import { buildShieldCalldata, type BuildShieldCalldataParams } from "../note/shield";
 import type { ChainReader } from "../interfaces";
 import { normalizeContext, type TransactionContext } from "../validation";
 
@@ -113,19 +113,19 @@ export class TokenProtocol {
         };
     }
 
-    cancelCredit(request: Omit<BuildCancelCreditCalldataParams, "context">) {
+    revokeCredit(request: Omit<BuildRevokeCreditCalldataParams, "context">) {
         return {
             to: this.context.protocolAddress,
             value: 0n,
-            ...buildCancelCreditCalldata({ ...request, context: this.context }),
+            ...buildRevokeCreditCalldata({ ...request, context: this.context }),
         };
     }
 
-    topUpCredit(request: Omit<BuildTopUpCreditCalldataParams, "context">) {
+    updateCredit(request: Omit<BuildUpdateCreditCalldataParams, "context">) {
         return {
             to: this.context.protocolAddress,
             value: 0n,
-            ...buildTopUpCreditCalldata({ ...request, context: this.context }),
+            ...buildUpdateCreditCalldata({ ...request, context: this.context }),
         };
     }
 }

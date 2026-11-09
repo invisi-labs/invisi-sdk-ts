@@ -5,9 +5,9 @@ import { Interface } from "ethers";
 import type { OperationPlan } from "../transactions/operation-types";
 import { statement } from "../transactions/signing/statement";
 
-/** Public frozen request for quote signing. Empty proof/signature make this deliberately non-sendable. */
+/** Quote-only export; callers still need the operation-specific proof or owner authorization. */
 export function exportBroadcasterIntent(plan: OperationPlan) {
-    if (plan.kind === "draw-credit" || (plan.statement && plan.statement.target !== "evm"))
+    if (plan.statement && plan.statement.target !== "evm")
         throw new Error("unsupported broadcaster operation");
     if (plan.statement) statement(plan);
     const feeDefaults = <T extends { feeRecipient?: string; feeAmount?: bigint }>(params: T) => ({
@@ -36,20 +36,28 @@ export function exportBroadcasterIntent(plan: OperationPlan) {
             plan.outputs.map((o) => o.delivery),
             funding,
         ];
-    } else if (plan.credit?.topUp) {
-        method = "topUpCredit";
-        args = [
-            "0x",
-            { ...plan.credit.topUp, creation: feeDefaults(plan.credit.topUp.creation) },
-            plan.credit.deliveries,
-            funding,
-        ];
     } else if (plan.credit?.creation) {
         method = "createCredit";
-        args = ["0x", feeDefaults(plan.credit.creation), plan.credit.deliveries, funding];
-    } else if (plan.credit?.cancel) {
-        method = "cancelCredit";
-        args = ["0x", feeDefaults(plan.credit.cancel)];
+        args = ["0x", plan.credit.creation, plan.credit.deliveries];
+    } else if (plan.credit?.draw) {
+        method = "creditDraw";
+        args = ["0x", plan.credit.draw, plan.credit.deliveries];
+    } else if (plan.credit?.update) {
+        method = "updateCredit";
+        args = ["0x", plan.credit.update, plan.credit.deliveries];
+    } else if (plan.credit?.revocation) {
+        const p = plan.credit.revocation;
+        method = "revokeCredit";
+        args = [
+            p.token,
+            p.owner,
+            p.shard,
+            p.slot,
+            p.deadline,
+            p.feeRecipient ?? "0x0000000000000000000000000000000000000000",
+            p.feeAmount ?? 0n,
+            "0x",
+        ];
     } else throw new Error("unsupported broadcaster operation");
     const abi = invisiProtocolAbi.filter(
         (item) =>

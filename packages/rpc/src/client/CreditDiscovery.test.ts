@@ -1,0 +1,206 @@
+import { expect, it } from "vitest";
+import { TREE_DEPTH, poseidonHash } from "@invisi-labs/core";
+import {
+    block,
+    context,
+    encryptedOutput,
+    h,
+    setup,
+    status,
+    transactionWire,
+    wireBlock,
+} from "./ProtocolRpcClient-fixtures";
+
+const range = { fromBlock: 10n, toBlock: 10n };
+const key = new Uint8Array(32).fill(1);
+const delivery = (byte = "ab") => ({
+    ciphertext: "0x81" + byte.repeat(80),
+    clue: "0x" + "02".repeat(68),
+});
+const state = () => {
+    const { ciphertext: _ciphertext, clue: _clue, ...metadata } = encryptedOutput();
+    return { ...metadata, kind: "CreditCreated", deliveries: [delivery(), delivery("cd")] };
+};
+const event = (name = "CreditCreated") => ({
+    block: wireBlock,
+    name,
+    transactionHash: h(22),
+    logIndex: 4,
+    data: { revocationShard: "18446744073709551615", revocationSlot: 65535 },
+});
+it("keeps both role envelopes in a separate Credit candidate model", async () => {
+    const raw = state();
+    const { client, requests } = setup((m) =>
+        m === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  checkedBits: 8,
+                  candidates: [
+                      { state: raw, fallback: false },
+                      { state: raw, fallback: false },
+                  ],
+              }
+    );
+    const page = await client.detectCreditStates(context, { ...range, detectionKey: key });
+    expect(page.states).toHaveLength(1);
+    expect(page.states[0]?.deliveries).toEqual(raw.deliveries);
+    expect("notes" in page).toBe(false);
+    expect(requests[1]?.method).toBe("invisi_detectCreditStates");
+});
+it.each([
+    { kind: "Transact" },
+    { deliveries: [delivery()] },
+    { deliveries: [delivery(), delivery(), delivery()] },
+    { deliveries: [delivery(), { ciphertext: "0x", clue: "0x" }] },
+    { deliveries: [delivery(), { ...delivery(), clue: "0x12" }] },
+    { commitment: h(1n << 255n) },
+])("rejects malformed Credit states %j", async (patch) => {
+    const { client } = setup((m) =>
+        m === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  checkedBits: 8,
+                  candidates: [{ state: { ...state(), ...patch }, fallback: true }],
+              }
+    );
+    await expect(
+        client.detectCreditStates(context, { ...range, detectionKey: key })
+    ).rejects.toThrow();
+});
+it("rejects conflicting state envelopes sharing a leaf", async () => {
+    const raw = state();
+    const { client } = setup((m) =>
+        m === "invisi_getStatus"
+            ? status()
+            : {
+                  blockHash: h(10),
+                  checkedBits: 8,
+                  candidates: [
+                      { state: raw, fallback: false },
+                      {
+                          state: { ...raw, deliveries: [delivery("ef"), delivery("cd")] },
+                          fallback: false,
+                      },
+                  ],
+              }
+    );
+    await expect(
+        client.detectCreditStates(context, { ...range, detectionKey: key })
+    ).rejects.toThrow("Conflicting");
+});
+it("does not classify Credit states as Notes from an envelope header", async () => {
+    const { client } = setup((m) =>
+        m === "invisi_getStatus"
+            ? status()
+            : { blockHash: h(10), notes: [{ ...encryptedOutput(), kind: "CreditCreated" }] }
+    );
+    await expect(client.getNoteUpdates(context, range)).rejects.toThrow(
+        "Credit state cannot appear"
+    );
+});
+it("validates canonical Credit event names and retains public shard precision", async () => {
+    const { client } = setup((m) => (m === "invisi_getStatus" ? status() : [event(), event()]));
+    const page = await client.getCreditTransitions(context, range);
+    expect(page.transitions).toHaveLength(1);
+    expect(page.transitions[0]?.data.revocationShard).toBe("18446744073709551615");
+    expect("notes" in page).toBe(false);
+});
+it.each(["CreditCancelled", "CreditToppedUp", "Transact"])(
+    "rejects event from other model %s",
+    async (name) => {
+        const { client } = setup((m) => (m === "invisi_getStatus" ? status() : [event(name)]));
+        await expect(client.getCreditTransitions(context, range)).rejects.toThrow(
+            "Invalid Credit transition"
+        );
+    }
+);
+it("requires explicit enabled detection and correct precision", async () => {
+    const noKey = setup(() => status());
+    await expect(noKey.client.detectCreditStates(context, range)).rejects.toThrow(
+        "Detection key required"
+    );
+    expect(noKey.requests).toHaveLength(0);
+    const disabled = setup(() => ({ ...status(), detectionEnabled: false }));
+    await expect(
+        disabled.client.detectCreditStates(context, { ...range, detectionKey: key })
+    ).rejects.toThrow("disabled");
+    const wrong = setup((m) =>
+        m === "invisi_getStatus" ? status() : { blockHash: h(10), checkedBits: 9, candidates: [] }
+    );
+    await expect(
+        wrong.client.detectNotes(context, { ...range, detectionKey: key })
+    ).rejects.toThrow("precision");
+});
+it("queries Credit consumption independently from Note spent state", async () => {
+    const { client, requests } = setup(() => true);
+    expect(await client.isCreditConsumed(context, h(1), block)).toBe(true);
+    expect(await client.isNoteSpent(context, h(2), block)).toBe(true);
+    expect(requests.map((r) => r.method)).toEqual([
+        "invisi_isCreditConsumed",
+        "invisi_isNoteSpent",
+    ]);
+    expect(requests.map((r) => r.params[1])).toEqual([10, 10]);
+});
+it("validates grant query anchors, bitmap bounds and uint64 shard precision", async () => {
+    const owner = "0x1111111111111111111111111111111111111111",
+        token = "0x2222222222222222222222222222222222222222";
+    const { client, requests } = setup((m) =>
+        m === "invisi_getCreditAllocation"
+            ? { block: wireBlock, shard: "18446744073709551615", slot: 65535 }
+            : { block: wireBlock, bitmap: (1n << 255n).toString() }
+    );
+    expect(await client.getCreditAllocation(context, owner, token, block)).toMatchObject({
+        shard: (1n << 64n) - 1n,
+        slot: 65535,
+    });
+    expect(
+        await client.getCreditRevocationBitmap(context, owner, token, 1n, 255, block)
+    ).toMatchObject({ bitmap: 1n << 255n });
+    expect(requests[1]?.params).toEqual([owner, token, "1", 255, 10]);
+    await expect(
+        client.getCreditRevocationBitmap(context, owner, token, 0n, 0, block)
+    ).rejects.toThrow("location");
+    await expect(
+        client.getCreditRevocationBitmap(context, owner, token, 1n, 256, block)
+    ).rejects.toThrow("location");
+});
+it("authenticates Credit state membership and preserves both deliveries", async () => {
+    const siblings = Array.from({ length: TREE_DEPTH }, () => h(0));
+    let root = h(12);
+    for (const sibling of siblings) root = await poseidonHash([BigInt(root), BigInt(sibling)]);
+    const anchor = { treeId: 1, leafCount: 1, root, block: wireBlock },
+        membership = { anchor, leafIndex: 0, commitment: h(12), siblings };
+    const raw = { ...state(), leafIndex: 0 };
+    const { client } = setup(
+        (m) =>
+            ({
+                invisi_getStatus: status(),
+                invisi_getCreditState: { state: raw, membership },
+                invisi_getRoots: [anchor],
+                invisi_getMembership: membership,
+            })[m]
+    );
+    const found = await client.getCreditState(context, h(12), block);
+    expect(found?.membership.root).toBe(root);
+    expect(found?.state.deliveries).toHaveLength(2);
+});
+it("returns Credit transaction state records and transitions without Note arrays", async () => {
+    const raw = { ...state(), transactionHash: h(123) };
+    const { client } = setup((m) =>
+        m === "invisi_getStatus"
+            ? status()
+            : {
+                  ...transactionWire(),
+                  states: [raw],
+                  transitions: [{ ...event(), transactionHash: h(123) }],
+              }
+    );
+    const result = await client.getTransactionCreditUpdates(context, h(123));
+    expect(result.status).toBe("indexed");
+    if (result.status !== "indexed") throw new Error("indexed required");
+    expect(result.states[0]?.deliveries).toHaveLength(2);
+    expect(result.transitions).toHaveLength(1);
+    expect("notes" in result).toBe(false);
+});

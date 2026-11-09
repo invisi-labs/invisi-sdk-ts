@@ -1,11 +1,12 @@
 import { getAddress } from "ethers";
 import type {
-    CancelCreditPreparation,
+    RevokeCreditPreparation,
     CreateCreditPreparation,
+    DrawCreditPreparation,
     OperationPlan,
     PreparationRuntime,
     ShieldPreparation,
-    TopUpCreditPreparation,
+    UpdateCreditPreparation,
     TransferPreparation,
 } from "../transactions/operation-types";
 import { TransactionPreparation } from "../transactions/preparation/transaction-preparation";
@@ -15,9 +16,10 @@ export type PreparationIntent =
     | { kind: "transfer"; options: TransferPreparation }
     | { kind: "shield"; options: ShieldPreparation }
     | { kind: "create-credit"; options: CreateCreditPreparation }
-    | { kind: "top-up-credit"; options: TopUpCreditPreparation }
-    | { kind: "cancel-credit"; options: CancelCreditPreparation };
-export type BroadcasterFeeSource = "public-funding" | "private-inputs" | "payout";
+    | { kind: "draw-credit"; options: DrawCreditPreparation }
+    | { kind: "update-credit"; options: UpdateCreditPreparation }
+    | { kind: "revoke-credit"; options: RevokeCreditPreparation };
+export type BroadcasterFeeSource = "public-funding" | "private-inputs";
 export interface WithBroadcasterOptions {
     maxFeeAmount: bigint;
     feeSource?: BroadcasterFeeSource;
@@ -40,12 +42,14 @@ export async function prepareIntent(
             return preparation.prepareTransfer(intent.options);
         case "shield":
             return preparation.prepareShield(intent.options);
+        case "draw-credit":
+            return preparation.prepareDrawCredit(intent.options);
         case "create-credit":
             return preparation.prepareCreateCredit(intent.options);
-        case "top-up-credit":
-            return preparation.prepareTopUpCredit(intent.options);
-        case "cancel-credit":
-            return preparation.prepareCancelCredit(intent.options);
+        case "update-credit":
+            return preparation.prepareUpdateCredit(intent.options);
+        case "revoke-credit":
+            return preparation.prepareRevokeCredit(intent.options);
     }
 }
 export async function prepareBroadcasterPlan(
@@ -63,21 +67,53 @@ export async function prepareBroadcasterPlan(
         throw new Error("maxFeeAmount must be a positive uint128");
     if (!Number.isInteger(attempts) || attempts < 1 || attempts > 16)
         throw new Error("maxAttempts must be 1..16");
+    if (intent.kind !== "transfer" && intent.kind !== "shield") {
+        if (options.feeSource || options.fundingPermit)
+            throw new Error("Credit fees use the owner allowance or gross draw deduction");
+        let current = plan;
+        let previousAmount = 0n;
+        for (let i = 0; i < attempts; i++) {
+            const schedule = await client.fee(
+                plan.context.tokenAddress,
+                exportBroadcasterIntent(current).data
+            );
+            const minimum = BigInt(schedule.feeAmount),
+                amount = minimum > previousAmount ? minimum : previousAmount;
+            const recipient = getAddress(schedule.feeRecipient) as `0x${string}`;
+            if (amount <= 0n || amount > maxFee || amount >= 1n << 128n || BigInt(recipient) === 0n)
+                throw new Error("broadcaster fee exceeds user limit or is invalid");
+            const request = structuredClone(intent);
+            request.options.fee = { recipient, amount };
+            current = await reprepare(request);
+            if (current.credit?.revocation)
+                current.credit.revocationCaller = client.configuration.quoteSigner as `0x${string}`;
+            const data = exportBroadcasterIntent(current).data;
+            const recalculated = await client.fee(plan.context.tokenAddress, data);
+            if (
+                getAddress(recalculated.feeRecipient) !== recipient ||
+                BigInt(recalculated.feeAmount) <= 0n ||
+                BigInt(recalculated.feeAmount) > maxFee
+            )
+                throw new Error("broadcaster fee exceeds user limit or recipient changed");
+            if (amount >= BigInt(recalculated.feeAmount)) {
+                current.intent = structuredClone(intent);
+                return {
+                    plan: current,
+                    quote: await client.quote(data, {
+                        chainId: current.context.chainId,
+                        protocol: current.context.protocolAddress,
+                    }),
+                };
+            }
+            previousAmount = amount;
+        }
+        throw new Error("broadcaster fee did not stabilize within the preparation limit");
+    }
     const funding = "funding" in intent.options ? intent.options.funding : undefined;
-    let source =
-        options.feeSource ??
-        (intent.kind === "cancel-credit"
-            ? "payout"
-            : funding
-              ? "public-funding"
-              : "private-inputs");
-    if (!["public-funding", "private-inputs", "payout"].includes(source))
+    let source = options.feeSource ?? (funding ? "public-funding" : "private-inputs");
+    if (!["public-funding", "private-inputs"].includes(source))
         throw new Error("unsupported fee source");
-    if (
-        intent.kind === "cancel-credit"
-            ? source !== "payout"
-            : source === "payout" || (intent.kind === "shield" && source !== "public-funding")
-    )
+    if (intent.kind === "shield" && source !== "public-funding")
         throw new Error("fee source is unavailable for this operation");
     if (source === "public-funding" && !funding)
         throw new Error("public funding fee requires an explicit payer");
@@ -95,19 +131,12 @@ export async function prepareBroadcasterPlan(
             options.feeSource === undefined &&
             funding &&
             plan.inputs.length > 0 &&
-            (intent.kind === "transfer" ||
-                intent.kind === "create-credit" ||
-                intent.kind === "top-up-credit")
+            intent.kind === "transfer"
         ) {
-            const business =
-                intent.kind === "transfer"
-                    ? intent.options.outputs.reduce(
-                          (sum, output) => sum + output.amount,
-                          intent.options.withdrawal?.amount ?? 0n
-                      )
-                    : intent.kind === "create-credit"
-                      ? intent.options.amount
-                      : intent.options.additionalAmount;
+            const business = intent.options.outputs.reduce(
+                (sum, output) => sum + output.amount,
+                intent.options.withdrawal?.amount ?? 0n
+            );
             const change =
                 plan.inputs.reduce((sum, input) => sum + input.note.amount, funding.amount) -
                 business;
@@ -122,8 +151,6 @@ export async function prepareBroadcasterPlan(
             throw new Error(
                 "existing permit cannot fund an increased amount; provide fundingPermit for final gross funding or approve separately"
             );
-        if (source === "payout" && amount >= plan.credit!.cancel!.amount)
-            throw new Error("fee must be less than the cancellation refund");
         const request = structuredClone(intent);
         request.options.fee = { recipient, amount };
         if (funding && "funding" in request.options) {

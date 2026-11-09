@@ -2,7 +2,6 @@ import { Wallet } from "@invisi-labs/core";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     configureTransactionInfrastructure,
-    copyGasBenchmarks,
     prepareWithErrors,
     validateTransactionInfrastructure,
 } from "@invisi-labs/sdk/session-support";
@@ -14,13 +13,13 @@ import type { Protocol, TransactionCall } from "@invisi-labs/protocol";
 import { TransactionPreparation } from "@invisi-labs/sdk/session-support";
 import { Operation } from "../operations/Operation";
 import type {
-    CancelCreditPreparation,
+    RevokeCreditPreparation,
     CreateCreditPreparation,
     DrawCreditPreparation,
     OperationPlan,
     OperationRuntime,
     ShieldPreparation,
-    TopUpCreditPreparation,
+    UpdateCreditPreparation,
     TransferPreparation,
     WalletSessionInfrastructure,
     WalletSessionOptions,
@@ -111,9 +110,6 @@ export class WalletSession {
                           },
                       },
                   }
-                : {}),
-            ...(options.gasBenchmarks
-                ? { gasBenchmarks: copyGasBenchmarks(options.gasBenchmarks) }
                 : {}),
         };
         this.protocol = options.protocol;
@@ -343,16 +339,16 @@ export class WalletSession {
             return this.preparation(options.tokenAddress).prepareDrawCredit(options);
         });
     }
-    async prepareTopUpCredit(options: TopUpCreditPreparation): Promise<Operation> {
-        return prepareWithErrors("prepareTopUpCredit", async () => {
+    async prepareUpdateCredit(options: UpdateCreditPreparation): Promise<Operation> {
+        return prepareWithErrors("prepareUpdateCredit", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareTopUpCredit(options);
+            return this.preparation(options.tokenAddress).prepareUpdateCredit(options);
         });
     }
-    async prepareCancelCredit(options: CancelCreditPreparation): Promise<Operation> {
-        return prepareWithErrors("prepareCancelCredit", async () => {
+    async prepareRevokeCredit(options: RevokeCreditPreparation): Promise<Operation> {
+        return prepareWithErrors("prepareRevokeCredit", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareCancelCredit(options);
+            return this.preparation(options.tokenAddress).prepareRevokeCredit(options);
         });
     }
     async resume(operationId: string): Promise<Operation> {

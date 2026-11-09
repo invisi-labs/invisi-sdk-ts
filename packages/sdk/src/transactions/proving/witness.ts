@@ -14,29 +14,21 @@ export async function witnessFor(
     if (credit) {
         if (!authorization) throw new Error("private Credit wallet authorization required");
 
-        if (credit.topUp) {
-            return builder.topUpCredit({
-                params: credit.topUp,
+        if (credit.update)
+            return builder.updateCredit({
+                params: credit.update,
                 deliveries: credit.deliveries,
-                funding: plan.funding,
-                inputs: plan.inputs,
+                input: credit.inputs[0]!,
                 state: credit.outputs[0]!.state,
-                ...(plan.outputs[0] ? { change: plan.outputs[0].note } : {}),
-                previous: credit.inputs[0]!,
                 authorization,
             });
-        }
-        if (credit.creation) {
+        if (credit.creation)
             return builder.createCredit({
                 params: credit.creation,
                 deliveries: credit.deliveries,
-                funding: plan.funding,
-                inputs: plan.inputs,
                 state: credit.outputs[0]!.state,
-                ...(plan.outputs[0] ? { change: plan.outputs[0].note } : {}),
                 authorization,
             });
-        }
         if (credit.draw) {
             return builder.drawCredit({
                 timestamp: plan.preparedAt.timestamp,
@@ -44,13 +36,7 @@ export async function witnessFor(
                 deliveries: credit.deliveries,
                 inputs: credit.inputs,
                 amounts: credit.amounts!,
-                authorization,
-            });
-        }
-        if (credit.cancel) {
-            return builder.cancelCredit({
-                params: credit.cancel,
-                input: credit.inputs[0]!,
+                output: plan.outputs[0]!.note!,
                 authorization,
             });
         }

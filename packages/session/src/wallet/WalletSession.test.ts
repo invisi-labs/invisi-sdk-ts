@@ -30,7 +30,7 @@ it("prepares private transfer 30 and random ordinary change 70 as an immutable o
         review = operation.preview();
     expect(review.outputs.map((output) => output.amount)).toEqual([30n, 70n]);
     expect(review.inputs).toBe(1);
-    expect(review.capacity).toBe(14);
+    expect(review.capacity).toBe(3);
     const state = await h.store.readSnapshot(h.scope);
     expect(state.reservations[h.leaf]).toBe(operation.id);
     const saved = state.operations[operation.id]!.payload as SavedOperation;

@@ -104,11 +104,11 @@ try {
         status = await rpc.getStatus(protocol.context);
     }
     // Query ciphertext outputs only in this transaction's block, without retrieving historical receipts or creating a Store or Session.
-    const page = await rpc.getOutputs(protocol.context, {
+    const page = await rpc.getNoteUpdates(protocol.context, {
         fromBlock: BigInt(receipt.blockNumber),
         toBlock: BigInt(receipt.blockNumber),
     });
-    const output = page.outputs.find(
+    const output = page.notes.find(
         (item) =>
             item.transactionHash.toLowerCase() === transaction.hash.toLowerCase() && BigInt(item.tokenAddress) === BigInt(tokenAddress)
     );

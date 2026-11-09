@@ -1,6 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { validateClueKey } from "../fmd/fmd";
-import { normalizeCreditPolicy } from "../notes/creditCommitment";
+import { normalizeCreditPolicy, normalizeCreditState } from "../credit/state";
 import type { CreditDeliveryState, ReceivingKeys } from "../types";
 
 function concat(...parts: Uint8Array[]): Uint8Array {
@@ -53,7 +53,31 @@ function receivingKeys(keys: ReceivingKeys): ReceivingKeys {
 export function normalizeCreditDeliveryState(state: CreditDeliveryState): CreditDeliveryState {
     if (!state || typeof state !== "object" || !state.note || typeof state.note !== "object")
         throw new TypeError("complete Credit delivery state required");
-    const note = structuredClone(state.note);
+    const allowed = [
+        "chainId",
+        "protocolAddress",
+        "tokenAddress",
+        "spenderWalletIdentity",
+        "ownerWalletIdentity",
+        "revocationShard",
+        "revocationSlot",
+        "nonce",
+        "expiry",
+        "creditSharedKey",
+        "singleLimit",
+        "dailyLimit",
+        "monthlyLimit",
+        "lifetimeLimit",
+        "lastDay",
+        "dailySpent",
+        "lastMonth",
+        "monthlySpent",
+        "totalSpent",
+        "payload",
+    ];
+    if (Object.keys(state.note).some((k) => !allowed.includes(k)))
+        throw Error("Unsupported Credit fields");
+    const note = normalizeCreditState(structuredClone(state.note));
     return {
         note: {
             ...note,
@@ -103,68 +127,67 @@ export const fundsEnvelopeV1 = {
         };
     },
 };
-export const creditEnvelopeV1 = {
+const creditWireFields = [
+    ["spenderWalletIdentity", 32],
+    ["ownerWalletIdentity", 32],
+    ["revocationShard", 8],
+    ["revocationSlot", 2],
+    ["nonce", 32],
+    ["expiry", 8],
+    ["creditSharedKey", 32],
+    ["singleLimit", 16],
+    ["dailyLimit", 16],
+    ["monthlyLimit", 16],
+    ["lifetimeLimit", 16],
+    ["lastDay", 8],
+    ["dailySpent", 16],
+    ["lastMonth", 8],
+    ["monthlySpent", 16],
+    ["totalSpent", 16],
+] as const;
+export const creditEnvelopeV2 = {
     kind: "credit" as const,
-    version: 1,
-    minimum: 498,
+    version: 2,
+    minimum: 484,
     maximum: 4096,
-    encode(state: CreditDeliveryState) {
+    encode(input: CreditDeliveryState) {
+        const state = normalizeCreditDeliveryState(input);
         return concat(
-            encode(BigInt(state.note.spenderWalletIdentity)),
-            encode(BigInt(state.note.ownerWalletIdentity)),
-            encode(state.note.spenderPayout, 20),
-            encode(state.note.ownerPayout, 20),
-            encode(state.note.amount, 16),
-            encode(state.note.nonce),
-            encode(state.note.expiry, 8),
-            encode(state.note.creditSharedKey),
+            ...creditWireFields.map(([k, size]) => encode(BigInt(state.note[k]!), size)),
             state.ownerReceivingKeys.viewingPublicKey,
             state.ownerReceivingKeys.clueKey,
             state.spenderReceivingKeys.viewingPublicKey,
             state.spenderReceivingKeys.clueKey,
-            encode(state.note.singleLimit!, 16),
-            encode(state.note.dailyLimit!, 16),
-            encode(state.note.monthlyLimit!, 16),
-            encode(state.note.lastDay!, 8),
-            encode(state.note.dailySpent!, 16),
-            encode(state.note.lastMonth!, 8),
-            encode(state.note.monthlySpent!, 16),
             encodePayload(state.note.payload)
         );
     },
-    decode(plain: Uint8Array, context: import("./encryption").CreditNoteDecryptionContext) {
-        const note = {
+    decode(plain: Uint8Array, context: import("./encryption").CreditStateDecryptionContext) {
+        let offset = 0;
+        const note: Record<string, unknown> = {
             chainId: context.chainId,
             protocolAddress: context.protocolAddress,
-            spenderWalletIdentity: hexField(decode(plain.slice(0, 32))),
-            ownerWalletIdentity: hexField(decode(plain.slice(32, 64))),
-            spenderPayout: decode(plain.slice(64, 84)),
-            ownerPayout: decode(plain.slice(84, 104)),
             tokenAddress: context.tokenAddress,
-            amount: decode(plain.slice(104, 120)),
-            nonce: decode(plain.slice(120, 152)),
-            expiry: decode(plain.slice(152, 160)),
-            creditSharedKey: decode(plain.slice(160, 192)),
-            singleLimit: decode(plain.slice(322, 338)),
-            dailyLimit: decode(plain.slice(338, 354)),
-            monthlyLimit: decode(plain.slice(354, 370)),
-            lastDay: decode(plain.slice(370, 378)),
-            dailySpent: decode(plain.slice(378, 394)),
-            lastMonth: decode(plain.slice(394, 402)),
-            monthlySpent: decode(plain.slice(402, 418)),
-            payload: readPayload(plain, 418),
         };
-        const state = normalizeCreditDeliveryState({
-            note,
-            ownerReceivingKeys: {
-                viewingPublicKey: plain.slice(192, 225),
-                clueKey: plain.slice(225, 257),
-            },
-            spenderReceivingKeys: {
-                viewingPublicKey: plain.slice(257, 290),
-                clueKey: plain.slice(290, 322),
-            },
+        for (const [k, size] of creditWireFields) {
+            const n = decode(plain.slice(offset, offset + size));
+            note[k] = k.endsWith("Identity") ? hexField(n) : n;
+            offset += size;
+        }
+        const keys = () => {
+            const k = {
+                viewingPublicKey: plain.slice(offset, offset + 33),
+                clueKey: plain.slice(offset + 33, offset + 65),
+            };
+            offset += 65;
+            return k;
+        };
+        const ownerReceivingKeys = keys(),
+            spenderReceivingKeys = keys();
+        note.payload = readPayload(plain, offset);
+        return normalizeCreditDeliveryState({
+            note: note as unknown as import("../types").CreditState,
+            ownerReceivingKeys,
+            spenderReceivingKeys,
         });
-        return { ...state, note: { ...state.note, payload: note.payload } };
     },
 };

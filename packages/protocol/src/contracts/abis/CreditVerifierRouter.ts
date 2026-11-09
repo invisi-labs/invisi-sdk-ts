@@ -15,8 +15,8 @@ export const creditVerifierRouterAbi = [
       },
       {
         "name": "creditVerifiers",
-        "type": "address[7]",
-        "internalType": "contract IVerifier[7]"
+        "type": "address[15]",
+        "internalType": "contract IVerifier[15]"
       }
     ],
     "stateMutability": "nonpayable"
@@ -36,33 +36,7 @@ export const creditVerifierRouterAbi = [
   },
   {
     "type": "function",
-    "name": "creditCancelVerifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IVerifier"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "creditDrawSlots120Verifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IVerifier"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "creditDrawSlots12Verifier",
+    "name": "creditDrawSlots10Verifier",
     "inputs": [],
     "outputs": [
       {
@@ -88,6 +62,84 @@ export const creditVerifierRouterAbi = [
   },
   {
     "type": "function",
+    "name": "creditDrawSlots20Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots2Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots30Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots3Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots40Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots4Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "creditDrawSlots50Verifier",
     "inputs": [],
     "outputs": [
@@ -101,7 +153,59 @@ export const creditVerifierRouterAbi = [
   },
   {
     "type": "function",
-    "name": "creditTopUpVerifier",
+    "name": "creditDrawSlots5Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots60Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots70Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditDrawSlots80Verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifier"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "creditUpdateVerifier",
     "inputs": [],
     "outputs": [
       {
@@ -140,19 +244,6 @@ export const creditVerifierRouterAbi = [
   },
   {
     "type": "function",
-    "name": "getCreditCancelVerifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IVerifier"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getCreditDrawVerifier",
     "inputs": [
       {
@@ -172,7 +263,7 @@ export const creditVerifierRouterAbi = [
   },
   {
     "type": "function",
-    "name": "getCreditTopUpVerifier",
+    "name": "getCreditUpdateVerifier",
     "inputs": [],
     "outputs": [
       {

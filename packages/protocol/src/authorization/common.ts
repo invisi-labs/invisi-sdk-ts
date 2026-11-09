@@ -1,6 +1,6 @@
 import {
     normalizeCreditPolicy,
-    type CreditNote,
+    type CreditState,
     type WalletAuthorizationWitness,
 } from "@invisi-labs/core";
 import {
@@ -17,23 +17,6 @@ import layouts from "../witness-layouts.json";
 export const pad = <T>(values: readonly T[], count: number, zero: () => T): T[] => {
     if (values.length > count) throw new Error("witness capacity exceeded");
     return [...values, ...Array.from({ length: count - values.length }, zero)];
-};
-
-export const policyWitness = (note: CreditNote, usage = true) => {
-    const p = normalizeCreditPolicy(note);
-    return {
-        single_limit: p.singleLimit,
-        daily_limit: p.dailyLimit,
-        monthly_limit: p.monthlyLimit,
-        ...(usage
-            ? {
-                  last_day: p.lastDay,
-                  daily_spent: p.dailySpent,
-                  last_month: p.lastMonth,
-                  monthly_spent: p.monthlySpent,
-              }
-            : {}),
-    };
 };
 
 export const zeros = () => Array<bigint>(16).fill(0n);

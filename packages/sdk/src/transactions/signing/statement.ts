@@ -1,10 +1,9 @@
 import { creditPeriods, type WalletOperation } from "@invisi-labs/core";
 import {
     WitnessBuilder,
-    cancelCreditPublicInputs,
     createCreditPublicInputs,
     creditDrawPublicInputs,
-    topUpCreditPublicInputs,
+    updateCreditPublicInputs,
     transactUserPublicInputs,
 } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -12,6 +11,7 @@ import type { ProofStatement } from "@invisi-labs/prover";
 import type { OperationPlan } from "../operation-types";
 
 export function requiresAuthorization(plan: OperationPlan): boolean {
+    if (plan.credit?.revocation) return false;
     // Derive the exemption from the actual frozen transaction, never an API/mode flag.
     const ownerOnlyFullWithdrawal =
         !plan.credit &&
@@ -36,25 +36,13 @@ export function statement(plan: OperationPlan): ProofStatement {
 
     const credit = plan.credit;
     let words: Hex[];
-    if (credit?.topUp) {
-        words = topUpCreditPublicInputs(
-            plan.context,
-            credit.topUp,
-            credit.deliveries,
-            plan.funding
-        );
-    } else if (credit?.creation) {
-        words = createCreditPublicInputs(
-            plan.context,
-            credit.creation,
-            credit.deliveries,
-            plan.funding
-        );
-    } else if (credit?.draw) {
+    if (credit?.update)
+        words = updateCreditPublicInputs(plan.context, credit.update, credit.deliveries);
+    else if (credit?.creation)
+        words = createCreditPublicInputs(plan.context, credit.creation, credit.deliveries);
+    else if (credit?.draw)
         words = creditDrawPublicInputs(plan.context, credit.draw, credit.deliveries);
-    } else if (credit?.cancel) {
-        words = cancelCreditPublicInputs(plan.context, credit.cancel);
-    } else {
+    else {
         words = transactUserPublicInputs(
             plan.context,
             plan.params!,
@@ -78,11 +66,7 @@ export function authorizationRequest(plan: OperationPlan) {
     let operation: WalletOperation = "transact";
     if (plan.kind === "draw-credit") {
         operation = "credit-draw";
-    } else if (
-        plan.kind === "create-credit" ||
-        plan.kind === "top-up-credit" ||
-        plan.kind === "cancel-credit"
-    ) {
+    } else if (plan.kind === "create-credit" || plan.kind === "update-credit") {
         operation = plan.kind;
     }
 
@@ -101,10 +85,8 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
     if (now > plan.deadline) return true;
 
     const credit = plan.credit;
-    if (credit?.topUp && now >= credit.topUp.previousExpiry) return true;
-    if (credit?.creation && now >= credit.creation.expiry) return true;
+    if (credit?.inputs.some((i) => now > i.state.note.expiry)) return true;
     if (credit?.draw) {
-        if (credit.draw.expiries.some((expiry) => now >= expiry)) return true;
         const prepared = creditPeriods(plan.preparedAt.timestamp),
             current = creditPeriods(now);
         if (

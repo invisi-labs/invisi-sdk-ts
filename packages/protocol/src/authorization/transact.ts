@@ -1,8 +1,8 @@
 import { computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/core";
 import { type ProvingRequest } from "@invisi-labs/prover";
 import type { Hex } from "../contracts/index";
-import { transactUserPublicInputs } from "../funds/public-inputs";
-import { normalizeTransactRequest } from "../funds/request";
+import { transactUserPublicInputs } from "../note/public-inputs";
+import { normalizeTransactRequest } from "../note/request";
 import { field, uint, word } from "../validation";
 import { check, pad, provingRequest, zeroAuthority, zeros } from "./common";
 import type { TransactWitnessParams } from "./types";

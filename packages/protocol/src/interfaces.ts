@@ -6,7 +6,6 @@ export type {
     ProtocolDataProvider,
     ProtocolDataStatus,
     ProtocolUpdateRange,
-    ProtocolUpdates,
 } from "@invisi-labs/rpc";
 
 import type { DeploymentContext } from "./validation";
@@ -24,6 +23,20 @@ export interface CanonicalReceipt {
     status?: "success" | "reverted";
 }
 export interface ChainReader {
+    getCreditAllocation?(
+        context: DeploymentContext,
+        owner: Address,
+        token: Address,
+        block: CanonicalBlock
+    ): Promise<{ shard: bigint; slot: number }>;
+    getCreditRevocationBitmap?(
+        context: DeploymentContext,
+        owner: Address,
+        token: Address,
+        shard: bigint,
+        word: number,
+        block: CanonicalBlock
+    ): Promise<bigint>;
     getChainId(): Promise<bigint>;
     /** Required when a selected deployment includes a receiving-key registry. */
     getProtocolAddressRegistry?(address: Address): Promise<Address>;

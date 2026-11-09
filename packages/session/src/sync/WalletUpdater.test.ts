@@ -3,8 +3,10 @@ import {
     ReceivingAddress,
     ViewingCapability,
     applyCreditDrawUsage,
+    computeNoteIdentity,
+    computeNoteCommitment,
     creditV1,
-    encryptCreditNote,
+    encryptCreditState,
 } from "@invisi-labs/core";
 import {
     Protocol,
@@ -36,6 +38,20 @@ const block = (number = 12n): CanonicalBlock => ({
     parentHash: hex(number - 1n),
     timestamp: BigInt(vectors.context.timestamp) + number,
 });
+function noteCandidate(transactionHash: Hex) {
+    return {
+        transactionHash,
+        block: block(),
+        treeId: 1n,
+        leafIndex: 0,
+        commitment: vectors.note.commitment as Hex,
+        tokenAddress: token,
+        ciphertext: vectors.note.ciphertext as Hex,
+        clue: `0x${clues.vectors[0]!.clue}` as Hex,
+        logIndex: 1,
+        kind: "note",
+    };
+}
 async function harness() {
     const tree = await MerkleFixture.create();
     await tree.insert(BigInt(vectors.note.commitment));
@@ -128,19 +144,32 @@ async function harness() {
             detectionEnabled: false,
             checkedBits: 8,
         }),
-        getUpdates: async () => ({
+        getCreditTransitions: async (_: unknown, range: { toBlock: bigint }) => ({
+            block: block(range.toBlock),
+            transitions: [],
+        }),
+        detectCreditStates: async (_: unknown, range: { toBlock: bigint }) => ({
+            block: block(range.toBlock),
+            states: [],
+        }),
+        getNoteUpdates: async () => ({
             block: batch.block,
-            transactionHashes: batch.transactionHashes,
+            notes: batch.transactionHashes.map(noteCandidate),
         }),
     };
-    const session = new WalletSession(sessionOptions({ ...options, protocolRpc }));
+    const session = new WalletSession(
+        sessionOptions({
+            ...options,
+            protocolRpc: { ...protocolRpc, detectNotes: protocolRpc.getNoteUpdates },
+        })
+    );
     const updater = new WalletUpdater({
         protocol,
         scope: session.scope,
         store,
         reader,
         viewing,
-        protocolRpc,
+        protocolRpc: { ...protocolRpc, detectNotes: protocolRpc.getNoteUpdates },
     });
     return {
         session,
@@ -307,15 +336,33 @@ it("rejects a changed chain during processing without committing candidate notes
     expect(state.invalidated).toBeTruthy();
 });
 
-it.each([false, true])(
-    "recovers Credit financial fields and retains only authenticated child memos (valid envelope: %s)",
-    async (validChild) => {
-        const h = await harness();
-        const p = vectors.credit;
-        const tree = await MerkleFixture.create();
-        await tree.insert(BigInt(p.commitment));
-        await tree.insert(BigInt(p.remainder.remainderCommitment));
-        const abi = new Interface(invisiProtocolAbi);
+it.each([
+    { validChild: false, crossTree: false },
+    { validChild: true, crossTree: false },
+    { validChild: false, crossTree: true },
+    { validChild: true, crossTree: true },
+])(
+    "recovers deferred usage and authenticates child memo across ordered trees: %j",
+    async ({ validChild, crossTree }) => {
+        const h = await harness(),
+            p = vectors.credit;
+        const inputTree = await MerkleFixture.create();
+        if (crossTree) await inputTree.insert(1n);
+        await inputTree.insert(BigInt(p.commitment));
+        const outputTree = crossTree ? await MerkleFixture.create() : inputTree;
+        const parentIndex = crossTree ? 1 : 0,
+            childIndex = crossTree ? 0 : 1,
+            outputTreeId = crossTree ? 2n : 1n;
+        await outputTree.insert(BigInt(p.draw.stateCommitment));
+        const ordinary = await computeNoteCommitment(
+            context.chainId,
+            await computeNoteIdentity(BigInt(p.spenderWalletIdentity), 12345n),
+            BigInt(token),
+            30n
+        );
+        await outputTree.insert(BigInt(ordinary));
+        const abi = new Interface(invisiProtocolAbi),
+            clue = `0x${clues.vectors[0]!.clue}`;
         const event = (
             name: string,
             args: Record<string, unknown>,
@@ -330,8 +377,7 @@ it.each([false, true])(
             transactionHash: hash,
             logIndex,
         });
-        const clue = `0x${clues.vectors[0]!.clue}`;
-        const corrupt = { ciphertext: "0x05" + "11".repeat(497), clue };
+        const corrupt = { ciphertext: "0x05" + "11".repeat(483), clue };
         const parent = vectors.memoVectors.find(
             (v) => v.kind === "credit" && v.role === "owner" && v.name === "binary"
         )!;
@@ -346,29 +392,28 @@ it.each([false, true])(
             role: "owner",
         });
         const childMemo = new Uint8Array([65, 0, 255]);
-        const childCiphertext = validChild
-            ? await encryptCreditNote(
+        const cipher = validChild
+            ? await encryptCreditState(
                   parentState.ownerReceivingKeys.viewingPublicKey,
                   {
                       ...parentState,
                       note: {
                           ...parentState.note,
                           ...applyCreditDrawUsage(parentState.note, 30n, block(13n).timestamp),
-                          amount: BigInt(p.remainder.remainder.amount),
-                          nonce: BigInt(p.remainder.remainder.nonce),
+                          nonce: BigInt(p.draw.state.nonce),
                           payload: creditV1.encode({ memo: childMemo }),
                       },
                   },
                   {
                       ...context,
                       protocolAddress: BigInt(context.protocolAddress),
-                      outputCommitment: p.remainder.remainderCommitment as Hex,
+                      outputCommitment: p.draw.stateCommitment as Hex,
                       role: "owner",
                   }
               )
             : undefined;
-        const childDelivery = childCiphertext
-            ? { ciphertext: `0x${Buffer.from(childCiphertext).toString("hex")}`, clue }
+        const childDelivery = cipher
+            ? { ciphertext: `0x${Buffer.from(cipher).toString("hex")}`, clue }
             : corrupt;
         const created: CanonicalReceipt = {
             block: block(),
@@ -377,7 +422,7 @@ it.each([false, true])(
             logs: [
                 event(
                     "CommitmentsInserted",
-                    { treeId: 1n, startLeafIndex: 0, commitments: [p.commitment] },
+                    { treeId: 1n, startLeafIndex: parentIndex, commitments: [p.commitment] },
                     hex(101n),
                     0
                 ),
@@ -385,19 +430,19 @@ it.each([false, true])(
                     "CreditCreated",
                     {
                         token,
-                        owner: `0x${BigInt(p.ownerPayout).toString(16).padStart(40, "0")}`,
+                        owner: ownerHex(p.ownerWalletIdentity),
                         outputTreeId: 1n,
-                        sources: [],
-                        nullifiers: [],
+                        revocationShard: 1n,
+                        revocationSlot: 0n,
                         creditCommitment: p.commitment,
-                        changeCommitment: hex(0n),
-                        leafIndices: [0],
+                        leafIndex: parentIndex,
                         deliveries: [
                             { ciphertext: parent.ciphertext, clue },
                             { ciphertext: p.spenderCiphertext, clue },
-                            { ciphertext: "0x", clue: "0x" },
                         ],
-                        expiry: BigInt(p.expiry),
+                        deadline: 2000000100n,
+                        feeRecipient: "0x0000000000000000000000000000000000000000",
+                        feeAmount: 0n,
                     },
                     hex(101n),
                     1
@@ -405,16 +450,16 @@ it.each([false, true])(
             ] as CanonicalReceipt["logs"],
         };
         const drawn: CanonicalReceipt = {
-            block: block(13n),
+            block: block(crossTree ? 12n : 13n),
             transactionHash: hex(102n),
             status: "success",
             logs: [
                 event(
                     "CommitmentsInserted",
                     {
-                        treeId: 1n,
-                        startLeafIndex: 1,
-                        commitments: [p.remainder.remainderCommitment],
+                        treeId: outputTreeId,
+                        startLeafIndex: childIndex,
+                        commitments: [p.draw.stateCommitment, ordinary],
                     },
                     hex(102n),
                     2
@@ -422,21 +467,23 @@ it.each([false, true])(
                 event(
                     "CreditDraw",
                     {
-                        spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
-                        outputTreeId: 1n,
+                        outputTreeId,
                         params: {
                             token,
-                            sources: [{ treeId: 1n, merkleRoot: hex(tree.getRoot()) }],
+                            sources: [{ treeId: 1n, merkleRoot: hex(inputTree.getRoot()) }],
+                            payers: [{ payer: ownerHex(p.ownerWalletIdentity), amount: 30n }],
+                            grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
                             nullifiers: [p.nullifier],
-                            remainderCommitments: [p.remainder.remainderCommitment],
-                            expiries: [BigInt(p.expiry)],
-                            recoveryAmounts: [p.remainder.recoveryAmount],
-                            spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
+                            stateCommitments: [p.draw.stateCommitment],
+                            recoveryAmounts: [p.draw.recoveryAmount],
+                            noteCommitment: ordinary,
                             totalAmount: 30n,
                             deadline: 2000000100n,
+                            feeRecipient: "0x0000000000000000000000000000000000000000",
+                            feeAmount: 0n,
                         },
-                        remainderLeafIndices: [1],
-                        deliveries: [childDelivery, corrupt],
+                        leafIndices: [childIndex, childIndex + 1],
+                        deliveries: [childDelivery, corrupt, { ciphertext: "0x", clue: "0x" }],
                     },
                     hex(102n),
                     3
@@ -444,162 +491,50 @@ it.each([false, true])(
             ] as CanonicalReceipt["logs"],
         };
         h.reader.getReceipt = async (hash) => structuredClone(hash === hex(101n) ? created : drawn);
-        h.treeRoots.set(1n, hex(tree.getRoot()));
+        h.treeRoots.set(1n, hex(inputTree.getRoot()));
+        h.treeRoots.set(outputTreeId, hex(outputTree.getRoot()));
         h.reader.isSpent = async (_, words) => words.map((value) => value === p.nullifier);
-        const memberships = [p.commitment, p.remainder.remainderCommitment].map(
-            (leaf, leafIndex) => ({
+        h.setMemberships([
+            {
                 treeId: 1n,
-                leafIndex,
-                leaf: leaf as Hex,
-                root: hex(tree.getRoot()),
-                path: tree.getProof(leafIndex).merklePath,
+                leafIndex: parentIndex,
+                leaf: p.commitment as Hex,
+                root: hex(inputTree.getRoot()),
+                path: inputTree.getProof(parentIndex).merklePath,
                 block: block(13n),
-            })
-        );
-        h.setMemberships(memberships);
-        // Reordered candidates still recover the parent before the draw is applied.
+            },
+            {
+                treeId: outputTreeId,
+                leafIndex: childIndex,
+                leaf: p.draw.stateCommitment as Hex,
+                root: hex(outputTree.getRoot()),
+                path: outputTree.getProof(childIndex).merklePath,
+                block: block(13n),
+            },
+        ]);
         await h.updater.applyUpdates({
             context,
             block: block(13n),
             transactionHashes: [hex(102n), hex(101n)],
         });
-        const state = await h.store.readSnapshot(h.session.scope);
-        const remainder = state.credits[p.remainder.remainderCommitment + ":owner"]!;
-        expect(remainder.state.note.amount).toBe(70n);
-        expect(remainder.state.note.dailySpent).toBe(40n);
-        expect(remainder.state.note.monthlySpent).toBe(50n);
+        const state = await h.store.readSnapshot(h.session.scope),
+            successor = state.credits[p.draw.stateCommitment + ":owner"]!;
+        expect(successor.state.note).not.toHaveProperty("amount");
+        expect(successor.state.note.dailySpent).toBe(30n);
+        expect(successor.state.note.monthlySpent).toBe(30n);
+        expect(successor.state.note.totalSpent).toBe(30n);
         if (validChild)
-            expect(creditV1.decode(remainder.state.note.payload!).memo).toEqual(childMemo);
-        else expect(remainder.state.note).not.toHaveProperty("payload");
+            expect(creditV1.decode(successor.state.note.payload!).memo).toEqual(childMemo);
+        else expect(successor.state.note).not.toHaveProperty("payload");
         expect(
             creditV1.decode(state.credits[p.commitment + ":owner"]!.state.note.payload!).memo
         ).toEqual(new Uint8Array([0, 255, 128, 0, 17]));
-        expect(remainder.spent).toBe("unspent");
-        expect(remainder.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
+        expect(successor.spent).toBe("unspent");
+        expect(successor.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
         expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");
+        expect(state.credits[ordinary + ":owner"]).toBeUndefined();
     }
 );
-
-it("orders same-block Credit parents before successors across different trees", async () => {
-    const h = await harness();
-    const p = vectors.credit;
-    const tree = await MerkleFixture.create();
-    await tree.insert(1n);
-    await tree.insert(BigInt(p.commitment));
-    const nextTree = await MerkleFixture.create();
-    await nextTree.insert(BigInt(p.remainder.remainderCommitment));
-    const abi = new Interface(invisiProtocolAbi);
-    const event = (name: string, args: Record<string, unknown>, hash: Hex, logIndex: number) => ({
-        ...abi.encodeEventLog(
-            name,
-            abi.getEvent(name)!.inputs.map((field) => args[field.name])
-        ),
-        address: context.protocolAddress,
-        transactionHash: hash,
-        logIndex,
-    });
-    const clue = `0x${clues.vectors[0]!.clue}`;
-    const corrupt = { ciphertext: "0x05" + "11".repeat(497), clue };
-    const created: CanonicalReceipt = {
-        block: block(),
-        transactionHash: hex(101n),
-        status: "success",
-        logs: [
-            event(
-                "CommitmentsInserted",
-                { treeId: 1n, startLeafIndex: 1, commitments: [p.commitment] },
-                hex(101n),
-                0
-            ),
-            event(
-                "CreditCreated",
-                {
-                    token,
-                    owner: `0x${BigInt(p.ownerPayout).toString(16).padStart(40, "0")}`,
-                    outputTreeId: 1n,
-                    sources: [],
-                    nullifiers: [],
-                    creditCommitment: p.commitment,
-                    changeCommitment: hex(0n),
-                    leafIndices: [1],
-                    deliveries: [
-                        { ciphertext: p.ownerCiphertext, clue },
-                        { ciphertext: p.spenderCiphertext, clue },
-                        { ciphertext: "0x", clue: "0x" },
-                    ],
-                    expiry: BigInt(p.expiry),
-                },
-                hex(101n),
-                1
-            ),
-        ] as CanonicalReceipt["logs"],
-    };
-    const drawn: CanonicalReceipt = {
-        block: block(12n),
-        transactionHash: hex(102n),
-        status: "success",
-        logs: [
-            event(
-                "CommitmentsInserted",
-                { treeId: 2n, startLeafIndex: 0, commitments: [p.remainder.remainderCommitment] },
-                hex(102n),
-                2
-            ),
-            event(
-                "CreditDraw",
-                {
-                    spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
-                    outputTreeId: 2n,
-                    params: {
-                        token,
-                        sources: [{ treeId: 1n, merkleRoot: hex(tree.getRoot()) }],
-                        nullifiers: [p.nullifier],
-                        remainderCommitments: [p.remainder.remainderCommitment],
-                        expiries: [BigInt(p.expiry)],
-                        recoveryAmounts: [p.remainder.recoveryAmount],
-                        spender: `0x${BigInt(p.spenderPayout).toString(16).padStart(40, "0")}`,
-                        totalAmount: 30n,
-                        deadline: 2000000100n,
-                    },
-                    remainderLeafIndices: [0],
-                    deliveries: [corrupt, corrupt],
-                },
-                hex(102n),
-                3
-            ),
-        ] as CanonicalReceipt["logs"],
-    };
-    h.reader.getReceipt = async (hash) => structuredClone(hash === hex(101n) ? created : drawn);
-    h.treeRoots.set(1n, hex(tree.getRoot()));
-    h.treeRoots.set(2n, hex(nextTree.getRoot()));
-    h.reader.isSpent = async (_, words) => words.map((value) => value === p.nullifier);
-    const memberships = [
-        { tree: tree, treeId: 1n, leafIndex: 1, leaf: p.commitment },
-        { tree: nextTree, treeId: 2n, leafIndex: 0, leaf: p.remainder.remainderCommitment },
-    ].map(({ tree: source, treeId, leafIndex, leaf }) => ({
-        treeId,
-        leafIndex,
-        leaf: leaf as Hex,
-        root: hex(source.getRoot()),
-        path: source.getProof(leafIndex).merklePath,
-        block: block(),
-    }));
-    h.setMemberships(memberships);
-    // Reordered candidates still recover the parent before the draw is applied.
-    await h.updater.applyUpdates({
-        context,
-        block: block(12n),
-        transactionHashes: [hex(102n), hex(101n)],
-    });
-    const state = await h.store.readSnapshot(h.session.scope);
-    const remainder = state.credits[p.remainder.remainderCommitment + ":owner"]!;
-    expect(remainder.state.note.amount).toBe(70n);
-    expect(remainder.state.note.dailySpent).toBe(40n);
-    expect(remainder.state.note.monthlySpent).toBe(50n);
-    expect(remainder.spent).toBe("unspent");
-    expect(remainder.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
-    expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");
-});
 
 it("never resurrects an already spent note from an inconsistent RPC observation", async () => {
     const h = await harness();
@@ -648,9 +583,9 @@ it("accepts historical membership roots still known by the contract", async () =
 it("composes both RPCs and refreshes owned inventory without delegating wallet secrets", async () => {
     const h = await harness();
     const key = new Uint8Array(32).fill(1);
-    const getUpdates = vi.fn(async () => ({
+    const getNoteUpdates = vi.fn(async () => ({
         block: h.batch.block,
-        transactionHashes: h.batch.transactionHashes,
+        notes: h.batch.transactionHashes.map(noteCandidate),
     }));
     const getMembership = vi.fn(async () => h.membership);
     const protocolRpc = {
@@ -659,16 +594,33 @@ it("composes both RPCs and refreshes owned inventory without delegating wallet s
             detectionEnabled: true,
             checkedBits: 8,
         }),
-        getUpdates,
+        getNoteUpdates,
+        detectNotes: getNoteUpdates,
+        getCreditTransitions: async () => ({ block: h.batch.block, transitions: [] }),
+        detectCreditStates: async () => ({ block: h.batch.block, states: [] }),
         getMembership,
     };
-    const session = new WalletSession(sessionOptions({ ...h.options, protocolRpc }));
+    const session = new WalletSession(
+        sessionOptions({
+            ...h.options,
+            protocolRpc: {
+                ...protocolRpc,
+                detectNotes: protocolRpc.getNoteUpdates,
+                detectCreditStates: async (_: unknown, range: { toBlock: bigint }) => ({
+                    block: block(range.toBlock),
+                    states: [],
+                }),
+            },
+        })
+    );
     const result = await session.refresh({ fromBlock: 12n, detectionKey: key });
     expect(result.notes).toBe(1);
     expect((await session.balance(token)).availableKnown).toBe(70n);
     expect(getMembership).toHaveBeenCalledTimes(1);
     expect(key.every((value) => value === 1)).toBe(true);
-    const sent = getUpdates.mock.calls as unknown as Array<[unknown, { detectionKey: Uint8Array }]>;
+    const sent = getNoteUpdates.mock.calls as unknown as Array<
+        [unknown, { detectionKey: Uint8Array }]
+    >;
     expect(sent[0]![1].detectionKey).not.toBe(key);
     expect(sent[0]![1].detectionKey.every((value) => value === 0)).toBe(true);
 });
@@ -689,7 +641,11 @@ it("serializes entire multi-page refreshes while a provider request is pending",
             calls.push("status");
             return { indexedHead: block(13n), detectionEnabled: false, checkedBits: 8 };
         }),
-        getUpdates: vi.fn(
+        getCreditTransitions: async (_: unknown, range: { toBlock: bigint }) => ({
+            block: block(range.toBlock),
+            transitions: [],
+        }),
+        getNoteUpdates: vi.fn(
             async (_context: unknown, range: { fromBlock: bigint; toBlock: bigint }) => {
                 calls.push(`page:${range.fromBlock}`);
                 if (calls.length === 2) {
@@ -698,7 +654,8 @@ it("serializes entire multi-page refreshes while a provider request is pending",
                 }
                 return {
                     block: block(range.toBlock),
-                    transactionHashes: range.fromBlock === 12n ? h.batch.transactionHashes : [],
+                    notes:
+                        range.fromBlock === 12n ? h.batch.transactionHashes.map(noteCandidate) : [],
                 };
             }
         ),
@@ -707,13 +664,25 @@ it("serializes entire multi-page refreshes while a provider request is pending",
             block: at,
         })),
     };
-    const session = new WalletSession(sessionOptions({ ...h.options, protocolRpc }));
+    const session = new WalletSession(
+        sessionOptions({
+            ...h.options,
+            protocolRpc: {
+                ...protocolRpc,
+                detectNotes: protocolRpc.getNoteUpdates,
+                detectCreditStates: async (_: unknown, range: { toBlock: bigint }) => ({
+                    block: block(range.toBlock),
+                    states: [],
+                }),
+            },
+        })
+    );
     const first = session.refresh({ fromBlock: 12n, toBlock: 13n, pageSize: 1 });
     await pending;
     const second = session.refresh({ fromBlock: 12n, toBlock: 13n, pageSize: 1 });
     await Promise.resolve();
     expect(protocolRpc.getStatus).toHaveBeenCalledTimes(1);
-    expect(protocolRpc.getUpdates).toHaveBeenCalledTimes(1);
+    expect(protocolRpc.getNoteUpdates).toHaveBeenCalledTimes(1);
     release();
     const results = await Promise.all([first, second]);
     expect(results.map((result) => result.block.number)).toEqual([13n, 13n]);

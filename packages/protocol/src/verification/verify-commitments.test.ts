@@ -13,28 +13,39 @@ const note = {
     nonce: hex(vectors.note.nonce),
     noteCommitment: vectors.note.commitment as `0x${string}`,
 };
-const credit = {
+const creditState = {
     chainId,
-    tokenAddress,
-    spenderWalletIdentity: ownerHex(vectors.credit.spenderWalletIdentity),
-    ownerWalletIdentity: ownerHex(vectors.credit.ownerWalletIdentity),
-    spenderPayout:
-        `0x${BigInt(vectors.credit.spenderPayout).toString(16).padStart(40, "0")}` as `0x${string}`,
-    ownerPayout:
-        `0x${BigInt(vectors.credit.ownerPayout).toString(16).padStart(40, "0")}` as `0x${string}`,
-    amount: BigInt(vectors.credit.amount),
-    nonce: BigInt(vectors.credit.nonce),
-    expiry: BigInt(vectors.credit.expiry),
-    creditSharedKey: BigInt(vectors.credit.creditSharedKey),
-    singleLimit: BigInt(vectors.credit.singleLimit),
-    dailyLimit: BigInt(vectors.credit.dailyLimit),
-    monthlyLimit: BigInt(vectors.credit.monthlyLimit),
-    lastDay: BigInt(vectors.credit.lastDay),
-    dailySpent: BigInt(vectors.credit.dailySpent),
-    lastMonth: BigInt(vectors.credit.lastMonth),
-    monthlySpent: BigInt(vectors.credit.monthlySpent),
-    creditCommitment: vectors.credit.commitment as `0x${string}`,
-};
+    protocolAddress: BigInt(vectors.context.protocolAddress),
+    tokenAddress: BigInt(tokenAddress),
+    ...Object.fromEntries(
+        Object.entries(vectors.credit)
+            .filter(([k]) =>
+                [
+                    "spenderWalletIdentity",
+                    "ownerWalletIdentity",
+                    "revocationShard",
+                    "revocationSlot",
+                    "nonce",
+                    "expiry",
+                    "creditSharedKey",
+                    "singleLimit",
+                    "dailyLimit",
+                    "monthlyLimit",
+                    "lifetimeLimit",
+                    "lastDay",
+                    "dailySpent",
+                    "lastMonth",
+                    "monthlySpent",
+                    "totalSpent",
+                ].includes(k)
+            )
+            .map(([k, v]) => [
+                k,
+                k.endsWith("Identity") ? ownerHex(v as string) : BigInt(v as string),
+            ])
+    ),
+} as import("@invisi-labs/core").CreditState;
+const credit = { state: creditState, creditCommitment: vectors.credit.commitment as `0x${string}` };
 
 describe("verifyNoteCommitment", () => {
     it("accepts the independent current wallet note vector", async () => {
@@ -68,34 +79,31 @@ describe("verifyNoteCommitment", () => {
 });
 
 describe("verifyCreditCommitment", () => {
-    it("accepts the independent complete Credit leaf", async () => {
+    it("verifies the current deployment-bound Credit leaf", async () => {
         expect(await verifyCreditCommitment(credit)).toBe(true);
+        for (const field of [
+            "nonce",
+            "revocationShard",
+            "revocationSlot",
+            "lifetimeLimit",
+            "totalSpent",
+            "protocolAddress",
+        ] as const)
+            expect(
+                await verifyCreditCommitment({
+                    ...credit,
+                    state: { ...credit.state, [field]: (credit.state[field] ?? 0n) + 1n },
+                })
+            ).toBe(false);
     });
-    it("returns false when the server folded a tampered nonce", async () => {
-        expect(await verifyCreditCommitment({ ...credit, nonce: credit.nonce + 1n })).toBe(false);
-    });
-    it("rejects a substituted shared key and noncanonical shared keys", async () => {
-        expect(
-            await verifyCreditCommitment({
-                ...credit,
-                creditSharedKey: credit.creditSharedKey + 1n,
-            })
-        ).toBe(false);
-        for (const creditSharedKey of [-1n, 0n, FIELD_MODULUS])
-            await expect(verifyCreditCommitment({ ...credit, creditSharedKey })).rejects.toThrow();
-    });
-    it("binds both wallet roles and both payout addresses", async () => {
-        for (const changed of [
-            {
-                ...credit,
-                spenderWalletIdentity: ownerHex(BigInt(credit.spenderWalletIdentity) + 1n),
-            },
-            { ...credit, ownerWalletIdentity: ownerHex(BigInt(credit.ownerWalletIdentity) + 1n) },
-            { ...credit, spenderPayout: `0x${"11".repeat(20)}` as `0x${string}` },
-            { ...credit, ownerPayout: `0x${"22".repeat(20)}` as `0x${string}` },
-        ]) {
-            await expect(verifyCreditCommitment(changed)).rejects.toThrow(/payout/);
-        }
+    it("rejects noncanonical shared keys", async () => {
+        for (const key of [-1n, 0n, FIELD_MODULUS])
+            await expect(
+                verifyCreditCommitment({
+                    ...credit,
+                    state: { ...credit.state, creditSharedKey: key },
+                })
+            ).rejects.toThrow();
     });
 });
 

@@ -66,8 +66,8 @@ Fund Alice and Bob with **the configured chain's native currency before running 
 | Account | Why it needs native currency | Preparation |
 | --- | --- | --- |
 | Alice (A) | Most transfers, aggregation, session transactions, and funding Charlie/Frank | Fund manually; see `settings.suggestedGasBalance` |
-| Bob (B) | Registry registration/update and credit creation/top-up | Fund manually; see `settings.suggestedGasBalance` |
-| Charlie (C) | Credit creation and cancellation | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
+| Bob (B) | Registry registration/update and Credit creation/update | Fund manually; see `settings.suggestedGasBalance` |
+| Charlie (C) | Credit creation and public revocation | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
 | Frank (F) | Delegated sweep submission | `prepare:suite` tops up to `settings.helperGasBalance` from Alice |
 | Other recipients | Receive only in this suite | No native-token funding required |
 
@@ -92,7 +92,7 @@ pnpm --filter @invisi-examples/scenarios example:transparent:1 --execute
 | [01 Registry](01-address-registry/01-register-bob.ts) | `example:registry:1`, `:2` | Bob registration and update through external EIP-712 requests |
 | [02 Transparent amounts](02-transparent-amount/01-alice-to-bob.ts) | `example:transparent:1`, `:1b`, `:1c`, `:2`, `:3`, `:4`, `:5` | Full receiving address, registered EVM address, explicit chain lookup, nine recipients, Bob funding authorization, raw memo payload, complete Shield broadcaster walkthrough |
 | [03 Hidden amounts](03-hidden-amount/01-cash-to-bob-with-change.ts) | `example:hidden:1`, `:1b`, `:2`, `:3`, `:4`, `:4b`, `:5`, `:6` | Cash/notes, separate funding/spending signatures, change, withdrawal, delegated owner-only sweep, four-member aggregation |
-| [04 Credit](04-credit/01-bob-and-charlie-create.ts) | `example:credit:1` through `:4` | Bob/Charlie create credit for Alice, multi-owner batch draw, top-up with notes/cash/change, cancellation |
+| [04 Credit](04-credit/01-bob-and-charlie-create.ts) | `example:credit:1` through `:4` | Bob/Charlie create credit for Alice, multi-owner gross batch draw with one net Note, owner policy update, public grant revocation |
 | [05 WalletSession](05-wallet-session/01-restore-session.ts) | `example:session:1` through `:4` | Encrypted SQLite, incremental inventory, outgoing/incoming history, own cash/notes/gas, reopen and reconcile |
 | [06 Disclosure](06-disclosure/01-note-opening.ts) | `example:disclosure:1` through `:3` | Historical funds opening, single-output payload key and memo, credit opening; independent canonical receipt verification |
 
@@ -131,7 +131,7 @@ Maintainers can use `pnpm deploy:local` with the sibling protocol repository and
 Start with [02-05 Shield via broadcaster](02-transparent-amount/05-shield-via-broadcaster.ts), the complete walkthrough. It shows business intent, `.withBroadcaster(client, { maxFeeAmount })`, final business/fee/gross amounts, ERC20 allowance, external funding signature, calldata export and submission. Shield needs neither a private-note authorization nor a ZK proof. Discover token-compatible clients with `protocol.getBroadcasters({ tokenAddress })`, choose a service, and set the final fee limit in `.withBroadcaster()`. A client can also be constructed directly from an RPC registration with `new BroadcasterClient(registration)`.
 
 
-The same attachment method supports Transfer, Shield, Credit creation, top-up and cancellation. Credit draw and registration do not support broadcasting. Existing self-submission uses the original prepared handle and ethers. When private inputs already have sufficient change, that change pays the fee without increasing public funding. Otherwise an explicitly selected public funding source adds the fee to the original amount and requires an external funding signature; Shield uses that signature without a proof, while funded private operations prove before exporting funding authorization. Private inputs pay from notes/change without reducing business outputs or Credit balances. Cancellation deducts the fee from the refund. Preparation fails on insufficient funds, an excessive fee or an unstable estimate.
+The broadcaster attachment supports Transfer, Shield and all four Credit operations. Credit creation/update/revocation fees are pulled from the owner's ERC20 wallet; owners must provide allowance and balance. Credit draw keeps explicit gross grant debits unchanged and deducts the fee from the ordinary recipient Note; usage counts gross debits. Quotes bind the final public request and fees before authorization. Existing direct submission remains available. Repricing after authorization/proving is rejected. Ordinary Note funding, change and permit behavior remains unchanged.
 
 Approve the final gross funding amount separately, or supply `fundingPermit` to sign an exact final permit through your application once fee preparation stabilizes. An existing permit is rejected when its public funding amount would increase without that callback. Managed operations atomically replace reservations under one operation id; the former managed handle becomes stale. Detached originals remain usable for ordinary self-submission. Do not execute against a deployment until its fee-enabled ABI and authenticated circuits are installed.
 

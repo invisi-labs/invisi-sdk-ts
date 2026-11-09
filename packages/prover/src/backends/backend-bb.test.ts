@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { generateProofBundle, verifyProofBundle } from "../proofs/prover";
 import {
-    CANCEL_FIXTURE,
-    LIMITED_CREATE_FIXTURE,
-    LIMITED_DRAW_FIXTURE,
-    LIMITED_TOP_UP_FIXTURE,
+    UPDATE_FIXTURE,
+    CREATE_FIXTURE,
+    DRAW_FIXTURE,
     SWEEP_FIXTURE,
-    TOP_UP_FIXTURE,
     USER_FIXTURE,
 } from "../testing/test-fixtures";
 import { ZERO_INPUT_FIXTURE } from "../testing/zero-input-fixture";
@@ -18,14 +16,12 @@ native("real BB6.0.0 native proving (set BB_BINARY_PATH)", () => {
         expect(await checkBBAvailable(bbBin)).toBe(true);
     });
     it.each([
-        ["credit_draw_slots1", LIMITED_DRAW_FIXTURE, "evm"],
-        ["credit_top_up", LIMITED_TOP_UP_FIXTURE, "evm"],
-        ["create_credit", LIMITED_CREATE_FIXTURE, "evm"],
-        ["credit_cancel", CANCEL_FIXTURE, "evm"],
-        ["credit_top_up", TOP_UP_FIXTURE, "evm"],
-        ["transact_user_slots14", USER_FIXTURE, "evm"],
-        ["transact_user_slots14", SWEEP_FIXTURE, "evm"],
-        ["transact_user_slots14", USER_FIXTURE, "noir-recursive"],
+        ["credit_draw_slots1", DRAW_FIXTURE, "evm"],
+        ["credit_update", UPDATE_FIXTURE, "evm"],
+        ["create_credit", CREATE_FIXTURE, "evm"],
+        ["transact_user_slots2", USER_FIXTURE, "evm"],
+        ["transact_user_slots1", SWEEP_FIXTURE, "evm"],
+        ["transact_user_slots2", USER_FIXTURE, "noir-recursive"],
     ] as const)(
         "proves and independently verifies case %#",
         async (circuitName, fixture, target) => {
@@ -48,7 +44,7 @@ native("real BB6.0.0 native proving (set BB_BINARY_PATH)", () => {
     it("proves and independently verifies zero-input transact14", async () => {
         const fixture = ZERO_INPUT_FIXTURE;
         const bundle = await generateProofBundle({
-            circuitName: "transact_user_slots14",
+            circuitName: "transact_user_slots2",
             inputs: fixture.witness,
             expectedPublicInputs: fixture.publicInputs,
             target: "evm",

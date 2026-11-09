@@ -64,19 +64,19 @@ it("binds complete Delivery bytes into the private WalletAuthorization statement
                     protocolAddress: BigInt(context.protocolAddress),
                 },
                 operation: "transact",
-                capacity: 14,
+                capacity: 2,
                 words: base.map(BigInt),
             })
         )
     );
-    expect(transactUserPublicInputs(context, params, [delivery])).toHaveLength(59);
+    expect(transactUserPublicInputs(context, params, [delivery])).toHaveLength(23);
     const hash = keccak256(
         AbiCoder.defaultAbiCoder().encode(
             ["(bytes ciphertext,bytes clue)[]"].map((parameter) => ParamType.from(parameter)),
             [[delivery]]
         ) as Hex
     ) as Hex;
-    expect((BigInt(base[48]!) << 128n) | BigInt(base[49]!)).toBe(BigInt(hash));
+    expect((BigInt(base[12]!) << 128n) | BigInt(base[13]!)).toBe(BigInt(hash));
     const modified = { ...delivery, clue: (delivery.clue.slice(0, -2) + "44") as `0x${string}` };
     expect(
         ((typed) =>

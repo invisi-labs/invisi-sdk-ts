@@ -1,18 +1,17 @@
 import type { PublicWallet } from "@invisi-labs/core";
 import type {
     Address,
-    CancelCreditParams,
+    RevokeCreditParams,
     CreateCreditParams,
     CreditDrawParams,
     Delivery,
     Hex,
     ShieldOutput,
     ShieldParams,
-    TopUpCreditParams,
+    UpdateCreditParams,
     TransactRequest,
 } from "@invisi-labs/protocol/contracts";
 import type { Provider } from "ethers";
-import type { GasBenchmarkProfile } from "../gas/gas-estimation";
 import type { NoteOutput } from "../notes/NoteOutput";
 
 import type { AuthorizedStatement, CreditDeliveryState, Note, Wallet } from "@invisi-labs/core";
@@ -102,46 +101,43 @@ export interface PreparedOutput {
 }
 export interface CreateCreditPreparation {
     fee?: { recipient: Address; amount: bigint };
-    /** Version-specific application data. Omission uses built-in v1 with no data. */
     payload?: Uint8Array;
     singleLimit?: bigint;
     dailyLimit?: bigint;
     monthlyLimit?: bigint;
+    lifetimeLimit?: bigint;
     tokenAddress: Address;
     spender: string;
-    amount: bigint;
     expiry: bigint;
-    funding?: FundingSource;
     deadline?: bigint;
 }
 export interface DrawCreditPreparation {
+    fee?: { recipient: Address; amount: bigint };
     tokenAddress: Address;
-    credits: readonly {
-        credit: Hex;
-        amount: bigint;
-        payload?: Uint8Array;
-    }[];
+    credits: readonly { credit: Hex; amount: bigint; payload?: Uint8Array }[];
+    recipient: string;
+    payload?: Uint8Array;
     deadline?: bigint;
 }
-export interface TopUpCreditPreparation {
+export interface UpdateCreditPreparation {
     fee?: { recipient: Address; amount: bigint };
-    /** Version-specific application data. Omission uses built-in v1 with no data. */
     payload?: Uint8Array;
-    /** Omission inherits the previous limit; zero disables it without clearing usage. */
     singleLimit?: bigint;
     dailyLimit?: bigint;
     monthlyLimit?: bigint;
+    lifetimeLimit?: bigint;
     tokenAddress: Address;
     credit: Hex;
-    additionalAmount: bigint;
     expiry?: bigint;
-    funding?: FundingSource;
     deadline?: bigint;
 }
-export interface CancelCreditPreparation {
+export interface RevokeCreditPreparation {
     fee?: { recipient: Address; amount: bigint };
     tokenAddress: Address;
-    credit: Hex;
+    owner?: Address;
+    shard: bigint;
+    slot: bigint;
+    caller?: Address;
     deadline?: bigint;
 }
 export interface PreparedCreditOutput {
@@ -159,8 +155,10 @@ export interface CreditPlan {
     deliveries: Delivery[];
     creation?: CreateCreditParams;
     draw?: CreditDrawParams;
-    cancel?: CancelCreditParams;
-    topUp?: TopUpCreditParams;
+    update?: UpdateCreditParams;
+    revocation?: RevokeCreditParams;
+    revocationSignature?: Hex;
+    revocationCaller?: Hex;
     amounts?: bigint[];
 }
 export interface OperationPlan {
@@ -168,7 +166,7 @@ export interface OperationPlan {
     version: 1;
     id: string;
     kind:
-        "transfer" | "shield" | "create-credit" | "draw-credit" | "top-up-credit" | "cancel-credit";
+        "transfer" | "shield" | "create-credit" | "draw-credit" | "update-credit" | "revoke-credit";
     context: TransactionContext;
     scope: WalletScope;
     preparedAt: CanonicalBlock;
@@ -194,7 +192,6 @@ export interface SavedOperation {
     claim?: { stage: string; token: string };
 }
 export interface TransactionInfrastructure {
-    gasBenchmarks?: readonly GasBenchmarkProfile[];
     wallet: Wallet | PublicWallet;
     protocol: Protocol;
     chainReader?: ChainReader;

@@ -9,14 +9,14 @@ export {
     aggregatePublicInputs,
     buildTransactAggregateCalldata,
     encodeAggregateFundingTypedData,
-} from "./funds/aggregate";
-export { BuildTransactCalldataParams, buildTransactCalldata } from "./funds/calldata";
+} from "./note/aggregate";
+export { BuildTransactCalldataParams, buildTransactCalldata } from "./note/calldata";
 export {
     encodeTransactFundingTypedData,
     encodeTransactTypedData,
     transactFundingRequestHash,
-} from "./funds/funding";
-export { transactUserPublicInputs } from "./funds/public-inputs";
+} from "./note/funding";
+export { transactUserPublicInputs } from "./note/public-inputs";
 export {
     TRANSACT_CAPACITIES,
     TransactCapacity,
@@ -24,14 +24,14 @@ export {
     normalizeTransactRequest,
     selectTransactCapacity,
     transactPublicInputs,
-} from "./funds/request";
+} from "./note/request";
 export {
     BuildShieldCalldataParams,
     buildShieldCalldata,
     encodeShieldFundingTypedData,
     shieldFundingRequestHash,
     validateShieldRequest,
-} from "./funds/shield";
+} from "./note/shield";
 export * from "./interfaces";
 export * from "./registry/AddressRegistry";
 export * from "./registry/registry";
@@ -41,3 +41,5 @@ export * from "./verification/verify";
 export * from "./client/TokenProtocol";
 export * from "./factory/factory";
 export * from "./registry/RegistrationOperation";
+
+export { normalizeFee } from "./fees/fee";

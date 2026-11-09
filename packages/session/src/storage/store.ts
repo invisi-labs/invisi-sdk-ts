@@ -38,7 +38,7 @@ export function scopeKey(scope: WalletScope): string {
 export function initialState(scope: WalletScope): WalletState {
     scopeKey(scope);
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         scope: { ...scope },
         revision: 0,
         notes: {},
@@ -50,7 +50,7 @@ export function initialState(scope: WalletScope): WalletState {
 export function validateState(state: WalletState, scope: WalletScope, revision: number): void {
     if (
         !state ||
-        state.schemaVersion !== 1 ||
+        state.schemaVersion !== 2 ||
         scopeKey(state.scope) !== scopeKey(scope) ||
         state.revision !== revision
     )

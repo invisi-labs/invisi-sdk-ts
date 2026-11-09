@@ -6,7 +6,7 @@ const root = resolve(process.argv[2] ?? "../invisi-protocol");
 const json = (path) => JSON.parse(readFileSync(resolve(root, path), "utf8"));
 const sha = (data) => createHash("sha256").update(data).digest("hex");
 const layouts = {};
-for (const path of ["circuits/transact-user-manifest.json", "circuits/credit-manifest.json"]) {
+for (const path of ["circuits/transact/manifest.json", "circuits/credit/manifest.json"]) {
     const manifest = json(path);
     if (!manifest.complete) throw new Error("incomplete circuit release");
     for (const [path, hash] of Object.entries(manifest.dependencies))

@@ -1,3 +1,4 @@
+import { discoverIndexedCreditStates } from "../04-credit/discover-credits.js";
 import { settings } from "../settings.js";
 import { JsonRpcProvider, getBytes } from "ethers";
 import { Disclosure, DisclosureVerifier, Protocol, ProtocolRpcClient, ViewingCapability, type DisclosureReference } from "@invisi-labs/sdk";
@@ -32,32 +33,20 @@ try {
         throw new Error("Protocol RPC has not indexed any blocks yet");
     }
     let reference: DisclosureReference | undefined;
-    for (let fromBlock = protocol.deployment.protocol.fromBlock; fromBlock <= status.indexedHead.number && !reference; fromBlock += 100n) {
-        const toBlock = fromBlock + 99n < status.indexedHead.number ? fromBlock + 99n : status.indexedHead.number;
-        const page = await rpc.getCreditOutputs(protocol.context, { fromBlock, toBlock });
-        for (const output of page.outputs) {
-            if (BigInt(output.tokenAddress) !== BigInt(tokenAddress)) {
-                continue;
-            }
-            try {
-                await viewer.decryptCredit(output.ciphertext, {
-                    chainId: protocol.context.chainId,
-                    protocolAddress: BigInt(protocol.context.protocolAddress),
-                    tokenAddress: BigInt(tokenAddress),
-                    outputCommitment: output.commitment,
-                    role: "owner",
-                });
-                reference = {
-                    transactionHash: output.transactionHash,
-                    treeId: output.treeId,
-                    leafIndex: output.leafIndex,
-                    role: "owner",
-                };
-                break;
-            } catch {
-                // Ciphertexts for other recipients or roles do not belong to this holder; also skip outputs that do not match the application format.
-                continue;
-            }
+    for (const output of await discoverIndexedCreditStates(protocolRpc, protocol, provider)) {
+        if (BigInt(output.tokenAddress) !== BigInt(tokenAddress)) continue;
+        try {
+            await viewer.decryptCredit(output.deliveries[0].ciphertext, {
+                chainId: protocol.context.chainId,
+                protocolAddress: BigInt(protocol.context.protocolAddress),
+                tokenAddress: BigInt(tokenAddress),
+                outputCommitment: output.commitment,
+                role: "owner",
+            });
+            reference = { transactionHash: output.transactionHash, treeId: output.treeId, leafIndex: output.leafIndex, role: "owner" };
+            break;
+        } catch {
+            continue;
         }
     }
     if (!reference) {
@@ -87,7 +76,7 @@ try {
         role: reference.role,
     });
 
-    // 3. Generate only the credit commitment opening, including the amount, both identities, payout addresses, expiry, limits, and usage fields.
+    // 3. Generate only the credit commitment opening, including both identities, grant namespace, expiry, limits, and usage fields.
     // Hash creditSharedKey; do not hand over the shared recovery key, recipient public-key snapshot, or memo.
     const disclosure = await Disclosure.fromCredit(state.note);
     console.log("Disclosure scope:", disclosure.getScope());
@@ -123,7 +112,7 @@ try {
     if (verified.result.kind !== "credit") {
         throw new Error("The disclosure material does not match the expected note type");
     }
-    console.log("Verified amount (token base units):", verified.result.note.amount);
+    console.log("Verified lifetime usage (token base units):", verified.result.note.totalSpent);
     console.log("Verified credit expiry:", verified.result.note.expiry);
     console.log("Verified credit per-transaction limit:", verified.result.note.singleLimit);
     console.log("On-chain output commitment:", verified.output.commitment);

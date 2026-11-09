@@ -1,275 +1,155 @@
-import { Interface } from "ethers";
-
-import {
-    buildCancelCreditCalldata,
-    buildCreditDrawCalldata,
-    buildTopUpCreditCalldata,
-    cancelCreditPublicInputs,
-    cancelCreditRequestHash,
-    creditDrawPublicInputs,
-    encodeCancelCreditTypedData,
-    encodeCreditDrawTypedData,
-    encodeTopUpCreditFundingTypedData,
-    encodeTopUpCreditTypedData,
-    selectCreditDrawCircuit,
-    topUpCreditPublicInputs,
-    topUpCreditRequestHash,
-} from "@invisi-labs/protocol";
-import { describe, expect, it } from "vitest";
-import { invisiProtocolAbi } from "../contracts/index";
-import vectors from "../protocol-vectors.json";
-const revive = (v: unknown): any =>
+import { it, expect, describe } from "vitest";
+import { Interface, TypedDataEncoder } from "ethers";
+import * as api from "../index";
+import { invisiProtocolAbi } from "../contracts";
+import raw from "../protocol-vectors.json";
+const revive = (v: any): any =>
     Array.isArray(v)
         ? v.map(revive)
         : v && typeof v === "object"
           ? Object.fromEntries(
-                Object.entries(v).map(([k, v]) => [k, k === "version" ? v : revive(v)])
+                Object.entries(v).map(([k, x]) => [k, k === "version" ? x : revive(x)])
             )
           : typeof v === "string" && /^\d+$/.test(v)
             ? BigInt(v)
             : v;
-const { context, fixtures } = revive(vectors);
-describe("current credit lifecycle reference vectors", () => {
-    for (const n of [1, 2, 13, 51])
-        it(`matches draw tier for ${n} inputs`, () => {
-            const f = fixtures["draw" + n];
-            expect(creditDrawPublicInputs(context, f.params, f.deliveries)).toEqual(f.publicInputs);
-            expect(creditDrawPublicInputs(context, f.params, f.deliveries)).toHaveLength(
-                6 * selectCreditDrawCircuit(n).maxSize + 14
-            );
-            expect(encodeCreditDrawTypedData(context, f.params, f.deliveries)).toEqual(f.typedData);
-        });
-    it("matches cancellation request hash, private wallet authorization and public input order", () => {
-        const f = fixtures.cancel;
-        expect(cancelCreditPublicInputs(context, f.params)).toEqual(f.publicInputs);
-        expect(cancelCreditRequestHash(f.params)).toBe(f.requestHash);
-        expect(encodeCancelCreditTypedData(context, f.params)).toEqual(f.typedData);
-    });
-    it("matches top-up hash and previous expiry at base public input 48", () => {
-        const f = fixtures.topUp;
-        expect(topUpCreditPublicInputs(context, f.params, f.deliveries, f.funding)).toEqual(
-            f.publicInputs
-        );
-        expect(topUpCreditRequestHash(f.params, f.deliveries, f.funding)).toBe(f.requestHash);
-        expect(encodeTopUpCreditTypedData(context, f.params, f.deliveries, f.funding)).toEqual(
-            f.typedData
-        );
-        expect(
-            encodeTopUpCreditFundingTypedData(context, f.params, f.deliveries, f.funding)
-        ).toEqual(f.fundingTypedData);
-    });
-    it("selects current credit capacities", () =>
-        expect([1, 2, 12, 13, 50, 51, 120].map((n) => selectCreditDrawCircuit(n).maxSize)).toEqual([
-            1, 12, 12, 50, 50, 120, 120,
-        ]));
-    it("requires two empty delivery slots for each fully drawn Credit", () => {
-        const f = fixtures.draw1;
-        expect(f.deliveries).toEqual([
-            { ciphertext: "0x", clue: "0x" },
-            { ciphertext: "0x", clue: "0x" },
-        ]);
-        for (const deliveries of [
-            [],
-            f.deliveries.slice(0, 1),
-            [...f.deliveries, f.deliveries[0]],
-            fixtures.create.deliveries.slice(0, 2),
-        ]) {
-            expect(() => creditDrawPublicInputs(context, f.params, deliveries)).toThrow();
+const { context, fixtures } = revive(raw),
+    iface = new Interface(invisiProtocolAbi);
+describe("deferred Credit independent protocol vectors", () => {
+    it("binds create and update exactly without any cash funding", () => {
+        for (const [key, words, typed, build] of [
+            [
+                "create",
+                api.createCreditPublicInputs,
+                api.encodeCreateCreditTypedData,
+                api.buildCreateCreditCalldata,
+            ],
+            [
+                "update",
+                api.updateCreditPublicInputs,
+                api.encodeUpdateCreditTypedData,
+                api.buildUpdateCreditCalldata,
+            ],
+        ] as const) {
+            const f = fixtures[key];
+            expect(words(context, f.params, f.deliveries)).toEqual(f.publicInputs);
+            expect(typed(context, f.params, f.deliveries)).toEqual(f.typedData);
+            expect(
+                build({ context, params: f.params, deliveries: f.deliveries, proof: "0x1234" }).data
+            ).toBe(f.calldata);
+            expect(f.deliveries).toHaveLength(2);
         }
-        const partial = {
-            token: "0x2222222222222222222222222222222222222222" as const,
-            ...f.params,
-            remainderCommitments: [fixtures.create.params.creditCommitment],
-        };
-        expect(() => creditDrawPublicInputs(context, partial, f.deliveries)).toThrow();
-        expect(
-            creditDrawPublicInputs(context, partial, fixtures.create.deliveries.slice(0, 2))
-        ).toHaveLength(20);
     });
-    it("encodes draw and top-up with current direct Credit proof frames", () => {
-        const draw = fixtures.draw1,
-            top = fixtures.topUp;
+    it.each([1, 2, 6, 11, 21, 31, 41, 51, 61, 71, 80])(
+        "matches current draw capacity and protocol public words for N=%i",
+        (n) => {
+            const f = fixtures["draw" + n];
+            expect(api.creditDrawPublicInputs(context, f.params, f.deliveries)).toEqual(
+                f.publicInputs
+            );
+            expect(f.publicInputs).toHaveLength(17 + 10 * api.selectCreditDrawCircuit(n).capacity);
+            expect(api.encodeCreditDrawTypedData(context, f.params, f.deliveries)).toEqual(
+                f.typedData
+            );
+            expect(f.params.stateCommitments).toHaveLength(n);
+            expect(f.deliveries).toHaveLength(2 * n + 1);
+        }
+    );
+    it("encodes one ordinary Note with every successor state", () => {
+        const f = fixtures.draw1;
         expect(
-            buildCreditDrawCalldata({
+            api.buildCreditDrawCalldata({
                 context,
+                params: f.params,
+                deliveries: f.deliveries,
                 proof: "0x1234",
-                params: draw.params,
-                deliveries: draw.deliveries,
             }).data
-        ).toBe(draw.calldata);
+        ).toBe(f.calldata);
+        expect(iface.decodeFunctionData("creditDraw", f.calldata)[1].noteCommitment).toBe(
+            f.params.noteCommitment
+        );
+    });
+    it("enforces grouping and distinct grant namespace ordering", () => {
+        const f = fixtures.draw2;
+        for (const p of [
+            { ...f.params, totalAmount: 1n },
+            { ...f.params, grantRefs: [f.params.grantRefs[0], f.params.grantRefs[0]] },
+            { ...f.params, grantRefs: [...f.params.grantRefs].reverse() },
+            { ...f.params, payers: [{ payer: f.params.payers[0].payer, amount: 0n }] },
+            {
+                ...f.params,
+                stateCommitments: [f.params.noteCommitment, f.params.stateCommitments[1]],
+            },
+        ])
+            expect(() => api.creditDrawPublicInputs(context, p, f.deliveries)).toThrow();
+    });
+    it("rejects retired funded creation, payout and remainder fields", () => {
+        const f = fixtures.create;
+        for (const key of [
+            "sources",
+            "nullifiers",
+            "amount",
+            "funding",
+            "changeCommitment",
+            "expiry",
+        ])
+            expect(() =>
+                api.createCreditPublicInputs(context, { ...f.params, [key]: 0n }, f.deliveries)
+            ).toThrow();
+        const d = fixtures.draw1;
+        for (const key of ["spender", "remainderCommitments", "expiries"])
+            expect(() =>
+                api.creditDrawPublicInputs(context, { ...d.params, [key]: [] }, d.deliveries)
+            ).toThrow();
+    });
+    it("requires explicit timestamp and binds public periods to draw authorization", () => {
+        const f = fixtures.draw1;
+        expect(() =>
+            api.creditDrawPublicInputs({ ...context, timestamp: undefined }, f.params, f.deliveries)
+        ).toThrow();
         expect(
-            buildTopUpCreditCalldata({
-                context,
-                proof: "0x1234",
-                params: top.params,
-                deliveries: top.deliveries,
-                funding: { ...top.funding, signature: "0xabcd" },
-            }).data
-        ).toBe(top.calldata);
+            api.creditDrawPublicInputs(
+                { ...context, timestamp: context.timestamp + 86400n },
+                f.params,
+                f.deliveries
+            )
+        ).not.toEqual(f.publicInputs);
     });
-    it("encodes cancellation against current protocol", () => {
-        const r = buildCancelCreditCalldata({
-            context,
-            proof: "0x1234",
-            params: fixtures.cancel.params,
-        });
-        expect(r.data).toBe(fixtures.cancel.calldata);
-    });
-});
-
-// The supplied proof contains private wallet authorization for the selected public payout.
-describe("wallet-authorized collection and lifecycle boundaries", () => {
-    it("encodes public payouts through the unified transact builder", async () => {
-        const { buildTransactCalldata } = await import("../index");
-        const params = {
+    it("revokes with public owner authorization and no proof", () => {
+        const p = {
             token: context.tokenAddress,
-            sources: [fixtures.cancel.params.source],
-            nullifiers: [fixtures.cancel.params.nullifier],
-            outputCommitments: [],
-            withdrawalAddress: context.protocolAddress,
-            withdrawalAmount: 100n,
+            owner: fixtures.create.params.owner,
+            shard: 1n,
+            slot: 0n,
             deadline: 900n,
         };
-        // The proof authorizes the selected payout; low-level encoding does not accept private notes.
-        for (const withdrawalAddress of [context.protocolAddress, context.tokenAddress]) {
-            const call = buildTransactCalldata({
-                context,
-                proof: "0x1234",
-                params: { ...params, withdrawalAddress },
-                deliveries: [],
-            });
-            expect(
-                new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!.name
-            ).toBe("transact");
-        }
-    });
-    it("rejects stale top-ups, decreasing expiry, duplicate credit nullifier and full-draw recovery", () => {
-        const top = fixtures.topUp,
-            draw = fixtures.draw1;
+        const typed = api.encodeRevokeCreditTypedData(context, p);
+        expect(typed.primaryType).toBe("RevokeCredit");
+        expect(typed.types.RevokeCredit.map((x) => x.name)).toEqual([
+            "token",
+            "owner",
+            "shard",
+            "slot",
+            "deadline",
+            "feeRecipient",
+            "feeAmount",
+        ]);
+        const call = api.buildRevokeCreditCalldata({
+            context,
+            params: p,
+            signature: "0x",
+            caller: p.owner,
+        });
+        expect(iface.parseTransaction({ data: call.data })!.name).toBe("revokeCredit");
         expect(() =>
-            topUpCreditPublicInputs(
-                { ...context, now: 951n },
-                top.params,
-                top.deliveries,
-                top.funding
-            )
-        ).toThrow("deadline");
-        expect(() =>
-            topUpCreditPublicInputs(
-                context,
-                { ...top.params, previousExpiry: 1001n },
-                top.deliveries,
-                top.funding
-            )
-        ).toThrow("decrease");
-        expect(() =>
-            topUpCreditPublicInputs(
-                context,
-                {
-                    ...top.params,
-                    creation: {
-                        token: "0x2222222222222222222222222222222222222222" as const,
-                        ...top.params.creation,
-                        sources: fixtures.single.params.sources,
-                        nullifiers: [top.params.creditNullifier],
-                    },
-                },
-                top.deliveries,
-                top.funding
-            )
-        ).toThrow();
-        expect(() =>
-            creditDrawPublicInputs(
-                context,
-                {
-                    ...draw.params,
-                    recoveryAmounts: ["0x" + 1n.toString(16).padStart(64, "0")],
-                },
-                draw.deliveries
-            )
-        ).toThrow("zero recovery");
-        expect(() =>
-            creditDrawPublicInputs(context, { ...draw.params, expiries: [0n] }, draw.deliveries)
-        ).toThrow("future");
-    });
-});
-
-describe("top-up incremental value requirement", () => {
-    it("rejects prior-credit-only top-ups at validation, public-input and calldata boundaries", async () => {
-        const { validateTopUpCreditRequest } = await import("@invisi-labs/protocol");
-        const top = fixtures.topUp;
-        expect(() => validateTopUpCreditRequest(context, top.params, top.deliveries)).toThrow(
-            "positive funding"
-        );
-        expect(() => topUpCreditPublicInputs(context, top.params, top.deliveries)).toThrow(
-            "positive funding"
-        );
-        expect(() =>
-            buildTopUpCreditCalldata({
-                context,
-                proof: "0x1234",
-                params: top.params,
-                deliveries: top.deliveries,
-            })
-        ).toThrow("positive funding");
-    });
-    it("retains notes-only and mixed top-ups", async () => {
-        const { validateTopUpCreditRequest } = await import("@invisi-labs/protocol"),
-            top = fixtures.topUp,
-            params = {
-                ...top.params,
-                creation: {
-                    token: "0x2222222222222222222222222222222222222222" as const,
-                    ...top.params.creation,
-                    sources: fixtures.single.params.sources,
-                    nullifiers: ["0x" + 22n.toString(16).padStart(64, "0")],
-                },
-            };
-        for (const funding of [undefined, { payer: context.protocolAddress, amount: 1n }]) {
-            expect(
-                validateTopUpCreditRequest(context, params, top.deliveries, funding).creation
-                    .nullifiers
-            ).toHaveLength(1);
-            expect(topUpCreditPublicInputs(context, params, top.deliveries, funding)).toHaveLength(
-                52
-            );
-            expect(
-                new Interface(invisiProtocolAbi).parseTransaction({
-                    data: buildTopUpCreditCalldata({
-                        context,
-                        proof: "0x1234",
-                        params,
-                        deliveries: top.deliveries,
-
-                        ...(funding ? { funding } : {}),
-                    }).data,
-                })!.name
-            ).toBe("topUpCredit");
-        }
-    });
-});
-
-describe("top-up submission funding expiry", () => {
-    it("rejects expired signed funding, accepts equality and preserves direct payer metadata", () => {
-        const top = fixtures.topUp,
-            p = {
-                context: { ...context, now: 800n },
-                proof: "0x1234" as const,
-                params: top.params,
-                deliveries: top.deliveries,
-            },
-            signed = { ...top.funding, signature: "0xabcd" };
-        expect(() =>
-            buildTopUpCreditCalldata({ ...p, funding: { ...signed, deadline: 799n } })
-        ).toThrow("funding authorization has expired");
+            api.buildRevokeCreditCalldata({ context, params: p, signature: "0x" })
+        ).toThrow(/owner/);
         expect(
-            buildTopUpCreditCalldata({ ...p, funding: { ...signed, deadline: 800n } }).data
-        ).toMatch(/^0x/);
-        expect(
-            buildTopUpCreditCalldata({
-                ...p,
-                funding: { payer: context.protocolAddress, amount: 100n },
-            }).data
-        ).toMatch(/^0x/);
+            api.buildRevokeCreditCalldata({ context, params: p, signature: "0x1234" }).approveAmount
+        ).toBe(0n);
+    });
+    it("selects exactly the13 current direct draw capacities", () => {
+        expect(api.CREDIT_DRAW_CAPACITIES).toEqual([1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80]);
+        for (const n of [0, 81, 1.1]) expect(() => api.selectCreditDrawCircuit(n)).toThrow();
     });
 });

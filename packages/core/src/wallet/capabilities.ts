@@ -2,10 +2,10 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { ReceivingAddress } from "../address/receiving-address";
 import {
-    decryptCreditNote,
+    decryptCreditState,
     decryptPrivateTransferNote,
     viewingPublicKey,
-    type CreditNoteDecryptionContext,
+    type CreditStateDecryptionContext,
     type NoteBytes,
     type NoteDecryptionContext,
 } from "../delivery/encryption";
@@ -64,8 +64,11 @@ export class ViewingCapability {
         });
     }
 
-    decryptCredit(envelope: NoteBytes, context: Omit<CreditNoteDecryptionContext, "ownerAddress">) {
-        return decryptCreditNote(this.#key, envelope, {
+    decryptCredit(
+        envelope: NoteBytes,
+        context: Omit<CreditStateDecryptionContext, "ownerAddress">
+    ) {
+        return decryptCreditState(this.#key, envelope, {
             ...context,
             ownerAddress: this.ownerAddress,
         });
@@ -86,7 +89,7 @@ export class ViewingCapability {
     /** Exposes the entire Credit envelope; prefer Disclosure.fromCredit() for hash-only opening. */
     discloseCredit(
         envelope: NoteBytes,
-        context: Omit<CreditNoteDecryptionContext, "ownerAddress">
+        context: Omit<CreditStateDecryptionContext, "ownerAddress">
     ) {
         return Disclosure.fromEncryptedCredit(this.#key, envelope, {
             ...context,

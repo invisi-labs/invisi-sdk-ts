@@ -54,8 +54,11 @@ export async function proveOperation(
         throw new Error("execution must be single or aggregate");
     }
     const frozen = statement(plan);
-    if (execution === "aggregate" && (plan.kind !== "transfer" || plan.capacity !== 14)) {
-        throw new Error("aggregate execution requires a 14-slot transfer");
+    if (
+        execution === "aggregate" &&
+        (plan.kind !== "transfer" || !plan.capacity || plan.capacity > 10)
+    ) {
+        throw new Error("aggregate execution requires a C1..C10 transfer");
     }
     if (plan.kind === "transfer") {
         // Only the proof backend/key changes; public words and wallet authorization stay fixed.

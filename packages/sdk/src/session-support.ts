@@ -15,7 +15,7 @@ export * from "./transactions/execution/calldata";
 export * from "./transactions/execution/operation-execution";
 export * from "./transactions/execution/operation-preview";
 export * from "./transactions/operation-types";
-export * from "./transactions/preparation/credit-values";
+export * from "./credit/state";
 export * from "./transactions/preparation/inputs";
 export * from "./transactions/preparation/transaction-preparation";
 export * from "./transactions/proving/aggregate-receipt";
@@ -29,3 +29,8 @@ export * from "./transactions/signing/statement";
 export * from "./client/infrastructure";
 
 export { TransactionOutput } from "./notes/TransactionOutput";
+
+export {
+    revocationSigningRequest,
+    acceptRevocationSignature,
+} from "./transactions/signing/revocation";

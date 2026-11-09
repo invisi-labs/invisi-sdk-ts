@@ -1,10 +1,10 @@
-import type { CreditDeliveryState, CreditNote, Note } from "../types";
+import type { CreditDeliveryState, CreditState, Note } from "../types";
 import { deliveryCodec, deliveryHeader } from "./delivery-codec";
 import { envelopeBytes, open, publicKey, seal, viewingPublicKey } from "./envelope";
 import { normalizeCreditDeliveryState } from "./note-payload";
 import {
-    CreditNoteDecryptionContext,
-    CreditNoteEncryptionContext,
+    CreditStateDecryptionContext,
+    CreditStateEncryptionContext,
     NoteBytes,
     NoteDecryptionContext,
     NoteEncryptionContext,
@@ -88,10 +88,10 @@ function matchCreditRecipient(
 }
 
 /** SDK v1 Credit envelope with a fixed recovery prefix and opaque application bytes. */
-export async function encryptCreditNote(
+export async function encryptCreditState(
     viewingKey: NoteBytes,
     state: CreditDeliveryState,
-    context: CreditNoteEncryptionContext
+    context: CreditStateEncryptionContext
 ): Promise<Uint8Array> {
     const scopedState = normalizeCreditDeliveryState(state),
         scopedNote = scopedState.note;
@@ -116,9 +116,9 @@ export async function encryptCreditNote(
 async function readCredit(
     key: NoteBytes,
     envelope: NoteBytes,
-    context: CreditNoteDecryptionContext,
+    context: CreditStateDecryptionContext,
     payloadKey = false
-): Promise<CreditDeliveryState & { note: CreditNote & { payload: Uint8Array } }> {
+): Promise<CreditDeliveryState & { note: CreditState & { payload: Uint8Array } }> {
     const authenticatedContext = { ...context };
     const data = envelopeBytes(envelope, true);
     const plain = await open(
@@ -169,11 +169,11 @@ export function decryptPrivateTransferNote(
 }
 
 /** Authenticated Credit decryption, including role and historical receiving keys. */
-export function decryptCreditNote(
+export function decryptCreditState(
     key: NoteBytes,
     envelope: NoteBytes,
-    context: CreditNoteDecryptionContext
-): Promise<CreditDeliveryState & { note: CreditNote & { payload: Uint8Array } }> {
+    context: CreditStateDecryptionContext
+): Promise<CreditDeliveryState & { note: CreditState & { payload: Uint8Array } }> {
     return readCredit(key, envelope, context);
 }
 
@@ -189,14 +189,14 @@ export function decryptNotePayload(
 export function decryptCreditPayload(
     key: NoteBytes,
     envelope: NoteBytes,
-    context: CreditNoteDecryptionContext
-): Promise<CreditDeliveryState & { note: CreditNote & { payload: Uint8Array } }> {
+    context: CreditStateDecryptionContext
+): Promise<CreditDeliveryState & { note: CreditState & { payload: Uint8Array } }> {
     return readCredit(key, envelope, context, true);
 }
 
 export {
-    CreditNoteDecryptionContext,
-    CreditNoteEncryptionContext,
+    CreditStateDecryptionContext,
+    CreditStateEncryptionContext,
     NoteBytes,
     NoteDecryptionContext,
     NoteEncryptionContext,

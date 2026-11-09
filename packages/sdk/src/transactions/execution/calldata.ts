@@ -1,9 +1,9 @@
 import {
-    buildCancelCreditCalldata,
+    buildRevokeCreditCalldata,
     buildCreateCreditCalldata,
     buildCreditDrawCalldata,
     buildShieldCalldata,
-    buildTopUpCreditCalldata,
+    buildUpdateCreditCalldata,
     buildTransactCalldata,
     type TransactionCall,
 } from "@invisi-labs/protocol";
@@ -18,10 +18,10 @@ export async function encodeOperation(saved: SavedOperation): Promise<Transactio
     const funded = { ...common, funding: plan.funding, ...(caller ? { caller } : {}) };
 
     let encoded: { data: Hex };
-    if (credit?.topUp) {
-        encoded = buildTopUpCreditCalldata({
+    if (credit?.update) {
+        encoded = buildUpdateCreditCalldata({
             ...funded,
-            params: credit.topUp,
+            params: credit.update,
             deliveries: credit.deliveries,
         });
     } else if (credit?.creation) {
@@ -36,8 +36,13 @@ export async function encodeOperation(saved: SavedOperation): Promise<Transactio
             params: credit.draw,
             deliveries: credit.deliveries,
         });
-    } else if (credit?.cancel) {
-        encoded = buildCancelCreditCalldata({ ...common, params: credit.cancel });
+    } else if (credit?.revocation) {
+        encoded = buildRevokeCreditCalldata({
+            context: plan.context,
+            params: credit.revocation,
+            signature: credit.revocationSignature ?? "0x",
+            ...(credit.revocationCaller ? { caller: credit.revocationCaller } : {}),
+        });
     } else if (plan.kind === "shield") {
         encoded = await buildShieldCalldata({
             ...funded,

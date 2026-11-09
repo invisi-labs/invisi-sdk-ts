@@ -11,10 +11,10 @@ export interface NoteDecryptionContext extends NoteEncryptionContext {
     ownerAddress: `0x${string}`;
 }
 
-export interface CreditNoteEncryptionContext extends NoteEncryptionContext {
+export interface CreditStateEncryptionContext extends NoteEncryptionContext {
     role: "owner" | "spender";
 }
 
-export interface CreditNoteDecryptionContext extends NoteDecryptionContext {
+export interface CreditStateDecryptionContext extends NoteDecryptionContext {
     role: "owner" | "spender";
 }

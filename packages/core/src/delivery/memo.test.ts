@@ -90,19 +90,20 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
             tokenAddress: context.tokenAddress,
             spenderWalletIdentity: address(vectors.credit.spenderWalletIdentity),
             ownerWalletIdentity: address(vectors.credit.ownerWalletIdentity),
-            spenderPayout: BigInt(vectors.credit.spenderPayout),
-            ownerPayout: BigInt(vectors.credit.ownerPayout),
-            amount: BigInt(vectors.credit.amount),
+            revocationShard: BigInt(vectors.credit.revocationShard),
+            revocationSlot: BigInt(vectors.credit.revocationSlot),
             nonce: BigInt(vectors.credit.nonce),
             expiry: BigInt(vectors.credit.expiry),
             creditSharedKey: BigInt(vectors.credit.creditSharedKey),
             singleLimit: BigInt(vectors.credit.singleLimit),
             dailyLimit: BigInt(vectors.credit.dailyLimit),
             monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+            lifetimeLimit: BigInt(vectors.credit.lifetimeLimit),
             lastDay: BigInt(vectors.credit.lastDay),
             dailySpent: BigInt(vectors.credit.dailySpent),
             lastMonth: BigInt(vectors.credit.lastMonth),
             monthlySpent: BigInt(vectors.credit.monthlySpent),
+            totalSpent: BigInt(vectors.credit.totalSpent),
         },
         ownerReceivingKeys: {
             viewingPublicKey: core.viewingPublicKey(key),
@@ -137,16 +138,16 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         const privateKey = Uint8Array.from(
             Buffer.from(vectors[role].viewingPrivateKey.slice(2), "hex")
         );
-        const pending = core.encryptCreditNote(
+        const pending = core.encryptCreditState(
             publicKey,
             { ...state, note: { ...state.note, payload: core.creditV1.encode({ memo }) } },
             scoped
         );
         memo.fill(0);
         const envelope = await pending;
-        expect(envelope[0]).toBe(129);
-        expect(envelope).toHaveLength(755);
-        const decoded = await core.decryptCreditNote(privateKey, envelope, scoped);
+        expect(envelope[0]).toBe(130);
+        expect(envelope).toHaveLength(741);
+        const decoded = await core.decryptCreditState(privateKey, envelope, scoped);
         expect(core.creditV1.decode(decoded.note.payload!).memo).toEqual(
             new Uint8Array(256).fill(255)
         );
@@ -186,7 +187,7 @@ it("decrypts every independently generated text and opaque shared memo vector", 
                 payload: core.fundsV1.encode({ memo }),
             });
         } else {
-            const decoded = await core.decryptCreditNote(
+            const decoded = await core.decryptCreditState(
                 privateKey,
                 vector.ciphertext as `0x${string}`,
                 {
@@ -197,16 +198,17 @@ it("decrypts every independently generated text and opaque shared memo vector", 
                 }
             );
             expect(decoded.note).toMatchObject({
-                amount: BigInt(vectors.credit.amount),
                 nonce: BigInt(vectors.credit.nonce),
                 creditSharedKey: BigInt(vectors.credit.creditSharedKey),
                 singleLimit: BigInt(vectors.credit.singleLimit),
                 dailyLimit: BigInt(vectors.credit.dailyLimit),
                 monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+                lifetimeLimit: BigInt(vectors.credit.lifetimeLimit),
                 lastDay: BigInt(vectors.credit.lastDay),
                 dailySpent: BigInt(vectors.credit.dailySpent),
                 lastMonth: BigInt(vectors.credit.lastMonth),
                 monthlySpent: BigInt(vectors.credit.monthlySpent),
+                totalSpent: BigInt(vectors.credit.totalSpent),
                 payload: core.creditV1.encode({ memo }),
             });
         }

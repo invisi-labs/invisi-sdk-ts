@@ -91,8 +91,9 @@ export const transactionWire = (state = "indexed") => ({
     status: state,
     indexedHead: wireBlock,
     ...(state === "not_found" ? {} : { blockNumber: 10, blockHash: h(10), receiptStatus: 1 }),
-    outputs: state === "indexed" ? [] : null,
-    creditTransitions: state === "indexed" ? [] : null,
+    notes: state === "indexed" ? [] : null,
+    states: state === "indexed" ? [] : null,
+    transitions: state === "indexed" ? [] : null,
 });
 
 export const transactionOutput = () => ({

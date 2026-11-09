@@ -10,8 +10,8 @@ const methods = [
     "prepareShield",
     "prepareCreateCredit",
     "prepareDrawCredit",
-    "prepareTopUpCredit",
-    "prepareCancelCredit",
+    "prepareUpdateCredit",
+    "prepareRevokeCredit",
 ] as const;
 const registration = "prepareRegistration" as const;
 
@@ -140,9 +140,7 @@ describe("recipient preparation failures", () => {
                 wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
                 protocol,
                 tokenAddress: h.context.tokenAddress,
-                inputs: [],
                 spender: h.bob.ownerAddress,
-                amount: 1n,
                 expiry: 2000001000n,
             })
             .catch((error: unknown) => error);

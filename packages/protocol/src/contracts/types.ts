@@ -61,42 +61,57 @@ export interface TransactRequest {
 }
 export interface CreateCreditParams {
     token: Address;
-    sources: readonly InputSource[];
-    nullifiers: readonly Hex[];
-    creditCommitment: Hex;
-    changeCommitment: Hex;
     owner: Address;
-    expiry: bigint;
+    revocationShard: bigint;
+    revocationSlot: bigint;
+    creditCommitment: Hex;
     deadline: bigint;
     feeRecipient?: Address;
     feeAmount?: bigint;
+}
+export interface CreditPayer {
+    payer: Address;
+    amount: bigint;
+}
+export interface CreditGrantRef {
+    payerIndex: bigint;
+    shard: bigint;
+    slot: bigint;
 }
 export interface CreditDrawParams {
     token: Address;
     sources: readonly InputSource[];
+    payers: readonly CreditPayer[];
+    grantRefs: readonly CreditGrantRef[];
     nullifiers: readonly Hex[];
-    remainderCommitments: readonly Hex[];
-    expiries: readonly bigint[];
+    stateCommitments: readonly Hex[];
     recoveryAmounts: readonly Hex[];
-    spender: Address;
+    noteCommitment: Hex;
     totalAmount: bigint;
-    deadline: bigint;
-}
-export interface CancelCreditParams {
-    token: Address;
-    source: InputSource;
-    nullifier: Hex;
-    owner: Address;
-    amount: bigint;
     deadline: bigint;
     feeRecipient?: Address;
     feeAmount?: bigint;
 }
-export interface TopUpCreditParams {
-    creation: CreateCreditParams;
-    creditSource: InputSource;
-    creditNullifier: Hex;
-    previousExpiry: bigint;
+export interface UpdateCreditParams {
+    token: Address;
+    owner: Address;
+    source: InputSource;
+    nullifier: Hex;
+    creditCommitment: Hex;
+    revocationShard: bigint;
+    revocationSlot: bigint;
+    deadline: bigint;
+    feeRecipient?: Address;
+    feeAmount?: bigint;
+}
+export interface RevokeCreditParams {
+    token: Address;
+    owner: Address;
+    shard: bigint;
+    slot: bigint;
+    deadline: bigint;
+    feeRecipient?: Address;
+    feeAmount?: bigint;
 }
 export interface ReceivingKeys {
     viewingPublicKey: Hex;

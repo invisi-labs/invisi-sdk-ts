@@ -250,82 +250,54 @@ describe("broadcaster final intents", () => {
     });
 });
 
-it.each(["shield", "createCredit", "topUpCredit", "cancelCredit"])(
-    "binds %s intent and omits only proof and funding signature",
-    (method) => {
-        const zero = ZeroHash;
-        const token = "0x" + "33".repeat(20);
-        const source = { treeId: 1n, merkleRoot: zero };
-        const fee = { feeRecipient: signer.address, feeAmount: 2n };
-        const creation = {
-            token,
-            sources: [source],
-            nullifiers: ["0x" + "44".repeat(32)],
-            creditCommitment: zero,
-            changeCommitment: zero,
-            owner: signer.address,
-            expiry: 9999999999n,
-            deadline: 9999999999n,
-            ...fee,
-        };
-        const build = (proof: string, signature: string, feeAmount = 2n) => {
-            const funding = {
-                payer: signer.address,
-                amount: 102n,
-                sigNonce: 1n,
-                deadline: 9999999999n,
-                signature,
-                permit: { deadline: 0n, v: 0, r: zero, s: zero },
-            };
-            const params = { ...creation, feeAmount };
-            const args =
-                method === "shield"
-                    ? [
-                          {
-                              token,
-                              outputCommitments: [zero],
-                              deadline: 9999999999n,
-                              ...fee,
-                              feeAmount,
-                          },
-                          [{ identity: zero, amount: 100n }],
-                          [],
-                          funding,
-                      ]
-                    : method === "createCredit"
-                      ? [proof, params, [], funding]
-                      : method === "topUpCredit"
-                        ? [
-                              proof,
-                              {
-                                  creation: params,
-                                  creditSource: source,
-                                  creditNullifier: zero,
-                                  previousExpiry: 9999999998n,
-                              },
-                              [],
-                              funding,
-                          ]
-                        : [
-                              proof,
-                              {
-                                  token,
-                                  source,
-                                  nullifier: zero,
-                                  owner: signer.address,
-                                  amount: 100n,
-                                  deadline: 9999999999n,
-                                  ...fee,
-                                  feeAmount,
-                              },
-                          ];
-            return broadcasterTransactInterface.encodeFunctionData(method, args);
-        };
-        expect(broadcasterRequestHash(build("0x1234", "0x11"))).toBe(
-            broadcasterRequestHash(build("0xabcd", "0x22"))
-        );
-        expect(broadcasterRequestHash(build("0x1234", "0x11"))).not.toBe(
-            broadcasterRequestHash(build("0x1234", "0x11", 3n))
+it("matches all six independent canonical ABI and EIP712 cross-language vectors", async () => {
+    const { readFileSync } = await import("node:fs");
+    const vectors = JSON.parse(
+        readFileSync(new URL("./testdata/broadcaster-v1.json", import.meta.url), "utf8")
+    );
+    expect(vectors).toHaveLength(6);
+    for (const vector of vectors) {
+        expect(broadcasterRequestHash(vector.data)).toBe(vector.requestHash);
+        expect(broadcasterRequestHash(vector.unsignedVariant)).toBe(vector.requestHash);
+        verifyBroadcasterQuote(
+            { quote: vector.quote, signature: vector.signature },
+            { ...vector.trust, chainId: BigInt(vector.trust.chainId) },
+            vector.data,
+            1900000000n
         );
     }
-);
+});
+
+it("rejects zero Credit service fees and binds positive protocol fees", async () => {
+    const { readFileSync } = await import("node:fs");
+    const vectors = JSON.parse(
+        readFileSync(new URL("./testdata/broadcaster-v1.json", import.meta.url), "utf8")
+    );
+    for (const vector of vectors.filter(
+        (v: { method: string }) => !["transact", "shield"].includes(v.method)
+    )) {
+        const client = new BroadcasterClient(
+            {
+                endpoint: "https://example.org",
+                quoteSigner: vector.trust.signer,
+                feeRecipient: vector.quote.feeRecipient,
+            },
+            async (request) => ({
+                jsonrpc: "2.0",
+                id: request.id,
+                result: { feeRecipient: ZeroAddress, feeAmount: "0", maxGas: "100000" },
+            })
+        );
+        await expect(client.fee(vector.quote.token, vector.data)).rejects.toThrow(
+            "invalid broadcaster fee"
+        );
+        expect(() =>
+            verifyBroadcasterQuote(
+                { quote: { ...vector.quote, feeAmount: "0" }, signature: vector.signature },
+                { ...vector.trust, chainId: BigInt(vector.trust.chainId) },
+                vector.data,
+                1900000000n
+            )
+        ).toThrow();
+    }
+});

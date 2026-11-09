@@ -59,10 +59,15 @@ export async function fixture() {
         isKnownRoot: async () => true,
         isSpent: async (_: unknown, words: readonly Hex[]) => words.map(() => false),
         getFundingNonce: async () => 0n,
+        getCreditAllocation: async () => ({ shard: 1n, slot: 0 }),
+        getCreditRevocationBitmap: async () => 0n,
     } as unknown as ChainReader;
     const membership: ProtocolDataProvider = {
         getStatus: async () => ({ indexedHead: block, detectionEnabled: false, checkedBits: 8 }),
-        getUpdates: async () => ({ block, transactionHashes: [] }),
+        getNoteUpdates: async () => ({ block, notes: [] }),
+        getCreditTransitions: async () => ({ block, transitions: [] }),
+        detectNotes: async () => ({ block, notes: [] }),
+        detectCreditStates: async () => ({ block, states: [] }),
         getMembership: async (_, input) => {
             const proof = tree.getProof(input.leafIndex);
             return {
@@ -127,7 +132,15 @@ export async function receiptLog(
         topics: new Interface([event])
             .encodeEventLog(
                 name,
-                event.inputs.map((input) => args[input.name])
+                event.inputs.map(
+                    (input) =>
+                        args[input.name] ??
+                        (input.name === "feeRecipient"
+                            ? "0x0000000000000000000000000000000000000000"
+                            : input.name === "feeAmount"
+                              ? 0n
+                              : undefined)
+                )
             )
             .topics.map((topic) => {
                 if (typeof topic !== "string") throw new Error("incomplete event topics");
@@ -135,7 +148,15 @@ export async function receiptLog(
             }),
         data: new Interface([event]).encodeEventLog(
             name,
-            event.inputs.map((input) => args[input.name])
+            event.inputs.map(
+                (input) =>
+                    args[input.name] ??
+                    (input.name === "feeRecipient"
+                        ? "0x0000000000000000000000000000000000000000"
+                        : input.name === "feeAmount"
+                          ? 0n
+                          : undefined)
+            )
         ).data as Hex,
     };
 }

@@ -7,7 +7,7 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 
 // Complete broadcaster walkthrough: Alice funds Bob's note and the fee; the broadcaster pays gas.
 // The same withBroadcaster() attachment supports prepareTransfer, prepareShield,
-// prepareCreateCredit, prepareTopUpCredit and prepareCancelCredit.
+// prepareCreateCredit, prepareDrawCredit, prepareUpdateCredit and prepareRevokeCredit.
 // Credit draw and address registration do not support broadcasters.
 // Transfer and Credit operations also require owner authorization and a local proof;
 // their public funding, when present, is signed after proving. Cancellation fees

@@ -160,11 +160,15 @@ it("does not advance discovery over gaps or after a partially failed range", asy
     const h = await fixture();
     await h.session.refresh({ fromBlock: 1n, toBlock: 12n });
     expect((await h.session.getHistory()).checkedThrough).toBeNull();
+    vi.spyOn(h.membership, "getCreditTransitions").mockImplementation(async (_, range) => ({
+        block: { ...(await h.reader.getBlock(range.toBlock)), number: range.toBlock },
+        transitions: [],
+    }));
     let pages = 0;
-    vi.spyOn(h.membership, "getUpdates").mockImplementation(async (_, range) => {
+    vi.spyOn(h.membership, "getNoteUpdates").mockImplementation(async (_, range) => {
         if (++pages === 2) throw new Error("indexer unavailable");
-        const block = await h.reader.getBlock(12n);
-        return { block: { ...block, number: range.toBlock }, transactionHashes: [] };
+        const block = { ...(await h.reader.getBlock(range.toBlock)), number: range.toBlock };
+        return { block, notes: [] };
     });
     await expect(h.session.refresh({ fromBlock: 0n, toBlock: 12n, pageSize: 5 })).rejects.toThrow(
         /indexer unavailable/

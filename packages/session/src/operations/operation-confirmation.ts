@@ -185,8 +185,8 @@ export async function confirmOperation(
                 receipt.block
             );
             await verifyMembership(reader, plan.context, receipt.block, input, proof);
-            const index = plan.credit?.draw?.remainderCommitments.indexOf(output.commitment);
-            const parent = plan.credit?.topUp
+            const index = plan.credit?.draw?.stateCommitments.indexOf(output.commitment);
+            const parent = plan.credit?.update
                 ? plan.credit.inputs[0]
                 : index !== undefined && index >= 0
                   ? plan.credit?.inputs[index]
@@ -194,7 +194,7 @@ export async function confirmOperation(
             const receivingKeySource =
                 parent && state.credits[parent.commitment + ":" + role]
                     ? {
-                          kind: plan.credit?.topUp ? ("top-up" as const) : ("draw" as const),
+                          kind: plan.credit?.update ? ("update" as const) : ("draw" as const),
                           commitment: parent.commitment,
                       }
                     : undefined;

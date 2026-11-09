@@ -15,7 +15,7 @@ import { deriveWallet } from "./wallet";
 const request = {
     context: { chainId: 31337n, protocolAddress: 0x1234n },
     operation: "transact" as const,
-    capacity: 14,
+    capacity: 2,
     words: [31337n, 0x1234n],
 };
 describe("capability wallet objects", () => {

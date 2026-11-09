@@ -1,7 +1,7 @@
 import { computeNoteCommitment, computeNoteIdentity } from "../notes/commitment";
-import { computeCreditCommitment, computeCreditSharedKeyHash } from "../notes/creditCommitment";
+import { computeCreditCommitment, computeCreditSharedKeyHash } from "../credit/state";
 import { assertNoteContext } from "../notes/noteContext";
-import type { CreditNote, Note } from "../types";
+import type { CreditState, Note } from "../types";
 import { field, uint } from "./binary";
 import { NoteEncryptionContext } from "./types";
 
@@ -21,28 +21,6 @@ function validateNote(note: Note): void {
     uint(note.tokenAddress, 160, "tokenAddress");
 }
 
-function validateCredit(note: CreditNote): void {
-    uint(note.amount, 126, "amount");
-    uint(note.expiry, 64, "expiry");
-    uint(note.tokenAddress, 160, "tokenAddress");
-    uint(BigInt(note.spenderWalletIdentity), 160, "spenderWalletIdentity");
-    uint(BigInt(note.ownerWalletIdentity), 160, "ownerWalletIdentity");
-    uint(note.spenderPayout, 160, "spenderPayout");
-    uint(note.ownerPayout, 160, "ownerPayout");
-    field(note.nonce, "nonce");
-    field(note.creditSharedKey, "creditSharedKey");
-    if (
-        BigInt(note.spenderWalletIdentity) === 0n ||
-        BigInt(note.ownerWalletIdentity) === 0n ||
-        note.spenderPayout === 0n ||
-        note.ownerPayout === 0n ||
-        note.amount === 0n ||
-        note.expiry === 0n ||
-        note.creditSharedKey === 0n
-    )
-        throw new Error("Credit roles, payouts, amount, expiry and shared key must be positive");
-}
-
 export async function noteCommitment(context: NoteEncryptionContext, note: Note): Promise<void> {
     validateContext(context, note.tokenAddress);
     assertNoteContext(note, context);
@@ -59,24 +37,11 @@ export async function noteCommitment(context: NoteEncryptionContext, note: Note)
 
 export async function creditCommitment(
     context: NoteEncryptionContext,
-    note: CreditNote
+    note: CreditState
 ): Promise<void> {
     validateContext(context, note.tokenAddress);
     assertNoteContext(note, context);
-    validateCredit(note);
-    const commitment = await computeCreditCommitment(
-        context.chainId,
-        note.spenderWalletIdentity,
-        note.ownerWalletIdentity,
-        note.spenderPayout,
-        note.ownerPayout,
-        note.tokenAddress,
-        note.amount,
-        note.nonce,
-        note.expiry,
-        await computeCreditSharedKeyHash(note.creditSharedKey),
-        note
-    );
+    const commitment = await computeCreditCommitment(note);
     if (BigInt(commitment) !== BigInt(context.outputCommitment))
         throw new Error("credit commitment mismatch");
 }

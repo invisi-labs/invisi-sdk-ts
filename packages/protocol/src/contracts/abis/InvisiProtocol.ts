@@ -159,78 +159,6 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "function",
-    "name": "cancelCredit",
-    "inputs": [
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "p",
-        "type": "tuple",
-        "internalType": "struct IInvisiProtocol.CancelCreditParams",
-        "components": [
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "source",
-            "type": "tuple",
-            "internalType": "struct IInvisiProtocol.InputSource",
-            "components": [
-              {
-                "name": "treeId",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "merkleRoot",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "nullifier",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "owner",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "feeRecipient",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "feeAmount",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "circuitPaused",
     "inputs": [],
     "outputs": [
@@ -262,46 +190,24 @@ export const invisiProtocolAbi = [
             "internalType": "address"
           },
           {
-            "name": "sources",
-            "type": "tuple[]",
-            "internalType": "struct IInvisiProtocol.InputSource[]",
-            "components": [
-              {
-                "name": "treeId",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "merkleRoot",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "nullifiers",
-            "type": "bytes32[]",
-            "internalType": "bytes32[]"
-          },
-          {
-            "name": "creditCommitment",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "changeCommitment",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
             "name": "owner",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "expiry",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "revocationShard",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "revocationSlot",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "creditCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "deadline",
@@ -336,69 +242,39 @@ export const invisiProtocolAbi = [
             "internalType": "bytes"
           }
         ]
-      },
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct IInvisiProtocol.FundingParams",
-        "components": [
-          {
-            "name": "payer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "sigNonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "signature",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "permit",
-            "type": "tuple",
-            "internalType": "struct IMetaTx.TokenPermit",
-            "components": [
-              {
-                "name": "deadline",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "v",
-                "type": "uint8",
-                "internalType": "uint8"
-              },
-              {
-                "name": "r",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "s",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          }
-        ]
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "creditAllocation",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "shard",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "slot",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -437,19 +313,53 @@ export const invisiProtocolAbi = [
             ]
           },
           {
+            "name": "payers",
+            "type": "tuple[]",
+            "internalType": "struct IInvisiProtocol.CreditPayer[]",
+            "components": [
+              {
+                "name": "payer",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "grantRefs",
+            "type": "tuple[]",
+            "internalType": "struct IInvisiProtocol.CreditGrantRef[]",
+            "components": [
+              {
+                "name": "payerIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "shard",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "slot",
+                "type": "uint16",
+                "internalType": "uint16"
+              }
+            ]
+          },
+          {
             "name": "nullifiers",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
           },
           {
-            "name": "remainderCommitments",
+            "name": "stateCommitments",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
-          },
-          {
-            "name": "expiries",
-            "type": "uint256[]",
-            "internalType": "uint256[]"
           },
           {
             "name": "recoveryAmounts",
@@ -457,9 +367,9 @@ export const invisiProtocolAbi = [
             "internalType": "bytes32[]"
           },
           {
-            "name": "spender",
-            "type": "address",
-            "internalType": "address"
+            "name": "noteCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "totalAmount",
@@ -468,6 +378,16 @@ export const invisiProtocolAbi = [
           },
           {
             "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -493,6 +413,40 @@ export const invisiProtocolAbi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "creditRevocationBitmap",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shard",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "word",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -772,6 +726,54 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "function",
+    "name": "revokeCredit",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "shard",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "slot",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "feeRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "feeAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "signature",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "rootHistory",
     "inputs": [
       {
@@ -868,198 +870,6 @@ export const invisiProtocolAbi = [
           },
           {
             "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "",
-        "type": "tuple[]",
-        "internalType": "struct IInvisiProtocol.Delivery[]",
-        "components": [
-          {
-            "name": "ciphertext",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "clue",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      },
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct IInvisiProtocol.FundingParams",
-        "components": [
-          {
-            "name": "payer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "sigNonce",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "signature",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "permit",
-            "type": "tuple",
-            "internalType": "struct IMetaTx.TokenPermit",
-            "components": [
-              {
-                "name": "deadline",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "v",
-                "type": "uint8",
-                "internalType": "uint8"
-              },
-              {
-                "name": "r",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "s",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "topUpCredit",
-    "inputs": [
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "p",
-        "type": "tuple",
-        "internalType": "struct IInvisiProtocol.TopUpCreditParams",
-        "components": [
-          {
-            "name": "creation",
-            "type": "tuple",
-            "internalType": "struct IInvisiProtocol.CreateCreditParams",
-            "components": [
-              {
-                "name": "token",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "sources",
-                "type": "tuple[]",
-                "internalType": "struct IInvisiProtocol.InputSource[]",
-                "components": [
-                  {
-                    "name": "treeId",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  },
-                  {
-                    "name": "merkleRoot",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                  }
-                ]
-              },
-              {
-                "name": "nullifiers",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
-              },
-              {
-                "name": "creditCommitment",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "changeCommitment",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "owner",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "expiry",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "deadline",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "feeRecipient",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "feeAmount",
-                "type": "uint256",
-                "internalType": "uint256"
-              }
-            ]
-          },
-          {
-            "name": "creditSource",
-            "type": "tuple",
-            "internalType": "struct IInvisiProtocol.InputSource",
-            "components": [
-              {
-                "name": "treeId",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "merkleRoot",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "creditNullifier",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "previousExpiry",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -1494,6 +1304,105 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "function",
+    "name": "updateCredit",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "p",
+        "type": "tuple",
+        "internalType": "struct IInvisiProtocol.UpdateCreditParams",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "source",
+            "type": "tuple",
+            "internalType": "struct IInvisiProtocol.InputSource",
+            "components": [
+              {
+                "name": "treeId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "merkleRoot",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          },
+          {
+            "name": "nullifier",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "creditCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "revocationShard",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "revocationSlot",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct IInvisiProtocol.Delivery[]",
+        "components": [
+          {
+            "name": "ciphertext",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "clue",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "verifierRouter",
     "inputs": [],
     "outputs": [
@@ -1753,49 +1662,12 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "event",
-    "name": "CreditCancelled",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "owner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "inputTreeId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "nullifier",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "CreditCreated",
     "inputs": [
       {
         "name": "token",
         "type": "address",
-        "indexed": false,
+        "indexed": true,
         "internalType": "address"
       },
       {
@@ -1811,28 +1683,16 @@ export const invisiProtocolAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "sources",
-        "type": "tuple[]",
+        "name": "revocationShard",
+        "type": "uint64",
         "indexed": false,
-        "internalType": "struct IInvisiProtocol.InputSource[]",
-        "components": [
-          {
-            "name": "treeId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "merkleRoot",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          }
-        ]
+        "internalType": "uint64"
       },
       {
-        "name": "nullifiers",
-        "type": "bytes32[]",
+        "name": "revocationSlot",
+        "type": "uint16",
         "indexed": false,
-        "internalType": "bytes32[]"
+        "internalType": "uint16"
       },
       {
         "name": "creditCommitment",
@@ -1841,16 +1701,10 @@ export const invisiProtocolAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "changeCommitment",
-        "type": "bytes32",
+        "name": "leafIndex",
+        "type": "uint32",
         "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "leafIndices",
-        "type": "uint32[]",
-        "indexed": false,
-        "internalType": "uint32[]"
+        "internalType": "uint32"
       },
       {
         "name": "deliveries",
@@ -1871,7 +1725,19 @@ export const invisiProtocolAbi = [
         ]
       },
       {
-        "name": "expiry",
+        "name": "deadline",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "feeRecipient",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "feeAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1883,12 +1749,6 @@ export const invisiProtocolAbi = [
     "type": "event",
     "name": "CreditDraw",
     "inputs": [
-      {
-        "name": "spender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
       {
         "name": "outputTreeId",
         "type": "uint256",
@@ -1924,19 +1784,53 @@ export const invisiProtocolAbi = [
             ]
           },
           {
+            "name": "payers",
+            "type": "tuple[]",
+            "internalType": "struct IInvisiProtocol.CreditPayer[]",
+            "components": [
+              {
+                "name": "payer",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "grantRefs",
+            "type": "tuple[]",
+            "internalType": "struct IInvisiProtocol.CreditGrantRef[]",
+            "components": [
+              {
+                "name": "payerIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "shard",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "slot",
+                "type": "uint16",
+                "internalType": "uint16"
+              }
+            ]
+          },
+          {
             "name": "nullifiers",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
           },
           {
-            "name": "remainderCommitments",
+            "name": "stateCommitments",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
-          },
-          {
-            "name": "expiries",
-            "type": "uint256[]",
-            "internalType": "uint256[]"
           },
           {
             "name": "recoveryAmounts",
@@ -1944,9 +1838,9 @@ export const invisiProtocolAbi = [
             "internalType": "bytes32[]"
           },
           {
-            "name": "spender",
-            "type": "address",
-            "internalType": "address"
+            "name": "noteCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "totalAmount",
@@ -1957,11 +1851,21 @@ export const invisiProtocolAbi = [
             "name": "deadline",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       },
       {
-        "name": "remainderLeafIndices",
+        "name": "leafIndices",
         "type": "uint32[]",
         "indexed": false,
         "internalType": "uint32[]"
@@ -1989,7 +1893,50 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "event",
-    "name": "CreditToppedUp",
+    "name": "CreditRevoked",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "shard",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
+      },
+      {
+        "name": "slot",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
+        "name": "feeRecipient",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "feeAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CreditUpdated",
     "inputs": [
       {
         "name": "owner",
@@ -2007,79 +1954,20 @@ export const invisiProtocolAbi = [
         "name": "params",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct IInvisiProtocol.TopUpCreditParams",
+        "internalType": "struct IInvisiProtocol.UpdateCreditParams",
         "components": [
           {
-            "name": "creation",
-            "type": "tuple",
-            "internalType": "struct IInvisiProtocol.CreateCreditParams",
-            "components": [
-              {
-                "name": "token",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "sources",
-                "type": "tuple[]",
-                "internalType": "struct IInvisiProtocol.InputSource[]",
-                "components": [
-                  {
-                    "name": "treeId",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  },
-                  {
-                    "name": "merkleRoot",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                  }
-                ]
-              },
-              {
-                "name": "nullifiers",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
-              },
-              {
-                "name": "creditCommitment",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "changeCommitment",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "owner",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "expiry",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "deadline",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "feeRecipient",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "feeAmount",
-                "type": "uint256",
-                "internalType": "uint256"
-              }
-            ]
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "name": "creditSource",
+            "name": "owner",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "source",
             "type": "tuple",
             "internalType": "struct IInvisiProtocol.InputSource",
             "components": [
@@ -2096,22 +1984,47 @@ export const invisiProtocolAbi = [
             ]
           },
           {
-            "name": "creditNullifier",
+            "name": "nullifier",
             "type": "bytes32",
             "internalType": "bytes32"
           },
           {
-            "name": "previousExpiry",
+            "name": "creditCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "revocationShard",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "revocationSlot",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "feeAmount",
             "type": "uint256",
             "internalType": "uint256"
           }
         ]
       },
       {
-        "name": "leafIndices",
-        "type": "uint32[]",
+        "name": "leafIndex",
+        "type": "uint32",
         "indexed": false,
-        "internalType": "uint32[]"
+        "internalType": "uint32"
       },
       {
         "name": "deliveries",
@@ -2581,7 +2494,7 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
-    "name": "CreditDrawWindowClosed",
+    "name": "CreditAlreadyRevoked",
     "inputs": []
   },
   {
@@ -2603,11 +2516,6 @@ export const invisiProtocolAbi = [
   {
     "type": "error",
     "name": "ExpectedPause",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ExpiryInPast",
     "inputs": []
   },
   {
@@ -2658,7 +2566,7 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
-    "name": "InvalidCreditExpiry",
+    "name": "InvalidCreditAllocation",
     "inputs": []
   },
   {
@@ -2669,11 +2577,6 @@ export const invisiProtocolAbi = [
   {
     "type": "error",
     "name": "InvalidFunding",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidIdentityCommitment",
     "inputs": []
   },
   {
@@ -2690,21 +2593,6 @@ export const invisiProtocolAbi = [
   {
     "type": "error",
     "name": "InvalidNonce",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidNullifierKeyHash",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidOwnerIdentityCommitment",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidPrivateTransferCiphertext",
     "inputs": []
   },
   {
@@ -2808,22 +2696,6 @@ export const invisiProtocolAbi = [
   },
   {
     "type": "error",
-    "name": "NullifierAlreadySpent",
-    "inputs": [
-      {
-        "name": "nullifier",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NullifiersEmpty",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "OwnableInvalidOwner",
     "inputs": [
       {
@@ -2894,54 +2766,6 @@ export const invisiProtocolAbi = [
         "name": "str",
         "type": "string",
         "internalType": "string"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "TransferFailed",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "TreeFull",
-    "inputs": [
-      {
-        "name": "treeId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "WrongPermitToken",
-    "inputs": [
-      {
-        "name": "provided",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "expected",
-        "type": "address",
-        "internalType": "address"
       }
     ]
   },

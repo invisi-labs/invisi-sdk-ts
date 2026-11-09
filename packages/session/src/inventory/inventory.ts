@@ -4,7 +4,7 @@ import {
     computeCreditCommitment,
     computeCreditNullifier,
     computeCreditSharedKeyHash,
-    recoverCreditRemainder,
+    recoverCreditState,
     type CreditDeliveryState,
     type ReceivingKeys,
     type ViewingCapability,
@@ -95,19 +95,7 @@ export abstract class InventoryProcessor {
         return computeCreditNullifier(
             n.chainId,
             n.creditSharedKey,
-            await computeCreditCommitment(
-                n.chainId,
-                n.spenderWalletIdentity,
-                n.ownerWalletIdentity,
-                n.spenderPayout,
-                n.ownerPayout,
-                n.tokenAddress,
-                n.amount,
-                n.nonce,
-                n.expiry,
-                await computeCreditSharedKeyHash(n.creditSharedKey),
-                n
-            )
+            await computeCreditCommitment(n)
         );
     }
 
@@ -166,45 +154,32 @@ export abstract class InventoryProcessor {
                 const args = event.args!;
                 const params = args.params as {
                     nullifiers: readonly Hex[];
-                    remainderCommitments: readonly Hex[];
+                    stateCommitments: readonly Hex[];
                     recoveryAmounts: readonly Hex[];
-                    expiries: readonly bigint[];
                 };
-                const indices = args.remainderLeafIndices as readonly number[];
+                const indices = args.leafIndices as readonly number[];
                 check(
                     Array.isArray(params.nullifiers) &&
-                        params.nullifiers.length === params.remainderCommitments.length &&
+                        params.nullifiers.length === params.stateCommitments.length &&
                         params.nullifiers.length === params.recoveryAmounts.length &&
-                        params.nullifiers.length === params.expiries.length &&
-                        params.nullifiers.length === indices.length,
+                        params.nullifiers.length + 1 === indices.length,
                     "invalid draw recovery slots"
                 );
                 for (const [index, nullifier] of params.nullifiers.entries()) {
                     for (const previous of matching(nullifier)) {
-                        check(
-                            previous.state.note.expiry === params.expiries[index],
-                            "draw recovery expiry mismatch"
-                        );
-                        const remainder = await recoverCreditRemainder(
-                            context,
-                            previous.state.note,
-                            {
-                                timestamp: block.timestamp,
-                                creditNullifier: nullifier,
-                                remainderCommitment: params.remainderCommitments[index]!,
-                                recoveryAmount: BigInt(params.recoveryAmounts[index]!),
-                            }
-                        );
-                        if (!remainder) {
-                            continue;
-                        }
+                        const successor = await recoverCreditState(context, previous.state.note, {
+                            timestamp: block.timestamp,
+                            creditNullifier: nullifier,
+                            stateCommitment: params.stateCommitments[index]!,
+                            recoveryAmount: BigInt(params.recoveryAmounts[index]!),
+                        });
                         // Financial recovery alone cannot establish uncommitted child metadata.
                         const child = foundByKey.get(
-                            params.remainderCommitments[index]! + ":" + previous.role
+                            params.stateCommitments[index]! + ":" + previous.role
                         );
                         const payload = child?.state.note.payload;
                         const record: StoredCredit = {
-                            commitment: params.remainderCommitments[index]!,
+                            commitment: params.stateCommitments[index]!,
                             treeId: BigInt(args.outputTreeId as bigint),
                             leafIndex: Number(indices[index]),
                             blockNumber: event.blockNumber!,
@@ -214,7 +189,7 @@ export abstract class InventoryProcessor {
                             state: {
                                 ...clone(previous.state),
                                 note: {
-                                    ...remainder,
+                                    ...successor,
                                     ...(payload === undefined ? {} : { payload: clone(payload) }),
                                 },
                             },
@@ -231,15 +206,13 @@ export abstract class InventoryProcessor {
                         recovered.push(record);
                     }
                 }
-            } else if (event.eventName === "CreditToppedUp") {
+            } else if (event.eventName === "CreditUpdated") {
                 const params = event.args!.params as {
-                    creditNullifier: Hex;
-                    creation: { creditCommitment: Hex };
+                    nullifier: Hex;
+                    creditCommitment: Hex;
                 };
-                for (const previous of matching(params.creditNullifier)) {
-                    const child = foundByKey.get(
-                        params.creation.creditCommitment + ":" + previous.role
-                    );
+                for (const previous of matching(params.nullifier)) {
+                    const child = foundByKey.get(params.creditCommitment + ":" + previous.role);
                     if (!child) {
                         continue;
                     }
@@ -252,15 +225,17 @@ export abstract class InventoryProcessor {
                             "tokenAddress",
                             "spenderWalletIdentity",
                             "ownerWalletIdentity",
-                            "spenderPayout",
-                            "ownerPayout",
+                            "revocationShard",
+                            "revocationSlot",
                             "creditSharedKey",
                         ].some(
                             (field) =>
                                 old[field as keyof typeof old] !== next[field as keyof typeof next]
                         ) ||
-                        next.amount <= old.amount ||
-                        next.expiry < old.expiry
+                        ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"].some(
+                            (field) =>
+                                old[field as keyof typeof old] !== next[field as keyof typeof next]
+                        )
                     ) {
                         continue;
                     }
@@ -271,7 +246,7 @@ export abstract class InventoryProcessor {
                             ownerReceivingKeys: clone(previous.state.ownerReceivingKeys),
                             spenderReceivingKeys: clone(previous.state.spenderReceivingKeys),
                         },
-                        receivingKeySource: { kind: "top-up", commitment: previous.commitment },
+                        receivingKeySource: { kind: "update", commitment: previous.commitment },
                     };
                     this.checkSnapshotKeys(repaired);
                     await remember(repaired);

@@ -49,12 +49,14 @@ describe("explicit transactions without a wallet store", () => {
         expect(preview.inputDetails[0]).not.toHaveProperty("noteSecret");
         expect(preview.inputDetails[0]).not.toHaveProperty("nonce");
         expect(preview.inputDetails[0]).not.toHaveProperty("path");
+        if (preview.inputDetails[0]!.kind !== "notes") throw Error("Note input expected");
         preview.inputDetails[0]!.amount = 1n;
         preview.funding.amount = 1n;
-        expect(prepared.preview().inputDetails[0]!.amount).toBe(100n);
+        expect(prepared.preview().inputDetails[0]).toMatchObject({ amount: 100n });
         expect(prepared.preview().funding.amount).toBe(0n);
 
-        expect(prepared.estimateGas().gasUnits).toBeGreaterThan(0n);
+        expect(prepared.getGasReference().source).toBe("documented-reference");
+        await expect(prepared.estimateGas()).rejects.toThrow(/provider/);
         expect(store.readSnapshot).not.toHaveBeenCalled();
         expect(store.transaction).not.toHaveBeenCalled();
         expect((await h.store.readSnapshot(h.scope)).reservations).toEqual({});
@@ -214,7 +216,7 @@ it.each([
     ).rejects.toThrow(/execution|target/);
 });
 
-it("rejects aggregation above 14 slots without invoking the prover", async () => {
+it("rejects aggregation above10 slots without invoking the prover", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
         wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
@@ -226,7 +228,7 @@ it("rejects aggregation above 14 slots without invoking the prover", async () =>
         ),
     });
     const authorized = await externallyAuthorize(prepared);
-    await expect(authorized.prove({ execution: "aggregate" })).rejects.toThrow(/14-slot/);
+    await expect(authorized.prove({ execution: "aggregate" })).rejects.toThrow(/C1..C10/);
     expect(h.prover.prove).not.toHaveBeenCalled();
     // A failed local proof attempt leaves the detached authorized handle usable.
     const ready = await authorized.prove();

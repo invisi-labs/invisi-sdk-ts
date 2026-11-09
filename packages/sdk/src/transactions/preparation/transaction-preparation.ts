@@ -8,13 +8,13 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress } from "ethers";
 import { NoteOutput, resolvedOutputSnapshot } from "../../notes/NoteOutput";
 import type {
-    CancelCreditPreparation,
+    RevokeCreditPreparation,
     CreateCreditPreparation,
     DrawCreditPreparation,
     OperationPlan,
     PreparationRuntime,
     ShieldPreparation,
-    TopUpCreditPreparation,
+    UpdateCreditPreparation,
     TransferPreparation,
 } from "../operation-types";
 import {
@@ -23,7 +23,7 @@ import {
     Preparation,
     type PreparationFrame,
 } from "./prepare-common";
-import { CreditPreparation } from "./prepare-credit";
+import { CreditPreparation } from "../../credit/preparation";
 
 /** Shared preparation engine for managed sessions and explicitly supplied inputs. */
 export class TransactionPreparation<Result> {
@@ -71,7 +71,7 @@ export class TransactionPreparation<Result> {
             ...(copied.commitments !== undefined ? { inputSelection: copied.commitments } : {}),
         });
         const frame = await preparation.frame(copied.deadline);
-        if (copied.outputs.length > 168) throw new Error("transfer supports at most 168 outputs");
+        if (copied.outputs.length > 190) throw new Error("transfer supports at most 190 outputs");
         let withdrawalAddress: Hex = ZERO_ADDRESS;
         let withdrawalAmount = 0n;
         if (copied.withdrawal !== undefined) {
@@ -221,22 +221,22 @@ export class TransactionPreparation<Result> {
     }
 
     prepareDrawCredit(options: DrawCreditPreparation): Promise<Result> {
-        this.#intent = undefined;
+        this.#intent = { kind: "draw-credit", options: structuredClone(options) };
         return new CreditPreparation(this.runtime(options.tokenAddress)).draw(
             structuredClone(options)
         );
     }
 
-    prepareTopUpCredit(options: TopUpCreditPreparation): Promise<Result> {
-        this.#intent = { kind: "top-up-credit", options: structuredClone(options) };
-        return new CreditPreparation(this.runtime(options.tokenAddress)).topUp(
+    prepareUpdateCredit(options: UpdateCreditPreparation): Promise<Result> {
+        this.#intent = { kind: "update-credit", options: structuredClone(options) };
+        return new CreditPreparation(this.runtime(options.tokenAddress)).update(
             structuredClone(options)
         );
     }
 
-    prepareCancelCredit(options: CancelCreditPreparation): Promise<Result> {
-        this.#intent = { kind: "cancel-credit", options: structuredClone(options) };
-        return new CreditPreparation(this.runtime(options.tokenAddress)).cancel(
+    prepareRevokeCredit(options: RevokeCreditPreparation): Promise<Result> {
+        this.#intent = { kind: "revoke-credit", options: structuredClone(options) };
+        return new CreditPreparation(this.runtime(options.tokenAddress)).revoke(
             structuredClone(options)
         );
     }

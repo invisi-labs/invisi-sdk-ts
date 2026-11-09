@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { generateProofBundle, verifyProofBundle } from "../proofs/prover";
 import {
-    CANCEL_FIXTURE,
-    LIMITED_CREATE_FIXTURE,
-    LIMITED_DRAW_FIXTURE,
-    LIMITED_TOP_UP_FIXTURE,
+    UPDATE_FIXTURE,
+    CREATE_FIXTURE,
+    DRAW_FIXTURE,
     SWEEP_FIXTURE,
-    TOP_UP_FIXTURE,
     USER_FIXTURE,
 } from "../testing/test-fixtures";
 import { ZERO_INPUT_FIXTURE } from "../testing/zero-input-fixture";
@@ -14,14 +12,12 @@ import { generateProofBundle as proveBrowser, verifyProofBundle as verifyBrowser
 const wasm = process.env.INVISI_TEST_WASM === "1" ? describe : describe.skip;
 wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
     it.each([
-        ["credit_draw_slots1", LIMITED_DRAW_FIXTURE, "evm"],
-        ["credit_top_up", LIMITED_TOP_UP_FIXTURE, "evm"],
-        ["create_credit", LIMITED_CREATE_FIXTURE, "evm"],
-        ["credit_cancel", CANCEL_FIXTURE, "evm"],
-        ["credit_top_up", TOP_UP_FIXTURE, "evm"],
-        ["transact_user_slots14", USER_FIXTURE, "evm"],
-        ["transact_user_slots14", SWEEP_FIXTURE, "evm"],
-        ["transact_user_slots14", USER_FIXTURE, "noir-recursive"],
+        ["credit_draw_slots1", DRAW_FIXTURE, "evm"],
+        ["credit_update", UPDATE_FIXTURE, "evm"],
+        ["create_credit", CREATE_FIXTURE, "evm"],
+        ["transact_user_slots2", USER_FIXTURE, "evm"],
+        ["transact_user_slots1", SWEEP_FIXTURE, "evm"],
+        ["transact_user_slots2", USER_FIXTURE, "noir-recursive"],
     ] as const)(
         "proves through browser entry and cross-verifies case %#",
         async (circuitName, fixture, target) => {
@@ -51,7 +47,7 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
     it("proves zero-input transact14 through browser entry and cross-verifies", async () => {
         const fixture = ZERO_INPUT_FIXTURE;
         const bundle = await proveBrowser({
-            circuitName: "transact_user_slots14",
+            circuitName: "transact_user_slots2",
             inputs: fixture.witness,
             expectedPublicInputs: fixture.publicInputs,
             target: "evm",
@@ -64,7 +60,7 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
                 true
             );
             const native = await generateProofBundle({
-                circuitName: "transact_user_slots14",
+                circuitName: "transact_user_slots2",
                 inputs: fixture.witness,
                 expectedPublicInputs: fixture.publicInputs,
                 target: "evm",

@@ -24,18 +24,19 @@ export interface CreditPolicy {
     singleLimit: bigint;
     dailyLimit: bigint;
     monthlyLimit: bigint;
+    lifetimeLimit: bigint;
     lastDay: bigint;
     dailySpent: bigint;
     lastMonth: bigint;
     monthlySpent: bigint;
+    totalSpent: bigint;
 }
-export interface CreditNote extends ProtocolContext, Partial<CreditPolicy> {
+export interface CreditState extends ProtocolContext, Partial<CreditPolicy> {
     spenderWalletIdentity: `0x${string}`;
     ownerWalletIdentity: `0x${string}`;
-    spenderPayout: bigint;
-    ownerPayout: bigint;
+    revocationShard: bigint;
+    revocationSlot: bigint;
     tokenAddress: bigint;
-    amount: bigint;
     nonce: bigint;
     /** Opaque application bytes. Decryption returns a copy without interpreting the application schema. */
     payload?: Uint8Array;
@@ -51,16 +52,16 @@ export interface ReceivingKeys {
 
 /** Authenticated Credit preimage plus both historical receiving-key snapshots. */
 export interface CreditDeliveryState {
-    note: CreditNote;
+    note: CreditState;
     ownerReceivingKeys: ReceivingKeys;
     spenderReceivingKeys: ReceivingKeys;
 }
 
 /** Circuit-bound fields from an authenticated Credit draw event. */
-export interface CreditRemainderRecovery {
+export interface CreditStateRecovery {
     /** Timestamp of the independently authenticated confirmed draw block. */
     timestamp: bigint;
     creditNullifier: `0x${string}`;
-    remainderCommitment: `0x${string}`;
+    stateCommitment: `0x${string}`;
     recoveryAmount: bigint;
 }

@@ -1,3 +1,4 @@
+import { selectAggregateRoute } from "@invisi-labs/core";
 import { MissingCapabilityError } from "@invisi-labs/core";
 import { assertExpectedProof } from "./backends/backend-service";
 import type { CircuitName, ProofBundle } from "./circuits/circuit-types";
@@ -47,15 +48,16 @@ export class Aggregator implements AggregatorCapability {
                 expectedPublicInputs: [...member.statement.expectedPublicInputs],
             },
         }));
-        if (![4, 8, 12].includes(frozen.length))
-            throw new Error("aggregation requires 4, 8 or 12 members");
+        const route = selectAggregateRoute(
+            frozen.map((m) => getCircuitMetadata(m.bundle.circuitName).capacity!)
+        );
         options.signal?.throwIfAborted();
         for (const member of frozen) {
             if (
-                member.bundle.circuitName !== "transact_user_slots14" ||
+                !member.bundle.circuitName.startsWith("transact_user_slots") ||
                 member.bundle.target !== "noir-recursive"
             )
-                throw new Error("aggregation requires recursive slots14 members");
+                throw new Error("aggregation requires recursive Note members");
             await assertProofBundle(member.bundle);
             assertExpectedProof(member.bundle, member.statement);
         }
@@ -75,31 +77,54 @@ export class Aggregator implements AggregatorCapability {
             }
             if (!valid) throw new Error("aggregate member proof verification failed");
         }
-        const circuitName = `transact_aggregate_14_${frozen.length}` as CircuitName,
+        const circuitName = route.name as CircuitName,
             metadata = getCircuitMetadata(circuitName),
-            key = getCircuitKey(circuitName, "evm"),
-            inner = getCircuitKey("transact_user_slots14", "noir-recursive");
-        if (!inner.vkFields || !inner.vkHash)
-            throw new Error("authenticated recursive verification key is missing");
+            key = getCircuitKey(circuitName, "evm");
+        const inner = (capacity: number) => {
+            const key = getCircuitKey(
+                `transact_user_slots${capacity}` as CircuitName,
+                "noir-recursive"
+            );
+            if (!key.vkFields || !key.vkHash)
+                throw Error("authenticated recursive verification key is missing");
+            return key;
+        };
         const expected: ProofStatement = {
-                circuitName,
-                target: "evm",
-                artifactSha256: metadata.artifactSha256,
-                vkSha256: key.vkSha256,
-                expectedPublicInputs: words,
-            },
-            witness = new LocalWitness({
-                verification_key: [...inner.vkFields],
-                key_hash: inner.vkHash,
-                proofs: frozen.map((member) =>
-                    Array.from(
-                        { length: 458 },
-                        (_, i) => `0x${member.bundle.proofHex.slice(2 + 64 * i, 66 + 64 * i)}`
-                    )
-                ),
-                statements: frozen.map((member) => [...member.bundle.publicInputs]),
-                inner_vk_commitment: words.at(-1)!,
-            });
+            circuitName,
+            target: "evm",
+            artifactSha256: metadata.artifactSha256,
+            vkSha256: key.vkSha256,
+            expectedPublicInputs: words,
+        };
+        const proofs = frozen.map((m) =>
+            Array.from(
+                { length: 458 },
+                (_, i) => `0x${m.bundle.proofHex.slice(2 + 64 * i, 66 + 64 * i)}`
+            )
+        );
+        const witness = new LocalWitness(
+            route.kind === "dedicated"
+                ? {
+                      verification_key: [...inner(route.capacity).vkFields!],
+                      key_hash: inner(route.capacity).vkHash!,
+                      proofs,
+                      statements: frozen.map((m) => [...m.bundle.publicInputs]),
+                      inner_vk_commitment: words.at(-1)!,
+                  }
+                : {
+                      verification_keys: [1, 2, 3, 4, 5].map((c) => [...inner(c).vkFields!]),
+                      key_hashes: [1, 2, 3, 4, 5].map((c) => inner(c).vkHash!),
+                      proofs,
+                      capacities: frozen.map((m) =>
+                          BigInt(getCircuitMetadata(m.bundle.circuitName).capacity!)
+                      ),
+                      statements: frozen.map((m) => [
+                          ...m.bundle.publicInputs,
+                          ...Array(32 - m.bundle.publicInputs.length).fill(0n),
+                      ]),
+                      inner_vk_commitments: metadata.innerVkCommitments!,
+                  }
+        );
         try {
             const bundle = copy(
                 await this.#prover.prove({ ...structuredClone(expected), witness }, options)

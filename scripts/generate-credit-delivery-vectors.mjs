@@ -14,19 +14,20 @@ const clueKey = "0xc69480518ea88f8cb925fbcd8f5100b1ebc46cc4d8cbe19e0478936567e6b
 const fields = [
     "spenderWalletIdentity",
     "ownerWalletIdentity",
-    "spenderPayout",
-    "ownerPayout",
-    "amount",
+    "revocationShard",
+    "revocationSlot",
     "nonce",
     "expiry",
     "creditSharedKey",
     "singleLimit",
     "dailyLimit",
     "monthlyLimit",
+    "lifetimeLimit",
     "lastDay",
     "dailySpent",
     "lastMonth",
     "monthlySpent",
+    "totalSpent",
 ];
 const note = Object.fromEntries(fields.map((field) => [field, BigInt(vectors.credit[field])]));
 const state = {
@@ -61,8 +62,8 @@ vectors.credit.ownerReceivingKeys = state.ownerReceivingKeys;
 vectors.credit.spenderReceivingKeys = state.spenderReceivingKeys;
 vectors.credit.deliverySource = {
     envelopeType: 1,
-    envelopeVersion: 1,
-    header: 129,
+    envelopeVersion: 2,
+    header: 130,
     ciphertextBytes: (vectors.credit.ownerCiphertext.length - 2) / 2,
     protocolClientSha256: createHash("sha256").update(readFileSync(source)).digest("hex"),
     purpose:
@@ -87,7 +88,7 @@ const fundsEnvelope = await encryptPrivateTransferNote(
 vectors.note.ciphertext = "0x" + fundsEnvelope.toString("hex");
 vectors.note.deliverySource = {
     envelopeType: 0,
-    envelopeVersion: 1,
+    envelopeVersion: 2,
     header: 1,
     ciphertextBytes: fundsEnvelope.length,
     protocolClientSha256: createHash("sha256").update(readFileSync(fundsSource)).digest("hex"),

@@ -28,7 +28,7 @@ export interface OperationRecord {
 }
 
 export interface WalletState {
-    schemaVersion: 1;
+    schemaVersion: 2;
     scope: WalletScope;
     revision: number;
     notes: Record<string, StoredNote>;

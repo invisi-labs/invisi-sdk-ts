@@ -37,7 +37,14 @@ export function broadcasterQuoteDomain(trust: BroadcasterTrust) {
         verifyingContract: getAddress(trust.protocol),
     };
 }
-const supportedMethods = ["transact", "shield", "createCredit", "topUpCredit", "cancelCredit"];
+const supportedMethods = [
+    "transact",
+    "shield",
+    "createCredit",
+    "creditDraw",
+    "updateCredit",
+    "revokeCredit",
+];
 const intentAbi = invisiProtocolAbi.filter(
     (item) =>
         item.type === "function" &&
@@ -45,7 +52,7 @@ const intentAbi = invisiProtocolAbi.filter(
         (item.name !== "transact" || item.inputs[1]?.type === "tuple")
 );
 export const broadcasterTransactInterface = new Interface(intentAbi);
-/** Decode a canonical supported direct public intent. Draw, registry and aggregates are excluded. */
+/** Decode a canonical supported direct public intent. Registry and aggregates are excluded. */
 export function decodeBroadcasterIntent(data: string) {
     const parsed = broadcasterTransactInterface.parseTransaction({ data });
     if (!parsed || !supportedMethods.includes(parsed.name))
@@ -59,43 +66,44 @@ export function decodeBroadcasterIntent(data: string) {
         throw new Error("noncanonical broadcaster calldata");
     const method = parsed.name;
     const raw = method === "transact" ? decoded[1] : undefined;
+    const credit = !["transact", "shield"].includes(method);
     const params =
         raw?.params ??
         (method === "shield"
             ? decoded[0]
-            : method === "topUpCredit"
-              ? decoded[1].creation
+            : method === "revokeCredit"
+              ? {
+                    token: decoded[0],
+                    owner: decoded[1],
+                    shard: decoded[2],
+                    slot: decoded[3],
+                    deadline: decoded[4],
+                    feeRecipient: decoded[5],
+                    feeAmount: decoded[6],
+                }
               : decoded[1]);
-    const funding =
-        raw?.funding ??
-        (method === "shield"
-            ? decoded[3]
-            : ["createCredit", "topUpCredit"].includes(method)
-              ? decoded[3]
-              : undefined);
+    const funding = raw?.funding ?? (method === "shield" ? decoded[3] : undefined);
     const deliveries =
         raw?.deliveries ??
-        (method === "shield"
-            ? decoded[2]
-            : ["createCredit", "topUpCredit"].includes(method)
-              ? decoded[2]
-              : []);
+        (method === "shield" ? decoded[2] : credit && method !== "revokeCredit" ? decoded[2] : []);
     return {
         fragment,
         method,
         args: decoded,
-        proof: method === "shield" ? "0x" : (decoded[0] as string),
+        credit,
+        proof: method === "shield" || method === "revokeCredit" ? "0x" : (decoded[0] as string),
         request: { params, funding, deliveries },
     };
 }
-/** Domain-separated final public intent: omit only proof bytes and funding.signature. */
+/** Domain-separated final public intent: omit proof bytes, funding.signature and revocation authorization. */
 export function broadcasterRequestHash(data: string): string {
     const { fragment, method, args } = decodeBroadcasterIntent(data);
     const copy = (value: unknown): unknown => (Array.isArray(value) ? value.map(copy) : value);
     const canonical = copy(args) as unknown[];
-    if (method !== "shield") canonical[0] = "0x";
+    if (method !== "shield" && method !== "revokeCredit") canonical[0] = "0x";
+    if (method === "revokeCredit") canonical[7] = "0x";
     if (method === "transact") ((canonical[1] as unknown[])[2] as unknown[])[4] = "0x";
-    else if (method !== "cancelCredit") (canonical[3] as unknown[])[4] = "0x";
+    else if (method === "shield") (canonical[3] as unknown[])[4] = "0x";
     const calldata = broadcasterTransactInterface.encodeFunctionData(fragment, canonical);
     return keccak256(
         AbiCoder.defaultAbiCoder().encode(

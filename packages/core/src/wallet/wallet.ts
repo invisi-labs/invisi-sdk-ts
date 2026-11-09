@@ -22,8 +22,7 @@ const OPERATIONS = {
     transact: "Transact",
     "create-credit": "CreateCredit",
     "credit-draw": "CreditDraw",
-    "cancel-credit": "CancelCredit",
-    "top-up-credit": "TopUpCredit",
+    "update-credit": "UpdateCredit",
 } as const;
 export type WalletOperation = keyof typeof OPERATIONS;
 export interface WalletAuthorizationRequest {
@@ -150,14 +149,13 @@ export function walletAuthorizationTypedData(request: WalletAuthorizationRequest
     if (!Object.hasOwn(OPERATIONS, operation)) throw new Error("unsupported wallet operation");
     const allowed =
         operation === "transact"
-            ? [14, 56, 112, 168]
+            ? [
+                  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130,
+                  140, 150, 160, 170, 180, 190,
+              ]
             : operation === "credit-draw"
-              ? [1, 12, 50, 120]
-              : operation === "cancel-credit"
-                ? [1]
-                : operation.endsWith("address")
-                  ? [0]
-                  : [10];
+              ? [1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80]
+              : [1];
     if (!allowed.includes(capacity)) throw new Error("invalid operation capacity");
     if (!Array.isArray(words) || words.length < 2) throw new Error("public words required");
     for (const value of words)
@@ -191,7 +189,13 @@ export function walletAuthorizationTypedData(request: WalletAuthorizationRequest
         types: WALLET_AUTHORIZATION_TYPES,
         primaryType: "WalletAuthorization" as const,
         message: {
-            operation: hex(keccak_256(utf8ToBytes(`Invisi.${OPERATIONS[operation]}.v1`))),
+            operation: hex(
+                keccak_256(
+                    utf8ToBytes(
+                        `Invisi.${OPERATIONS[operation]}.${operation === "transact" ? "v1" : "v4"}`
+                    )
+                )
+            ),
             statementHash: hex(keccak_256(statement)),
         },
     };

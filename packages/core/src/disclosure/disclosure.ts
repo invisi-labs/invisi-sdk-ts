@@ -1,12 +1,12 @@
 import { bytesToHex } from "@noble/hashes/utils";
 import { FIELD_MODULUS } from "../crypto/random";
 import {
-    decryptCreditNote,
+    decryptCreditState,
     decryptCreditPayload,
     decryptNotePayload,
     decryptPrivateTransferNote,
     exportPayloadKey,
-    type CreditNoteDecryptionContext,
+    type CreditStateDecryptionContext,
     type NoteBytes,
     type NoteDecryptionContext,
 } from "../delivery/encryption";
@@ -15,12 +15,12 @@ import {
     computeCreditCommitment,
     computeCreditSharedKeyHash,
     normalizeCreditPolicy,
-} from "../notes/creditCommitment";
-import type { CreditNote, CreditPolicy, Note } from "../types";
+} from "../credit/state";
+import type { CreditState, CreditPolicy, Note } from "../types";
 
 /** A Credit commitment opening excludes encrypted memos and the shared recovery/nullifier secret. */
 export interface CreditOpening
-    extends Omit<CreditNote, "creditSharedKey" | "memo" | keyof CreditPolicy>, CreditPolicy {
+    extends Omit<CreditState, "creditSharedKey" | "memo" | keyof CreditPolicy>, CreditPolicy {
     creditSharedKeyHash: `0x${string}`;
 }
 
@@ -56,19 +56,20 @@ const NOTE_FIELDS = ["ownerAddress", "amount", "nonce"] as const;
 const CREDIT_FIELDS = [
     "spenderWalletIdentity",
     "ownerWalletIdentity",
-    "spenderPayout",
-    "ownerPayout",
-    "amount",
+    "revocationShard",
+    "revocationSlot",
     "nonce",
     "expiry",
     "creditSharedKeyHash",
     "singleLimit",
     "dailyLimit",
     "monthlyLimit",
+    "lifetimeLimit",
     "lastDay",
     "dailySpent",
     "lastMonth",
     "monthlySpent",
+    "totalSpent",
 ] as const;
 
 function record(value: unknown, fields: readonly string[]): Record<string, unknown> {
@@ -127,16 +128,15 @@ function encode(values: Record<string, bigint | string>): Record<string, string>
     );
 }
 
-async function creditOpening(note: CreditNote): Promise<CreditOpening> {
+async function creditOpening(note: CreditState): Promise<CreditOpening> {
     const copied = { ...note };
     return {
         ...context(copied),
         ...normalizeCreditPolicy(copied),
         spenderWalletIdentity: owner(copied.spenderWalletIdentity, "spender identity"),
         ownerWalletIdentity: owner(copied.ownerWalletIdentity, "owner identity"),
-        spenderPayout: number(copied.spenderPayout, 160, "spender payout"),
-        ownerPayout: number(copied.ownerPayout, 160, "owner payout"),
-        amount: number(copied.amount, 126, "amount"),
+        revocationShard: number(copied.revocationShard, 64, "revocation shard"),
+        revocationSlot: number(copied.revocationSlot, 16, "revocation slot"),
         nonce: nonce(copied.nonce),
         expiry: number(copied.expiry, 64, "expiry"),
         creditSharedKeyHash: await computeCreditSharedKeyHash(copied.creditSharedKey),
@@ -145,19 +145,7 @@ async function creditOpening(note: CreditNote): Promise<CreditOpening> {
 
 async function commitment(note: Note | CreditOpening): Promise<`0x${string}`> {
     if ("creditSharedKeyHash" in note) {
-        return computeCreditCommitment(
-            note.chainId,
-            note.spenderWalletIdentity,
-            note.ownerWalletIdentity,
-            note.spenderPayout,
-            note.ownerPayout,
-            note.tokenAddress,
-            note.amount,
-            note.nonce,
-            note.expiry,
-            note.creditSharedKeyHash,
-            note
-        );
+        return computeCreditCommitment({ ...note, creditSharedKey: 0n }, note.creditSharedKeyHash);
     }
     return computeNoteCommitment(
         note.chainId,
@@ -205,7 +193,7 @@ export class Disclosure {
         });
     }
 
-    static async fromCredit(value: CreditNote): Promise<Disclosure> {
+    static async fromCredit(value: CreditState): Promise<Disclosure> {
         const note = await creditOpening(value);
         const data = Object.fromEntries(CREDIT_FIELDS.map((key) => [key, note[key].toString()]));
         return new Disclosure({
@@ -241,13 +229,13 @@ export class Disclosure {
     static async fromEncryptedCredit(
         key: NoteBytes,
         envelope: NoteBytes,
-        value: CreditNoteDecryptionContext
+        value: CreditStateDecryptionContext
     ): Promise<Disclosure> {
         const scoped = { ...value };
         const copied = typeof envelope === "string" ? envelope : Uint8Array.from(envelope);
         const localKey = typeof key === "string" ? key : Uint8Array.from(key);
         try {
-            await decryptCreditNote(localKey, copied, scoped);
+            await decryptCreditState(localKey, copied, scoped);
             return await Disclosure.fromEnvelope(localKey, copied, scoped, scoped.role);
         } finally {
             if (localKey instanceof Uint8Array) localKey.fill(0);
@@ -457,9 +445,8 @@ export class Disclosure {
             ...scoped,
             spenderWalletIdentity: data.spenderWalletIdentity as `0x${string}`,
             ownerWalletIdentity: data.ownerWalletIdentity as `0x${string}`,
-            spenderPayout: BigInt(data.spenderPayout!),
-            ownerPayout: BigInt(data.ownerPayout!),
-            amount: BigInt(data.amount!),
+            revocationShard: BigInt(data.revocationShard!),
+            revocationSlot: BigInt(data.revocationSlot!),
             nonce: BigInt(data.nonce!),
             expiry: BigInt(data.expiry!),
             ...normalizeCreditPolicy(
@@ -468,10 +455,12 @@ export class Disclosure {
                         "singleLimit",
                         "dailyLimit",
                         "monthlyLimit",
+                        "lifetimeLimit",
                         "lastDay",
                         "dailySpent",
                         "lastMonth",
                         "monthlySpent",
+                        "totalSpent",
                     ].map((k) => [k, BigInt(data[k]!)])
                 )
             ),

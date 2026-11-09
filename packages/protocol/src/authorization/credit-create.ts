@@ -1,22 +1,43 @@
-import { type ProvingRequest } from "@invisi-labs/prover";
+import { normalizeCreditDeliveryState, normalizeCreditPolicy } from "@invisi-labs/core";
 import { createCreditPublicInputs } from "../credit/credit-create";
-import { provingRequest } from "./common";
-import { creation } from "./credit-creation";
+import { check, provingRequest } from "./common";
 import type { CreateCreditWitnessParams } from "./types";
 import { WitnessContext } from "./WitnessContext";
-export async function createCredit(
-    witness: WitnessContext,
-    p: CreateCreditWitnessParams
-): Promise<ProvingRequest> {
-    const words = createCreditPublicInputs(
-        witness.protocol.context,
-        p.params,
-        p.deliveries,
-        p.funding
+export async function createCredit(w: WitnessContext, p: CreateCreditWitnessParams) {
+    const n = normalizeCreditDeliveryState(p.state).note,
+        policy = normalizeCreditPolicy(n),
+        words = createCreditPublicInputs(w.protocol.context, p.params, p.deliveries);
+    check(
+        n.ownerWalletIdentity === p.params.owner &&
+            n.revocationShard === p.params.revocationShard &&
+            n.revocationSlot === p.params.revocationSlot &&
+            n.expiry >= p.params.deadline &&
+            (await w.creditLeaf(n)) === p.params.creditCommitment,
+        "Credit creation mismatch"
     );
+    for (const k of ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"] as const)
+        check(policy[k] === 0n, "initial Credit usage must be zero");
     return provingRequest(
         "create_credit",
-        await creation(witness, p, "create-credit", words),
+        {
+            ...(await w.authority(
+                "create-credit",
+                1,
+                words,
+                p.authorization,
+                n.ownerWalletIdentity
+            )),
+            spender_wallet_identity: BigInt(n.spenderWalletIdentity),
+            credit_nonce: n.nonce,
+            expiry: n.expiry,
+            credit_shared_key: n.creditSharedKey,
+            limits: [
+                policy.singleLimit,
+                policy.dailyLimit,
+                policy.monthlyLimit,
+                policy.lifetimeLimit,
+            ],
+        },
         words
     );
 }

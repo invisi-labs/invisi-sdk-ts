@@ -1,5 +1,6 @@
 # @invisi-labs/vue
 
+
 ## 1.1.7
 
 - Use the independent @invisi-labs/session package for managed wallet integration.

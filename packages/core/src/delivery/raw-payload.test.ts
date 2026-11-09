@@ -73,7 +73,7 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
         role: "owner" as const,
         outputCommitment: vectors.credit.commitment as `0x${string}`,
     };
-    const state = await core.decryptCreditNote(
+    const state = await core.decryptCreditState(
         key,
         vectors.credit.ownerCiphertext as `0x${string}`,
         ownerScope
@@ -91,15 +91,15 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
                     ? state.note.ownerWalletIdentity
                     : state.note.spenderWalletIdentity,
         };
-        const payload = new Uint8Array(3598).fill(255);
-        const envelope = await core.encryptCreditNote(
+        const payload = new Uint8Array(3612).fill(255);
+        const envelope = await core.encryptCreditState(
             publicKey,
             { ...state, note: { ...state.note, payload } },
             scope
         );
         expect(envelope.length).toBe(4096);
-        expect(envelope[0]).toBe(129);
-        const decoded = await core.decryptCreditNote(secret, envelope, scope);
+        expect(envelope[0]).toBe(130);
+        const decoded = await core.decryptCreditState(secret, envelope, scope);
         expect(decoded.note.payload).toEqual(payload);
         const viewer = new core.ViewingCapability(scope.ownerAddress, secret);
         const output = { ...scope, ciphertext: envelope };
@@ -107,9 +107,9 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
         const imported = await core.Disclosure.fromExport(disclosure.export());
         expect((await imported.verify(output)).note.payload).toEqual(payload);
         await expect(
-            core.encryptCreditNote(
+            core.encryptCreditState(
                 publicKey,
-                { ...state, note: { ...state.note, payload: new Uint8Array(3599) } },
+                { ...state, note: { ...state.note, payload: new Uint8Array(3613) } },
                 scope
             )
         ).rejects.toThrow(/length/);

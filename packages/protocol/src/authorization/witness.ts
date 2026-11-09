@@ -9,25 +9,22 @@ import type { Hex } from "../contracts/index";
 
 import { WitnessContext } from "./WitnessContext";
 import { witnessStatement } from "./common";
-import { cancelCredit } from "./credit-cancel";
 import { createCredit } from "./credit-create";
 import { drawCredit } from "./credit-draw";
-import { topUpCredit } from "./credit-top-up";
+import { updateCredit } from "./credit-update";
 import { transact } from "./transact";
 import type {
-    CancelCreditWitnessParams,
     CreateCreditWitnessParams,
     DrawCreditWitnessParams,
-    TopUpCreditWitnessParams,
+    UpdateCreditWitnessParams,
     TransactWitnessParams,
 } from "./types";
 export type {
-    CancelCreditWitnessParams,
     CreateCreditWitnessParams,
     CreditMembership,
     DrawCreditWitnessParams,
     NoteMembership,
-    TopUpCreditWitnessParams,
+    UpdateCreditWitnessParams,
     TransactWitnessParams,
 } from "./types";
 /** Assemble witnesses through operation-specific builders with shared validation. */
@@ -49,13 +46,10 @@ export class WitnessBuilder {
     async createCredit(p: CreateCreditWitnessParams): Promise<ProvingRequest> {
         return createCredit(this.#witness, p);
     }
-    async cancelCredit(p: CancelCreditWitnessParams): Promise<ProvingRequest> {
-        return cancelCredit(this.#witness, p);
-    }
     async drawCredit(p: DrawCreditWitnessParams): Promise<ProvingRequest> {
         return drawCredit(this.#witness, p);
     }
-    async topUpCredit(p: TopUpCreditWitnessParams): Promise<ProvingRequest> {
-        return topUpCredit(this.#witness, p);
+    async updateCredit(p: UpdateCreditWitnessParams): Promise<ProvingRequest> {
+        return updateCredit(this.#witness, p);
     }
 }

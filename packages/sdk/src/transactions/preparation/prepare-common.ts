@@ -233,7 +233,7 @@ export class Preparation<Result> {
         return { ...proof, path: [...proof.path] };
     }
 
-    async selectFunds(target: bigint, frame: PreparationFrame, maxInputs = 168) {
+    async selectFunds(target: bigint, frame: PreparationFrame, maxInputs = 190) {
         const { scope, options, reader } = this.runtime;
         const state = await this.runtime.readInventory();
         if (state.invalidated) {

@@ -1,9 +1,11 @@
+import { revocationSigningRequest, acceptRevocationSignature } from "../signing/revocation";
+import type { Hex } from "@invisi-labs/protocol/contracts";
 import { TransactionOutput } from "../../notes/TransactionOutput";
 import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { ProofBundle, Prover } from "@invisi-labs/prover";
 import { exportBroadcasterIntent } from "../../broadcaster/intent";
-import { estimateGasReference } from "../../gas/gas-estimation";
+import { getOperationGasReference } from "../../gas/gas-estimation";
 import type {
     OperationAggregateMember,
     OperationPlan,
@@ -98,12 +100,18 @@ export class PreparedTransaction {
     get kind() {
         return this.#saved.plan.kind;
     }
-    estimateGas() {
-        return estimateGasReference(
-            this.#saved.plan,
-            this.#runtime.options.protocol,
-            this.#runtime.options.gasBenchmarks
-        );
+    async estimateGas(options: { from?: `0x${string}` } = {}) {
+        const provider = this.#runtime.options.provider;
+        if (!provider)
+            throw new MissingCapabilityError("ethers provider for final eth_estimateGas");
+        const call = await this.exportTransaction();
+        return {
+            source: "rpc" as const,
+            gasUnits: await provider.estimateGas({ ...call, ...options }),
+        };
+    }
+    getGasReference() {
+        return getOperationGasReference(this.#saved.plan, this.#runtime.options.protocol);
     }
     /** Final Note outputs, including change; Credit outputs are not exported as IPN. */
     getOutputs(): readonly TransactionOutput[] {
@@ -157,6 +165,24 @@ export class PreparedTransaction {
         } finally {
             this.#lifecycle.busy = false;
         }
+    }
+    async exportRevocationAuthorization() {
+        this.current();
+        check(this.status === "prepared", "revocation is not awaiting authorization");
+        return revocationSigningRequest(this.#saved.plan, this.#runtime);
+    }
+    async withRevocationSignature(signature: Hex): Promise<PreparedTransaction> {
+        this.current();
+        const verified = await acceptRevocationSignature(
+            this.#saved.plan,
+            signature,
+            this.#runtime
+        );
+        return this.stage("revocation authorization", ["prepared"], async (saved) => {
+            saved.plan.credit!.revocationSignature = verified;
+            saved.call = await this.encode(saved);
+            return { status: "ready" };
+        });
     }
     /** Public EIP-712 request; signing transport and key custody belong to the caller. */
     async exportWalletAuthorization(options: { signal?: AbortSignal } = {}) {
@@ -249,7 +275,10 @@ export class PreparedTransaction {
             "a broadcaster quote requires direct execution"
         );
         const plan = this.#saved.plan;
-        check(plan.kind !== "shield", "shield requires no proof");
+        check(
+            plan.kind !== "shield" && plan.kind !== "revoke-credit",
+            "operation requires no proof"
+        );
         if (requiresAuthorization(plan)) {
             check(
                 this.#authorization,
@@ -292,7 +321,8 @@ export class PreparedTransaction {
     /** Shield caller funding needs no wallet signing or proof; this step only encodes its frozen request. */
     async ready(): Promise<PreparedTransaction> {
         check(
-            this.kind === "shield" && this.#saved.plan.fundingMode === "caller",
+            (this.kind === "shield" && this.#saved.plan.fundingMode === "caller") ||
+                this.kind === "revoke-credit",
             "operation needs authorization or proof first"
         );
         return this.stage("encoding", ["prepared"], async (saved) => {
@@ -324,8 +354,9 @@ export class PreparedTransaction {
                 plan.params &&
                 saved.proof &&
                 plan.statement?.target === "noir-recursive" &&
-                plan.statement.circuitName === "transact_user_slots14",
-            "ready recursive slots14 transaction required"
+                plan.statement.circuitName.startsWith("transact_user_slots") &&
+                (plan.capacity ?? 0) <= 10,
+            "ready recursive C1..C10 transaction required"
         );
         sameStatement(saved.proof, statement(plan));
         check(

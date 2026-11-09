@@ -150,6 +150,41 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
             await new Contract(instance, invisiProtocolAbi, this.client).getFunction("factory")()
         );
     }
+    async getCreditAllocation(
+        context: import("@invisi-labs/protocol").DeploymentContext,
+        owner: Address,
+        token: Address,
+        block: CanonicalBlock
+    ): Promise<{ shard: bigint; slot: number }> {
+        const result = (await this.read(
+            context,
+            context.protocolAddress,
+            invisiProtocolAbi,
+            "creditAllocation",
+            [owner, token],
+            block
+        )) as readonly bigint[];
+        return { shard: BigInt(result[0]!), slot: Number(result[1]!) };
+    }
+    async getCreditRevocationBitmap(
+        context: import("@invisi-labs/protocol").DeploymentContext,
+        owner: Address,
+        token: Address,
+        shard: bigint,
+        wordIndex: number,
+        block: CanonicalBlock
+    ): Promise<bigint> {
+        return BigInt(
+            (await this.read(
+                context,
+                context.protocolAddress,
+                invisiProtocolAbi,
+                "creditRevocationBitmap",
+                [owner, token, shard, wordIndex],
+                block
+            )) as bigint
+        );
+    }
     async getLatestBlockNumber() {
         return BigInt(await this.client.getBlockNumber());
     }

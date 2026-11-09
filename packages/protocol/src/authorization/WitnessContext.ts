@@ -8,7 +8,7 @@ import {
     poseidonHash,
     verifyWalletAuthorization,
     type AuthorizedStatement,
-    type CreditNote,
+    type CreditState,
     type Note,
     type WalletAuthorizationWitness,
     type WalletOperation,
@@ -20,7 +20,7 @@ import type { NoteMembership } from "./types";
 /** Shared ownership, authorization and Merkle checks for witness builders. */
 export class WitnessContext {
     constructor(readonly protocol: TokenProtocol) {}
-    context(note: Note | CreditNote): void {
+    context(note: Note | CreditState): void {
         const c = this.protocol.context;
         check(
             note.chainId === c.chainId &&
@@ -96,21 +96,9 @@ export class WitnessContext {
             note.amount
         );
     }
-    async creditLeaf(note: CreditNote): Promise<Hex> {
+    async creditLeaf(note: CreditState): Promise<Hex> {
         this.context(note);
-        return computeCreditCommitment(
-            note.chainId,
-            note.spenderWalletIdentity,
-            note.ownerWalletIdentity,
-            note.spenderPayout,
-            note.ownerPayout,
-            note.tokenAddress,
-            note.amount,
-            note.nonce,
-            note.expiry,
-            await computeCreditSharedKeyHash(note.creditSharedKey),
-            note
-        );
+        return computeCreditCommitment(note);
     }
     async noteInputs(
         inputs: readonly NoteMembership[],

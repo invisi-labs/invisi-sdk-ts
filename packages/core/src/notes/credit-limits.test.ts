@@ -1,14 +1,16 @@
 import { expect, it } from "vitest";
-import { applyCreditDrawUsage, creditPeriods, normalizeCreditPolicy } from "./creditCommitment";
+import { applyCreditDrawUsage, creditPeriods, normalizeCreditPolicy } from "../credit/state";
 it("validates canonical period sentinels and the u126/u128/u64 ranges", () => {
     expect(normalizeCreditPolicy({})).toEqual({
         singleLimit: 0n,
         dailyLimit: 0n,
         monthlyLimit: 0n,
+        lifetimeLimit: 0n,
         lastDay: 0n,
         dailySpent: 0n,
         lastMonth: 0n,
         monthlySpent: 0n,
+        totalSpent: 0n,
     });
     for (const p of [
         { dailySpent: 1n },
@@ -23,7 +25,6 @@ it("debits both calendar counters, resets only on rollover and applies full-bala
     const t = BigInt(Date.parse("2024-02-29T23:59:59Z")) / 1000n,
         periods = creditPeriods(t);
     const n = {
-        amount: 100n,
         singleLimit: 40n,
         dailyLimit: 50n,
         monthlyLimit: 60n,
@@ -45,7 +46,7 @@ it("debits both calendar counters, resets only on rollover and applies full-bala
     });
     expect(() => applyCreditDrawUsage(n, 1n, t - 86400n)).toThrow("rollback");
     for (const p of [{ singleLimit: 99n }, { dailyLimit: 99n }, { monthlyLimit: 99n }])
-        expect(() => applyCreditDrawUsage({ amount: 100n, ...p }, 100n, t)).toThrow();
+        expect(() => applyCreditDrawUsage({ ...p }, 100n, t)).toThrow();
 });
 it("computes Gregorian calendar periods for epoch, leap day and the entire uint64 timestamp range", () => {
     expect(creditPeriods(0n)).toEqual({ currentDay: 1n, currentMonth: 1n });
@@ -61,12 +62,7 @@ it.each(vectors.creditPolicyCases)("matches independent policy case $name", (c) 
     const policy = Object.fromEntries(
         Object.entries(c.policy).map(([k, v]) => [k, BigInt(v)])
     ) as unknown as CreditPolicy;
-    const draw = () =>
-        applyCreditDrawUsage(
-            { amount: BigInt(c.amount), ...policy },
-            BigInt(c.drawAmount),
-            BigInt(c.timestamp)
-        );
+    const draw = () => applyCreditDrawUsage(policy, BigInt(c.drawAmount), BigInt(c.timestamp));
     if (c.reject) expect(draw).toThrow();
     else
         expect(draw()).toEqual(

@@ -17,3 +17,5 @@ export type {
     ProverProgress,
     ProvingRequest,
 } from "./interfaces";
+
+export { CIRCUIT_RELEASE } from "./release-identity";

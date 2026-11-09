@@ -32,7 +32,7 @@ describe("RPC deployment discovery", () => {
         expect((await client.getStatus(context)).indexedHead).toEqual(block);
     });
     it.each([
-        { apiVersion: "v2" },
+        { apiVersion: "unsupported" },
         { protocolVersion: "2" },
         { deployment: { ...wire().deployment, chainId: "1" } },
         {

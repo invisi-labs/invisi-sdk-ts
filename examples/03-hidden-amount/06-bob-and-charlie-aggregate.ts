@@ -167,7 +167,7 @@ try {
     const aggregator = new Aggregator({
         prover,
     });
-    // The current circuit supports exactly 4, 8, or 12 transfers; all four slots must be filled with distinct members.
+    // Four C1..C5 members use the current mixed outer; every request remains ordered and distinct.
     // The aggregator validates each proof before constructing the outer proof; member order must match requests.
     const proof = await aggregator.aggregate(members, {
         onProgress: (event) => {

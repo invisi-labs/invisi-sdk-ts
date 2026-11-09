@@ -2,15 +2,15 @@ import { expect, it } from "vitest";
 import { LocalWitness, type ProvingRequest } from "../interfaces";
 import { NativeProver } from "../native";
 import { getCircuitKey, getCircuitMetadata } from "../proofs/proof-data";
-import { CANCEL_FIXTURE } from "../testing/test-fixtures";
+import { UPDATE_FIXTURE } from "../testing/test-fixtures";
 import { WasmProver } from "../wasm";
 const statement = (): ProvingRequest => ({
-    circuitName: "credit_cancel",
+    circuitName: "credit_update",
     target: "evm",
-    artifactSha256: getCircuitMetadata("credit_cancel").artifactSha256,
-    vkSha256: getCircuitKey("credit_cancel").vkSha256,
-    expectedPublicInputs: [...CANCEL_FIXTURE.publicInputs],
-    witness: new LocalWitness(CANCEL_FIXTURE.witness),
+    artifactSha256: getCircuitMetadata("credit_update").artifactSha256,
+    vkSha256: getCircuitKey("credit_update").vkSha256,
+    expectedPublicInputs: [...UPDATE_FIXTURE.publicInputs],
+    witness: new LocalWitness(UPDATE_FIXTURE.witness),
 });
 it("rejects stale releases and cancellation before executing a backend", async () => {
     for (const prover of [

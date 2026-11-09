@@ -6,7 +6,7 @@ export {
     D_CREDIT,
     D_CREDIT_KEY_HASH,
     D_CREDIT_RECOVERY,
-    D_CREDIT_REMAINDER_NONCE,
+    D_CREDIT_STATE_NONCE,
     D_IDENT,
     D_NOTE,
     D_NULL,
@@ -15,16 +15,16 @@ export {
 export { poseidonHash } from "./crypto/poseidon";
 export { FIELD_MODULUS, generateCreditSharedKey, generateNonce } from "./crypto/random";
 export {
-    decryptCreditNote,
+    decryptCreditState,
     decryptPrivateTransferNote,
-    encryptCreditNote,
+    encryptCreditState,
     encryptPrivateTransferNote,
     normalizeCreditDeliveryState,
     viewingPublicKey,
 } from "./delivery/encryption";
 export type {
-    CreditNoteDecryptionContext,
-    CreditNoteEncryptionContext,
+    CreditStateDecryptionContext,
+    CreditStateEncryptionContext,
     NoteBytes,
     NoteDecryptionContext,
     NoteEncryptionContext,
@@ -41,22 +41,25 @@ export { createClue, createClueFromSeed, deriveClueKey, validateClueKey } from "
 export { computeNoteCommitment, computeNoteIdentity } from "./notes/commitment";
 export {
     CREDIT_POLICY_FIELDS,
+    deriveCreditState,
+    deriveCreditUpdate,
     applyCreditDrawUsage,
     computeCreditCommitment,
     computeCreditNullifier,
     computeCreditRecoveryPad,
     computeCreditSharedKeyHash,
     creditPeriods,
-    deriveRemainderNonce,
+    deriveCreditStateNonce,
     normalizeCreditPolicy,
-    recoverCreditRemainder,
-} from "./notes/creditCommitment";
+    normalizeCreditState,
+    recoverCreditState,
+} from "./credit/state";
 export { computeNoteNullifier } from "./notes/nullifier";
 export type {
     CreditDeliveryState,
-    CreditNote,
+    CreditState,
     CreditPolicy,
-    CreditRemainderRecovery,
+    CreditStateRecovery,
     Note,
     ProtocolContext,
     ReceivingKeys,
@@ -103,3 +106,5 @@ export type { DeliveryKind } from "./delivery/delivery-codec";
 export { creditV1, fundsV1 } from "./delivery/payload";
 
 export type { CreditDataV1, FundsDataV1 } from "./types";
+export { AGGREGATE_ROUTES, selectAggregateRoute } from "./note/aggregate-routes";
+export type { AggregateRoute } from "./note/aggregate-routes";

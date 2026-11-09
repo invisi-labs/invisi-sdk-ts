@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CANCEL_FIXTURE } from "../testing/test-fixtures";
+import { UPDATE_FIXTURE } from "../testing/test-fixtures";
 import { assertProofBundle, makeProofBundle } from "./proof-data";
 import { generateProofBundle } from "./prover";
 describe("proof bundle validation", () => {
     it("binds bytes, current artifact, target, key, and exact statement width", async () => {
-        const bundle = await makeProofBundle("credit_cancel", "evm", `0x${"00".repeat(32)}`, [
-            ...CANCEL_FIXTURE.publicInputs,
+        const bundle = await makeProofBundle("credit_update", "evm", `0x${"00".repeat(32)}`, [
+            ...UPDATE_FIXTURE.publicInputs,
         ]);
         const legacy = { ...bundle };
         Object.assign(legacy, { bbVersion: "5.2.1" });
@@ -19,7 +19,7 @@ describe("proof bundle validation", () => {
         await expect(assertProofBundle({ ...bundle, publicInputs: [] })).rejects.toThrow("count");
         await expect(
             makeProofBundle(
-                "credit_cancel",
+                "credit_update",
                 "evm",
                 bundle.proofHex,
                 bundle.publicInputs,
@@ -30,7 +30,7 @@ describe("proof bundle validation", () => {
     it("rejects unsupported targets before witness execution", async () => {
         await expect(
             generateProofBundle({
-                circuitName: "transact_user_slots168",
+                circuitName: "transact_user_slots190",
                 target: "noir-recursive",
                 inputs: {},
             })
@@ -39,8 +39,8 @@ describe("proof bundle validation", () => {
     it("rejects noncanonical public inputs before backend verification", async () => {
         const modulus =
             21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-        const bundle = await makeProofBundle("credit_cancel", "evm", `0x${"00".repeat(32)}`, [
-            ...CANCEL_FIXTURE.publicInputs,
+        const bundle = await makeProofBundle("credit_update", "evm", `0x${"00".repeat(32)}`, [
+            ...UPDATE_FIXTURE.publicInputs,
         ]);
         for (const value of [modulus, modulus + 1n]) {
             const publicInputs = [...bundle.publicInputs];

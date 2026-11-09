@@ -14,7 +14,7 @@ export class MemoryWalletStore extends TransactionalWalletStore {
 
 export * from "./operations/Operation";
 export type {
-    CancelCreditPreparation,
+    RevokeCreditPreparation,
     CoinSelector,
     CreateCreditPreparation,
     DrawCreditPreparation,
@@ -24,7 +24,7 @@ export type {
     FundingTypedData,
     OperationAggregateMember,
     ShieldPreparation,
-    TopUpCreditPreparation,
+    UpdateCreditPreparation,
     TransactionExecution,
     TransactionProveOptions,
     TransferPreparation,

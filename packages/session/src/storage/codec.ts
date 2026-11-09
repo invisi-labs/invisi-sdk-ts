@@ -52,9 +52,11 @@ export function serializeState(state: WalletState): Uint8Array {
     return new TextEncoder().encode(JSON.stringify(encode(state)));
 }
 export function deserializeState(data: Uint8Array): WalletState {
-    return decode(
+    const state = decode(
         JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(data))
     ) as WalletState;
+    if (state.schemaVersion !== 2) throw Error("Unsupported wallet store schema");
+    return state;
 }
 /** Only for explicitly nonpersistent reference storage. Persistent adapters require a caller-selected codec. */
 export class MemoryRecordCodec implements WalletRecordCodec {

@@ -37,7 +37,7 @@ describe("ProtocolRpcClient", () => {
         expect((await client.getStatus(context)).indexedHead).toEqual(block);
     });
     it.each([
-        { apiVersion: "v2" },
+        { apiVersion: "unsupported" },
         { protocolVersion: "2" },
         {
             deployment: {
@@ -51,66 +51,30 @@ describe("ProtocolRpcClient", () => {
         const { client } = setup(() => ({ ...status(), ...patch }));
         await expect(client.getStatus(context)).rejects.toBeInstanceOf(ProtocolRpcError);
     });
-    it("handles nil output arrays and deduplicates every credit transition", async () => {
+    it("handles nil ordinary Note arrays on its own route", async () => {
         const { client, requests } = setup((method) =>
-            method === "invisi_getStatus"
-                ? status()
-                : {
-                      blockHash: h(10),
-                      outputs: null,
-                      creditTransitions: [
-                          { transactionHash: h(2), logIndex: 0, block: wireBlock },
-                          { transactionHash: h(2), logIndex: 1, block: wireBlock },
-                          { transactionHash: h(3), logIndex: 2, block: wireBlock },
-                      ],
-                  }
+            method === "invisi_getStatus" ? status() : { blockHash: h(10), notes: null }
         );
         expect(
-            (await client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).transactionHashes
-        ).toEqual([h(2), h(3)]);
+            (await client.getNoteUpdates(context, { fromBlock: 1n, toBlock: 10n })).notes
+        ).toEqual([]);
         expect(requests[1]).toMatchObject({
-            method: "invisi_getUpdates",
+            method: "invisi_getNoteUpdates",
             params: [{ fromBlock: 1, toBlock: 10, blockHash: h(10) }],
         });
-        expect(JSON.stringify(requests)).not.toMatch(/viewKey|spendKey|sign/);
-    });
-    it("delegates detection only for explicit valid keys and retains credit refs", async () => {
-        const key = new Uint8Array(32);
-        key[0] = 1;
-        const { client, requests } = setup((method) =>
-            method === "invisi_getStatus"
-                ? status()
-                : {
-                      blockHash: h(10),
-                      checkedBits: 8,
-                      candidates: [
-                          {
-                              output: { transactionHash: h(2), logIndex: 0, block: wireBlock },
-                              fallback: true,
-                          },
-                      ],
-                      creditTransitions: [{ transactionHash: h(3), logIndex: 1, block: wireBlock }],
-                  }
-        );
-        expect(
-            (await client.getUpdates(context, { fromBlock: 1n, toBlock: 10n, detectionKey: key }))
-                .transactionHashes
-        ).toEqual([h(2), h(3)]);
-        expect(requests[1]!.method).toBe("invisi_detectOutputs");
-        expect(requests[1]!.params[1]).toBe("0x01" + "00".repeat(31));
     });
     it("rejects invalid range, update anchor and malformed refs", async () => {
         const { client } = setup((m) =>
             m === "invisi_getStatus"
                 ? status()
-                : { blockHash: h(9), outputs: null, creditTransitions: null }
+                : { blockHash: h(9), notes: null, creditTransitions: null }
         );
         await expect(
-            client.getUpdates(context, { fromBlock: 1n, toBlock: 10001n })
+            client.getNoteUpdates(context, { fromBlock: 1n, toBlock: 10001n })
         ).rejects.toThrow(/100/);
-        await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
-            /anchor/
-        );
+        await expect(
+            client.getNoteUpdates(context, { fromBlock: 1n, toBlock: 10n })
+        ).rejects.toThrow(/anchor/);
     });
     it("verifies membership root, path and earlier canonical anchor", async () => {
         const siblings = Array(TREE_DEPTH).fill(h(0));
@@ -272,7 +236,7 @@ it("authenticates event block timestamps before accepting update candidates", as
             ? status()
             : {
                   blockHash: h(10),
-                  outputs: [
+                  notes: [
                       {
                           transactionHash: h(2),
                           logIndex: 0,
@@ -282,7 +246,7 @@ it("authenticates event block timestamps before accepting update candidates", as
                   creditTransitions: [],
               }
     );
-    await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
+    await expect(client.getNoteUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
         "canonical block mismatch"
     );
 });
@@ -299,21 +263,21 @@ it("accepts exactly 10000 update blocks and reads only the requested canonical e
                       parentHash: h(19999),
                   },
               }
-            : { blockHash: h(10000), outputs: null, creditTransitions: null }
+            : { blockHash: h(10000), notes: null, creditTransitions: null }
     );
     await expect(
-        client.getUpdates(context, { fromBlock: 1n, toBlock: 10000n })
+        client.getNoteUpdates(context, { fromBlock: 1n, toBlock: 10000n })
     ).resolves.toMatchObject({ block: { number: 10000n } });
-    expect(reader.getBlock.mock.calls.map(([number]) => number)).toEqual([10000n]);
+    expect(reader.getBlock.mock.calls.map(([number]) => number)).toEqual([10000n, 10000n]);
 });
 
 it.each([null, { ...wireBlock, number: 9 }])(
     "rejects update ranges outside indexed history %j",
     async (indexedHead) => {
         const { client, reader, requests } = setup(() => ({ ...status(), indexedHead }));
-        await expect(client.getUpdates(context, { fromBlock: 1n, toBlock: 10n })).rejects.toThrow(
-            /indexed/
-        );
+        await expect(
+            client.getNoteUpdates(context, { fromBlock: 1n, toBlock: 10n })
+        ).rejects.toThrow(/indexed/);
         expect(reader.getBlock).not.toHaveBeenCalled();
         expect(requests).toHaveLength(1);
     }

@@ -142,7 +142,8 @@ try {
 
     // Estimate main-transaction gas from its structure and benchmark data, without on-chain simulation or Bob's approval.
     // This is a reference gas-unit count, not a gas price or final fee.
-    const { gasUnits } = prepared.estimateGas();
+    const reference = prepared.getGasReference();
+    const gasUnits = reference.available ? reference.gasUnits : null;
     console.log("Reference gas before proving:", gasUnits);
 
     // 4. Arbitrary spending of existing notes requires Alice's authorization; the signing tool receives only the SDK-exported request.

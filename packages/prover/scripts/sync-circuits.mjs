@@ -1,5 +1,6 @@
 /** Import only authenticated, published proving artifacts. No witnesses or source maps. */
 import assert from "node:assert/strict";
+import { format, resolveConfig } from "prettier";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, rmSync, renameSync, readdirSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
@@ -20,11 +21,11 @@ const field = (value) => {
 let recursiveHasher;
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const json = (p) => JSON.parse(readFileSync(join(root, p), "utf8"));
-const manifestPaths = ["circuits/transact-user-manifest.json", "circuits/credit-manifest.json"];
+const manifestPaths = ["circuits/transact/manifest.json", "circuits/credit/manifest.json"];
 const manifests = manifestPaths.map(json);
 for (const [i, version, format] of [
-    [0, 3, 7],
-    [1, 4, 5],
+    [0, 4, 7],
+    [1, 7, 8],
 ]) {
     assert.equal(manifests[i].version, version, "retired manifest version");
     assert.equal(manifests[i].formatVersion, format, "retired proof format");
@@ -119,31 +120,64 @@ try {
                 ...(entry.capacity ? { capacity: entry.capacity } : {}),
                 ...(entry.count ? { count: entry.count } : {}),
                 ...(entry.innerVkCommitment ? { innerVkCommitment: entry.innerVkCommitment } : {}),
+                ...(entry.innerVkCommitments
+                    ? { innerVkCommitments: entry.innerVkCommitments }
+                    : {}),
+                ...(entry.memberCapacities ? { memberCapacities: entry.memberCapacities } : {}),
                 keys,
             });
         }
     }
-    const recursivePin = entries.find((e) => e.name === "transact_user_slots14").keys[
-        "noir-recursive"
-    ].innerVkCommitment;
-    assert(recursivePin, "missing recursive key commitment");
-    for (const entry of entries.filter((e) => e.count))
-        assert.equal(
-            entry.innerVkCommitment,
-            recursivePin,
-            "aggregate inner key commitment mismatch"
-        );
+    for (const entry of entries.filter((e) => e.count)) {
+        const pins =
+            entry.innerVkCommitments ?? (entry.innerVkCommitment ? [entry.innerVkCommitment] : []);
+        assert(pins.length, "missing aggregate trusted key pins");
+        for (const pin of pins)
+            assert(
+                entries.some((e) => e.keys["noir-recursive"]?.innerVkCommitment === pin),
+                "unknown aggregate inner key commitment"
+            );
+    }
     const release = {
         bbVersion: "6.0.0",
-        noirVersion: "1.0.0-rc.6",
+        noirVersion: "1.0.0",
         manifests: manifests.map((m, i) => ({
             name: ["transact-user", "credit"][i],
+            version: m.version,
+            formatVersion: m.formatVersion,
             sha256: digest(readFileSync(join(root, manifestPaths[i]))),
         })),
         entries,
     };
     writeFileSync(join(stage, "manifest.json"), JSON.stringify(release, null, 2) + "\n");
+    const releaseIdentityPath = join(packageRoot, "src/release-identity.ts");
+    writeFileSync(
+        releaseIdentityPath,
+        await format(
+            "// Generated from authenticated protocol manifests.\nexport const CIRCUIT_RELEASE = " +
+                JSON.stringify(
+                    {
+                        note: {
+                            version: manifests[0].version,
+                            formatVersion: manifests[0].formatVersion,
+                            aggregateFormatVersion: manifests[0].aggregateFormatVersion,
+                        },
+                        credit: {
+                            version: manifests[1].version,
+                            formatVersion: manifests[1].formatVersion,
+                        },
+                    },
+                    null,
+                    2
+                ) +
+                " as const;\n",
+            { ...(await resolveConfig(releaseIdentityPath)), filepath: releaseIdentityPath }
+        )
+    );
     mkdirSync(destination, { recursive: true });
+    for (const filename of readdirSync(destination))
+        if (!readdirSync(stage).includes(filename))
+            rmSync(join(destination, filename), { force: true });
     for (const filename of readdirSync(stage))
         renameSync(join(stage, filename), join(destination, filename));
     for (const filename of ["wallet_registration.json", "wallet_registration.evm.vk"])

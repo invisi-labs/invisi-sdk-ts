@@ -6,15 +6,13 @@ export function inputFacts(
     plan: OperationPlan
 ): Array<{ key: string; reservationKey: string; nullifier: Hex; kind: "notes" | "credits" }> {
     const credit = plan.credit;
-    const noteNullifiers = plan.params?.nullifiers ?? credit?.creation?.nullifiers ?? [];
+    const noteNullifiers = plan.params?.nullifiers ?? [];
     let creditNullifiers: readonly Hex[] = [];
 
     if (credit?.draw) {
         creditNullifiers = credit.draw.nullifiers;
-    } else if (credit?.topUp) {
-        creditNullifiers = [credit.topUp.creditNullifier];
-    } else if (credit?.cancel) {
-        creditNullifiers = [credit.cancel.nullifier];
+    } else if (credit?.update) {
+        creditNullifiers = [credit.update.nullifier];
     }
 
     if (
@@ -45,11 +43,7 @@ export function operationSources(plan: OperationPlan): readonly InputSource[] {
     if (noteSources != null) return noteSources;
 
     const credit = plan.credit;
-    if (credit?.topUp) {
-        return [...credit.topUp.creation.sources, credit.topUp.creditSource];
-    }
-    if (credit?.creation) return credit.creation.sources;
     if (credit?.draw) return credit.draw.sources;
-    if (credit?.cancel) return [credit.cancel.source];
+    if (credit?.update) return [credit.update.source];
     return [];
 }

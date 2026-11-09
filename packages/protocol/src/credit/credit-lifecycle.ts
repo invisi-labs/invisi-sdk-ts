@@ -1,138 +1,155 @@
-import { AbiCoder, getAddress, Interface, keccak256, ParamType } from "ethers";
-import type { Address, Hex } from "../contracts/index";
 import { normalizeFee } from "../fees/fee";
-
-import {
-    computeWalletAuthorizationDigest,
-    creditPeriods,
-    walletAuthorizationTypedData,
-    type WalletOperation,
-} from "@invisi-labs/core";
+import { Interface, getAddress } from "ethers";
+import { creditPeriods, walletAuthorizationTypedData } from "@invisi-labs/core";
 import {
     invisiProtocolAbi,
-    type CancelCreditParams,
+    type Hex,
     type CreditDrawParams,
+    type UpdateCreditParams,
+    type RevokeCreditParams,
     type Delivery,
-    type TopUpCreditParams,
+    type CreditGrantRef,
 } from "../contracts/index";
 import {
+    normalizeContext,
+    normalizeSources,
+    normalizeOpaqueDelivery,
+    known,
+    uint,
+    word,
+    field,
+    notes,
+    dense,
     checkDeadline,
     deliveriesHash,
-    dense,
-    field,
-    fundingFields,
-    getEIP712Domain,
-    known,
-    normalizeContext,
-    normalizeOpaqueDelivery,
-    normalizeSources,
-    notes,
     pad,
-    uint,
-    validateFundingSubmission,
-    word,
-    ZERO_ADDRESS,
-    type FundingInput,
     type TransactionContext,
 } from "../validation";
-import {
-    createCreditBaseInputs,
-    encodeCreditProof,
-    validateCreateCreditRequest,
-} from "./credit-create";
-export const CREDIT_DRAW_CAPACITIES = [1, 12, 50, 120] as const;
+import { authorizedCreditInputs, encodeCreditProof } from "./credit-create";
+export const CREDIT_DRAW_CAPACITIES = [1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80] as const;
 export function selectCreditDrawCircuit(count: number) {
-    if (!Number.isInteger(count) || count < 1 || count > 120)
-        throw new Error("draw requires 1..120 credits");
-    const maxSize = CREDIT_DRAW_CAPACITIES.find((n) => count <= n)!;
+    if (!Number.isInteger(count) || count < 1 || count > 80)
+        throw Error("draw requires1..80 grants");
+    const capacity = CREDIT_DRAW_CAPACITIES.find((n) => count <= n)!;
     return {
-        name: `credit_draw_slots${maxSize}`,
-        maxSize,
-        publicInputCount: 6 * maxSize + 14,
-        totalBits: 126 + Math.ceil(Math.log2(maxSize)),
+        name: `credit_draw_slots${capacity}`,
+        capacity,
+        publicInputCount: 17 + 10 * capacity,
     };
 }
+const nonzero = (v: Hex) => {
+    const w = word(field(v));
+    if (!BigInt(w)) throw Error("zero commitment or nullifier");
+    return w;
+};
 export function validateCreditDrawRequest(
     c: TransactionContext,
     p: CreditDrawParams,
-    cs: readonly Delivery[]
+    d: readonly Delivery[]
 ) {
     known(p, [
         "token",
         "sources",
+        "payers",
+        "grantRefs",
         "nullifiers",
-        "remainderCommitments",
-        "expiries",
+        "stateCommitments",
         "recoveryAmounts",
-        "spender",
+        "noteCommitment",
         "totalAmount",
         "deadline",
+        "feeRecipient",
+        "feeAmount",
     ]);
-    if ((getAddress(p.token) as Hex) !== (getAddress(c.tokenAddress) as Hex))
-        throw new Error("request token mismatch");
     const ctx = normalizeContext(c),
-        ns = notes(p.nullifiers, "nullifiers"),
+        ns = notes(p.nullifiers, "nullifiers").map(nonzero),
         profile = selectCreditDrawCircuit(ns.length),
-        sources = normalizeSources(p.sources, ns.length, profile.maxSize);
-    for (const [key, v] of Object.entries({
-        remainderCommitments: p.remainderCommitments,
-        expiries: p.expiries,
-        recoveryAmounts: p.recoveryAmounts,
-    }))
-        if (dense<unknown>(v, key).length !== ns.length) throw new Error(`${key} count mismatch`);
-    const remainderCommitments = p.remainderCommitments.map((v) => word(field(v))),
+        sources = normalizeSources(p.sources, ns.length, profile.capacity);
+    if (getAddress(p.token) !== ctx.tokenAddress) throw Error("token context mismatch");
+    for (const k of ["stateCommitments", "recoveryAmounts"] as const)
+        if (dense(p[k], k).length !== ns.length) throw Error(`${k} count mismatch`);
+    const stateCommitments = p.stateCommitments.map(nonzero),
         recoveryAmounts = p.recoveryAmounts.map((v) => word(field(v))),
-        expiries = p.expiries.map((v) => uint(v, 64, "expiry")),
-        positives = remainderCommitments.filter((v) => BigInt(v) !== 0n);
-    if (new Set(positives).size !== positives.length)
-        throw new Error("duplicate remainder commitment");
-    for (let i = 0; i < ns.length; i++) {
-        if (expiries[i] === 0n || (c.now !== undefined && expiries[i]! <= c.now))
-            throw new Error("expiry must be future");
-        if (BigInt(remainderCommitments[i]!) === 0n && BigInt(recoveryAmounts[i]!) !== 0n)
-            throw new Error("full draw requires zero recovery amount");
-    }
-    const spender = getAddress(p.spender) as Hex,
-        totalAmount = uint(p.totalAmount, profile.totalBits, "totalAmount");
-    if (BigInt(spender) === 0n || totalAmount === 0n)
-        throw new Error("spender and total amount must be positive");
-    if (dense(cs, "deliveries").length !== 2 * ns.length)
-        throw new Error("deliveries count mismatch");
-    const deliveries = cs.map((v, i) =>
-        BigInt(remainderCommitments[Math.floor(i / 2)]!) === 0n
-            ? normalizeOpaqueDelivery(v, { empty: true })
-            : normalizeOpaqueDelivery(v, {})
-    );
+        noteCommitment = nonzero(p.noteCommitment);
+    if (new Set([...stateCommitments, noteCommitment]).size !== ns.length + 1)
+        throw Error("duplicate commitment");
+    let prev = 0n;
+    if (!dense(p.payers, "payers").length || p.payers.length > ns.length)
+        throw Error("payer count out of bounds");
+    const payers = p.payers.map((payer) => {
+        known(payer, ["payer", "amount"]);
+        const address = getAddress(payer.payer) as Hex,
+            amount = uint(payer.amount, 128, "payer amount");
+        if (BigInt(address) <= prev || !amount)
+            throw Error("payers must be sorted unique positive addresses with positive receipts");
+        prev = BigInt(address);
+        return { payer: address, amount };
+    });
+    if (dense(p.grantRefs, "grantRefs").length !== ns.length)
+        throw Error("grant reference count mismatch");
+    let previous: CreditGrantRef | undefined;
+    const grantRefs = p.grantRefs.map((ref) => {
+        known(ref, ["payerIndex", "shard", "slot"]);
+        const r = {
+            payerIndex: uint(ref.payerIndex, 32),
+            shard: uint(ref.shard, 64),
+            slot: uint(ref.slot, 16),
+        };
+        if (r.payerIndex >= BigInt(payers.length) || !r.shard)
+            throw Error("invalid grant namespace");
+        if (
+            previous &&
+            (r.payerIndex < previous.payerIndex ||
+                (r.payerIndex === previous.payerIndex &&
+                    (r.shard < previous.shard ||
+                        (r.shard === previous.shard && r.slot <= previous.slot))))
+        )
+            throw Error("grant references must be sorted unique payer/shard/slot");
+        previous = r;
+        return r;
+    });
+    const totalAmount = uint(p.totalAmount, 128, "totalAmount");
+    if (!totalAmount || payers.reduce((sum, p) => sum + p.amount, 0n) !== totalAmount)
+        throw Error("payer receipts must equal totalAmount");
+    if (normalizeFee(p).feeAmount >= totalAmount)
+        throw Error("Credit draw fee must leave a positive ordinary Note");
+    if (dense(d, "deliveries").length !== 2 * ns.length + 1)
+        throw Error("deliveries count mismatch");
+    if (c.timestamp === undefined) throw Error("explicit Credit draw timestamp required");
     return {
         ...ctx,
+        ...normalizeFee(p),
+        profile,
         sources,
+        payers,
+        grantRefs,
         nullifiers: ns,
-        remainderCommitments,
+        stateCommitments,
         recoveryAmounts,
-        expiries,
-        spender,
+        noteCommitment,
         totalAmount,
         deadline: checkDeadline(c, p.deadline),
-        deliveries,
-        profile,
-        periods: creditPeriods(c.timestamp!),
+        periods: creditPeriods(c.timestamp),
+        deliveries: d.map((v, i) =>
+            normalizeOpaqueDelivery(v, { allowEmpty: i === 2 * ns.length })
+        ),
     };
 }
 export function creditDrawBaseInputs(
     c: TransactionContext,
     p: CreditDrawParams,
-    cs: readonly Delivery[]
+    d: readonly Delivery[]
 ) {
-    const r = validateCreditDrawRequest(c, p, cs),
-        n = r.profile.maxSize,
-        h = BigInt(deliveriesHash(cs));
+    const r = validateCreditDrawRequest(c, p, d),
+        n = r.profile.capacity,
+        h = BigInt(deliveriesHash(d));
     return [
         r.chainId,
         BigInt(r.protocolAddress),
         BigInt(r.tokenAddress),
-        BigInt(r.spender),
         BigInt(r.nullifiers.length),
         BigInt(r.sources.length),
+        BigInt(r.payers.length),
         ...pad(
             r.sources.map((s) => s.treeId),
             n
@@ -141,51 +158,107 @@ export function creditDrawBaseInputs(
             r.sources.map((s) => BigInt(s.merkleRoot)),
             n
         ),
+        ...pad(
+            r.payers.map((s) => BigInt(s.payer)),
+            n
+        ),
+        ...pad(
+            r.payers.map((s) => s.amount),
+            n
+        ),
+        ...pad(
+            r.grantRefs.map((s) => s.payerIndex),
+            n
+        ),
+        ...pad(
+            r.grantRefs.map((s) => s.shard),
+            n
+        ),
+        ...pad(
+            r.grantRefs.map((s) => s.slot),
+            n
+        ),
         ...pad(r.nullifiers.map(BigInt), n),
-        ...pad(r.remainderCommitments.map(BigInt), n),
-        ...pad(r.expiries, n),
+        ...pad(r.stateCommitments.map(BigInt), n),
+        ...pad(r.recoveryAmounts.map(BigInt), n),
+        BigInt(r.noteCommitment),
         r.totalAmount,
         r.deadline,
         h >> 128n,
         h & ((1n << 128n) - 1n),
-        ...pad(r.recoveryAmounts.map(BigInt), n),
         r.periods.currentDay,
         r.periods.currentMonth,
+        BigInt(r.feeRecipient),
+        r.feeAmount,
     ].map(word);
 }
-export function validateCancelCreditRequest(c: TransactionContext, p: CancelCreditParams) {
+export function creditDrawPublicInputs(
+    c: TransactionContext,
+    p: CreditDrawParams,
+    d: readonly Delivery[]
+) {
+    return authorizedCreditInputs(
+        c,
+        "credit-draw",
+        selectCreditDrawCircuit(p.nullifiers.length).capacity,
+        creditDrawBaseInputs(c, p, d)
+    );
+}
+export function encodeCreditDrawTypedData(
+    c: TransactionContext,
+    p: CreditDrawParams,
+    d: readonly Delivery[]
+) {
+    return walletAuthorizationTypedData({
+        context: { chainId: c.chainId, protocolAddress: BigInt(c.protocolAddress) },
+        operation: "credit-draw",
+        capacity: selectCreditDrawCircuit(p.nullifiers.length).capacity,
+        words: creditDrawBaseInputs(c, p, d).map(BigInt),
+    });
+}
+export function validateUpdateCreditRequest(
+    c: TransactionContext,
+    p: UpdateCreditParams,
+    d: readonly Delivery[]
+) {
     known(p, [
         "token",
+        "owner",
         "source",
         "nullifier",
-        "owner",
-        "amount",
+        "creditCommitment",
+        "revocationShard",
+        "revocationSlot",
         "deadline",
         "feeRecipient",
         "feeAmount",
     ]);
-    if ((getAddress(p.token) as Hex) !== (getAddress(c.tokenAddress) as Hex))
-        throw new Error("request token mismatch");
     const ctx = normalizeContext(c),
-        source = normalizeSources([p.source], 1, 1)[0]!,
-        nullifier = notes([p.nullifier], "nullifier")[0]!,
         owner = getAddress(p.owner) as Hex,
-        amount = uint(p.amount, 126, "amount");
-    if (BigInt(owner) === 0n || amount === 0n) throw new Error("owner and amount must be positive");
-    const fee = normalizeFee(p);
-    if (fee.feeAmount >= amount) throw new Error("fee must leave a positive owner refund");
+        revocationShard = uint(p.revocationShard, 64);
+    if (getAddress(p.token) !== ctx.tokenAddress || !BigInt(owner) || !revocationShard)
+        throw Error("invalid update authority or token");
+    if (dense(d, "deliveries").length !== 2) throw Error("deliveries count mismatch");
     return {
         ...ctx,
-        ...fee,
-        source,
-        nullifier,
+        ...normalizeFee(p),
         owner,
-        amount,
+        source: normalizeSources([p.source], 1, 1)[0]!,
+        nullifier: nonzero(p.nullifier),
+        creditCommitment: nonzero(p.creditCommitment),
+        revocationShard,
+        revocationSlot: uint(p.revocationSlot, 16),
         deadline: checkDeadline(c, p.deadline),
+        deliveries: d.map((v) => normalizeOpaqueDelivery(v, {})),
     };
 }
-export function cancelCreditBaseInputs(c: TransactionContext, p: CancelCreditParams) {
-    const r = validateCancelCreditRequest(c, p);
+export function updateCreditBaseInputs(
+    c: TransactionContext,
+    p: UpdateCreditParams,
+    d: readonly Delivery[]
+) {
+    const r = validateUpdateCreditRequest(c, p, d),
+        h = BigInt(deliveriesHash(d));
     return [
         r.chainId,
         BigInt(r.protocolAddress),
@@ -194,194 +267,34 @@ export function cancelCreditBaseInputs(c: TransactionContext, p: CancelCreditPar
         r.source.treeId,
         BigInt(r.source.merkleRoot),
         BigInt(r.nullifier),
-        r.amount,
+        BigInt(r.creditCommitment),
+        r.revocationShard,
+        r.revocationSlot,
         r.deadline,
+        h >> 128n,
+        h & ((1n << 128n) - 1n),
         BigInt(r.feeRecipient),
         r.feeAmount,
     ].map(word);
 }
-export function validateTopUpCreditRequest(
+export function updateCreditPublicInputs(
     c: TransactionContext,
-    p: TopUpCreditParams,
-    cs: readonly Delivery[],
-    funding: FundingInput = {}
+    p: UpdateCreditParams,
+    d: readonly Delivery[]
 ) {
-    known(p, ["token", "creation", "creditSource", "creditNullifier", "previousExpiry"]);
-    const creation = validateCreateCreditRequest(c, p.creation, cs, funding),
-        creditSource = normalizeSources([p.creditSource], 1, 1)[0]!,
-        creditNullifier = notes([p.creditNullifier], "creditNullifier")[0]!,
-        previousExpiry = uint(p.previousExpiry, 64, "previousExpiry");
-    if (previousExpiry === 0n || (c.now !== undefined && previousExpiry <= c.now))
-        throw new Error("previous Credit has expired");
-    if (creation.expiry < previousExpiry) throw new Error("expiry must not decrease");
-    if (creation.nullifiers.includes(creditNullifier))
-        throw new Error("duplicate credit and ordinary nullifier");
-    return { creation, creditSource, creditNullifier, previousExpiry };
+    return authorizedCreditInputs(c, "update-credit", 1, updateCreditBaseInputs(c, p, d));
 }
-export function topUpCreditBaseInputs(
+export function encodeUpdateCreditTypedData(
     c: TransactionContext,
-    p: TopUpCreditParams,
-    cs: readonly Delivery[],
-    f: FundingInput = {}
-) {
-    const r = validateTopUpCreditRequest(c, p, cs, f);
-    return [
-        ...createCreditBaseInputs(c, p.creation, cs, f),
-        word(r.creditSource.treeId),
-        r.creditSource.merkleRoot,
-        r.creditNullifier,
-        word(r.previousExpiry),
-    ];
-}
-const cancelTuple = [
-    "(address token,(uint256 treeId,bytes32 merkleRoot) source,bytes32 nullifier,address owner,uint256 amount,uint256 deadline,address feeRecipient,uint256 feeAmount)",
-][0]!;
-const topTuple = [
-    "((address token,(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32 creditCommitment,bytes32 changeCommitment,address owner,uint256 expiry,uint256 deadline,address feeRecipient,uint256 feeAmount) creation,(uint256 treeId,bytes32 merkleRoot) creditSource,bytes32 creditNullifier,uint256 previousExpiry)",
-][0]!;
-const hashContext = {
-    chainId: 0n,
-    protocolAddress: ZERO_ADDRESS,
-    tokenAddress: ZERO_ADDRESS,
-};
-export function cancelCreditRequestHash(p: CancelCreditParams) {
-    validateCancelCreditRequest({ ...hashContext, tokenAddress: p.token }, p);
-    return keccak256(
-        AbiCoder.defaultAbiCoder().encode(
-            [{ type: "bytes32" }, cancelTuple].map((parameter) => ParamType.from(parameter)),
-            [
-                keccak256(new TextEncoder().encode("InvisiCancelCredit")),
-                { ...p, ...normalizeFee(p) },
-            ]
-        ) as Hex
-    ) as Hex;
-}
-export function topUpCreditRequestHash(
-    p: TopUpCreditParams,
-    cs: readonly Delivery[],
-    f: FundingInput = {}
-) {
-    const r = validateTopUpCreditRequest(
-        { ...hashContext, tokenAddress: p.creation.token },
-        p,
-        cs,
-        f
-    );
-    return keccak256(
-        AbiCoder.defaultAbiCoder().encode(
-            [
-                { type: "bytes32" },
-                topTuple,
-                { type: "bytes32" },
-                { type: "address" },
-                { type: "uint256" },
-            ].map((parameter) => ParamType.from(parameter)),
-            [
-                keccak256(new TextEncoder().encode("InvisiTopUpCredit")),
-                { ...p, creation: { ...p.creation, ...normalizeFee(p.creation) } },
-                deliveriesHash(cs),
-                r.creation.funding.payer,
-                r.creation.funding.amount,
-            ]
-        ) as Hex
-    ) as Hex;
-}
-function authorize(
-    c: TransactionContext,
-    operation: WalletOperation,
-    capacity: number,
-    words: readonly Hex[]
+    p: UpdateCreditParams,
+    d: readonly Delivery[]
 ) {
     return walletAuthorizationTypedData({
         context: { chainId: c.chainId, protocolAddress: BigInt(c.protocolAddress) },
-        operation,
-        capacity,
-        words: words.map(BigInt),
+        operation: "update-credit",
+        capacity: 1,
+        words: updateCreditBaseInputs(c, p, d).map(BigInt),
     });
-}
-function appendDigest(
-    c: TransactionContext,
-    operation: WalletOperation,
-    capacity: number,
-    words: readonly Hex[]
-) {
-    const digest = BigInt(
-        computeWalletAuthorizationDigest({
-            context: { chainId: c.chainId, protocolAddress: BigInt(c.protocolAddress) },
-            operation,
-            capacity,
-            words: words.map(BigInt),
-        })
-    );
-    return [...words, word(digest >> 128n), word(digest & ((1n << 128n) - 1n))];
-}
-export function encodeCancelCreditTypedData(c: TransactionContext, p: CancelCreditParams) {
-    return authorize(c, "cancel-credit", 1, cancelCreditBaseInputs(c, p));
-}
-export function encodeTopUpCreditTypedData(
-    c: TransactionContext,
-    p: TopUpCreditParams,
-    deliveries: readonly Delivery[],
-    funding: FundingInput = {}
-) {
-    return authorize(c, "top-up-credit", 10, topUpCreditBaseInputs(c, p, deliveries, funding));
-}
-export function encodeCreditDrawTypedData(
-    c: TransactionContext,
-    p: CreditDrawParams,
-    deliveries: readonly Delivery[]
-) {
-    return authorize(
-        c,
-        "credit-draw",
-        selectCreditDrawCircuit(p.nullifiers.length).maxSize,
-        creditDrawBaseInputs(c, p, deliveries)
-    );
-}
-export function creditDrawPublicInputs(
-    c: TransactionContext,
-    p: CreditDrawParams,
-    deliveries: readonly Delivery[]
-) {
-    return appendDigest(
-        c,
-        "credit-draw",
-        selectCreditDrawCircuit(p.nullifiers.length).maxSize,
-        creditDrawBaseInputs(c, p, deliveries)
-    );
-}
-export function cancelCreditPublicInputs(c: TransactionContext, p: CancelCreditParams) {
-    return appendDigest(c, "cancel-credit", 1, cancelCreditBaseInputs(c, p));
-}
-export function topUpCreditPublicInputs(
-    c: TransactionContext,
-    p: TopUpCreditParams,
-    deliveries: readonly Delivery[],
-    funding: FundingInput = {}
-) {
-    return appendDigest(c, "top-up-credit", 10, topUpCreditBaseInputs(c, p, deliveries, funding));
-}
-export function encodeTopUpCreditFundingTypedData(
-    c: TransactionContext,
-    p: TopUpCreditParams,
-    cs: readonly Delivery[],
-    f: FundingInput
-) {
-    const r = validateTopUpCreditRequest(c, p, cs, f),
-        funding = r.creation.funding;
-    if (funding.amount === 0n) throw new Error("funding authorization requires positive deposit");
-    return {
-        domain: getEIP712Domain(c),
-        primaryType: "FundTransact" as const,
-        types: { FundTransact: fundingFields },
-        message: {
-            requestHash: topUpCreditRequestHash(p, cs, f),
-            payer: funding.payer,
-            amount: funding.amount,
-            sigNonce: funding.sigNonce,
-            deadline: funding.deadline,
-        },
-    };
 }
 export interface BuildCreditDrawCalldataParams {
     context: TransactionContext;
@@ -390,49 +303,109 @@ export interface BuildCreditDrawCalldataParams {
     deliveries: readonly Delivery[];
 }
 export function buildCreditDrawCalldata(p: BuildCreditDrawCalldataParams) {
-    validateCreditDrawRequest(p.context, p.params, p.deliveries);
+    const r = validateCreditDrawRequest(p.context, p.params, p.deliveries);
     return {
         data: new Interface(invisiProtocolAbi).encodeFunctionData("creditDraw", [
             encodeCreditProof(p.proof),
-            p.params,
+            { ...p.params, ...normalizeFee(p.params) },
             p.deliveries,
         ]) as Hex,
-        nullifiers: p.params.nullifiers,
-        totalAmount: p.params.totalAmount,
+        approveAmount: 0n,
+        approvalRequirements: r.payers.map((payer) => ({
+            token: r.tokenAddress,
+            payer: payer.payer,
+            amount: payer.amount,
+        })),
     };
 }
-export interface BuildCancelCreditCalldataParams {
+export interface BuildUpdateCreditCalldataParams {
     context: TransactionContext;
     proof: Hex;
-    params: CancelCreditParams;
+    params: UpdateCreditParams;
+    deliveries: readonly Delivery[];
 }
-export function buildCancelCreditCalldata(p: BuildCancelCreditCalldataParams) {
-    validateCancelCreditRequest(p.context, p.params);
+export function buildUpdateCreditCalldata(p: BuildUpdateCreditCalldataParams) {
+    const r = validateUpdateCreditRequest(p.context, p.params, p.deliveries);
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("cancelCredit", [
+        data: new Interface(invisiProtocolAbi).encodeFunctionData("updateCredit", [
             encodeCreditProof(p.proof),
             { ...p.params, ...normalizeFee(p.params) },
+            p.deliveries,
         ]) as Hex,
+        approveAmount: r.feeAmount,
+        approvalRequirements: r.feeAmount
+            ? [{ token: r.tokenAddress, payer: r.owner, amount: r.feeAmount }]
+            : [],
     };
 }
-export interface BuildTopUpCreditCalldataParams {
-    context: TransactionContext;
-    proof: Hex;
-    params: TopUpCreditParams;
-    deliveries: readonly Delivery[];
-    funding?: FundingInput;
-    caller?: Address;
-}
-export function buildTopUpCreditCalldata(p: BuildTopUpCreditCalldataParams) {
-    const r = validateTopUpCreditRequest(p.context, p.params, p.deliveries, p.funding);
-    validateFundingSubmission(r.creation.funding, p.caller, p.context.now);
+export const REVOKE_CREDIT_TYPES = {
+    RevokeCredit: [
+        { name: "token", type: "address" },
+        { name: "owner", type: "address" },
+        { name: "shard", type: "uint64" },
+        { name: "slot", type: "uint16" },
+        { name: "deadline", type: "uint256" },
+        { name: "feeRecipient", type: "address" },
+        { name: "feeAmount", type: "uint256" },
+    ],
+};
+export function encodeRevokeCreditTypedData(c: TransactionContext, p: RevokeCreditParams) {
+    known(p, ["token", "owner", "shard", "slot", "deadline", "feeRecipient", "feeAmount"]);
+    if (
+        getAddress(p.token) !== getAddress(c.tokenAddress) ||
+        !BigInt(p.owner) ||
+        !uint(p.shard, 64)
+    )
+        throw Error("invalid revocation authority");
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("topUpCredit", [
-            encodeCreditProof(p.proof),
-            { ...p.params, creation: { ...p.params.creation, ...normalizeFee(p.params.creation) } },
-            p.deliveries,
-            r.creation.funding,
+        domain: {
+            name: "InvisibleProtocol",
+            version: "1",
+            chainId: c.chainId,
+            verifyingContract: c.protocolAddress,
+        },
+        types: REVOKE_CREDIT_TYPES,
+        primaryType: "RevokeCredit" as const,
+        message: {
+            token: getAddress(p.token),
+            owner: getAddress(p.owner),
+            shard: uint(p.shard, 64),
+            slot: uint(p.slot, 16),
+            deadline: checkDeadline(c, p.deadline),
+            ...normalizeFee(p),
+        },
+    };
+}
+export interface BuildRevokeCreditCalldataParams {
+    context: TransactionContext;
+    params: RevokeCreditParams;
+    signature: Hex;
+    caller?: Hex;
+}
+export function buildRevokeCreditCalldata(p: BuildRevokeCreditCalldataParams) {
+    encodeRevokeCreditTypedData(p.context, p.params);
+    if (p.signature === "0x" && (!p.caller || getAddress(p.caller) !== getAddress(p.params.owner)))
+        throw Error("direct revocation requires owner caller");
+    return {
+        data: new Interface(invisiProtocolAbi).encodeFunctionData("revokeCredit", [
+            p.params.token,
+            p.params.owner,
+            p.params.shard,
+            p.params.slot,
+            p.params.deadline,
+            normalizeFee(p.params).feeRecipient,
+            normalizeFee(p.params).feeAmount,
+            p.signature,
         ]) as Hex,
-        approveAmount: r.creation.funding.amount,
+        approveAmount: normalizeFee(p.params).feeAmount,
+        approvalRequirements: normalizeFee(p.params).feeAmount
+            ? [
+                  {
+                      token: p.params.token,
+                      payer: p.params.owner,
+                      amount: normalizeFee(p.params).feeAmount,
+                  },
+              ]
+            : [],
     };
 }

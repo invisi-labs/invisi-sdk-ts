@@ -17,7 +17,7 @@ const { abiDecode } = noirRequire("@noir-lang/noirc_abi") as {
 describe("actual zero-input transact14 circuit", () => {
     it("executes a real zero-input funding witness and decodes all public words", async () => {
         const fixture = ZERO_INPUT_FIXTURE;
-        const circuit = loadCircuit("transact_user_slots14");
+        const circuit = loadCircuit("transact_user_slots2");
         const witness = await generateWitness(circuit, fixture.witness);
         const decoded = abiDecode(circuit.abi, decompressWitnessStack(witness)[0]!.witness);
         const words = circuit.abi.parameters
@@ -30,7 +30,7 @@ describe("actual zero-input transact14 circuit", () => {
         expect(BigInt(decoded.inputs.input_count!)).toBe(0n);
     });
     it("rejects private authority metadata and broken funding conservation", async () => {
-        const circuit = loadCircuit("transact_user_slots14");
+        const circuit = loadCircuit("transact_user_slots2");
         for (const changes of [{ input_owner_address: "1" }, { deposit_amount: "201" }]) {
             await expect(
                 generateWitness(circuit, { ...ZERO_INPUT_FIXTURE.witness, ...changes })

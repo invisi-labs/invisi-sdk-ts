@@ -34,8 +34,8 @@ try {
     let reference: DisclosureReference | undefined;
     for (let fromBlock = protocol.deployment.protocol.fromBlock; fromBlock <= status.indexedHead.number && !reference; fromBlock += 100n) {
         const toBlock = fromBlock + 99n < status.indexedHead.number ? fromBlock + 99n : status.indexedHead.number;
-        const page = await rpc.getOutputs(protocol.context, { fromBlock, toBlock });
-        for (const output of page.outputs) {
+        const page = await rpc.getNoteUpdates(protocol.context, { fromBlock, toBlock });
+        for (const output of page.notes) {
             if (BigInt(output.tokenAddress) !== BigInt(tokenAddress)) {
                 continue;
             }

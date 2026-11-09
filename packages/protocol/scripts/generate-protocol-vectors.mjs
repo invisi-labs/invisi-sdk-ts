@@ -29,7 +29,7 @@ const context = {
     payer = "0x4444444444444444444444444444444444444444";
 const clue = "0x" + "22".repeat(64) + "18" + "33".repeat(3),
     delivery = { ciphertext: "0x01" + "11".repeat(160), clue },
-    creditDelivery = { ciphertext: "0x81" + "22".repeat(497), clue },
+    creditDelivery = { ciphertext: "0x82" + "22".repeat(483), clue },
     empty = { ciphertext: "0x", clue: "0x" };
 const funding = { payer, amount: 100n, sigNonce: 7n, deadline: 1000n },
     fund = { ...funding, signature: "0xabcd", permit: { deadline: 0n, v: 0, r: w(0), s: w(0) } },
@@ -64,79 +64,68 @@ for (const count of [1, 15, 57, 113]) {
         publicInputs,
         typedData,
         digest: hashTyped(typedData),
-        userPublicInputs: u.userPublicInputs(
-            publicInputs,
-            count === 1 ? 14 : count === 15 ? 56 : count === 57 ? 112 : 168
-        ),
+        userPublicInputs: u.userPublicInputs(publicInputs, t.selectTransactSlotsCapacity(1, count)),
     };
 }
 const creation = {
         token: context.tokenAddress,
-        sources: [],
-        nullifiers: [],
-        creditCommitment: w(5),
-        changeCommitment: w(0),
         owner,
-        expiry: 1000n,
+        revocationShard: 1n,
+        revocationSlot: 0n,
+        creditCommitment: w(5),
         deadline: 900n,
         feeRecipient: zeroFunding.payer,
         feeAmount: 0n,
     },
-    creditDeliveries = [creditDelivery, creditDelivery, empty];
+    creditDeliveries = [creditDelivery, creditDelivery];
 fixtures.create = {
     params: creation,
     deliveries: creditDeliveries,
-    funding,
-    publicInputs: c.createCreditPublicInputs(context, creation, creditDeliveries, funding),
-    basePublicInputs: c.createCreditBaseInputs(context, creation, creditDeliveries, funding),
-    requestHash: c.createCreditRequestHash(creation, creditDeliveries, funding),
-    typedData: c.encodeCreateCreditTypedData(context, creation, creditDeliveries, funding),
-    fundingTypedData: c.encodeCreateCreditFundingTypedData(
-        context,
-        creation,
-        creditDeliveries,
-        funding
-    ),
+    publicInputs: c.createCreditPublicInputs(context, creation, creditDeliveries),
+    basePublicInputs: c.createCreditBaseInputs(context, creation, creditDeliveries),
+    typedData: c.encodeCreateCreditTypedData(context, creation, creditDeliveries),
 };
-const cancel = {
+const update = {
     token: context.tokenAddress,
+    owner,
     source: { treeId: 1n, merkleRoot: w(1) },
     nullifier: w(2),
-    owner,
-    amount: 50n,
+    creditCommitment: w(5),
+    revocationShard: 1n,
+    revocationSlot: 0n,
     deadline: 900n,
     feeRecipient: zeroFunding.payer,
     feeAmount: 0n,
 };
-fixtures.cancel = {
-    params: cancel,
-    publicInputs: l.cancelCreditPublicInputs(context, cancel),
-    requestHash: l.cancelCreditRequestHash(cancel),
-    typedData: l.encodeCancelCreditTypedData(context, cancel),
-};
-const top = { creation, creditSource: cancel.source, creditNullifier: w(2), previousExpiry: 950n };
-fixtures.topUp = {
-    params: top,
+fixtures.update = {
+    params: update,
     deliveries: creditDeliveries,
-    funding,
-    publicInputs: l.topUpCreditPublicInputs(context, top, creditDeliveries, funding),
-    requestHash: l.topUpCreditRequestHash(top, creditDeliveries, funding),
-    typedData: l.encodeTopUpCreditTypedData(context, top, creditDeliveries, funding),
-    fundingTypedData: l.encodeTopUpCreditFundingTypedData(context, top, creditDeliveries, funding),
+    publicInputs: l.updateCreditPublicInputs(context, update, creditDeliveries),
+    typedData: l.encodeUpdateCreditTypedData(context, update, creditDeliveries),
 };
-for (const count of [1, 2, 13, 51]) {
+for (const count of [1, 2, 6, 11, 21, 31, 41, 51, 61, 71, 80]) {
     const params = {
             token: context.tokenAddress,
             sources: [{ treeId: 1n, merkleRoot: w(1) }],
+            payers: [{ payer: owner, amount: BigInt(count) * 7n }],
+            grantRefs: Array.from({ length: count }, (_, i) => ({
+                payerIndex: 0n,
+                shard: 1n,
+                slot: BigInt(i),
+            })),
             nullifiers: Array.from({ length: count }, (_, i) => w(i + 2)),
-            remainderCommitments: Array(count).fill(w(0)),
-            expiries: Array(count).fill(1000n),
-            recoveryAmounts: Array(count).fill(w(0)),
-            spender: owner,
-            totalAmount: 50n,
+            stateCommitments: Array.from({ length: count }, (_, i) => w(i + 1000)),
+            recoveryAmounts: Array(count).fill(w(1)),
+            noteCommitment: w(9000),
+            totalAmount: BigInt(count) * 7n,
             deadline: 900n,
+            feeRecipient: zeroFunding.payer,
+            feeAmount: 0n,
         },
-        deliveries = Array.from({ length: count * 2 }, () => ({ ...empty }));
+        deliveries = [
+            ...Array.from({ length: count * 2 }, () => ({ ...creditDelivery })),
+            delivery,
+        ];
     fixtures["draw" + count] = {
         params,
         deliveries,
@@ -205,15 +194,70 @@ fixtures.create.calldata = iface.encodeFunctionData("createCredit", [
     framed,
     creation,
     creditDeliveries,
-    fund,
 ]);
-fixtures.cancel.calldata = iface.encodeFunctionData("cancelCredit", [framed, cancel]);
-fixtures.topUp.calldata = iface.encodeFunctionData("topUpCredit", [
+fixtures.update.calldata = iface.encodeFunctionData("updateCredit", [
     framed,
-    top,
+    update,
     creditDeliveries,
-    fund,
 ]);
+const feeRecipient = "0x5555555555555555555555555555555555555555",
+    feeAmount = 3n;
+for (const [name, base, words, typed, method] of [
+    [
+        "createFee",
+        fixtures.create,
+        c.createCreditPublicInputs,
+        c.encodeCreateCreditTypedData,
+        "createCredit",
+    ],
+    [
+        "updateFee",
+        fixtures.update,
+        l.updateCreditPublicInputs,
+        l.encodeUpdateCreditTypedData,
+        "updateCredit",
+    ],
+    [
+        "drawFee",
+        fixtures.draw1,
+        l.creditDrawPublicInputs,
+        l.encodeCreditDrawTypedData,
+        "creditDraw",
+    ],
+]) {
+    const params = { ...base.params, feeRecipient, feeAmount };
+    fixtures[name] = {
+        params,
+        deliveries: base.deliveries,
+        publicInputs: words(context, params, base.deliveries),
+        typedData: typed(context, params, base.deliveries),
+        calldata: iface.encodeFunctionData(method, [framed, params, base.deliveries]),
+    };
+}
+const { encodeRevokeCreditTypedData } = await from("scripts/credit-revocation-client.mjs");
+const revoke = {
+    token: context.tokenAddress,
+    owner,
+    shard: 1n,
+    slot: 0n,
+    deadline: 900n,
+    feeRecipient,
+    feeAmount,
+};
+fixtures.revokeFee = {
+    params: revoke,
+    typedData: encodeRevokeCreditTypedData(context, revoke),
+    calldata: iface.encodeFunctionData("revokeCredit", [
+        revoke.token,
+        revoke.owner,
+        revoke.shard,
+        revoke.slot,
+        revoke.deadline,
+        feeRecipient,
+        feeAmount,
+        "0x1234",
+    ]),
+};
 fixtures.draw1.calldata = iface.encodeFunctionData("creditDraw", [
     framed,
     fixtures.draw1.params,
@@ -249,102 +293,80 @@ for (const name of ["transact1", "single", "crossTwo"])
         },
     ]);
 fixtures.transact1.fundingRequestHash = fixtures.single.fundingRequestHash;
+const manifest = JSON.parse(readFileSync(resolve(root, "circuits/transact/manifest.json")));
 fixtures.aggregateStatements = {
-    innerVkCommitment: JSON.parse(
-        readFileSync(resolve(root, "circuits/transact-user-manifest.json"))
-    ).aggregates[0].innerVkCommitment,
-    members: Array.from({ length: 12 }, (_, i) => {
+    innerVkCommitment: manifest.aggregates.find((e) => e.name === "transact_aggregate_2_5")
+        .innerVkCommitment,
+    members: Array.from({ length: 5 }, (_, i) => {
         const words = [...fixtures.transact1.publicInputs];
-        words[34] = w(1000 + i);
-        words[35] = w(2000 + i);
-        return u.userPublicInputs(words, 14);
+        words[10] = w(1000 + i);
+        words[11] = w(2000 + i);
+        return u.userPublicInputs(words, 2);
     }),
 };
 writeFileSync(
     new URL("../src/protocol-vectors.json", import.meta.url),
     stringify({ context, fixtures })
 );
-// Current complete private witnesses from the same authenticated protocol release.
 const read = (p) => JSON.parse(readFileSync(resolve(root, p))),
-    cancelWitness = read("circuits/credit_cancel/target/cancel-fixture.json"),
-    topWitness = read("circuits/credit_top_up/target/topUp-fixture.json"),
-    userWitness = read("circuits/transact_user_slots14/target/transact-slots-fixture.json");
-const { deriveWallet } = await from("scripts/wallet-client.mjs");
-const { createWalletTransactFixture } = await from("scripts/wallet-transact-fixtures.mjs");
-const sweepWallet = await deriveWallet(w(1));
-const sweepWitness = await createWalletTransactFixture({
-    context: {
-        chainId: 31337n,
-        protocolAddress: "0x0000000000000000000000000000000000001234",
-        tokenAddress: "0x0000000000000000000000000000000000005678",
-    },
-    wallet: sweepWallet,
-    sourceNotes: [
-        { ownerAddress: sweepWallet.ownerAddress, amount: 100n, nonce: 123n, treeId: 1n },
-    ],
-    withdrawalAddress: toBeHex(sweepWallet.ownerAddress, 20),
-    withdrawalAmount: 100n,
-});
-for (const key of ["signature", "public_key_x", "public_key_y"]) sweepWitness.witness[key].fill(0);
-const limitedDraw = read("circuits/credit_draw_slots1/target/limitedSecondDraw-fixture.json"),
-    limitedTopUp = read("circuits/credit_top_up/target/limitedLoweredTopUp-fixture.json"),
-    limitedCreate = read("circuits/create_credit/target/limitedCreation-fixture.json");
+    user = read("circuits/transact/user/slots2/target/transact-slots-fixture.json"),
+    create = read("circuits/credit/create/target/creation-fixture.json"),
+    draw = read("circuits/credit/draw/slots1/target/draw-fixture.json"),
+    updateFixture = read("circuits/credit/update/target/update-fixture.json");
+const { deriveWallet } = await from("scripts/wallet-client.mjs"),
+    { createWalletTransactFixture } = await from("scripts/wallet-transact-fixtures.mjs"),
+    sweepWallet = await deriveWallet(w(1)),
+    sweep = await createWalletTransactFixture({
+        context: {
+            chainId: 31337n,
+            protocolAddress: "0x0000000000000000000000000000000000001234",
+            tokenAddress: "0x0000000000000000000000000000000000005678",
+        },
+        wallet: sweepWallet,
+        sourceNotes: [
+            { ownerAddress: sweepWallet.ownerAddress, amount: 100n, nonce: 123n, treeId: 1n },
+        ],
+        withdrawalAddress: toBeHex(sweepWallet.ownerAddress, 20),
+        withdrawalAmount: 100n,
+    });
+for (const k of ["signature", "public_key_x", "public_key_y"]) sweep.witness[k].fill(0);
 const rows = [
     [
-        "LIMITED_DRAW_FIXTURE",
-        { witness: limitedDraw.witness, publicInputs: limitedDraw.publicInputs },
+        "SWEEP_FIXTURE",
+        { witness: sweep.witness, publicInputs: u.userPublicInputs(sweep.publicInputs, 1) },
     ],
+    ["CREATE_FIXTURE", { witness: create.witness, publicInputs: create.publicInputs }],
+    ["DRAW_FIXTURE", { witness: draw.witness, publicInputs: draw.publicInputs }],
     [
-        "LIMITED_TOP_UP_FIXTURE",
-        { witness: limitedTopUp.witness, publicInputs: limitedTopUp.publicInputs },
-    ],
-    [
-        "LIMITED_CREATE_FIXTURE",
-        { witness: limitedCreate.witness, publicInputs: limitedCreate.publicInputs },
-    ],
-    [
-        "CANCEL_FIXTURE",
-        { witness: cancelWitness.witness, publicInputs: cancelWitness.publicInputs },
+        "UPDATE_FIXTURE",
+        { witness: updateFixture.witness, publicInputs: updateFixture.publicInputs },
     ],
     [
         "USER_FIXTURE",
-        {
-            witness: userWitness.witness,
-            publicInputs: u.userPublicInputs(userWitness.publicInputs, 14),
-        },
-    ],
-    ["TOP_UP_FIXTURE", { witness: topWitness.witness, publicInputs: topWitness.publicInputs }],
-    [
-        "SWEEP_FIXTURE",
-        {
-            witness: sweepWitness.witness,
-            publicInputs: u.userPublicInputs(sweepWitness.publicInputs, 14),
-        },
+        { witness: user.witness, publicInputs: u.userPublicInputs(user.publicInputs, 2) },
     ],
 ];
 writeFileSync(
     new URL("../../prover/src/testing/test-fixtures.ts", import.meta.url),
-    "// Deterministic public test-wallet fixtures. Never use these keys with real funds.\n" +
+    "// Deterministic public protocol fixtures. Never use these keys with real funds.\n" +
         rows
             .map(
                 ([name, value]) =>
-                    "export const " + name + " = " + stringify(value).trimEnd() + " as const\n"
+                    "export const " + name + " = " + stringify(value).trimEnd() + " as const;\n"
             )
             .join("\n")
 );
-console.log("Generated current formatting vectors and four current Noir witnesses");
-
-const { createTransactSlotsFixture } = await from("scripts/transact-slots-fixtures.mjs");
-const zeroInput = await createTransactSlotsFixture(0, 2, {
-    funding: { amount: 200n, payer: context.tokenAddress },
-});
+const { createTransactSlotsFixture } = await from("scripts/transact-slots-fixtures.mjs"),
+    zero = await createTransactSlotsFixture(0, 2, {
+        funding: { amount: 200n, payer: context.tokenAddress },
+    });
 writeFileSync(
     new URL("../../prover/src/testing/zero-input-fixture.ts", import.meta.url),
-    "// Independently generated by invisi-protocol createTransactSlotsFixture(0, 2) and userPublicInputs.\n" +
-        "export const ZERO_INPUT_FIXTURE = " +
+    "// Independent current pure funding fixture.\nexport const ZERO_INPUT_FIXTURE = " +
         stringify({
-            witness: zeroInput.witness,
-            publicInputs: u.userPublicInputs(zeroInput.publicInputs, 14),
+            witness: zero.witness,
+            publicInputs: u.userPublicInputs(zero.publicInputs, 2),
         }).trimEnd() +
         " as const;\n"
 );
+console.log("Generated current Note/Credit formatting and executable witness vectors");

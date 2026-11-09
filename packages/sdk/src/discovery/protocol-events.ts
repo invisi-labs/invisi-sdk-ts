@@ -1,5 +1,5 @@
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
-import { Interface, type Result } from "ethers";
+import { Interface, type ParamType } from "ethers";
 
 const protocolInterface = new Interface(invisiProtocolAbi);
 
@@ -16,33 +16,17 @@ export function decodeProtocolEvent(log: { data: string; topics: readonly string
         )
     )
         throw new Error("Noncanonical protocol receipt event");
-    const args = decoded.args.toObject(true);
-    // Preserve empty protocol arrays: ethers toObject(true) represents an empty Result as {}.
-    for (const key of [
-        "tokens",
-        "commitments",
-        "nullifiers",
-        "outputCommitments",
-        "leafIndices",
-        "remainderLeafIndices",
-    ]) {
-        const values = decoded.args.getValue(key) as Result | undefined;
-        if (values) args[key] = values.toArray(true);
-    }
-    for (const key of ["sources", "deliveries"]) {
-        const values = decoded.args.getValue(key) as Result[] | undefined;
-        if (values) args[key] = values.map((value) => value.toObject(true));
-    }
-    const params = decoded.args.getValue("params") as Result | undefined;
-    if (params) {
-        const source = (params.getValue("creation") as Result | undefined) ?? params;
-        const target = params.getValue("creation") ? args.params.creation : args.params;
-        for (const key of ["nullifiers", "remainderCommitments", "expiries", "recoveryAmounts"]) {
-            const values = source.getValue(key) as Result | undefined;
-            if (values) target[key] = values.toArray(true);
-        }
-        const sources = source.getValue("sources") as Result[] | undefined;
-        if (sources) target.sources = sources.map((value) => value.toObject(true));
-    }
+    const value = (type: ParamType, item: unknown): unknown => {
+        if (type.baseType === "array")
+            return Array.from(item as readonly unknown[], (v) => value(type.arrayChildren!, v));
+        if (type.baseType === "tuple")
+            return Object.fromEntries(
+                type.components!.map((t, i) => [t.name, value(t, (item as readonly unknown[])[i])])
+            );
+        return item;
+    };
+    const args = Object.fromEntries(
+        decoded.fragment.inputs.map((type, i) => [type.name, value(type, decoded.args[i])])
+    );
     return { eventName: decoded.name, args };
 }

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { decryptCreditNote, decryptPrivateTransferNote } from "../delivery/encryption";
+import { decryptCreditState, decryptPrivateTransferNote } from "../delivery/encryption";
 import { computeNoteCommitment, computeNoteIdentity } from "../notes/commitment";
 import {
     applyCreditDrawUsage,
     computeCreditCommitment,
     computeCreditNullifier,
     computeCreditSharedKeyHash,
-    recoverCreditRemainder,
-} from "../notes/creditCommitment";
+    recoverCreditState,
+} from "../credit/state";
 import { computeNoteNullifier } from "../notes/nullifier";
-import type { CreditNote, Note } from "../types";
+import type { CreditState, Note } from "../types";
 import vectors from "./testdata/wallet-note-vectors.json";
 const hexToBytes = (text: string): Uint8Array => Uint8Array.from(Buffer.from(text.slice(2), "hex"));
 const hex = (value: string): `0x${string}` => `0x${BigInt(value).toString(16).padStart(64, "0")}`;
@@ -24,41 +24,27 @@ const note: Note = {
     amount: 70n,
     nonce: 123n,
 };
-const credit: CreditNote = {
+const credit: CreditState = {
     ...context,
     tokenAddress: note.tokenAddress,
     spenderWalletIdentity: ownerHex(vectors.credit.spenderWalletIdentity),
     ownerWalletIdentity: note.ownerAddress,
-    spenderPayout: BigInt(vectors.credit.spenderWalletIdentity),
-    ownerPayout: BigInt(vectors.credit.ownerWalletIdentity),
-    amount: 100n,
+    revocationShard: 1n,
+    revocationSlot: 0n,
     nonce: 678n,
     expiry: 2000000123n,
     creditSharedKey: 999n,
     singleLimit: BigInt(vectors.credit.singleLimit),
     dailyLimit: BigInt(vectors.credit.dailyLimit),
     monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+    lifetimeLimit: BigInt(vectors.credit.lifetimeLimit),
     lastDay: BigInt(vectors.credit.lastDay),
     dailySpent: BigInt(vectors.credit.dailySpent),
     lastMonth: BigInt(vectors.credit.lastMonth),
     monthlySpent: BigInt(vectors.credit.monthlySpent),
+    totalSpent: BigInt(vectors.credit.totalSpent),
 };
-const creditLeaf = (n: CreditNote) =>
-    computeCreditSharedKeyHash(n.creditSharedKey).then((keyHash) =>
-        computeCreditCommitment(
-            n.chainId,
-            n.spenderWalletIdentity,
-            n.ownerWalletIdentity,
-            n.spenderPayout,
-            n.ownerPayout,
-            n.tokenAddress,
-            n.amount,
-            n.nonce,
-            n.expiry,
-            keyHash,
-            n
-        )
-    );
+const creditLeaf = (n: CreditState) => computeCreditCommitment(n);
 
 describe("wallet-owned note vectors", () => {
     it("matches genuine current protocol identity, leaf and private-key nullifier", async () => {
@@ -85,7 +71,6 @@ describe("wallet-owned note vectors", () => {
         const alternate = {
             ...credit,
             ownerWalletIdentity: credit.spenderWalletIdentity,
-            ownerPayout: BigInt(credit.spenderWalletIdentity),
         };
         expect(
             await computeCreditNullifier(
@@ -97,18 +82,17 @@ describe("wallet-owned note vectors", () => {
     });
 
     it("recovers the authenticated remainder without changing wallet roles or payout addresses", async () => {
-        const r = vectors.credit.remainder;
-        const recovered = await recoverCreditRemainder(context, credit, {
+        const r = vectors.credit.draw;
+        const recovered = await recoverCreditState(context, credit, {
             timestamp: BigInt(vectors.context.timestamp),
             creditNullifier: r.nullifier as `0x${string}`,
-            remainderCommitment: r.remainderCommitment as `0x${string}`,
+            stateCommitment: r.stateCommitment as `0x${string}`,
             recoveryAmount: BigInt(r.recoveryAmount),
         });
         expect(recovered).toEqual({
             ...credit,
             ...applyCreditDrawUsage(credit, 30n, BigInt(vectors.context.timestamp)),
-            amount: 70n,
-            nonce: BigInt(r.remainder!.nonce),
+            nonce: BigInt(r.state.nonce),
         });
     });
 
@@ -126,7 +110,7 @@ describe("wallet-owned note vectors", () => {
         expect(recovered).toEqual({ ...note, payload: new Uint8Array() });
         for (const role of ["owner", "spender"] as const) {
             expect(
-                await decryptCreditNote(
+                await decryptCreditState(
                     vectors[role].viewingPrivateKey as `0x${string}`,
                     vectors.credit[
                         role === "owner" ? "ownerCiphertext" : "spenderCiphertext"

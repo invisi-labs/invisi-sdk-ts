@@ -59,7 +59,7 @@ describe("service chain discovery", () => {
     });
 
     it.each([
-        { apiVersion: "v2", chains: [] },
+        { apiVersion: "unsupported", chains: [] },
         response(null),
         response({}),
         response([chain("0")]),

@@ -1,134 +1,69 @@
 import type { TokenProtocol } from "@invisi-labs/protocol";
 import type { OperationPlan } from "../transactions/operation-types";
+import { getDocumentedGasReference, type DocumentedGasShape } from "./documented-reference";
 import { operationSources } from "../transactions/preparation/inputs";
-import { defaultProfiles, sameCircuit, sameDeployment, shapeKeys } from "./profiles";
-import { estimateShapeGas } from "./shape";
-import {
-    BenchmarkGasEstimate,
-    GasBenchmarkProfile,
-    GasEstimateRequest,
-    GasReference,
-} from "./types";
-
-/** Pure reference lookup. No proof, RPC, current fee price, extrapolation or transaction gas limit. */
-export function estimateBenchmarkGas(
-    plan: OperationPlan,
-    protocol: TokenProtocol,
-    profiles?: readonly GasBenchmarkProfile[]
-): BenchmarkGasEstimate {
+/** A pre-proof documented scenario reference; conditions remain visible in the result. */
+export function getOperationGasReference(plan: OperationPlan, _protocol?: TokenProtocol) {
+    let query: DocumentedGasShape = { kind: plan.kind };
     const credit = plan.credit;
-    const deliveries = credit?.deliveries ?? plan.outputs.map((out) => out.delivery);
-    const request: GasEstimateRequest = {
-        deployment: {
-            chainId: plan.context.chainId.toString(),
-            protocolAddress: plan.context.protocolAddress,
-            runtimeCodeHash: protocol.expectedRuntimeCodeHash ?? null,
-            tokenAddress: plan.context.tokenAddress,
-        },
-        shape: {
-            kind: plan.kind,
-            target: plan.statement?.target ?? "evm",
-            capacity: plan.capacity ?? 0,
+    if (plan.statement?.target === "noir-recursive")
+        return getDocumentedGasReference({ kind: "aggregate" });
+    if (credit?.creation)
+        query = { kind: "create-credit", scenario: "first-allocation-empty-tree" };
+    else if (credit?.update)
+        query = { kind: "update-credit", scenario: "after-draw-preserve-usage" };
+    else if (credit?.draw)
+        query = {
+            kind: "draw-credit",
+            capacity: plan.capacity!,
+            creditInputs: credit.inputs.length,
+            distinctPayers: credit.draw.payers.length,
+            sourceTrees: operationSources(plan).length,
+            noteOutputs: 1,
+            creditOutputs: credit.outputs.length,
+            creditCiphertextBytes: 484,
+            noteCiphertextBytes: 160,
+            clueBytes: 68,
+            scenario: "distinct-payers",
+        };
+    else if (plan.kind === "transfer")
+        query = {
+            kind: "transact",
+            capacity: plan.capacity!,
             noteInputs: plan.inputs.length,
             noteOutputs: plan.outputs.length,
             sourceTrees: operationSources(plan).length,
-            creditInputs: credit?.inputs.length ?? 0,
-            creditOutputs: credit?.outputs.length ?? 0,
-            creditRemainders:
-                credit?.draw?.remainderCommitments.filter((hash) => BigInt(hash) !== 0n).length ??
-                0,
-            funding: plan.fundingMode,
-            permit: (plan.funding.permit?.deadline ?? 0n) !== 0n,
-            deliveryBytes: deliveries.reduce(
-                (sum, d) => sum + (d.ciphertext.length - 2) / 2 + (d.clue.length - 2) / 2,
-                0
-            ),
-        },
-        circuit: plan.statement
-            ? {
-                  circuitName: plan.statement.circuitName,
-                  target: plan.statement.target,
-                  artifactSha256: plan.statement.artifactSha256,
-                  vkSha256: plan.statement.vkSha256,
-              }
-            : null,
-    };
-    const base = { source: "benchmark" as const, request };
-    if (request.shape.target === "noir-recursive")
-        return { ...base, available: false, reason: "recursive-member-only" };
-    const candidates = (profiles ?? defaultProfiles).filter((p) =>
-        sameDeployment(p.deployment, request.deployment)
-    );
-    if (!request.deployment.runtimeCodeHash || !candidates.length)
-        return { ...base, available: false, reason: "deployment-not-covered" };
-    const exact = candidates.flatMap((profile) =>
-        profile.measurements
-            .filter(
-                (m) =>
-                    shapeKeys.every((key) => m.shape[key] === request.shape[key]) &&
-                    sameCircuit(m.circuit, request.circuit)
-            )
-            .map((measurement) => ({ profile, measurement }))
-    );
-    const mean = (measurement: GasBenchmarkProfile["measurements"][number]) => {
-        const count = BigInt(measurement.samples.length);
-        return (
-            (measurement.samples.reduce((sum, s) => sum + BigInt(s.gasUsed), 0n) + count - 1n) /
-            count
-        );
-    };
-    exact.sort((a, b) =>
-        mean(a.measurement) > mean(b.measurement)
-            ? -1
-            : mean(a.measurement) < mean(b.measurement)
-              ? 1
-              : a.measurement.id.localeCompare(b.measurement.id)
-    );
-    if (exact.length) {
-        const { profile, measurement } = exact[0]!;
-        const gas = measurement.samples.map((sample) => BigInt(sample.gasUsed));
-        const count = BigInt(gas.length);
-        return {
-            ...base,
-            available: true,
-            gasUnits: (gas.reduce((sum, value) => sum + value, 0n) + count - 1n) / count,
-            range: {
-                min: gas.reduce((a, b) => (a < b ? a : b)),
-                max: gas.reduce((a, b) => (a > b ? a : b)),
-                kind: "observed",
-            },
-            samples: gas.length,
-            profileId: profile.id,
-            measurementId: measurement.id,
-            evidence: structuredClone(profile.source),
+            noteCiphertextBytes: 160,
+            clueBytes: 68,
+            scenario: !plan.inputs.length
+                ? "public-funding"
+                : !plan.outputs.length
+                  ? "withdrawal"
+                  : !(plan.funding.amount ?? 0n) &&
+                      !(plan.params?.withdrawalAmount ?? 0n) &&
+                      !(plan.params?.feeAmount ?? 0n)
+                    ? "private"
+                    : "mixed",
+        };
+    if (credit) {
+        const feeAmount =
+            credit.creation?.feeAmount ??
+            credit.update?.feeAmount ??
+            credit.draw?.feeAmount ??
+            credit.revocation?.feeAmount ??
+            0n;
+        query = {
+            ...query,
+            feeEnabled: feeAmount > 0n,
+            feeMechanism: feeAmount > 0n ? (credit.draw ? "draw-deduction" : "owner-pull") : "none",
         };
     }
-    return { ...base, available: false, reason: "shape-not-covered" };
+    if (
+        plan.outputs.some((o) => (o.delivery.ciphertext.length - 2) / 2 !== 160) ||
+        credit?.outputs.some((o) => o.deliveries.some((d) => (d.ciphertext.length - 2) / 2 !== 484))
+    )
+        return getDocumentedGasReference({ kind: "unmeasured-delivery-size" });
+    return getDocumentedGasReference(query);
 }
-
-export function estimateGasReference(
-    plan: OperationPlan,
-    protocol: TokenProtocol,
-    profiles?: readonly GasBenchmarkProfile[]
-): GasReference {
-    const reference = estimateBenchmarkGas(plan, protocol, profiles);
-    if (reference.available) return { gasUnits: reference.gasUnits };
-    // Team records take priority only for their exact deployment and shape. The built-in
-    // reference model is deployment-independent and covers the current SDK operation family.
-    return estimateShapeGas(reference.request);
-}
-
-export {
-    BenchmarkGasEstimate,
-    GasBenchmarkCircuit,
-    GasBenchmarkDeployment,
-    GasBenchmarkProfile,
-    GasBenchmarkSample,
-    GasBenchmarkShape,
-    GasEstimateRequest,
-    GasReference,
-} from "./types";
-
-export { copyGasBenchmarks, defineGasBenchmarks } from "./profiles";
-
-export { estimateShapeGas } from "./shape";
+export { getDocumentedGasReference } from "./documented-reference";
+export type { DocumentedGasReference, DocumentedGasShape } from "./documented-reference";

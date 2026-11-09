@@ -16,6 +16,16 @@
       "types": "./dist/contracts.d.ts",
       "import": "./dist/contracts.js",
       "require": "./dist/contracts.cjs"
+    },
+    "./note": {
+      "types": "./dist/note.d.ts",
+      "import": "./dist/note.js",
+      "require": "./dist/note.cjs"
+    },
+    "./credit": {
+      "types": "./dist/credit.d.ts",
+      "import": "./dist/credit.js",
+      "require": "./dist/credit.cjs"
     }
   },
   "scripts": {

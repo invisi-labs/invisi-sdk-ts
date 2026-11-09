@@ -35,7 +35,8 @@ export interface NoteRecord extends ReceiptPosition {
 }
 
 export interface CreditRecord extends ReceiptPosition {
-    receivingKeySource?: { kind: "draw" | "top-up"; commitment: Hex };
+    receivingKeySource?: { kind: "draw" | "update"; commitment: Hex };
+    revoked?: boolean;
     state: CreditDeliveryState;
     role: "owner" | "spender";
     spent: SpentState;

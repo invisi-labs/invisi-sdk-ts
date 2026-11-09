@@ -42,8 +42,8 @@ function validateInheritance(state: WalletState, record: StoredCredit): boolean 
         "tokenAddress",
         "spenderWalletIdentity",
         "ownerWalletIdentity",
-        "spenderPayout",
-        "ownerPayout",
+        "revocationShard",
+        "revocationSlot",
         "creditSharedKey",
     ] as const;
     if (
@@ -56,15 +56,18 @@ function validateInheritance(state: WalletState, record: StoredCredit): boolean 
 
     if (source.kind === "draw") {
         if (
-            successor.note.amount >= previous.note.amount ||
+            (successor.note.totalSpent ?? 0n) <= (previous.note.totalSpent ?? 0n) ||
             successor.note.expiry !== previous.note.expiry
         ) {
             throw new Error("invalid Credit receiving inheritance");
         }
     } else if (
-        source.kind !== "top-up" ||
-        successor.note.amount <= previous.note.amount ||
-        successor.note.expiry < previous.note.expiry
+        source.kind !== "update" ||
+        ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"].some(
+            (field) =>
+                previous.note[field as keyof typeof previous.note] !==
+                successor.note[field as keyof typeof successor.note]
+        )
     ) {
         throw new Error("invalid Credit receiving inheritance");
     }

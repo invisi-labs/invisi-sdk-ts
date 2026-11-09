@@ -47,7 +47,7 @@ export function matchesAggregateTransaction(
         if (
             decoded.name !== "transact" ||
             !Array.isArray(requests) ||
-            ![4, 8, 12].includes(requests.length)
+            ![1, 2, 3, 4, 5].includes(requests.length)
         )
             return false;
         const canonical = (request: TransactRequest) =>

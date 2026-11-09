@@ -11,13 +11,28 @@ function fixture() {
         detectionEnabled: true,
         checkedBits: 8,
     }));
-    const getUpdates = vi.fn(
-        async (...[_context, range]: Parameters<ProtocolDataProvider["getUpdates"]>) => ({
+    const getNoteUpdates = vi.fn(
+        async (...[_context, range]: Parameters<ProtocolDataProvider["getNoteUpdates"]>) => ({
             block: block(range.toBlock),
-            transactionHashes: [] as `0x${string}`[],
+            notes: [] as Array<{ transactionHash: `0x${string}` }>,
         })
     );
-    const provider = { getStatus, getUpdates, getMembership: vi.fn() } as ProtocolDataProvider;
+    const getCreditTransitions = vi.fn(async (_context: unknown, range: { toBlock: bigint }) => ({
+        block: block(range.toBlock),
+        transitions: [],
+    }));
+    const detectCreditStates = vi.fn(async (_context: unknown, range: { toBlock: bigint }) => ({
+        block: block(range.toBlock),
+        states: [],
+    }));
+    const provider = {
+        getStatus,
+        getNoteUpdates,
+        detectNotes: getNoteUpdates,
+        getCreditTransitions,
+        detectCreditStates,
+        getMembership: vi.fn(),
+    } as unknown as ProtocolDataProvider;
     const apply = vi.fn(
         async (
             batch: import("./WalletUpdater").CandidatePage,
@@ -38,15 +53,17 @@ function fixture() {
             reader: { getBlock: async (n: bigint) => block(n) },
         },
         getStatus,
-        getUpdates,
+        getNoteUpdates,
+        getCreditTransitions,
+        detectCreditStates,
         apply,
     };
 }
 it("pulls bounded indexed pages and resets private inventory only on the first page", async () => {
     const h = fixture();
-    h.getUpdates.mockImplementation(async (_context, range) => ({
+    h.getNoteUpdates.mockImplementation(async (_context, range) => ({
         block: block(range.toBlock),
-        transactionHashes: [hash],
+        notes: [{ transactionHash: hash }],
     }));
     const key = new Uint8Array(32).fill(1);
     const result = await refreshWallet(h.runtime, {
@@ -55,7 +72,9 @@ it("pulls bounded indexed pages and resets private inventory only on the first p
         detectionKey: key,
         reset: true,
     });
-    expect(h.getUpdates.mock.calls.map(([, range]) => [range.fromBlock, range.toBlock])).toEqual([
+    expect(
+        h.getNoteUpdates.mock.calls.map(([, range]) => [range.fromBlock, range.toBlock])
+    ).toEqual([
         [10n, 109n],
         [110n, 209n],
         [210n, 260n],
@@ -73,13 +92,13 @@ it("does not delegate a detector implicitly and propagates caller cancellation",
     const h = fixture();
     const controller = new AbortController();
     await refreshWallet(h.runtime, { fromBlock: 10n, toBlock: 10n, signal: controller.signal });
-    expect(h.getUpdates.mock.calls[0]![1]).not.toHaveProperty("detectionKey");
-    expect(h.getUpdates.mock.calls[0]![1].signal).toBe(controller.signal);
+    expect(h.getNoteUpdates.mock.calls[0]![1]).not.toHaveProperty("detectionKey");
+    expect(h.getNoteUpdates.mock.calls[0]![1].signal).toBe(controller.signal);
     controller.abort();
     await expect(
         refreshWallet(h.runtime, { fromBlock: 11n, signal: controller.signal })
     ).rejects.toThrow();
-    expect(h.getUpdates).toHaveBeenCalledTimes(1);
+    expect(h.getNoteUpdates).toHaveBeenCalledTimes(1);
 });
 it("rejects invalid ranges and service page anchors without applying anything", async () => {
     const h = fixture();
@@ -91,7 +110,7 @@ it("rejects invalid ranges and service page anchors without applying anything", 
     ]) {
         await expect(refreshWallet(h.runtime, settings)).rejects.toThrow(/range|size|deployment/i);
     }
-    h.getUpdates.mockImplementation(async () => ({ block: block(999n), transactionHashes: [] }));
+    h.getNoteUpdates.mockImplementation(async () => ({ block: block(999n), notes: [] }));
     await expect(refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100 })).rejects.toThrow(
         /anchor/i
     );
@@ -99,9 +118,9 @@ it("rejects invalid ranges and service page anchors without applying anything", 
 });
 it("stops on a failed page instead of skipping it", async () => {
     const h = fixture();
-    h.getUpdates.mockRejectedValueOnce(new Error("unavailable"));
+    h.getNoteUpdates.mockRejectedValueOnce(new Error("unavailable"));
     await expect(refreshWallet(h.runtime, { fromBlock: 10n })).rejects.toThrow("unavailable");
-    expect(h.getUpdates).toHaveBeenCalledTimes(1);
+    expect(h.getNoteUpdates).toHaveBeenCalledTimes(1);
     expect(h.apply).not.toHaveBeenCalled();
 });
 
@@ -114,7 +133,7 @@ it("coalesces empty pages into one final state refresh", async () => {
         balances: [],
     }));
     const result = await refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100, reset: true });
-    expect(h.getUpdates).toHaveBeenCalledTimes(3);
+    expect(h.getNoteUpdates).toHaveBeenCalledTimes(3);
     expect(h.apply).toHaveBeenCalledTimes(1);
     expect(h.apply).toHaveBeenCalledWith(
         { context, block: block(260n), transactionHashes: [] },
@@ -124,9 +143,9 @@ it("coalesces empty pages into one final state refresh", async () => {
 });
 it("skips empty leading and trailing pages and delays reset until actual application", async () => {
     const h = fixture();
-    h.getUpdates.mockImplementation(async (_context, range) => ({
+    h.getNoteUpdates.mockImplementation(async (_context, range) => ({
         block: block(range.toBlock),
-        transactionHashes: range.fromBlock === 110n ? [hash] : [],
+        notes: range.fromBlock === 110n ? [{ transactionHash: hash }] : [],
     }));
     await refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100, reset: true });
     expect(h.apply).toHaveBeenCalledTimes(1);
@@ -135,9 +154,9 @@ it("skips empty leading and trailing pages and delays reset until actual applica
 });
 it("still validates skipped empty page anchors", async () => {
     const h = fixture();
-    h.getUpdates.mockImplementation(async (_context, range) => ({
+    h.getNoteUpdates.mockImplementation(async (_context, range) => ({
         block: block(range.fromBlock === 210n ? 999n : range.toBlock),
-        transactionHashes: range.fromBlock === 10n ? [hash] : [],
+        notes: range.fromBlock === 10n ? [{ transactionHash: hash }] : [],
     }));
     await expect(refreshWallet(h.runtime, { fromBlock: 10n, pageSize: 100 })).rejects.toThrow(
         /anchor/
@@ -158,10 +177,34 @@ it("defaults to 10000 blocks and accepts an explicit 10000 block page", async ()
             ...(pageSize === undefined ? {} : { pageSize }),
         });
         expect(
-            h.getUpdates.mock.calls.map(([, range]) => [range.fromBlock, range.toBlock])
+            h.getNoteUpdates.mock.calls.map(([, range]) => [range.fromBlock, range.toBlock])
         ).toEqual([
             [10n, 10009n],
             [10010n, 10010n],
         ]);
     }
+});
+
+it("keeps Credit transitions unfiltered while delegating independent Note and Credit-state detection", async () => {
+    const h = fixture();
+    await refreshWallet(h.runtime, {
+        fromBlock: 10n,
+        toBlock: 10n,
+        detectionKey: new Uint8Array(32).fill(7),
+    });
+    expect(h.getCreditTransitions).toHaveBeenCalledTimes(1);
+    expect(h.getCreditTransitions.mock.calls[0]![1]).not.toHaveProperty("detectionKey");
+    expect(h.getNoteUpdates.mock.calls[0]![1]).toHaveProperty("detectionKey");
+    expect(h.detectCreditStates.mock.calls[0]![1]).toHaveProperty("detectionKey");
+});
+it("rejects a Credit page with a different number even when the claimed hash matches", async () => {
+    const h = fixture();
+    h.getCreditTransitions.mockImplementation(async () => ({
+        block: block(999n),
+        transitions: [],
+    }));
+    await expect(refreshWallet(h.runtime, { fromBlock: 10n, toBlock: 10n })).rejects.toThrow(
+        /anchor/i
+    );
+    expect(h.apply).not.toHaveBeenCalled();
 });

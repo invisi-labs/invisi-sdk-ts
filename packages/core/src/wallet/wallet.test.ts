@@ -15,7 +15,7 @@ const privateKey = new Uint8Array(32).fill(1);
 const request = {
     context: { chainId: 31337n, protocolAddress: 0x1234n },
     operation: "transact" as const,
-    capacity: 14,
+    capacity: 2,
     words: [31337n, 0x1234n],
 };
 it("rejects malformed owner public keys", async () => {
@@ -59,7 +59,7 @@ describe("private wallet authorization", () => {
             )
         ).toBe(false);
         for (const patch of [
-            { capacity: 56 },
+            { capacity: 20 },
             { words: [...request.words, 1n] },
             { operation: "credit-draw" as const, capacity: 1 },
         ]) {

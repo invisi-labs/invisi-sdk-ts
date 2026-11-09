@@ -1,4 +1,5 @@
-import type { Hex } from "@invisi-labs/core";
+import { getAddress } from "ethers";
+import type { Address, Hex } from "@invisi-labs/core";
 import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
 import { MAX_UPDATE_BLOCKS } from "../constants";
 import { defineDeployment, type ProtocolDeployment } from "../deployment/deployment";
@@ -14,12 +15,14 @@ import type {
     Membership,
     ProtocolCreditTransition,
     ProtocolDataProvider,
-    ProtocolOutput,
-    ProtocolTransactionUpdates,
+    ProtocolNoteOutput,
+    IndexedCreditState,
+    ProtocolTransactionNoteUpdates,
+    ProtocolTransactionCreditUpdates,
     ProtocolUpdateRange,
     RegisteredReceivingAddress,
 } from "../types";
-import { parseOutputCandidates } from "../validation/outputs";
+import { parseNoteCandidates, parseCreditCandidates } from "../validation/outputs";
 import {
     blockReference,
     fieldHash,
@@ -249,7 +252,12 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             checkedBits,
         };
     }
-    private async readUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
+    private async updatePage(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange,
+        method: string,
+        detected = false
+    ) {
         this.context(context);
         if (
             range.fromBlock < this.deployment.protocol.fromBlock ||
@@ -257,174 +265,221 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             range.toBlock - range.fromBlock >= BigInt(MAX_UPDATE_BLOCKS)
         )
             invalid(`RPC updates require at most ${MAX_UPDATE_BLOCKS} deployment blocks`);
-        const fromBlock = numeric(range.fromBlock),
-            toBlock = numeric(range.toBlock);
-        let detectionKey: string | undefined;
-        if (range.detectionKey !== undefined) {
-            deriveClueKey(range.detectionKey);
-            detectionKey =
-                "0x" +
-                Array.from(range.detectionKey, (b) => b.toString(16).padStart(2, "0")).join("");
-        }
+        if (detected && range.detectionKey === undefined) invalid("Detection key required");
+        if (!detected && range.detectionKey !== undefined)
+            invalid("Use explicit detection method for a detection key");
         const status = await this.readStatusMetadata(
             context,
             range.signal ? { signal: range.signal } : {}
         );
         if (status.indexedHead === null) invalid("RPC has not indexed any blocks");
-        const indexedHead = blockReference(status.indexedHead);
-        if (range.toBlock > indexedHead.number) invalid("RPC range exceeds indexed history");
+        const head = blockReference(status.indexedHead);
+        if (range.toBlock > head.number) invalid("RPC range exceeds indexed history");
         const block = await this.reader.getBlock(range.toBlock);
         if (block.number !== range.toBlock) invalid("Reader returned wrong block");
         if (
-            indexedHead.number === block.number &&
-            (indexedHead.hash !== hash(block.hash) ||
-                indexedHead.parentHash !== hash(block.parentHash) ||
-                indexedHead.timestamp !== block.timestamp)
+            head.number === block.number &&
+            (head.hash !== hash(block.hash) ||
+                head.parentHash !== hash(block.parentHash) ||
+                head.timestamp !== block.timestamp)
         )
             invalid("RPC canonical block mismatch");
-        const anchor = { fromBlock, toBlock, blockHash: hash(block.hash) };
-        const result = object(
-            await this.rpc(
-                detectionKey === undefined ? "invisi_getUpdates" : "invisi_detectOutputs",
-                detectionKey === undefined ? [anchor] : [anchor, detectionKey],
-                range.signal
-            )
+        const anchor = {
+            fromBlock: numeric(range.fromBlock),
+            toBlock: numeric(range.toBlock),
+            blockHash: hash(block.hash),
+        };
+        let key: string | undefined;
+        if (detected) {
+            if (!status.detectionEnabled) invalid("Delegated detection is disabled");
+            deriveClueKey(range.detectionKey!);
+            key =
+                "0x" +
+                Array.from(range.detectionKey!, (b) => b.toString(16).padStart(2, "0")).join("");
+        }
+        const raw = await this.rpc(method, detected ? [anchor, key] : [anchor], range.signal);
+        if (method !== "invisi_getCreditTransitions") {
+            const result = object(raw);
+            if (hash(result.blockHash) !== hash(block.hash)) invalid("RPC update anchor mismatch");
+            if (detected) {
+                const bits = integer(result.checkedBits, 8);
+                if (bits < 1n || bits > 24n || Number(bits) !== status.checkedBits)
+                    invalid("Invalid detection precision");
+            }
+        }
+        return { block, raw };
+    }
+    private async recheck(block: CanonicalBlock) {
+        const current = await this.reader.getBlock(block.number);
+        if (
+            current.number !== block.number ||
+            hash(current.hash) !== hash(block.hash) ||
+            hash(current.parentHash) !== hash(block.parentHash) ||
+            current.timestamp !== block.timestamp
+        )
+            invalid("RPC query block changed during query");
+    }
+    async getNoteUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
+        const { block, raw } = await this.updatePage(context, range, "invisi_getNoteUpdates");
+        const page = await parseNoteCandidates(
+            this.canonical.bind(this),
+            block,
+            list(object(raw).notes),
+            range
         );
-        if (hash(result.blockHash) !== hash(block.hash)) invalid("RPC update anchor mismatch");
-        if (detectionKey !== undefined) {
-            const bits = integer(result.checkedBits, 8);
-            if (bits < 1n || bits > 24n) invalid("Invalid detection precision");
+        await this.recheck(block);
+        return page;
+    }
+    async detectNotes(context: DeploymentContext, range: ProtocolUpdateRange) {
+        const { block, raw } = await this.updatePage(context, range, "invisi_detectNotes", true);
+        const values = list(object(raw).candidates).map((v) => {
+            const c = object(v);
+            if (typeof c.fallback !== "boolean") invalid("Invalid candidate");
+            return c.note;
+        });
+        const page = await parseNoteCandidates(this.canonical.bind(this), block, values, range);
+        await this.recheck(block);
+        return page;
+    }
+    async detectCreditStates(context: DeploymentContext, range: ProtocolUpdateRange) {
+        const { block, raw } = await this.updatePage(
+            context,
+            range,
+            "invisi_detectCreditStates",
+            true
+        );
+        const values = list(object(raw).candidates).map((v) => {
+            const c = object(v);
+            if (typeof c.fallback !== "boolean") invalid("Invalid candidate");
+            return c.state;
+        });
+        const page = await parseCreditCandidates(this.canonical.bind(this), block, values, range);
+        await this.recheck(block);
+        return page;
+    }
+    private async parseTransitions(
+        values: unknown[],
+        range: Pick<ProtocolUpdateRange, "fromBlock" | "toBlock">
+    ) {
+        const transitions: ProtocolCreditTransition[] = [],
+            seen = new Map<string, string>();
+        for (const value of values) {
+            const event = object(value),
+                block = await this.canonical(event.block);
+            if (block.number < range.fromBlock || block.number > range.toBlock)
+                invalid("RPC Credit transition outside update range");
+            if (
+                !["CreditCreated", "CreditDraw", "CreditUpdated", "CreditRevoked"].includes(
+                    event.name as string
+                )
+            )
+                invalid("Invalid Credit transition name");
+            const transition: ProtocolCreditTransition = {
+                block,
+                name: event.name as ProtocolCreditTransition["name"],
+                transactionHash: hash(event.transactionHash),
+                logIndex: Number(integer(event.logIndex, 32)),
+                data: object(event.data),
+            };
+            const key = `${block.number}:${transition.logIndex}`,
+                fingerprint = JSON.stringify(transition, (_, v) =>
+                    typeof v === "bigint" ? v.toString() : v
+                ),
+                previous = seen.get(key);
+            if (previous !== undefined && previous !== fingerprint)
+                invalid("Conflicting Credit transition");
+            if (previous === undefined) transitions.push(transition);
+            seen.set(key, fingerprint);
         }
-        const outputs =
-            detectionKey === undefined
-                ? list(result.outputs)
-                : list(result.candidates).map((v) => {
-                      const c = object(v);
-                      if (typeof c.fallback !== "boolean") invalid("Invalid candidate");
-                      return c.output;
-                  });
-        return { block, outputs, creditTransitions: list(result.creditTransitions) };
+        return transitions;
     }
-
-    async getUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
-        const { block, outputs, creditTransitions } = await this.readUpdates(context, range);
-        const transactionHashes = new Set<Hex>();
-        for (const value of [...outputs, ...creditTransitions]) {
-            const ref = object(value);
-            integer(ref.logIndex);
-            const eventBlock = await this.canonical(ref.block);
-            if (eventBlock.number < range.fromBlock || eventBlock.number > range.toBlock)
-                invalid("RPC event outside update range");
-            transactionHashes.add(hash(ref.transactionHash));
-        }
-        return { block, transactionHashes: [...transactionHashes] };
+    async getCreditTransitions(context: DeploymentContext, range: ProtocolUpdateRange) {
+        const { block, raw } = await this.updatePage(context, range, "invisi_getCreditTransitions");
+        const transitions = await this.parseTransitions(list(raw), range);
+        await this.recheck(block);
+        return { block, transitions };
     }
-    /** Validated opaque candidates of every kind/version, preserving both Credit role envelopes. */
-    async getEncryptedOutputs(
-        context: DeploymentContext,
-        range: ProtocolUpdateRange
-    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
-        return this.readOutputCandidates(context, range, "all");
-    }
-
-    /** Return ordinary funds candidates directly, without fetching historical transaction receipts. */
-    async getOutputs(
-        context: DeploymentContext,
-        range: ProtocolUpdateRange
-    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
-        return this.readOutputCandidates(context, range, false);
-    }
-
-    /** Credit candidates preserve both role envelopes for the same inserted commitment. */
-    async getCreditOutputs(
-        context: DeploymentContext,
-        range: ProtocolUpdateRange
-    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
-        return this.readOutputCandidates(context, range, true);
-    }
-
-    private async readOutputCandidates(
-        context: DeploymentContext,
-        range: ProtocolUpdateRange,
-        credit: boolean | "all"
-    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
-        const { block, outputs } = await this.readUpdates(context, range);
-        return this.parseOutputCandidates(block, outputs, range, credit);
-    }
-
-    private async parseOutputCandidates(
-        block: CanonicalBlock,
-        outputs: unknown[],
-        range: Pick<ProtocolUpdateRange, "fromBlock" | "toBlock">,
-        credit: boolean | "all"
-    ): Promise<{ block: CanonicalBlock; outputs: ProtocolOutput[] }> {
-        return parseOutputCandidates(this.canonical.bind(this), block, outputs, range, credit);
-    }
-
-    /** Query one transaction without constructing a range; no automatic polling or receipt trust. */
-    async getTransactionUpdates(
+    async getTransactionNoteUpdates(
         context: DeploymentContext,
         transactionHash: Hex,
         options: { signal?: AbortSignal } = {}
-    ): Promise<ProtocolTransactionUpdates> {
+    ): Promise<ProtocolTransactionNoteUpdates> {
+        return (await this.readTransaction(
+            context,
+            transactionHash,
+            false,
+            options
+        )) as ProtocolTransactionNoteUpdates;
+    }
+    async getTransactionCreditUpdates(
+        context: DeploymentContext,
+        transactionHash: Hex,
+        options: { signal?: AbortSignal } = {}
+    ): Promise<ProtocolTransactionCreditUpdates> {
+        return (await this.readTransaction(
+            context,
+            transactionHash,
+            true,
+            options
+        )) as ProtocolTransactionCreditUpdates;
+    }
+    private async readTransaction(
+        context: DeploymentContext,
+        transactionHash: Hex,
+        credit: boolean,
+        options: { signal?: AbortSignal }
+    ) {
         this.context(context);
-        const requestedHash = hash(transactionHash);
-        if (BigInt(requestedHash) === 0n) invalid("Nonzero transaction hash required");
+        const requested = hash(transactionHash);
+        if (BigInt(requested) === 0n) invalid("Nonzero transaction hash required");
         await this.readStatusMetadata(context, options);
-        const result = object(
-            await this.rpc("invisi_getTransactionUpdates", [requestedHash], options.signal)
+        const r = object(
+            await this.rpc(
+                credit ? "invisi_getTransactionCreditUpdates" : "invisi_getTransactionNoteUpdates",
+                [requested],
+                options.signal
+            )
         );
-        if (hash(result.transactionHash) !== requestedHash)
-            invalid("RPC transaction hash mismatch");
+        if (hash(r.transactionHash) !== requested) invalid("RPC transaction hash mismatch");
         const indexedHead =
-            result.indexedHead === null
+            r.indexedHead === null
                 ? null
-                : result.status === "indexed"
-                  ? await this.canonical(result.indexedHead)
-                  : blockReference(result.indexedHead);
-        const common = { transactionHash: requestedHash, indexedHead };
-        if (result.status === "not_found") {
+                : r.status === "indexed"
+                  ? await this.canonical(r.indexedHead)
+                  : blockReference(r.indexedHead);
+        const common = { transactionHash: requested, indexedHead };
+        const fields = credit ? ["states", "transitions"] : ["notes"];
+        const empty = credit ? { states: null, transitions: null } : { notes: null };
+        if (r.status === "not_found") {
             if (
-                result.blockNumber !== undefined ||
-                result.blockHash !== undefined ||
-                result.receiptStatus !== undefined ||
-                result.outputs !== null ||
-                result.creditTransitions !== null
+                r.blockNumber !== undefined ||
+                r.blockHash !== undefined ||
+                r.receiptStatus !== undefined ||
+                fields.some((k) => r[k] !== null)
             )
                 invalid("Invalid not_found transaction updates");
-            return {
-                ...common,
-                status: "not_found",
-                block: null,
-                receiptStatus: null,
-                outputs: null,
-                creditTransitions: null,
-            };
+            return { ...common, status: "not_found", block: null, receiptStatus: null, ...empty };
         }
-        if (result.status !== "pending_index" && result.status !== "indexed")
+        if (r.status !== "pending_index" && r.status !== "indexed")
             invalid("Invalid transaction update status");
-        const number = integer(result.blockNumber);
-        const registryStart = this.deployment.registry?.fromBlock;
-        const start =
-            registryStart !== undefined && registryStart < this.deployment.protocol.fromBlock
-                ? registryStart
-                : this.deployment.protocol.fromBlock;
-        if (number < start) invalid("RPC transaction predates indexed deployment");
+        const number = integer(r.blockNumber);
+        const starts = [
+            this.deployment.protocol.fromBlock,
+            ...(this.deployment.registry ? [this.deployment.registry.fromBlock] : []),
+            ...(this.deployment.broadcasterRegistry
+                ? [this.deployment.broadcasterRegistry.fromBlock]
+                : []),
+        ];
+        if (starts.every((start) => number < start))
+            invalid("RPC transaction predates indexed deployment");
         const block = await this.reader.getBlock(number);
-        if (block.number !== number || hash(block.hash) !== hash(result.blockHash))
+        if (block.number !== number || hash(block.hash) !== hash(r.blockHash))
             invalid("RPC transaction block mismatch");
-        const receiptStatus = Number(integer(result.receiptStatus, 1)) as 0 | 1;
-        if (result.status === "pending_index") {
-            if (result.outputs !== null || result.creditTransitions !== null)
+        const receiptStatus = Number(integer(r.receiptStatus, 1)) as 0 | 1;
+        if (r.status === "pending_index") {
+            if (fields.some((k) => r[k] !== null))
                 invalid("Unindexed transaction must not contain updates");
-            return {
-                ...common,
-                status: "pending_index",
-                block,
-                receiptStatus,
-                outputs: null,
-                creditTransitions: null,
-            };
+            return { ...common, status: "pending_index", block, receiptStatus, ...empty };
         }
         if (
             indexedHead === null ||
@@ -432,68 +487,127 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             (indexedHead.number === number && hash(indexedHead.hash) !== hash(block.hash))
         )
             invalid("RPC transaction exceeds indexed head");
-        if (!Array.isArray(result.outputs) || !Array.isArray(result.creditTransitions))
-            return invalid("Indexed transaction requires arrays");
-        if (
-            receiptStatus === 0 &&
-            (result.outputs.length > 0 || result.creditTransitions.length > 0)
-        )
-            invalid("Reverted transaction cannot contain updates");
-        for (const value of [...result.outputs, ...result.creditTransitions]) {
-            if (hash(object(value).transactionHash) !== requestedHash)
-                invalid("RPC updates contain a different transaction");
+        for (const field of fields) {
+            if (!Array.isArray(r[field])) invalid("Indexed transaction requires arrays");
+            if (receiptStatus === 0 && (r[field] as unknown[]).length > 0)
+                invalid("Reverted transaction cannot contain updates");
+            for (const value of r[field] as unknown[]) {
+                if (hash(object(value).transactionHash) !== requested)
+                    invalid("RPC updates contain a different transaction");
+            }
         }
-        const { outputs } = await this.parseOutputCandidates(
-            block,
-            result.outputs,
-            { fromBlock: number, toBlock: number },
-            "all"
-        );
-        const creditTransitions: ProtocolCreditTransition[] = [];
-        const seen = new Map<number, string>();
-        for (const value of result.creditTransitions) {
-            const event = object(value);
-            const eventBlock = await this.canonical(event.block);
-            if (eventBlock.number !== number || hash(eventBlock.hash) !== hash(block.hash))
-                invalid("RPC Credit transition block mismatch");
-            if (
-                !["CreditCreated", "CreditDraw", "CreditCancelled", "CreditToppedUp"].includes(
-                    event.name as string
-                )
-            )
-                invalid("Invalid Credit transition name");
-            const transition: ProtocolCreditTransition = {
-                block: eventBlock,
-                name: event.name as ProtocolCreditTransition["name"],
-                transactionHash: requestedHash,
-                logIndex: Number(integer(event.logIndex, 32)),
-                data: object(event.data),
-            };
-            const fingerprint = JSON.stringify(transition, (_, value) =>
-                typeof value === "bigint" ? value.toString() : value
-            );
-            const previous = seen.get(transition.logIndex);
-            if (previous !== undefined && previous !== fingerprint)
-                invalid("Conflicting Credit transition");
-            if (previous === undefined) creditTransitions.push(transition);
-            seen.set(transition.logIndex, fingerprint);
-        }
-        const current = await this.reader.getBlock(number);
-        if (current.number !== number || hash(current.hash) !== hash(block.hash))
-            invalid("RPC transaction block changed during query");
-        return { ...common, status: "indexed", block, receiptStatus, outputs, creditTransitions };
+        const range = { fromBlock: number, toBlock: number };
+        const collections = credit
+            ? {
+                  ...(await parseCreditCandidates(
+                      this.canonical.bind(this),
+                      block,
+                      list(r.states),
+                      range
+                  )),
+                  transitions: await this.parseTransitions(list(r.transitions), range),
+              }
+            : await parseNoteCandidates(this.canonical.bind(this), block, list(r.notes), range);
+        await this.recheck(block);
+        return { ...common, status: "indexed", receiptStatus, ...collections };
     }
-
-    /** Indexed spent observation; preparation must independently check latest chain state. */
-    async isSpent(
+    private async consumed(
         context: DeploymentContext,
         nullifier: Hex,
-        options: { signal?: AbortSignal } = {}
-    ): Promise<boolean> {
+        block: CanonicalBlock,
+        credit: boolean,
+        options: { signal?: AbortSignal }
+    ) {
         this.context(context);
-        const value = await this.rpc("invisi_isSpent", [fieldHash(nullifier)], options.signal);
+        await this.recheck(block);
+        const leaf = fieldHash(nullifier);
+        if (BigInt(leaf) === 0n) invalid("Nonzero nullifier required");
+        const value = await this.rpc(
+            credit ? "invisi_isCreditConsumed" : "invisi_isNoteSpent",
+            [leaf, numeric(block.number)],
+            options.signal
+        );
         if (typeof value !== "boolean") invalid("Invalid spent observation");
+        await this.recheck(block);
         return value as boolean;
+    }
+    async isNoteSpent(
+        context: DeploymentContext,
+        nullifier: Hex,
+        block: CanonicalBlock,
+        options: { signal?: AbortSignal } = {}
+    ) {
+        return this.consumed(context, nullifier, block, false, options);
+    }
+    async isCreditConsumed(
+        context: DeploymentContext,
+        nullifier: Hex,
+        block: CanonicalBlock,
+        options: { signal?: AbortSignal } = {}
+    ) {
+        return this.consumed(context, nullifier, block, true, options);
+    }
+    async getCreditAllocation(
+        context: DeploymentContext,
+        owner: Address,
+        token: Address,
+        block: CanonicalBlock,
+        options: { signal?: AbortSignal } = {}
+    ) {
+        this.context(context);
+        const result = object(
+            await this.rpc(
+                "invisi_getCreditAllocation",
+                [getAddress(owner), getAddress(token), numeric(block.number)],
+                options.signal
+            )
+        );
+        const anchor = await this.canonical(result.block);
+        if (anchor.number !== block.number || hash(anchor.hash) !== hash(block.hash))
+            invalid("RPC grant block mismatch");
+        const shard = integer(result.shard);
+        if (shard === 0n) invalid("Invalid grant shard");
+        const slot = Number(integer(result.slot, 16));
+        await this.recheck(block);
+        return { block: anchor, shard, slot };
+    }
+    async getCreditRevocationBitmap(
+        context: DeploymentContext,
+        owner: Address,
+        token: Address,
+        shard: bigint,
+        word: number,
+        block: CanonicalBlock,
+        options: { signal?: AbortSignal } = {}
+    ) {
+        this.context(context);
+        if (
+            shard <= 0n ||
+            shard >= 1n << 64n ||
+            !Number.isSafeInteger(word) ||
+            word < 0 ||
+            word > 255
+        )
+            invalid("Invalid grant location");
+        const result = object(
+            await this.rpc(
+                "invisi_getCreditRevocationBitmap",
+                [
+                    getAddress(owner),
+                    getAddress(token),
+                    shard.toString(),
+                    word,
+                    numeric(block.number),
+                ],
+                options.signal
+            )
+        );
+        const anchor = await this.canonical(result.block);
+        if (anchor.number !== block.number || hash(anchor.hash) !== hash(block.hash))
+            invalid("RPC grant block mismatch");
+        const bitmap = integer(result.bitmap, 256);
+        await this.recheck(block);
+        return { block: anchor, bitmap };
     }
 
     /** Locate a Note by commitment, then independently authenticate its membership. */
@@ -501,20 +615,20 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         context: DeploymentContext,
         commitment: Hex,
         block: CanonicalBlock
-    ): Promise<{ output: ProtocolOutput; membership: Membership } | null> {
+    ): Promise<{ output: ProtocolNoteOutput; membership: Membership } | null> {
         this.context(context);
         const leaf = fieldHash(commitment);
         const response = await this.rpc("invisi_getNote", [leaf, numeric(block.number)]);
         if (response === null) return null;
         const result = object(response);
-        const { outputs } = await this.parseOutputCandidates(
+        const { notes: outputs } = await parseNoteCandidates(
+            this.canonical.bind(this),
             block,
             [result.output],
             {
                 fromBlock: this.deployment.protocol.fromBlock,
                 toBlock: block.number,
-            },
-            false
+            }
         );
         if (outputs.length !== 1 || outputs[0]!.commitment !== leaf)
             invalid("RPC note commitment mismatch");
@@ -556,6 +670,69 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         )
             invalid("RPC note lookup block changed during query");
         return { output, membership };
+    }
+
+    /** Locate Credit authority by commitment, then independently authenticate its membership. */
+    async getCreditState(
+        context: DeploymentContext,
+        commitment: Hex,
+        block: CanonicalBlock
+    ): Promise<{ state: IndexedCreditState; membership: Membership } | null> {
+        this.context(context);
+        const leaf = fieldHash(commitment);
+        const response = await this.rpc("invisi_getCreditState", [leaf, numeric(block.number)]);
+        if (response === null) return null;
+        const result = object(response);
+        const { states: outputs } = await parseCreditCandidates(
+            this.canonical.bind(this),
+            block,
+            [result.state],
+            {
+                fromBlock: this.deployment.protocol.fromBlock,
+                toBlock: block.number,
+            }
+        );
+        if (outputs.length !== 1 || outputs[0]!.commitment !== leaf)
+            invalid("RPC Credit state commitment mismatch");
+        const output = outputs[0]!;
+        const proof = object(result.membership);
+        const anchor = object(proof.anchor);
+        const membership = await this.getMembership(
+            context,
+            {
+                treeId: output.treeId,
+                leafIndex: output.leafIndex,
+                commitment: leaf,
+                root: fieldHash(anchor.root),
+            },
+            block
+        );
+        if (
+            integer(anchor.treeId) !== membership.treeId ||
+            integer(proof.leafIndex, 32) !== BigInt(membership.leafIndex) ||
+            fieldHash(proof.commitment) !== leaf ||
+            integer(anchor.leafCount, 32) <= BigInt(output.leafIndex) ||
+            integer(anchor.leafCount, 32) > 1n << BigInt(TREE_DEPTH)
+        )
+            invalid("RPC Credit state membership binding mismatch");
+        const siblings = list(proof.siblings).map((value) => BigInt(fieldHash(value)));
+        if (
+            siblings.length !== membership.path.length ||
+            siblings.some((value, i) => value !== membership.path[i])
+        )
+            invalid("RPC Credit state membership proof mismatch");
+        const anchorBlock = await this.canonical(anchor.block);
+        if (anchorBlock.number > block.number)
+            invalid("RPC Credit state membership anchor mismatch");
+        const current = await this.reader.getBlock(block.number);
+        if (
+            current.number !== block.number ||
+            hash(current.hash) !== hash(block.hash) ||
+            hash(current.parentHash) !== hash(block.parentHash) ||
+            current.timestamp !== block.timestamp
+        )
+            invalid("RPC Credit state lookup block changed during query");
+        return { state: output, membership };
     }
 
     async getMembership(

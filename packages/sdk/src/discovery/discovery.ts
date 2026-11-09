@@ -45,8 +45,8 @@ const EVENTS = new Set([
     "CrossTreeTransact",
     "CreditCreated",
     "CreditDraw",
-    "CreditToppedUp",
-    "CreditCancelled",
+    "CreditUpdated",
+    "CreditRevoked",
 ]);
 function check(ok: unknown, message: string): asserts ok {
     if (!ok) throw new Error(message);
@@ -190,18 +190,11 @@ export function extractDeliveryCandidates(
         fields: Record<string, unknown>
     ) => {
         const tree = integer(a.outputTreeId),
-            leaves = array(a.leafIndices),
+            leaf = index(a.leafIndex),
             ds = array(a.deliveries);
-        const change = hash(fields.changeCommitment),
-            hasChange = BigInt(change) !== 0n;
-        check(
-            ds.length === 3 && leaves.length === (hasChange ? 2 : 1),
-            "invalid Credit creation delivery slots"
-        );
-        add(log, tree, index(leaves[0]), fields.creditCommitment, "owner", ds[0]);
-        add(log, tree, index(leaves[0]), fields.creditCommitment, "spender", ds[1]);
-        if (hasChange) add(log, tree, index(leaves[1]), change, "funds", ds[2]);
-        else normalizeOpaqueDelivery(ds[2] as never, { empty: true });
+        check(ds.length === 2, "invalid Credit delivery slots");
+        add(log, tree, leaf, fields.creditCommitment, "owner", ds[0]);
+        add(log, tree, leaf, fields.creditCommitment, "spender", ds[1]);
     };
     for (const log of relevant) {
         const a = object(log.args);
@@ -251,28 +244,30 @@ export function extractDeliveryCandidates(
             });
             check(offset === packed.length, "trailing packed delivery bytes");
         } else if (log.eventName === "CreditCreated") creation(log, a, a);
-        else if (log.eventName === "CreditToppedUp")
-            creation(log, a, object(object(a.params).creation));
+        else if (log.eventName === "CreditUpdated") creation(log, a, object(a.params));
         else if (log.eventName === "CreditDraw") {
             const p = object(a.params),
-                cs = array(p.remainderCommitments),
+                cs = array(p.stateCommitments),
                 ds = array(a.deliveries),
-                leaves = array(a.remainderLeafIndices),
+                leaves = array(a.leafIndices),
                 tree = integer(a.outputTreeId);
             check(
-                ds.length === 2 * cs.length && leaves.length === cs.length,
+                ds.length === 2 * cs.length + 1 && leaves.length === cs.length + 1,
                 "invalid draw delivery slots"
             );
             cs.forEach((c, i) => {
-                if (BigInt(hash(c)) === 0n) {
-                    check(integer(leaves[i]) === 0n, "absent remainder has nonzero position");
-                    normalizeOpaqueDelivery(ds[2 * i] as never, { empty: true });
-                    normalizeOpaqueDelivery(ds[2 * i + 1] as never, { empty: true });
-                } else {
-                    add(log, tree, index(leaves[i]), c, "owner", ds[2 * i]);
-                    add(log, tree, index(leaves[i]), c, "spender", ds[2 * i + 1]);
-                }
+                add(log, tree, index(leaves[i]), c, "owner", ds[2 * i]);
+                add(log, tree, index(leaves[i]), c, "spender", ds[2 * i + 1]);
             });
+            add(
+                log,
+                tree,
+                index(leaves[cs.length]),
+                p.noteCommitment,
+                "funds",
+                ds[2 * cs.length],
+                p.token
+            );
         }
     }
     return [...results.values()];

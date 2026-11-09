@@ -2,15 +2,14 @@ import { MissingCapabilityError, PublicWallet } from "@invisi-labs/core";
 import type { RegistrationOperation, RegistrationPreparation } from "@invisi-labs/protocol";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { prepareWithErrors } from "../errors";
-import { copyGasBenchmarks } from "../gas/gas-estimation";
 import { AddressRegistry } from "../protocol/AddressRegistry";
 import type { PreparedTransaction } from "../transactions/execution/PreparedTransaction";
 import type {
-    ExplicitCancelCreditPreparation,
+    ExplicitRevokeCreditPreparation,
     ExplicitCreateCreditPreparation,
     ExplicitDrawCreditPreparation,
     ExplicitShieldPreparation,
-    ExplicitTopUpCreditPreparation,
+    ExplicitUpdateCreditPreparation,
     ExplicitTransferPreparation,
     TransactionIdentity,
 } from "../transactions/explicit-types";
@@ -62,9 +61,6 @@ export class Invisi {
         }
         this.#options = {
             ...options,
-            ...(options.gasBenchmarks
-                ? { gasBenchmarks: copyGasBenchmarks(options.gasBenchmarks) }
-                : {}),
         };
         Object.freeze(this);
     }
@@ -73,9 +69,6 @@ export class Invisi {
     getInfrastructure(): Readonly<InvisiOptions> {
         return Object.freeze({
             ...this.#options,
-            ...(this.#options.gasBenchmarks
-                ? { gasBenchmarks: copyGasBenchmarks(this.#options.gasBenchmarks) }
-                : {}),
         });
     }
 
@@ -164,7 +157,7 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
-            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
+            const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
             return preparation.prepareCreateCredit(request);
         });
     }
@@ -177,26 +170,26 @@ export class Invisi {
             return preparation.prepareDrawCredit(request);
         });
     }
-    async prepareTopUpCredit(
-        options: ExplicitTopUpCreditPreparation
+    async prepareUpdateCredit(
+        options: ExplicitUpdateCreditPreparation
     ): Promise<PreparedTransaction> {
-        return prepareWithErrors("prepareTopUpCredit", async () => {
+        return prepareWithErrors("prepareUpdateCredit", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-            return preparation.prepareTopUpCredit(request);
+            return preparation.prepareUpdateCredit(request);
         });
     }
-    async prepareCancelCredit(
-        options: ExplicitCancelCreditPreparation
+    async prepareRevokeCredit(
+        options: ExplicitRevokeCreditPreparation
     ): Promise<PreparedTransaction> {
-        return prepareWithErrors("prepareCancelCredit", async () => {
+        return prepareWithErrors("prepareRevokeCredit", async () => {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
-            const preparation = explicitPreparation(runtime, request, request.tokenAddress);
-            return preparation.prepareCancelCredit(request);
+            const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
+            return preparation.prepareRevokeCredit(request);
         });
     }
 

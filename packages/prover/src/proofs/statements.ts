@@ -1,7 +1,10 @@
 import type { Hex } from "@invisi-labs/core";
 import { computeWalletAuthorizationDigest, type WalletOperation } from "@invisi-labs/core";
 
-const capacities = [14, 56, 112, 168];
+const capacities = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150,
+    160, 170, 180, 190,
+];
 function check(ok: boolean, message: string): asserts ok {
     if (!ok) throw new Error(message);
 }
@@ -78,31 +81,54 @@ export function assertUserStatement(values: readonly string[], capacity: number)
     );
 }
 
-/** Validate aggregate member order, common context and cross-member uniqueness. */
-export function assertAggregateStatement(values: readonly Hex[], count: number, pin: string): void {
+/** Validate ordered members, common deployment and global nullifier/commitment uniqueness. */
+export function assertAggregateStatement(
+    values: readonly Hex[],
+    count: number,
+    pin: string | string[],
+    capacity: number
+): void {
+    const mixed = Array.isArray(pin),
+        caps = mixed
+            ? values.slice(0, count).map((v) => Number(BigInt(v)))
+            : Array(count).fill(capacity),
+        pins = mixed ? pin : [pin];
     check(
-        BigInt(values.at(-1)!) === BigInt(pin),
+        values.slice(-pins.length).every((v, i) => BigInt(v) === BigInt(pins[i]!)),
         "Aggregate inner verification key commitment mismatch"
     );
     const nullifiers = new Set<string>(),
-        commitments = new Set<string>(),
-        context = values.slice(0, 3).map(BigInt);
+        commitments = new Set<string>();
+    let context: bigint[] | undefined,
+        offset = mixed ? count : 0;
     for (let i = 0; i < count; i++) {
-        const member = values.slice(59 * i, 59 * (i + 1));
-        assertUserStatement(member, 14);
-        check(
-            member.slice(0, 3).every((v, j) => BigInt(v) === context[j]),
-            "Aggregate context mismatch"
-        );
+        const c = caps[i]!;
+        check(c >= 1 && c <= (mixed ? 5 : 10), "Invalid aggregate member capacity");
+        const width = 17 + 3 * c,
+            member = values.slice(offset, offset + width);
+        assertUserStatement(member, c);
+        if (context)
+            check(
+                member.slice(0, 2).every((v, j) => BigInt(v) === context![j]),
+                "Aggregate context mismatch"
+            );
+        else context = member.slice(0, 2).map(BigInt);
         const n = Number(BigInt(member[3]!)),
             m = Number(BigInt(member[4]!));
         for (let j = 0; j < n + m; j++) {
-            const value = BigInt(member[34 + j]!).toString(),
+            const v = BigInt(member[6 + 2 * c + j]!).toString(),
                 seen = j < n ? nullifiers : commitments;
-            check(!seen.has(value), "Duplicate aggregate nullifier or commitment");
-            seen.add(value);
+            check(!seen.has(v), "Duplicate aggregate nullifier or commitment");
+            seen.add(v);
         }
+        if (mixed)
+            check(
+                values.slice(offset + width, offset + 32).every((v) => BigInt(v) === 0n),
+                "Noncanonical mixed statement padding"
+            );
+        offset += mixed ? 32 : width;
     }
+    check(offset + pins.length === values.length, "Aggregate statement width mismatch");
 }
 
 /** Credit adapters reconstruct this digest from the exact base business words. */
@@ -111,17 +137,16 @@ export function assertCreditStatement(values: readonly string[], name: string): 
     const operation: WalletOperation =
         name === "create_credit"
             ? "create-credit"
-            : name === "credit_cancel"
-              ? "cancel-credit"
-              : name === "credit_top_up"
-                ? "top-up-credit"
-                : "credit-draw";
+            : name === "credit_update"
+              ? "update-credit"
+              : "credit-draw";
     const capacity =
-        operation === "credit-draw"
-            ? Number(name.slice("credit_draw_slots".length))
-            : operation === "cancel-credit"
-              ? 1
-              : 10;
+        operation === "credit-draw" ? Number(name.slice("credit_draw_slots".length)) : 1;
+    const feeRecipient = uint(w.at(-4)!, 160),
+        feeAmount = uint(w.at(-3)!, 128);
+    check((feeRecipient === 0n) === (feeAmount === 0n), "Invalid Credit fee context");
+    if (operation === "credit-draw")
+        check(feeAmount < w[7 + 10 * capacity]!, "Credit draw fee must leave a positive Note");
     const digest = BigInt(
         computeWalletAuthorizationDigest({
             context: { chainId: w[0]!, protocolAddress: w[1]! },

@@ -29,9 +29,17 @@ export interface ProtocolUpdateRange {
     detectionKey?: Uint8Array;
     signal?: AbortSignal;
 }
-export interface ProtocolUpdates {
+export interface ProtocolNoteUpdates {
     block: CanonicalBlock;
-    transactionHashes: readonly Hex[];
+    notes: readonly ProtocolNoteOutput[];
+}
+export interface ProtocolCreditUpdates {
+    block: CanonicalBlock;
+    transitions: readonly ProtocolCreditTransition[];
+}
+export interface ProtocolCreditCandidates {
+    block: CanonicalBlock;
+    states: readonly IndexedCreditState[];
 }
 export interface ProtocolDataProvider {
     getMembership(
@@ -39,12 +47,26 @@ export interface ProtocolDataProvider {
         input: { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex },
         block: CanonicalBlock
     ): Promise<Membership>;
-
     getStatus(
         context: DeploymentContext,
         options?: { signal?: AbortSignal }
     ): Promise<ProtocolDataStatus>;
-    getUpdates(context: DeploymentContext, range: ProtocolUpdateRange): Promise<ProtocolUpdates>;
+    getNoteUpdates(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<ProtocolNoteUpdates>;
+    getCreditTransitions(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<ProtocolCreditUpdates>;
+    detectNotes(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<ProtocolNoteUpdates>;
+    detectCreditStates(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<ProtocolCreditCandidates>;
 }
 
 /** Registered public receiving address returned by a trusted indexed RPC read. */
@@ -55,7 +77,7 @@ export interface RegisteredReceivingAddress {
 }
 
 /** Indexed encrypted output; authenticate decryption and verify membership before spending. */
-export interface ProtocolOutput {
+export interface ProtocolNoteOutput {
     block: CanonicalBlock;
     treeId: bigint;
     leafIndex: number;
@@ -71,40 +93,52 @@ export interface ProtocolOutput {
 /** Public indexed Credit event data; verify the canonical receipt before using it. */
 export interface ProtocolCreditTransition {
     block: CanonicalBlock;
-    name: "CreditCreated" | "CreditDraw" | "CreditCancelled" | "CreditToppedUp";
+    name: "CreditCreated" | "CreditDraw" | "CreditUpdated" | "CreditRevoked";
     transactionHash: Hex;
     logIndex: number;
     data: Readonly<Record<string, unknown>>;
 }
 
-/** Availability is independent of EVM execution success; only indexed arrays are complete. */
-export type ProtocolTransactionUpdates = {
+/** One public authority leaf retains both owner/spender deliveries in on-chain order. */
+export interface IndexedCreditState {
+    block: CanonicalBlock;
+    treeId: bigint;
+    leafIndex: number;
+    commitment: Hex;
+    tokenAddress: Address;
+    deliveries: readonly { ciphertext: Hex; clue: Hex }[];
     transactionHash: Hex;
-    /** Observed checkpoint; not_found/pending_index may report a stale, noncanonical fork. */
+    logIndex: number;
+    kind: "CreditCreated" | "CreditDraw" | "CreditUpdated";
+}
+interface TransactionCommon {
+    transactionHash: Hex;
     indexedHead: CanonicalBlock | null;
-} & (
-    | {
-          status: "not_found";
-          block: null;
-          receiptStatus: null;
-          outputs: null;
-          creditTransitions: null;
-      }
-    | {
-          status: "pending_index";
-          block: CanonicalBlock;
-          receiptStatus: 0 | 1;
-          outputs: null;
-          creditTransitions: null;
-      }
-    | {
-          status: "indexed";
-          block: CanonicalBlock;
-          receiptStatus: 0 | 1;
-          outputs: readonly ProtocolOutput[];
-          creditTransitions: readonly ProtocolCreditTransition[];
-      }
-);
+}
+type Availability<Collections> = TransactionCommon &
+    (
+        | ({ status: "not_found"; block: null; receiptStatus: null } & {
+              [K in keyof Collections]: null;
+          })
+        | ({ status: "pending_index"; block: CanonicalBlock; receiptStatus: 0 | 1 } & {
+              [K in keyof Collections]: null;
+          })
+        | ({ status: "indexed"; block: CanonicalBlock; receiptStatus: 0 | 1 } & Collections)
+    );
+export type ProtocolTransactionNoteUpdates = Availability<{ notes: readonly ProtocolNoteOutput[] }>;
+export type ProtocolTransactionCreditUpdates = Availability<{
+    states: readonly IndexedCreditState[];
+    transitions: readonly ProtocolCreditTransition[];
+}>;
+export interface IndexedCreditAllocation {
+    block: CanonicalBlock;
+    shard: bigint;
+    slot: number;
+}
+export interface IndexedCreditRevocationBitmap {
+    block: CanonicalBlock;
+    bitmap: bigint;
+}
 
 /** Public operator metadata from the selected registry's indexed state; not an endorsement. */
 export interface RegisteredBroadcaster {

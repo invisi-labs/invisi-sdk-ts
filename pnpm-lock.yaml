@@ -111,8 +111,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@noir-lang/noir_js':
-        specifier: 1.0.0-rc.6
-        version: 1.0.0-rc.6
+        specifier: 1.0.0
+        version: 1.0.0
       ethers:
         specifier: ^6.17.0
         version: 6.17.0
@@ -970,17 +970,17 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@noir-lang/acvm_js@1.0.0-rc.6':
-    resolution: {integrity: sha512-lGfiYGDQky6QtxVHtz6pJyGaOVR5y3SETlF1MuR6DwVIrK42m3LJkWfM/+duY0tWLI1SM0T61VGLT03cXgTuyQ==}
+  '@noir-lang/acvm_js@1.0.0':
+    resolution: {integrity: sha512-PmDnDgnq+oKWbUpDbLFXy+c+QRzznUH+mzoojZ4KKVgkQ/AmQZdE1d9JLgsmRnPQfvMifCIKvKpSkBXqO2b91A==}
 
-  '@noir-lang/noir_js@1.0.0-rc.6':
-    resolution: {integrity: sha512-dpKcx/+Skrgsny2/+XP+aQMwTyfdTC1akFpLco95pwYQ34P1uhogVECz9Fsg/4571w7P2ialMqLpV0KOmVZqvw==}
+  '@noir-lang/noir_js@1.0.0':
+    resolution: {integrity: sha512-LJKStl4X9MfPc0eAbGHV/AUy5zefil5n0+OVznpd4T9znwNbpAG6KsrcETyREzFEE5vehesCzR0IBOIAIngEaQ==}
 
-  '@noir-lang/noirc_abi@1.0.0-rc.6':
-    resolution: {integrity: sha512-wxMX+8GV9sAABu8P9cY++N6vduIBq0BEc2jDxsd0rwPHkQnpH69/jNWIkv2Co3wMiVmDoIRLkjJAZazMZVdhUg==}
+  '@noir-lang/noirc_abi@1.0.0':
+    resolution: {integrity: sha512-psK2i0oq1c1QhqgBIl77gJND0X8a5egj6Lloa85FhTt+R+M2QtiOle3jCwg64HSddCjKZe8OwlCDeqaa630RIg==}
 
-  '@noir-lang/types@1.0.0-rc.6':
-    resolution: {integrity: sha512-3pkaFwuRjbSfXUlqnrgORUxlb14nwnjrKX5oBGQiAs8z49+KfzvBMQNkPqJSD0lKNmFcZx7OydQaAhW35Cg+VQ==}
+  '@noir-lang/types@1.0.0':
+    resolution: {integrity: sha512-+yq5igydWbkrprufpxjsdjFjrc7Led0lDshew2HcXW3NFtXmEhggtHNGOMh502iBFE1KOu6l+t91OG9FAMMWqA==}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     resolution: {integrity: sha512-upnNBkA6ZH2VKGcBj9Fyl9IGNPULcjXRlg0LLeaioQWueH30p6IXtJEbKAgvyv+mJaMxSm1l6xwDXYjpEMiLMg==}
@@ -2837,20 +2837,20 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@noir-lang/acvm_js@1.0.0-rc.6': {}
+  '@noir-lang/acvm_js@1.0.0': {}
 
-  '@noir-lang/noir_js@1.0.0-rc.6':
+  '@noir-lang/noir_js@1.0.0':
     dependencies:
-      '@noir-lang/acvm_js': 1.0.0-rc.6
-      '@noir-lang/noirc_abi': 1.0.0-rc.6
-      '@noir-lang/types': 1.0.0-rc.6
+      '@noir-lang/acvm_js': 1.0.0
+      '@noir-lang/noirc_abi': 1.0.0
+      '@noir-lang/types': 1.0.0
       pako: 3.0.2
 
-  '@noir-lang/noirc_abi@1.0.0-rc.6':
+  '@noir-lang/noirc_abi@1.0.0':
     dependencies:
-      '@noir-lang/types': 1.0.0-rc.6
+      '@noir-lang/types': 1.0.0
 
-  '@noir-lang/types@1.0.0-rc.6': {}
+  '@noir-lang/types@1.0.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true

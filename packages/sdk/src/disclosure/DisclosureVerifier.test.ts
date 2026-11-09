@@ -172,6 +172,7 @@ describe("canonical disclosure verifier", () => {
             reference
         );
         expect(result.result.kind).toBe("note");
+        if (result.result.kind !== "note") throw Error("Note disclosure expected");
         expect(result.result.note.amount).toBe(BigInt(vectors.note.amount));
         expect(result.output.commitment).toBe(vectors.note.commitment);
         expect(result.output.transactionHash).toBe(reference.transactionHash);

@@ -9,7 +9,7 @@ import {
 import {
     buildTransactAggregateCalldata,
     type BuildTransactAggregateCalldataParams,
-} from "../funds/aggregate";
+} from "../note/aggregate";
 import type { ChainReader } from "../interfaces";
 import { known, type DeploymentContext } from "../validation";
 import { TokenProtocol } from "./TokenProtocol";

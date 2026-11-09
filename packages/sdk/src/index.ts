@@ -20,7 +20,7 @@ export type {
     Address,
     CreditDataV1,
     CreditDeliveryState,
-    CreditNote,
+    CreditState,
     CreditOpening,
     CreditPolicy,
     DisclosureExport,
@@ -45,7 +45,6 @@ export type {
     ProtocolDataStatus,
     ProtocolOptions,
     ProtocolUpdateRange,
-    ProtocolUpdates,
     RegistryContext,
     RegistryReader,
     TokenProtocol,
@@ -77,7 +76,7 @@ export { NoteOutput } from "./notes/NoteOutput";
 export type { NoteOutputContext, PaymentRequest, NoteOutputRecipient } from "./notes/NoteOutput";
 export { Protocol } from "./protocol/Protocol";
 export type {
-    CancelCreditPreparation,
+    RevokeCreditPreparation,
     CreateCreditPreparation,
     DrawCreditPreparation,
     FundingAuthorizationVerifier,
@@ -86,7 +85,7 @@ export type {
     FundingTypedData,
     OperationAggregateMember,
     ShieldPreparation,
-    TopUpCreditPreparation,
+    UpdateCreditPreparation,
     TransactionExecution,
     TransactionProveOptions,
     TransferPreparation,
@@ -113,26 +112,18 @@ export { ProtocolRpcClient } from "./protocol/ProtocolRpcClient";
 export { PreparedTransaction } from "./transactions/execution/PreparedTransaction";
 export type {
     CreditInput,
-    ExplicitCancelCreditPreparation,
+    ExplicitRevokeCreditPreparation,
     ExplicitCreateCreditPreparation,
     ExplicitDrawCreditPreparation,
     ExplicitShieldPreparation,
-    ExplicitTopUpCreditPreparation,
+    ExplicitUpdateCreditPreparation,
     ExplicitTransferPreparation,
     NoteInput,
     TransactionIdentity,
 } from "./transactions/explicit-types";
 
-export type {
-    GasBenchmarkCircuit,
-    GasBenchmarkDeployment,
-    GasBenchmarkProfile,
-    GasBenchmarkSample,
-    GasBenchmarkShape,
-    GasReference,
-} from "./gas/gas-estimation";
-
-export { defineGasBenchmarks } from "./gas/gas-estimation";
+export { getDocumentedGasReference } from "./gas/documented-reference";
+export type { DocumentedGasReference, DocumentedGasShape } from "./gas/documented-reference";
 
 export type { SigningRequest } from "@invisi-labs/core";
 
@@ -143,8 +134,10 @@ export { readProtocolLogs } from "./discovery/receipt-logs";
 
 export type {
     ProtocolCreditTransition,
-    ProtocolOutput,
-    ProtocolTransactionUpdates,
+    ProtocolNoteOutput,
+    IndexedCreditState,
+    ProtocolTransactionNoteUpdates,
+    ProtocolTransactionCreditUpdates,
 } from "@invisi-labs/rpc";
 
 export * from "./broadcaster/index";

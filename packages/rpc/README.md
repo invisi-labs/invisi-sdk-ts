@@ -1,88 +1,57 @@
 # @invisi-labs/rpc
 
-Typed client for Invisi Protocol RPC.
+Typed, deployment-pinned client for public Invisi Protocol history. Note and Credit have independent business methods and types; only physical tree membership and low-level canonical events share infrastructure.
 
 ```ts
-const rpc = new ProtocolRpcClient("http://localhost:8080/v1");
-```
-
-SDK preparation and `WalletSession` infrastructure composition supply the Chain RPC reader automatically. Standalone data queries that verify blocks or roots require `rpc.withReader(reader)`. Deployment discovery does not require a reader. The options constructor remains available for authenticated gateways, custom fetch and timeouts.
-
- It retrieves indexed candidate transaction references and historical membership paths. It does not scan Chain RPC logs, build public trees, decrypt notes, store wallet state, sign transactions or generate proofs.
-
-Apps discover supported chains before connecting a chain reader:
-
-```ts
-const chains = await ProtocolRpcClient.getChains("https://rpc.example/v1");
-const selected = chains.find(chain => chain.chainId === chainId);
-if (!selected) throw new Error("This service does not support the selected chain");
-const rpc = new ProtocolRpcClient({ url: selected.rpcUrl, reader });
-const protocol = await Protocol.fromRpc(rpc, provider);
-```
-
-`getChains(options, { signal })` uses `GET /v1`. It returns an immutable list of `{ chainId: bigint, protocolVersion: "1", rpcUrl: string }` and requires no Chain RPC, deployment or wallet. Supply `token`, `timeoutMs` or a custom `fetch` in options where needed. An empty list means the service has no active chains; transport, HTTP, timeout, cancellation and malformed-response failures throw `ProtocolRpcError`. The client validates chain IDs, versions, duplicate entries and advertised routes. Returned URLs preserve the selected service origin, deployment prefix and query parameters; reuse explicit authentication options when constructing the chain client.
-
-Discovery describes the selected service's active chains, not all Invisi deployments or transaction availability. Protocol/circuit pauses and indexing progress require their own checks. Service discovery does not authenticate a deployment's publisher.
-
-```ts
-import { ProtocolRpcClient } from "@invisi-labs/rpc";
-import { EthersChainReader } from "@invisi-labs/sdk/ethers";
-import { Protocol } from "@invisi-labs/protocol";
-import { JsonRpcProvider } from "ethers";
-
-const provider = new JsonRpcProvider("http://localhost:8545");
 const rpc = new ProtocolRpcClient({
-    url: "http://localhost:8080/v1",
+    url: "https://rpc.example/v1",
     reader: new EthersChainReader(provider),
 });
-
 const protocol = await Protocol.fromRpc(rpc, provider);
-await protocol.validateDeployment(new EthersChainReader(provider));
-
 const status = await rpc.getStatus(protocol.context);
 if (status.indexedHead) {
-    const page = await rpc.getUpdates(protocol.context, {
+    const range = {
         fromBlock: status.indexedHead.number,
         toBlock: status.indexedHead.number,
-    });
-    console.log(page.transactionHashes);
+    };
+    const notes = await rpc.getNoteUpdates(protocol.context, range);
+    const credits = await rpc.getCreditTransitions(protocol.context, range);
+    console.log(notes.notes, credits.transitions);
 }
 ```
 
-`reader` implements the exported `ProtocolRpcReader` interface: only `getBlock` and `isKnownRoot` are required; the RPC package has no dependency on Protocol, wallet storage or adapters. The ethers adapter above supplies an implementation. Deployment pins and API/Protocol versions are checked before indexed data is used. Block anchors, historical roots and authentication paths are independently checked against Chain RPC. Candidate references do not prove complete wallet history.
+A string URL is accepted synchronously. `getDeployment(chainId, {signal})` or `Protocol.fromRpc` selects `/v1/chains/<chainId>` and freezes its deployment pins. An explicitly discovered chain URL is also supported. `ProtocolRpcClient.getChains()` discovers active routes without a chain reader. Optional constructor `deployment` independently pins an expected deployment. Returned metadata does not establish that a deployment is official; select a trusted service. Discovery preserves API version `v1` and on-chain Protocol version `1`.
 
-- `getDeployment(chainId, { signal })`: load the selected chain endpoint's frozen Protocol and optional registry profile. It works before indexing has a checkpoint and binds this client to that deployment. A mismatched chain, version or later profile change is rejected.
-- `getStatus(context, { signal })`: canonical indexed head and detection policy.
-- `getUpdates(context, range)`: up to 100 anchored blocks, returning deduplicated candidate transaction hashes and all Credit transition references.
-- `getTransactionUpdates(context, transactionHash, { signal })`: query RPC 1.1.4+ for one transaction, with canonical block validation and no range construction.
-- `getMembership(context, input, block)`: a depth-16 path rooted in a canonical indexed root the contract still recognizes. Optional `input.root` pins a common root for multiple inputs from one tree.
+The exported `ProtocolRpcReader` requires only `getBlock` and `isKnownRoot`. Canonical block hashes/timestamps, physical roots and depth-16 membership paths are checked against this independent reader. The RPC package depends on neither Protocol builders nor wallet storage. No request falls back to scanning Chain RPC when the service fails.
 
-Detection is explicit: pass a detection key as `range.detectionKey` and a bearer `token` in client options when required. Omitting the key requests unfiltered references. Viewing and spending private keys stay local. Requests support `timeoutMs`; range/status calls also accept an `AbortSignal`. Errors are represented by `ProtocolRpcError` with a `kind` and optional numeric `code`; upstream text and credentials are not included. A failed request does not fall back to scanning Chain RPC.
+| Client method | Result |
+| --- | --- |
+| `getNoteUpdates(context, range)` | `{block, notes: ProtocolNoteOutput[]}` |
+| `getCreditTransitions(context, range)` | `{block, transitions: ProtocolCreditTransition[]}` |
+| `detectNotes(context, range)` | `{block, notes}`; requires `range.detectionKey` |
+| `detectCreditStates(context, range)` | `{block, states: IndexedCreditState[]}`; requires detection key |
+| `getNote(context, commitment, block)` | `{output, membership}` or `null`; ordinary Notes only |
+| `getCreditState(context, commitment, block)` | `{state, membership}` or `null`; Credit authority only |
+| `getTransactionNoteUpdates(context, hash, options?)` | Availability union with `notes` |
+| `getTransactionCreditUpdates(context, hash, options?)` | Availability union with `states` and `transitions` |
+| `isNoteSpent(context, nullifier, block, options?)` | Indexed ordinary Note consumption observation |
+| `isCreditConsumed(context, nullifier, block, options?)` | Indexed Credit state consumption observation |
+| `getCreditAllocation(context, owner, token, block, options?)` | `{block, shard: bigint, slot: number}` |
+| `getCreditRevocationBitmap(context, owner, token, shard, word, block, options?)` | `{block, bitmap: bigint}` |
+| `getMembership(context, input, block)` | Independently checked physical leaf proof |
 
-`Invisi({ provider, protocolRpc: rpc, store })` composes this client with wallet capabilities. `session.refresh({ fromBlock })` handles bounded pages, independent receipt lookup, local authenticated decryption and wallet-state updates.
+Mixed `getUpdates`, `getEncryptedOutputs`, `getOutputs`, `getCreditOutputs`, `getTransactionUpdates` and ambiguous `isSpent` client aliases are removed. Matching old mixed server routes return `-32601`. `ProtocolDataProvider` now declares the four explicit range/detection methods, status and membership. Custom providers and refresh callers must migrate as a unit.
 
-`ProtocolDeployment` and `ContractDeployment` are defined only in this package. A deployment contains `chainId`, `protocol` and optional `registry`; both contract entries use `address`, `runtimeCodeHash`, `fromBlock`. SDK and Protocol consume these types without maintaining another profile or catalog.
+`ProtocolNoteOutput` has one optional encrypted envelope. `IndexedCreditState` represents one authority leaf and retains both owner/spender deliveries in on-chain order. No envelope-header heuristic classifies Credit as a Note. Creation registers authority without principal funding; an optional authorized fee is pulled from the owner wallet. Draw consumes N states and appends N successor states plus one ordinary receiver Note. Payer totals and usage are gross; the Note amount is gross minus the authorized fee accrued to the broadcaster ledger. Update preserves the original grant namespace and may charge an authorized owner fee. Revocation may charge an authorized owner fee and changes the grant bitmap without producing a state, Note or nullifier. Transitions accept only `CreditCreated`, `CreditDraw`, `CreditUpdated` and `CreditRevoked`; obsolete top-up/cancellation events are rejected.
 
-A versioned service URL (`/v1`) is routed to `/v1/chains/<chainId>` by `getDeployment(chainId)` or `Protocol.fromRpc(rpc, provider)`. An explicitly discovered chain URL is also supported. Once deployment pins exist, all indexed queries keep using that chain; the configured service URL is unchanged. Deployment discovery uses `invisi_getDeployment` with no parameters. An application trusts the selected service to identify its pool; returned address/hash pairs alone cannot establish official provenance. `Protocol.validateDeployment()` checks chain ID, deployed runtime and (with the ethers reader) onchain VERSION. Registry use independently validates its runtime. Optional constructor `deployment` pins an independently trusted profile and allows indexed queries without discovery.
+Unfiltered methods reject `range.detectionKey`; invoke explicit detection methods instead. Detection requires an enabled service and validates the requested key before transmission. Pass only a detection key, never a viewing/spending key. For recovery, query unfiltered Credit transitions independently even when filtering encrypted candidates. Candidates and matching clues do not prove complete history. Clients must authenticate receipts, decrypt locally, recompute commitments and check canonical consumption before applying financial state. Indexed allocation/bitmap/consumption values remain observations: canonical block binding alone is not a storage proof of their values; compare them with independent contract reads when authorizing operations.
 
-`await Protocol.fromRpc(rpc, provider, { signal })` loads the deployment and validates its chain ID, runtime bytecode and available onchain version before returning. `WalletSession.connect()` also validates the deployment when opening a session. Failed lookup rejects without another service or local fallback.
+Ranges permit at most the exported `MAX_UPDATE_BLOCKS = 10000` inclusive blocks and must lie within deployment/indexed history. Clients validate anchors, duplicate/position conflicts, envelope bounds and per-item canonical block context, then recheck the end block. Range/status/transaction requests support `signal`; transport supports `timeoutMs` and optional bearer `token`. `ProtocolRpcError` exposes a safe `kind` and optional numeric code; credentials and upstream error text are redacted.
 
-## Single-transaction updates
+Transaction availability is independent of execution success. `not_found` means no mined receipt (possibly pending), with null block/status/collections. `pending_index` has an independently checked mined block and receipt status but null collections. `indexed` has typed arrays, empty for unrelated/reverted transactions. Indexed results require a canonical checkpoint; stale observed heads are retained only for unindexed availability. Every returned item must match the requested transaction. These methods do not poll or construct a range fallback.
 
-```ts
-const updates = await rpc.getTransactionUpdates(protocol.context, transactionHash);
-if (updates.status === "indexed") {
-    console.log(updates.block.number, updates.receiptStatus);
-    console.log(updates.outputs, updates.creditTransitions);
-} else {
-    console.log(updates.status);
-}
-```
+Block numbers, tree IDs and timestamps normalize to bigint. ABI uint64/uint256 event fields retain decimal-string precision in public transition `data`; uint16 slots remain numbers. Credit allocation starts at shard `1n`, slot `0`; revocation bitmap word is 0–255. Revocation and consumption are separate: an unconsumed state may belong to a revoked grant.
 
-`ProtocolTransactionUpdates` is a discriminated union. `not_found` means Chain RPC has no mined receipt (unknown or still pending); its block and receipt status are null. `pending_index` includes a canonical mined block and receipt status but no indexed updates yet. Both states retain null output/transition collections. Only `indexed` has arrays; empty arrays mean no matching protocol updates. `receiptStatus` is 0 for EVM reversion or 1 for success, independently of availability.
+`ProtocolDeployment`/`ContractDeployment` are defined in this package. Deployment records contain chain ID, Protocol and optional receiving/broadcaster registries with address, runtime hash and start block. `getReceivingAddress` and `getBroadcasters` preserve independent registry validation. SDK/Protocol consumers must not maintain a second deployment catalog.
 
-Block references and tree IDs normalize to bigint. For `not_found` and `pending_index`, `indexedHead` is an observed checkpoint and may remain on a stale fork; it is not a canonical-history claim. The mined transaction block is independently checked, and indexed results additionally require a canonical checkpoint. Outputs reuse the existing opaque output parser, including delivery/position validation and duplicate handling; both Credit role envelopes are retained. Credit transitions retain their named event, canonical block, transaction hash, log index and unparsed public `data`. Every returned item must match the requested transaction and block. Null indexed arrays, malformed metadata, conflicting duplicates and observed reorganizations fail with `ProtocolRpcError`.
-
-This method requires the same pinned deployment and independent Chain RPC reader as range queries. It does not poll, fall back to ranges, decrypt payloads, update a wallet Store or establish event completeness. Authenticate receipts and membership before applying candidates to financial state. Existing `ProtocolDataProvider` implementations used for range synchronization do not need to implement this additional client method.
-
-`getReceivingAddress(ownerAddress)` validates the RPC response’s `ownerAddress` against the requested EVM owner and returns its locally encoded full receiving address, registration nonce, and indexed block. Registry events retain their contract-defined field names.
+The synchronized server uses index format 3 and snapshot format 2; existing operators must follow its explicit backup/fresh-reindex/rollback guide. This client does not migrate server databases or wallet stores.

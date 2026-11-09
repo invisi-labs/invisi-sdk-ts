@@ -67,12 +67,43 @@ export async function refreshWallet(
         for (let from = options.fromBlock; from <= toBlock; from += BigInt(pageSize)) {
             signal?.throwIfAborted();
             const end = from + BigInt(pageSize) - 1n;
-            const page = await runtime.provider.getUpdates(runtime.context, {
+            const range = {
                 fromBlock: from,
                 toBlock: end < toBlock ? end : toBlock,
                 ...(options.detectionKey ? { detectionKey: options.detectionKey } : {}),
                 ...(signal ? { signal } : {}),
-            });
+            };
+            const [notePage, creditPage, detected] = await Promise.all([
+                options.detectionKey
+                    ? runtime.provider.detectNotes(runtime.context, range)
+                    : runtime.provider.getNoteUpdates(runtime.context, range),
+                runtime.provider.getCreditTransitions(runtime.context, {
+                    fromBlock: range.fromBlock,
+                    toBlock: range.toBlock,
+                    ...(signal ? { signal } : {}),
+                }),
+                options.detectionKey
+                    ? runtime.provider.detectCreditStates(runtime.context, range)
+                    : Promise.resolve(null),
+            ]);
+            if (
+                creditPage.block.hash !== notePage.block.hash ||
+                creditPage.block.number !== notePage.block.number ||
+                (detected &&
+                    (detected.block.hash !== notePage.block.hash ||
+                        detected.block.number !== notePage.block.number))
+            )
+                throw Error("Protocol RPC business query anchors differ");
+            const page = {
+                block: notePage.block,
+                transactionHashes: [
+                    ...new Set([
+                        ...notePage.notes.map((n) => n.transactionHash),
+                        ...creditPage.transitions.map((n) => n.transactionHash),
+                        ...(detected?.states ?? []).map((n) => n.transactionHash),
+                    ]),
+                ],
+            };
             if (page.block.number !== (end < toBlock ? end : toBlock))
                 throw new Error("Protocol RPC returned the wrong page anchor");
             signal?.throwIfAborted();

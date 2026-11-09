@@ -1,3 +1,4 @@
+import { normalizeCreditPolicy } from "@invisi-labs/core";
 import { normalizeFunding } from "@invisi-labs/protocol";
 import type { OperationPlan } from "../operation-types";
 import { inputFacts } from "../preparation/inputs";
@@ -5,7 +6,13 @@ import type { OperationStatus } from "../records";
 import { requiresAuthorization } from "../signing/statement";
 export function operationPreview(plan: OperationPlan, status: OperationStatus) {
     const p = plan;
-    const fee = p.params ?? p.shieldParams ?? p.credit?.creation ?? p.credit?.cancel;
+    const fee =
+        p.params ??
+        p.shieldParams ??
+        p.credit?.creation ??
+        p.credit?.update ??
+        p.credit?.draw ??
+        p.credit?.revocation;
     const funding = normalizeFunding(p.funding);
     return {
         id: p.id,
@@ -25,7 +32,8 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
             ...(p.credit?.inputs ?? []).map((input) => ({
                 kind: "credits" as const,
                 commitment: input.commitment,
-                amount: input.state.note.amount,
+                revocationShard: input.state.note.revocationShard,
+                revocationSlot: input.state.note.revocationSlot,
                 owner: input.state.note.ownerWalletIdentity,
                 spender: input.state.note.spenderWalletIdentity,
                 expiry: input.state.note.expiry,
@@ -44,13 +52,23 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
         },
         creditOutputs: p.credit?.outputs.map((output) => ({
             commitment: output.commitment,
-            amount: output.state.note.amount,
+            revocationShard: output.state.note.revocationShard,
+            revocationSlot: output.state.note.revocationSlot,
             expiry: output.state.note.expiry,
             owner: output.state.note.ownerWalletIdentity,
             spender: output.state.note.spenderWalletIdentity,
-            ownerPayout: output.state.note.ownerPayout,
-            spenderPayout: output.state.note.spenderPayout,
+            ...normalizeCreditPolicy(output.state.note),
         })),
+        creditDraw: p.credit?.draw
+            ? {
+                  grossAmount: p.credit.draw.totalAmount,
+                  feeAmount: p.credit.draw.feeAmount ?? 0n,
+                  netAmount: p.credit.draw.totalAmount - (p.credit.draw.feeAmount ?? 0n),
+                  payers: p.credit.draw.payers.map((payer) => ({ ...payer })),
+              }
+            : undefined,
+        creditFeePayer:
+            p.credit?.creation?.owner ?? p.credit?.update?.owner ?? p.credit?.revocation?.owner,
         outputs: p.outputs.map((output) => ({
             commitment: output.commitment,
             to: output.address,
@@ -63,18 +81,11 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
         feeAmount: fee?.feeAmount ?? 0n,
         fundingAmount: p.funding.amount ?? 0n,
         fundingPayer: p.funding.payer,
-        withdrawalAmount:
-            p.params?.withdrawalAmount ??
-            p.credit?.draw?.totalAmount ??
-            (p.credit?.cancel
-                ? p.credit.cancel.amount - (p.credit.cancel.feeAmount ?? 0n)
-                : undefined) ??
-            0n,
-        withdrawalAddress:
-            p.params?.withdrawalAddress ?? p.credit?.draw?.spender ?? p.credit?.cancel?.owner,
+        withdrawalAmount: p.params?.withdrawalAmount ?? 0n,
+        withdrawalAddress: p.params?.withdrawalAddress,
         permissions: {
             walletAuthorization: requiresAuthorization(p),
-            proof: p.kind !== "shield",
+            proof: p.kind !== "shield" && p.kind !== "revoke-credit",
             fundingAuthorization: p.fundingMode === "signature",
         },
     };

@@ -17,23 +17,24 @@ const note: core.Note = {
     amount: BigInt(vectors.note.amount),
     nonce: BigInt(vectors.note.nonce),
 };
-const credit: core.CreditNote = {
+const credit: core.CreditState = {
     ...context,
     spenderWalletIdentity: ownerHex(vectors.credit.spenderWalletIdentity),
     ownerWalletIdentity: ownerHex(vectors.credit.ownerWalletIdentity),
-    spenderPayout: BigInt(vectors.credit.spenderPayout),
-    ownerPayout: BigInt(vectors.credit.ownerPayout),
-    amount: BigInt(vectors.credit.amount),
+    revocationShard: BigInt(vectors.credit.revocationShard),
+    revocationSlot: BigInt(vectors.credit.revocationSlot),
     nonce: BigInt(vectors.credit.nonce),
     expiry: BigInt(vectors.credit.expiry),
     creditSharedKey: BigInt(vectors.credit.creditSharedKey),
     singleLimit: BigInt(vectors.credit.singleLimit),
     dailyLimit: BigInt(vectors.credit.dailyLimit),
     monthlyLimit: BigInt(vectors.credit.monthlyLimit),
+    lifetimeLimit: BigInt(vectors.credit.lifetimeLimit),
     lastDay: BigInt(vectors.credit.lastDay),
     dailySpent: BigInt(vectors.credit.dailySpent),
     lastMonth: BigInt(vectors.credit.lastMonth),
     monthlySpent: BigInt(vectors.credit.monthlySpent),
+    totalSpent: BigInt(vectors.credit.totalSpent),
 };
 const output = {
     ...context,
@@ -127,7 +128,8 @@ describe("selective disclosure", () => {
             const disclosure = await localViewer.discloseCredit(selected.ciphertext, selected);
             const result = await disclosure.verify(selected);
             expect(result.kind).toBe("credit");
-            expect(result.note.amount).toBe(credit.amount);
+            if (result.kind !== "credit") throw Error("Credit disclosure expected");
+            expect(result.note.totalSpent).toBe(credit.totalSpent);
             expect("creditSharedKey" in result.note).toBe(false);
             expect(disclosure.getScope().revealsCreditSharedKey).toBe(true);
             expect(disclosure.getScope().revealsReceivingKeys).toBe(true);
