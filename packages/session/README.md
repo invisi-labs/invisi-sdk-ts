@@ -46,3 +46,7 @@ request lists still require `applyWalletResponses([])` to finalize.
 
 Private authorization uses `operation.exportWalletRequest(id)`, host execution of `[request]`,
 and `operation.withWalletResponse(response)`, identical to detached SDK preparation.
+
+### Managed Credit examples
+
+See [the Credit walkthrough](../../examples/README.md#managed-credit-walkthrough) for four flat SQLite-backed Session mains: create, batch draw across different payers, update remaining quota, and proofless owner revocation. All use the same public Wallet and native array request/response boundary as Note payments. Example 4 recovers both Note and Credit operations with the original account and encrypted store. Credit authority and reservations stay separate from ordinary Note balances; successful draws issue ordinary recipient Notes.

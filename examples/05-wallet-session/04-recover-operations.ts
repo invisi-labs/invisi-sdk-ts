@@ -9,14 +9,19 @@ import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
 import { nativeWallet } from "../host-transport.js";
 
-// Reopen Alice's encrypted state and reconcile existing operations after external submission.
+// Reopen the selected account's Note and Credit journal after external submission.
 // Recovery never signs or sends again; a timeout does not justify a replacement payment.
 if (!process.argv.includes("--execute")) {
     console.log("Review this scenario, then pass --execute");
     process.exit(0);
 }
 
-const [alice] = getAccounts();
+const account = getAccounts().find(
+    (item) => item.name === (process.env.SESSION_ACCOUNT ?? "alice")
+);
+if (!account) {
+    throw Error("Unknown public SESSION_ACCOUNT");
+}
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
 
 // 1. Restore only encrypted local state using a dedicated host-managed storage key.
@@ -34,7 +39,7 @@ const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as {
 // An absolute default avoids creating a second wallet state when the working directory changes.
 const databasePath =
     process.env.WALLET_DB ??
-    fileURLToPath(new URL("../accounts/alice-session.sqlite", import.meta.url));
+    fileURLToPath(new URL(`../accounts/${account.name}-session.sqlite`, import.meta.url));
 const database = new DatabaseSync(databasePath);
 try {
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
@@ -51,9 +56,9 @@ try {
     const session = await WalletSession.connect({
         invisi,
         store,
-        wallet: alice.publicWallet,
+        wallet: account.publicWallet,
         protocol,
-        namespace: "alice-local-experiments",
+        namespace: `${account.name}-local-experiments`,
     });
 
     // 2. Revisit the saved checkpoint to detect reorgs before using inventory.

@@ -60,7 +60,7 @@ The final output is an unsigned transaction. Review its chain, target, value, ca
 - `02-transparent-amount`: offline Note output construction, shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, memo, and verified broadcaster quote.
 - `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
-- `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted shield/transfer preparation, and operation reconciliation. There is no injected private executor or automatic signer.
+- `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted Note and Credit preparation, grant reservations, and operation reconciliation. There is no injected private executor or automatic signer.
 - `06-disclosure`: independently read canonical receipt evidence, request native decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the native-authenticated application payload without claiming its financial opening proves the memo.
 
 ## Automatic discovery and recovery
@@ -74,3 +74,31 @@ Disclosure examples discover historical outputs, including spent notes or consum
 Session examples require Node.js 22.13+ and `STORE_ENCRYPTION_KEY_HEX`, a dedicated external 32-byte storage encryption key, plus optional `WALLET_DB` (default `examples/accounts/alice-session.sqlite`, resolved independently of the working directory). This key is solely for the encrypted store and must be supplied by host key management independently of account material. Use the same key, path, and namespace when restoring. Refresh remains visibly two steps: `nativeWallet.execute(pending.walletRequests)` and `pending.applyWalletResponses(responses)`. Keep exported operation IDs so a host can reconcile an existing submission rather than create a second payment.
 
 After external submission, recovery optionally reads `HOST_TRANSACTIONS_JSON`, an object mapping persisted operation IDs to host transaction hashes. It attaches these hashes with `trackTransaction` and reconciles canonical receipts without resending or signing again.
+
+## Managed Credit walkthrough
+
+The Session supports `prepareCreateCredit`, `prepareDrawCredit`, `prepareUpdateCredit`, and `prepareRevokeCredit`. It persists their intents and reservations, refreshes both role deliveries, and resumes them through the same operation API as Note payments. Credit quota is not included in the ordinary Note balance. The stateless `04-credit` files remain useful when the caller owns inventory management.
+
+Run each command with `--execute` after configuring the public accounts and external storage key:
+
+| Script | Account | What it demonstrates |
+| --- | --- | --- |
+| `example:session:5` | Bob by default; repeat with `SESSION_ACCOUNT=charlie` | Create a finite grant to Alice without spending Notes or moving principal |
+| `example:session:6` | Alice by default | Refresh durable spender inventory, draw seven base units from each of two different payers, issue one ordinary 14-unit Note to Dave |
+| `example:session:7` | Bob by default | Select a finite owner grant and add 100 base units to remaining quota, preserving usage |
+| `example:session:8` | Bob by default | Select a public grant reference and export owner-submitted revocation without private authorization or proof |
+| `example:session:4` | `SESSION_ACCOUNT` (Alice by default) | Resume and canonically reconcile existing Note or Credit operations by their saved IDs |
+
+```sh
+pnpm --filter @invisi-examples/scenarios example:session:5 --execute
+SESSION_ACCOUNT=charlie pnpm --filter @invisi-examples/scenarios example:session:5 --execute
+pnpm --filter @invisi-examples/scenarios example:session:6 --execute
+SESSION_ACCOUNT=bob pnpm --filter @invisi-examples/scenarios example:session:7 --execute
+SESSION_ACCOUNT=bob pnpm --filter @invisi-examples/scenarios example:session:8 --execute
+```
+
+Submit and confirm each exported transaction through the host before running a dependent step. Bob and Charlie must each supply ERC20 allowance and balance before Alice's draw. Refresh discovers the submitted successor grants automatically; the draw's recipient may be any complete receiving address. Its output is an ordinary Note, discovered by Dave's Session and spent through the normal Note flow.
+
+Each main visibly opens the encrypted store, refreshes with native arrays, selects role-bound Credit state, prepares the managed operation, and exports unsigned calldata. The store snapshot supplies current grant references; Session preparation independently rechecks chain state and reserves the consumed grant across both roles. No second ephemeral discovery scan is needed. Amounts are token base units; these examples use zero fees.
+
+The account controls the default database (`examples/accounts/<account>-session.sqlite`) and namespace (`<account>-local-experiments`). A `WALLET_DB` override is supported. Use the same account, namespace, database and host storage key for recovery. Set `HOST_TRANSACTIONS_JSON` to map saved operation IDs to the host-submitted transaction hashes, then run `example:session:4`. Exported operations remain reserved until canonical reconciliation: do not recreate a draw after a timeout or expect creating/updating a grant to credit your Note balance.
