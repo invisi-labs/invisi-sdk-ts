@@ -94,7 +94,7 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
         new Uint8Array(256).fill(255)
     );
 });
-it("rejects truncated prefixes, bounds, old versions, truncated clues, trailing bytes and count mismatches", () => {
+it("rejects truncated prefixes, bounds, unsupported versions, truncated clues, trailing bytes and count mismatches", () => {
     const ciphertext = "06" + "00".repeat(160);
     const framed = "00a0" + ciphertext + clue;
     for (const packed of [

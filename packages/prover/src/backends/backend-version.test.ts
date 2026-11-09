@@ -27,7 +27,7 @@ shell("native BB toolchain selection", () => {
         expect(await checkBBAvailable(await executable("6.0.0", true))).toBe(true);
     });
 
-    it("rejects previous BB versions", async () => {
-        expect(await checkBBAvailable(await executable("5.2.1"))).toBe(false);
+    it("rejects a backend release that differs from the pinned version", async () => {
+        expect(await checkBBAvailable(await executable("0.0.0"))).toBe(false);
     });
 });

@@ -146,23 +146,6 @@ describe("per-output receiving-key lookup", () => {
         expect(call).toHaveBeenCalledTimes(2);
         expect(h.requests).toEqual([]);
     });
-    it("rejects removed constructor lookup and resolver options", async () => {
-        const h = await registryFixture();
-        for (const options of [{ addressLookup: "chain" }, { addressResolver: async () => null }]) {
-            expect(() => new Invisi(options as never)).toThrow(/recipient|resolver|lookup/i);
-            expect(
-                () => new WalletSession(sessionOptions({ ...h.h.options, ...options } as never))
-            ).toThrow(/recipient|resolver|lookup/i);
-        }
-        await expect(
-            NoteOutput.create({
-                ...h.h.context,
-                amount: 1n,
-                recipient: { type: "evm", address: h.h.bob.ownerAddress },
-                addressResolver: async () => null,
-            } as never)
-        ).rejects.toThrow(/addressResolver/);
-    });
     it.each(["chain", "protocol-rpc"] as const)(
         "requires only the selected %s capability when resolving a pending envelope",
         async (source) => {

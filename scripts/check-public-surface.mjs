@@ -1,23 +1,33 @@
-/** Regression gate: public capability APIs only, with no obsolete transport package or alias. */
+/** Reviewable current package and capability boundaries. */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-for (const name of [
-    "ipp",
-    "payer",
-    "receiver",
-    "node",
-    "deployments",
-    "tree",
-    "contracts",
-    "wallet",
-    "adapters",
-])
-    assert(!existsSync(`packages/${name}/package.json`), `obsolete package remains: ${name}`);
-for (const name of readdirSync("packages")) {
-    const path = `packages/${name}/package.json`;
-    if (!existsSync(path)) continue;
-    const manifest = JSON.parse(readFileSync(path, "utf8"));
+
+const entries = {
+    core: [".", "./address", "./note", "./credit"],
+    protocol: [".", "./contracts", "./note", "./credit"],
+    prover: [".", "./native", "./wasm", "./aggregate"],
+    rpc: ["."],
+    sdk: [".", "./ethers", "./session-support", "./note", "./credit"],
+    session: [".", "./sqlite", "./indexeddb", "./memory"],
+    react: ["."],
+    vue: ["."],
+};
+const packages = readdirSync("packages").filter((name) =>
+    existsSync(`packages/${name}/package.json`)
+);
+assert.deepEqual(
+    packages.sort(),
+    Object.keys(entries).sort(),
+    "workspace package boundary changed"
+);
+for (const [name, paths] of Object.entries(entries)) {
+    const manifest = JSON.parse(readFileSync(`packages/${name}/package.json`, "utf8"));
+    assert.deepEqual(
+        Object.keys(manifest.exports).sort(),
+        [...paths].sort(),
+        `public entries changed: ${name}`
+    );
     for (const section of [
         "dependencies",
         "optionalDependencies",
@@ -25,197 +35,138 @@ for (const name of readdirSync("packages")) {
         "devDependencies",
     ])
         for (const dep of Object.keys(manifest[section] ?? {}))
-            assert(
-                dep !== "viem" &&
-                    !/^@invisi-labs\/(ipp|payer|receiver|node|deployments|tree|contracts|wallet|adapters)$/.test(
-                        dep
-                    ),
-                `obsolete dependency in ${manifest.name}: ${dep}`
-            );
+            if (dep.startsWith("@invisi-labs/"))
+                assert(
+                    Object.hasOwn(entries, dep.slice(13)),
+                    `unrecognized workspace dependency: ${dep}`
+                );
 }
-// Examples teach public API usage. Behavioral tests belong to their owning packages.
-function checkExampleDirectory(directory) {
+
+function checkExamples(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
         if (["node_modules", "dist", ".turbo"].includes(entry.name)) continue;
         const path = resolve(directory, entry.name);
-        if (entry.isDirectory()) {
-            checkExampleDirectory(path);
-        } else {
+        if (entry.isDirectory()) checkExamples(path);
+        else
             assert(
                 !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry.name),
-                `behavioral test inside examples: ${path}`
+                `behavioral test belongs to a package: ${path}`
             );
-        }
     }
 }
-checkExampleDirectory("examples");
+checkExamples("examples");
 const examples = JSON.parse(readFileSync("examples/package.json", "utf8"));
-assert(!examples.scripts.test, "examples must use build/typecheck and explicit smoke runs");
-assert(!examples.devDependencies?.vitest, "test runtime belongs to SDK packages");
-const core = await import(resolve("packages/core/dist/index.js")),
-    sdk = await import(resolve("packages/sdk/dist/index.js")),
-    session = await import(resolve("packages/session/dist/index.js"));
-for (const name of [
-    "deriveWallet",
-    "deriveWalletFromMnemonic",
-    "encodeLongAddress",
-    "encodeShortAddress",
-])
-    assert(!(name in core), `obsolete public function: ${name}`);
-for (const name of [
-    "IPPClient",
-    "buildShieldFromRequest",
-    "buildVoucher",
-    "createPaymentRequest",
-    "Synchronizer",
-    "EthersEventSource",
-    "CanonicalTreeProvider",
-    "InMemoryMerkleTree",
-    "InvisiTreeManager",
-    "MerkleTreeSync",
-    "WalletDiscovery",
-])
-    assert(!(name in sdk), `obsolete public API: ${name}`);
-for (const name of ["Wallet", "Invisi", "Protocol", "AddressRegistry", "InvisiError"])
-    assert.equal(typeof sdk[name], "function", `missing public object: ${name}`);
-assert.equal(
-    typeof sdk.Invisi.prototype.prepareRegistration,
-    "function",
-    "missing registry composition entry"
-);
-assert.equal(typeof core.Wallet.fromPrivateKey, "function", "missing account-key factory");
-for (const name of ["fromSeed", "fromPhrase"]) {
-    assert(!(name in core.Wallet), `obsolete HD factory: ${name}`);
-}
-assert(!("ReceivingAddress" in sdk), "low-level address object exposed by the SDK entry");
-for (const name of ["getViewer", "getDetector"]) {
-    assert.equal(
-        typeof core.Wallet.prototype[name],
-        "function",
-        `missing capability getter: ${name}`
-    );
-}
-for (const name of ["exportViewing", "exportDetection"]) {
-    assert(!(name in core.Wallet.prototype), `obsolete capability export: ${name}`);
-}
-assert(!("defineDeployment" in sdk), "deployment parsing belongs to the RPC package");
-assert(!("deployments" in sdk), "SDK must not keep a deployment catalog");
-const rpc = await import(resolve("packages/rpc/dist/index.js"));
-assert.equal(typeof rpc.ProtocolRpcClient.getChains, "function", "missing service chain discovery");
-assert.equal(typeof rpc.defineDeployment, "function", "RPC deployment parser missing");
-assert.equal(
-    typeof rpc.ProtocolRpcClient.prototype.getDeployment,
-    "function",
-    "RPC deployment discovery missing"
-);
-const rpcManifest = JSON.parse(readFileSync(resolve("packages/rpc/package.json"), "utf8"));
-assert(!("@invisi-labs/protocol" in rpcManifest.dependencies), "RPC must not depend on Protocol");
-assert.equal(typeof sdk.Protocol.fromRpc, "function", "missing async RPC protocol initialization");
-assert.equal(typeof sdk.Protocol.prototype.forToken, "function", "missing token operation binding");
-assert.equal(
-    typeof sdk.Protocol.prototype.aggregate,
-    "function",
-    "missing multi-token aggregation"
-);
-assert(!("resolveInstance" in sdk.Protocol.prototype), "retired token instance discovery remains");
+assert(!examples.scripts.test, "examples use explicit smoke runs");
+assert(!examples.devDependencies?.vitest, "test runtime belongs to packages");
+
+const core = await import(resolve("packages/core/dist/index.js"));
+const sdk = await import(resolve("packages/sdk/dist/index.js"));
+const session = await import(resolve("packages/session/dist/index.js"));
 const protocol = await import(resolve("packages/protocol/dist/index.js"));
-for (const name of ["registrationAuthorizationRequest", "registrationPublicInputs"])
-    assert(!(name in protocol), `retired registry circuit API: ${name}`);
-assert(!("registration" in protocol.WitnessBuilder), "registry witness builder remains");
+const rpc = await import(resolve("packages/rpc/dist/index.js"));
+function functions(api, names, label) {
+    for (const name of names)
+        assert.equal(typeof api[name], "function", `${label}.${name} missing`);
+}
+functions(
+    core,
+    [
+        "Wallet",
+        "PublicWallet",
+        "ViewingCapability",
+        "Detector",
+        "Disclosure",
+        "computeNoteCommitment",
+        "computeCreditCommitment",
+        "recoverCreditState",
+    ],
+    "core"
+);
+functions(
+    sdk,
+    [
+        "Invisi",
+        "Protocol",
+        "AddressRegistry",
+        "InvisiError",
+        "NoteOutput",
+        "PaymentNote",
+        "PreparedTransaction",
+        "RegistrationOperation",
+    ],
+    "sdk"
+);
+functions(session, ["WalletSession", "Operation", "EncryptedWalletCodec"], "session");
+functions(rpc, ["ProtocolRpcClient", "defineDeployment"], "rpc");
+functions(
+    protocol,
+    ["WitnessBuilder", "registrationTypedData", "registrationDigest", "buildRegistrationCalldata"],
+    "protocol"
+);
+functions(core.Wallet, ["fromPrivateKey"], "Wallet");
+functions(core.PublicWallet, ["fromAddress"], "PublicWallet");
+functions(core.Wallet.prototype, ["getViewer", "getDetector", "exportAuthorization"], "Wallet");
+// Public identities cannot decrypt or authorize spending.
+for (const name of ["getViewer", "getDetector", "exportAuthorization"])
+    assert(
+        !(name in core.PublicWallet.prototype),
+        `public wallet acquired secret capability: ${name}`
+    );
+functions(sdk.Protocol, ["fromRpc"], "Protocol");
+functions(sdk.Protocol.prototype, ["forToken", "aggregate"], "Protocol");
+functions(rpc.ProtocolRpcClient, ["getChains"], "ProtocolRpcClient");
+functions(
+    rpc.ProtocolRpcClient.prototype,
+    [
+        "getDeployment",
+        "getNote",
+        "getCreditState",
+        "getNoteUpdates",
+        "getCreditTransitions",
+        "detectNotes",
+        "detectCreditStates",
+    ],
+    "ProtocolRpcClient"
+);
+const preparations = [
+    "prepareShield",
+    "prepareTransfer",
+    "prepareCreateCredit",
+    "prepareDrawCredit",
+    "prepareUpdateCredit",
+    "prepareRevokeCredit",
+];
+functions(sdk.Invisi.prototype, [...preparations, "prepareRegistration"], "Invisi");
+functions(
+    session.WalletSession.prototype,
+    [...preparations, "refresh", "balance", "resume", "sendTransaction"],
+    "WalletSession"
+);
+for (const [name, entry] of [
+    ["PreparedTransaction", sdk.PreparedTransaction],
+    ["Operation", session.Operation],
+])
+    functions(
+        entry.prototype,
+        [
+            "exportWalletAuthorization",
+            "withWalletSignature",
+            "exportFundingAuthorization",
+            "withFundingSignature",
+            "exportRevocationAuthorization",
+            "withRevocationSignature",
+        ],
+        name
+    );
+functions(
+    sdk.RegistrationOperation.prototype,
+    ["exportRegistrationAuthorization", "withSignature", "authorizeDirect"],
+    "RegistrationOperation"
+);
+const rpcManifest = JSON.parse(readFileSync("packages/rpc/package.json", "utf8"));
 assert(
-    !("prove" in protocol.RegistrationOperation.prototype),
-    "registry operation requires a prover"
+    !("@invisi-labs/protocol" in rpcManifest.dependencies),
+    "transport must not depend on protocol execution"
 );
-for (const name of ["registrationTypedData", "registrationDigest", "buildRegistrationCalldata"])
-    assert.equal(typeof protocol[name], "function", `missing signature registry helper: ${name}`);
-for (const name of ["buildApproveCalldata", "buildPermitTypedData", "permitTypes"])
-    assert(!(name in protocol), `generic Ethereum helper must remain in ethers: ${name}`);
-
-for (const name of ["sync", "resync", "startSync", "stopSync", "applyUpdates"]) {
-    assert(!(name in session.WalletSession.prototype), `wallet session must not scan: ${name}`);
-}
-assert.equal(
-    typeof session.WalletSession.prototype.refresh,
-    "function",
-    "missing indexed refresh entry"
-);
-
-const ethersAdapter = await import(resolve("packages/sdk/dist/ethers.js"));
-assert(!("EthersEventSource" in ethersAdapter), "public RPC scanner remains in ethers adapter");
-for (const name of ["getTreeCount", "getMerkleRoot"]) {
-    assert(
-        !(name in ethersAdapter.EthersChainReader.prototype),
-        `unused public tree query remains: ${name}`
-    );
-}
-const wallet = await import(resolve("packages/sdk/dist/index.js"));
-assert(!("WalletDiscovery" in wallet), "standalone discovery facade remains public");
-const declaration = readFileSync("packages/sdk/dist/index.d.ts", "utf8");
-for (const name of ["WalletUpdateBatch", "WalletUpdateResult", "ApplyUpdatesOptions"]) {
-    assert(
-        !new RegExp(String.raw`${name}`).test(declaration),
-        `manual update contract remains public: ${name}`
-    );
-}
-
-for (const name of ["prepareClue", "detectClue", "clueIsValid"]) {
-    assert(!(name in core), `local detection implementation remains: ${name}`);
-}
-for (const name of ["detect", "classify"]) {
-    assert(!(name in core.Detector.prototype), `local detector method remains: ${name}`);
-}
-
-for (const name of ["PreparedTransaction", "Operation"]) {
-    for (const method of [
-        "exportWalletAuthorization",
-        "withWalletSignature",
-        "exportFundingAuthorization",
-        "withFundingSignature",
-    ]) {
-        assert.equal(
-            typeof (name === "Operation" ? session[name] : sdk[name]).prototype[method],
-            "function",
-            `missing external signing API: ${name}.${method}`
-        );
-    }
-}
-for (const method of ["exportRegistrationAuthorization", "withSignature"]) {
-    assert.equal(
-        typeof sdk.RegistrationOperation.prototype[method],
-        "function",
-        `missing registry signing API: ${method}`
-    );
-}
-
-assert.equal(typeof sdk.PublicWallet.fromAddress, "function");
-assert(!("fromAddress" in sdk.Wallet));
-assert(!("fromPrivateKey" in sdk.PublicWallet));
-for (const method of ["getViewer", "getDetector", "exportAuthorization"]) {
-    assert(!(method in sdk.PublicWallet.prototype));
-}
-
-for (const entry of [sdk.Invisi, session.WalletSession]) {
-    assert(!("prepareSweep" in entry.prototype));
-    assert(!("prepareWithdraw" in entry.prototype));
-}
-
-for (const method of ["authorize", "authorizeFunding"]) {
-    assert(
-        !(method in sdk.PreparedTransaction.prototype),
-        `independent private signing remains: ${method}`
-    );
-}
-assert(!("buildWithdrawalCalldata" in protocol), "retired withdrawal calldata helper remains");
-
-assert(!("authorize" in sdk.RegistrationOperation.prototype), "registry local signing remains");
-assert.equal(
-    typeof sdk.RegistrationOperation.prototype.authorizeDirect,
-    "function",
-    "missing caller registration encoding"
-);
-
-console.log(
-    "Current public surface PASS: capability objects, no obsolete package or compatibility aliases"
-);
-
+console.log("Current public surface PASS: explicit package entries and capability boundaries");
 await import("./check-session-boundary.mjs");

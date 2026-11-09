@@ -114,7 +114,7 @@ describe("recipient preparation failures", () => {
         });
         expect((await h.store.readSnapshot(h.scope)).reservations).toEqual({});
     });
-    it("rejects legacy plain outputs at preparation without resolving recipients", async () => {
+    it("rejects output objects without validated identity and commitment", async () => {
         const h = await fixture();
         const error = await new Invisi({ chainReader: h.reader })
             .prepareShield({

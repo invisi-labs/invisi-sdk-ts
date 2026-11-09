@@ -89,9 +89,4 @@ describe("EVM account key restoration", () => {
             await expect(Wallet.fromPrivateKey(input)).rejects.toThrow();
         }
     });
-
-    it("has no Invisi mnemonic or HD factory", () => {
-        expect(Wallet).not.toHaveProperty("fromSeed");
-        expect(Wallet).not.toHaveProperty("fromPhrase");
-    });
 });

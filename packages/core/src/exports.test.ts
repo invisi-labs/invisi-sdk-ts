@@ -1,31 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 
-describe("canonical protocol exports", () => {
-    it("does not expose application secret derivations or retired protocol formulas", async () => {
-        const mod = await import("./index");
-        expect(typeof mod.computeNoteIdentity).toBe("function");
-        for (const name of [
-            "computeIdentityCommitment",
-            "bytesToField",
-            "deriveNoteSecret",
-            "D_NOTE_SECRET",
-            "computeNullifier",
-            "deriveNullifierKey",
-            "computeNullifierKeyHash",
-            "VERSION",
-            "D_NKEY",
-            "D_PAY",
-            "D_NKHASH",
-            "deriveCreditNullifierKey",
-            "deriveChangeNullifierKey",
-            "deriveRemainderNullifierKey",
-            "computeRefundLink",
-            "D_DERIVE",
-            "D_REFLINK",
-            "D_CREDIT_NKEY",
-            "D_CHANGE_NKEY",
-        ]) {
-            expect(name in mod).toBe(false);
-        }
-    });
+it("provides current Note, Credit and wallet capability primitives", async () => {
+    const api = await import("./index");
+    for (const name of [
+        "computeNoteIdentity",
+        "computeNoteCommitment",
+        "computeCreditCommitment",
+        "recoverCreditState",
+        "Wallet",
+        "PublicWallet",
+        "ViewingCapability",
+        "Detector",
+        "Disclosure",
+    ] as const)
+        expect(typeof api[name]).toBe("function");
+    expect(typeof api.Wallet.fromPrivateKey).toBe("function");
+    expect(typeof api.PublicWallet.fromAddress).toBe("function");
 });

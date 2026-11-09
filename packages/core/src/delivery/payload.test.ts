@@ -19,16 +19,13 @@ it("encodes only payload version and memo bytes, preserving every leading memo b
     }
     expect(fundsV1.encode()).toEqual(new Uint8Array([1]));
 });
-it("rejects unsupported versions, oversized memos and removed built-in metadata fields", () => {
+it("rejects unsupported versions, oversized memos and unknown metadata fields", () => {
     for (const codec of [fundsV1, creditV1]) {
         for (const bytes of [[], [0], [2, 0], [1, ...new Uint8Array(257)]]) {
             expect(() => codec.decode(new Uint8Array(bytes))).toThrow();
         }
         expect(() => codec.encode({ memo: new Uint8Array(257) })).toThrow();
-        expect(() =>
-            codec.encode({ returnAddress: "application-defined" } as unknown as { memo?: string })
-        ).toThrow(/unsupported/);
-        expect(() => codec.encode({ flags: 1 } as unknown as { memo?: string })).toThrow(
+        expect(() => codec.encode({ unexpectedField: 1 } as unknown as { memo?: string })).toThrow(
             /unsupported/
         );
     }

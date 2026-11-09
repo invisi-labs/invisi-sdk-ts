@@ -93,7 +93,7 @@ it("binds complete Delivery bytes into the private WalletAuthorization statement
     ).not.toBe(digest);
 });
 
-it("encodes only the current request tuple and rejects retired ciphertext-only inputs", () => {
+it("encodes authenticated delivery tuples and rejects incomplete delivery values", () => {
     const { data } = buildTransactCalldata({
         context,
         proof: "0x1234",

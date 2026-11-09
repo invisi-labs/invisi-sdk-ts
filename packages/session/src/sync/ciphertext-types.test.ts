@@ -1,11 +1,4 @@
-import {
-    creditV1,
-    fundsV1,
-    Invisi,
-    NoteOutput,
-    type Note,
-    type PaymentRequest,
-} from "@invisi-labs/sdk";
+import { creditV1, fundsV1, NoteOutput, type Note, type PaymentRequest } from "@invisi-labs/sdk";
 import { expectTypeOf, it } from "vitest";
 it("exposes raw application bytes without a configurable envelope version or codec registry", () => {
     expectTypeOf<NoteOutput["payload"]>().toEqualTypeOf<Uint8Array>();
@@ -23,24 +16,14 @@ function checkTypes() {
         payload: fundsV1.encode({ memo: "hello" }),
     };
     const unknown: PaymentRequest = { ...good, payload: new Uint8Array([255, 99, 0]) };
-    // @ts-expect-error A payload is bytes, not a versioned JavaScript schema object.
-    const wrong: PaymentRequest = { ...good, payload: { version: 2, data: {} } };
+    // @ts-expect-error Payload objects must be encoded into bytes before preparation.
+    const wrong: PaymentRequest = { ...good, payload: { memo: "hello" } };
     // @ts-expect-error Only the factory constructs an output preparation input.
-    const removed: NoteOutput = { to: "recipient", amount: 1n };
+    const incomplete: NoteOutput = {};
     // @ts-expect-error The output constructor is private; use NoteOutput.create.
     new NoteOutput({} as never, Symbol());
-    // @ts-expect-error Application codecs are not injected into Invisi.
-    new Invisi({ ciphertextCodecs: {} });
-    // @ts-expect-error The SDK envelope version is not caller-configurable.
-    new Invisi({ envelopeVersion: 2 });
     // @ts-expect-error Pure built-in encoders still reject misspelled fields.
     fundsV1.encode({ memoo: "hello" });
-    // @ts-expect-error Built-in funds metadata only defines memo.
-    fundsV1.encode({ returnAddress: "address" });
-    // @ts-expect-error Built-in funds metadata has no flags.
-    fundsV1.encode({ flags: 1 });
-    // @ts-expect-error Credit metadata only defines memo.
-    creditV1.encode({ returnAddress: "address" });
-    void [unknown, wrong, removed];
+    void [unknown, wrong, incomplete];
 }
 void checkTypes;

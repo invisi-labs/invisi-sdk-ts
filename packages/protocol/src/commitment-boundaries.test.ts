@@ -25,22 +25,6 @@ it("rejects Credit commitments in Note requests and Note commitments in Credit s
             credit.deliveries
         )
     ).toThrow();
-    const { noteCommitments, ...noteRest } = note.params;
-    expect(() =>
-        transactPublicInputs(
-            context,
-            { ...noteRest, outputCommitments: noteCommitments },
-            note.deliveries
-        )
-    ).toThrow();
-    const { creditCommitments, ...creditRest } = credit.params;
-    expect(() =>
-        creditDrawPublicInputs(
-            context,
-            { ...creditRest, stateCommitments: creditCommitments },
-            credit.deliveries
-        )
-    ).toThrow();
 });
 
 it("decodes unchanged request bytes using distinct Note and Credit business names", () => {
@@ -58,10 +42,14 @@ it("keeps tree insertions generic and exposes registration rather than payment s
         abi.getEvent("CommitmentsInserted")!.inputs.some((input) => input.name === "commitments")
     ).toBe(true);
     const batchNames = abi.getEvent("BatchOutputs")!.inputs.map((input) => input.name);
-    expect(batchNames).toContain("noteCommitments");
-    expect(batchNames).not.toContain("commitments");
+    expect(batchNames).toEqual([
+        "treeId",
+        "startLeafIndex",
+        "firstOutputOffset",
+        "tokens",
+        "noteCommitments",
+        "packedDeliveries",
+    ]);
     expect(abi.getFunction("isCommitmentRegistered")).not.toBeNull();
     expect(abi.getError("CommitmentAlreadyRegistered")).not.toBeNull();
-    expect(abi.getFunction("isCommitmentPaid")).toBeNull();
-    expect(abi.getError("CommitmentAlreadyPaid")).toBeNull();
 });

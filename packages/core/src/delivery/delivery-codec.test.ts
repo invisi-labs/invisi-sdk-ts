@@ -7,7 +7,7 @@ it("separates the high type bit from the seven version bits", () => {
     expect(deliveryHeader("funds")).toBe(0x01);
     expect(deliveryHeader("credit")).toBe(0x82);
 });
-it("rejects zero, unknown versions and non-byte headers without compatibility fallbacks", () => {
+it("rejects zero, unknown versions and non-byte headers ", () => {
     for (const header of [0, 128, 2, 129, 5, 6, -1, 256, 1.5, NaN]) {
         expect(() => deliveryCodec(header)).toThrow();
     }

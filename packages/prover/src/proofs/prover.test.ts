@@ -7,9 +7,9 @@ describe("proof bundle validation", () => {
         const bundle = await makeProofBundle("credit_update", "evm", `0x${"00".repeat(32)}`, [
             ...UPDATE_FIXTURE.publicInputs,
         ]);
-        const legacy = { ...bundle };
-        Object.assign(legacy, { bbVersion: "5.2.1" });
-        await expect(assertProofBundle(legacy)).rejects.toThrow();
+        const mismatchedBackend = { ...bundle };
+        Object.assign(mismatchedBackend, { bbVersion: "0.0.0" });
+        await expect(assertProofBundle(mismatchedBackend)).rejects.toThrow();
         await expect(
             assertProofBundle({ ...bundle, artifactSha256: "0".repeat(64) })
         ).rejects.toThrow("Stale");

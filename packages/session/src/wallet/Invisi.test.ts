@@ -154,7 +154,7 @@ it("composes read-only provider infrastructure lazily without starting synchroni
 });
 
 it.each(["signer", "fundingSigner"])(
-    "rejects the removed %s constructor option before using it",
+    "keeps %s signing authority outside stateless infrastructure",
     (key) => {
         const signer = { getAddress: vi.fn(), signTypedData: vi.fn() };
         expect(() => new Invisi({ [key]: signer } as never)).toThrow(/signer|signing/i);
@@ -163,10 +163,10 @@ it.each(["signer", "fundingSigner"])(
     }
 );
 
-it("does not expose signer defaults in the infrastructure constructor type", () => {
-    expectTypeOf<
-        Extract<keyof import("@invisi-labs/sdk").InvisiOptions, "signer" | "fundingSigner">
-    >().toEqualTypeOf<never>();
+it("defines infrastructure capabilities independently of signing authority", () => {
+    expectTypeOf<keyof import("@invisi-labs/sdk").InvisiOptions>().toEqualTypeOf<
+        "chainReader" | "protocolRpc" | "prover" | "fundingVerifier" | "provider" | "transactionTTL"
+    >();
 });
 
 it("validates the provider chain even when a custom reader is supplied", async () => {

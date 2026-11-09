@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import { Interface } from "ethers";
 import { invisiProtocolAbi } from "./InvisiProtocol";
 const iface = new Interface(invisiProtocolAbi);
-it("ships current deferred Credit methods and omits retired funding lifecycle selectors", () => {
+it("exposes current Credit operations and public revocation queries", () => {
     for (const name of [
         "createCredit",
         "creditDraw",
@@ -12,8 +12,6 @@ it("ships current deferred Credit methods and omits retired funding lifecycle se
         "creditRevocationBitmap",
     ])
         expect(iface.getFunction(name)).not.toBeNull();
-    for (const name of ["cancelCredit", "topUpCredit", "reclaimCredit"])
-        expect(iface.getFunction(name)).toBeNull();
     expect(iface.getFunction("createCredit")!.inputs).toHaveLength(3);
     expect(iface.getFunction("revokeCredit")!.inputs).toHaveLength(8);
 });

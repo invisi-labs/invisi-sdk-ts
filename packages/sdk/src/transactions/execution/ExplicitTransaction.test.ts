@@ -195,25 +195,20 @@ it.each([undefined, "single", "aggregate"] as const)(
     }
 );
 
-it.each([
-    { execution: "aggregate" },
-    { execution: "evm" },
-    { execution: "noir-recursive" },
-    { execution: null },
-    { target: "noir-recursive" },
-    { execution: "single", target: "evm" },
-])("rejects invalid execution or retired target options: %j", async (invalid) => {
+it("rejects unsupported execution modes without invoking the prover", async () => {
     const h = await setup();
-    await expect(
-        h.invisi.prepareTransfer({
-            wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
-            protocol: h.protocol,
-            tokenAddress: h.context.tokenAddress,
-            inputs: h.inputs,
-            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
-            ...invalid,
-        } as any)
-    ).rejects.toThrow(/execution|target/);
+    const prepared = await h.invisi.prepareTransfer({
+        wallet: PublicWallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+    });
+    const authorized = await externallyAuthorize(prepared);
+    await expect(authorized.prove({ execution: "unsupported" as never })).rejects.toThrow(
+        /execution/
+    );
+    expect(h.prover.prove).not.toHaveBeenCalled();
 });
 
 it("rejects aggregation above10 slots without invoking the prover", async () => {

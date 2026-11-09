@@ -57,9 +57,9 @@ describe("Invisi address encoding", () => {
         expect(() => decodeAddress("0x" + "gg".repeat(20))).toThrow();
     });
 
-    it("rejects retired address encodings", () => {
-        expect(() => decodeAddress("0iQy352EUf40X77qfRG4NCn27DAUQjX3t8")).toThrow();
-        expect(() => decodeAddress("0inv" + long.slice(2))).toThrow();
+    it("rejects malformed current address lengths and prefixes", () => {
+        expect(() => decodeAddress(long.slice(0, -1))).toThrow();
+        expect(() => decodeAddress("0j" + long.slice(2))).toThrow();
     });
 
     it("rejects noncanonical identities, malformed secp keys and invalid clue keys", () => {

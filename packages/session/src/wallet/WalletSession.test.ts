@@ -189,11 +189,18 @@ it("pins a shared root across multiple inputs from one tree", async () => {
 
 it("keeps derivable session capabilities out of the configuration surface", () => {
     type Options = import("../operations/operation-types").WalletSessionOptions;
-    type Removed = Extract<
-        keyof Options,
-        "membership" | "nullifier" | "detector" | "receivingAddress"
-    >;
-    expectTypeOf<Removed>().toEqualTypeOf<never>();
+    expectTypeOf<keyof Options>().toEqualTypeOf<
+        | "invisi"
+        | "wallet"
+        | "protocol"
+        | "namespace"
+        | "store"
+        | "signer"
+        | "viewing"
+        | "authorization"
+        | "fundingSigner"
+        | "coinSelector"
+    >();
 });
 
 it("keeps application bytes independent of the SDK envelope in managed preparations", async () => {

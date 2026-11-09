@@ -146,8 +146,8 @@ it("validates Credit transition identity and duplicates independently", async ()
         "Conflicting Credit transition"
     );
 });
-it.each(["CreditCancelled", "CreditToppedUp", "Other"])(
-    "rejects obsolete Credit event %s",
+it.each(["Transact", "UnknownEvent"])(
+    "rejects non-Credit or unknown transition %s",
     async (name) => {
         const { client } = setup((m) =>
             m === "invisi_getStatus"

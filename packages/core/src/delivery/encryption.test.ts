@@ -200,16 +200,16 @@ describe("current authenticated delivery envelopes", () => {
             )
         ).rejects.toThrow();
     });
-    it("rejects retired Credit envelope and model", async () => {
-        const old = bytes(vectors.credit.ownerCiphertext);
-        old[0] = 0x81;
+    it("rejects unsupported Credit envelope versions and unexpected state fields", async () => {
+        const malformed = bytes(vectors.credit.ownerCiphertext);
+        malformed[0] = 0xff;
         await expect(
-            core.decryptCreditState(bytes(vectors.owner.viewingPrivateKey), old, cc("owner"))
+            core.decryptCreditState(bytes(vectors.owner.viewingPrivateKey), malformed, cc("owner"))
         ).rejects.toThrow(/version/);
         await expect(
             core.encryptCreditState(
                 keys("owner").viewingPublicKey,
-                { ...state, note: { ...credit, amount: 1n } as core.CreditState },
+                { ...state, note: { ...credit, unexpectedField: 1n } as core.CreditState },
                 cc("owner")
             )
         ).rejects.toThrow(/Unsupported Credit fields/);

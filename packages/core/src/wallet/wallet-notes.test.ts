@@ -62,7 +62,7 @@ describe("wallet-owned note vectors", () => {
         ).toBe(vectors.note.nullifier);
     });
 
-    it("binds both Credit roles and public payouts through the complete leaf and shared nullifier", async () => {
+    it("binds both Credit roles and policy through the complete leaf and shared nullifier", async () => {
         const commitment = await creditLeaf(credit);
         expect(commitment).toBe(vectors.credit.commitment);
         expect(
@@ -81,7 +81,7 @@ describe("wallet-owned note vectors", () => {
         ).not.toBe(vectors.credit.nullifier);
     });
 
-    it("recovers the authenticated remainder without changing wallet roles or payout addresses", async () => {
+    it("recovers authenticated Credit successors with preserved roles and policy", async () => {
         const r = vectors.credit.draw;
         const recovered = await recoverCreditState(context, credit, {
             timestamp: BigInt(vectors.context.timestamp),

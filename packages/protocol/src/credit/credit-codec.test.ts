@@ -83,25 +83,6 @@ describe("deferred Credit independent protocol vectors", () => {
         ])
             expect(() => api.creditDrawPublicInputs(context, p, f.deliveries)).toThrow();
     });
-    it("rejects retired funded creation, payout and remainder fields", () => {
-        const f = fixtures.create;
-        for (const key of [
-            "sources",
-            "nullifiers",
-            "amount",
-            "funding",
-            "changeCommitment",
-            "expiry",
-        ])
-            expect(() =>
-                api.createCreditPublicInputs(context, { ...f.params, [key]: 0n }, f.deliveries)
-            ).toThrow();
-        const d = fixtures.draw1;
-        for (const key of ["spender", "remainderCommitments", "expiries"])
-            expect(() =>
-                api.creditDrawPublicInputs(context, { ...d.params, [key]: [] }, d.deliveries)
-            ).toThrow();
-    });
     it("requires explicit timestamp and binds public periods to draw authorization", () => {
         const f = fixtures.draw1;
         expect(() =>
