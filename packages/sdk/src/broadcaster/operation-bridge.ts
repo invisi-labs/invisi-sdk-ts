@@ -1,3 +1,4 @@
+import type { Scope } from "@invisi-labs/core/provenance";
 import type { PreparedProvenanceCapability } from "./provenance-preparation";
 import type { ProvenanceProof } from "../provenance/proof-record";
 import type { BroadcasterClient, BroadcasterStatus } from "./index";
@@ -10,6 +11,7 @@ export interface BroadcasterTransaction {
 interface Hooks<T extends BroadcasterTransaction> {
     quote(client: BroadcasterClient, options: BroadcasterQuoteOptions): Promise<T>;
     submit(client: BroadcasterClient): Promise<BroadcasterStatus>;
+    provenanceContext(): Promise<Scope>;
     readProvenance(): Promise<ProvenanceProof | undefined>;
     proveProvenance(
         capability: PreparedProvenanceCapability,
@@ -59,4 +61,10 @@ export function readOperationProvenance(
     const hooks = bindings.get(target);
     if (!hooks) throw Error("Operation does not support Provenance proving");
     return hooks.readProvenance();
+}
+
+export function operationProvenanceContext(target: BroadcasterTransaction): Promise<Scope> {
+    const hooks = bindings.get(target);
+    if (!hooks) throw Error("Operation does not support Provenance proving");
+    return hooks.provenanceContext();
 }

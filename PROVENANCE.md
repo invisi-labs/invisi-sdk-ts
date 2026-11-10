@@ -25,7 +25,8 @@ Source-gated Broadcaster quotes bind `keccak256(abi.encode("InvisiBroadcasterPro
 ## TypeScript entrypoints
 
 - `@invisi-labs/sdk/provenance` (also `@invisi-labs/core/provenance`): primitives, `RecognizedTree`, `buildWitness`, `authenticateManifest`, `exportSidecar`, `validateProofBundle`, `ProvenanceClient`.
-- `@invisi-labs/prover/provenance`: `LocalProvenanceProver`, genuine in-process Noir 1.0.0 and BB 6.0.0 WASM proving plus independent local verification. The host supplies authenticated manifest/artifact/VK bytes through `loadAssets`; no VK URLs or remote prover endpoint are accepted. `crsPath`/`wasmPath` configure the public runtime resources.
+- `@invisi-labs/prover/native`: one `NativeProver` instance serves main protocol and Source proving, using the same BB 6 binary, threads, timeout and optional CRS path. It authenticates and loads packaged Source manifest/artifacts/VKs internally and independently verifies each proof. Source assets are lazy and Node-only.
+- `@invisi-labs/prover/provenance`: explicit browser/WASM Source backend for hosts that supply public assets; normal native examples do not use this lower-level adapter.
 - `BroadcasterClient` accepts optional `provenanceRequired: true` in configuration. Only `submitTransaction(data, signedQuote, sidecars)` receives source sidecars. Disabled configurations reject provenance metadata.
 
 Use `client.syncRecognizedTree(rootId, certificate, {maxLeaves})` for fixed-root public replay. The default replay budget is 100,000 leaves; raise it explicitly for a larger trusted snapshot.
@@ -34,9 +35,9 @@ Genuine local K1/K10 proof integration: `INVISI_PROTOCOL_ROOT=../invisi-protocol
 
 ## Signing-key rotation
 
-Pin the provider and genesis signing public key externally. `getPolicy` may return `initialSigningPublicKey` and public `keyRotations`; these fields never establish trust themselves. Verify the complete history (or an explicitly pinned checkpoint including validity intervals) with `verifyRotationChain` / `VerifyRotationChain` / `verify_rotation_chain`. The shared 169-byte rotation payload uses version 1, provider, old/new key IDs, new public key, activation time and previous rotation hash. Verify the old trusted key signature, SHA-256 new key ID, provider, previous hash, strictly increasing activation times and a caller-supplied current time.
+TS defaults bootstrap identity from the fixed official HTTPS endpoint with redirects disabled, authenticate the returned rotation chain, and pin provider/generation/keys for that instance. The packaged Source manifest digest remains independently pinned. This trusts official HTTPS for the initial identity; it is not an independently hardcoded issuer key. Private deployments supply a `ProvenanceClient` with explicit provider/genesis-key trust. `getRules` may return `initialSigningPublicKey` and public `keyRotations`; these fields never establish trust themselves. Verify the complete history (or an explicitly pinned checkpoint including validity intervals) with `verifyRotationChain` / `VerifyRotationChain` / `verify_rotation_chain`. The shared 169-byte rotation payload uses version 1, provider, old/new key IDs, new public key, activation time and previous rotation hash. Verify the old trusted key signature, SHA-256 new key ID, provider, previous hash, strictly increasing activation times and a caller-supplied current time.
 
-Apply the returned keyring explicitly with `withRotationHistory` / `WithRotationHistory` / `TrustContext::with_rotation_history`; the clients do not accept unknown keys automatically. Historical certificates issued before a key's retirement remain valid; that old key cannot issue certificates at or after the successor's activation. `getPolicy` alone permits an unknown reported current key so its history can be fetched for explicit verification; proving, evaluation, submission and job responses still require trusted keys.
+Apply the returned keyring explicitly with `withRotationHistory` / `WithRotationHistory` / `TrustContext::with_rotation_history`; the clients do not accept unknown keys automatically. Historical certificates issued before a key's retirement remain valid; that old key cannot issue certificates at or after the successor's activation. `getRules` alone permits an unknown reported current key so its history can be fetched for explicit verification; proving, evaluation, submission and job responses still require trusted keys.
 
 Optional service membership lookup requires an explicit interest-disclosure opt-in; returned paths are still checked locally against the trusted certificate. Local paginated replay remains the default.
 
@@ -75,19 +76,21 @@ See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local pro
 `broadcaster.quote(prepared, {maxFeeAmount})` only converges fees and obtains the signed final quote. It does not prepare Source data, generate a source proof, submit preflight or return tracking. Keep normal wallet authorization and main proving on the returned transaction.
 
 ```ts
+const prover = new NativeProver({bbBin, threads: 4});
+// Supply the same prover to Invisi when preparing the transaction.
 const ready = await (await quoted.withWalletResponse(response)).prove();
-const provenance = new Provenance({client, manifest, prover});
+const provenance = new Provenance({prover});
 const sourceProof = await provenance.prove(ready);
 const submitted = await broadcaster.submit(ready);
 ```
 
-Import `Provenance` from `@invisi-labs/sdk/provenance`. Its `prove` prepares public recognized-tree data, authenticates primary anchors and computes locally from the ready operation's retained private inputs. The proof is cached for relay submission and managed encrypted persistence. Only `broadcaster.submit` enforces Source acceptance before broadcasting. A configured optional `Invisi` Source capability can generate the proof there if not explicitly prepared. Credit/zero-private-input operations skip Note source proving.
+Import `Provenance` from `@invisi-labs/sdk/provenance`. Its `prove` prepares public recognized-tree data, authenticates primary anchors and computes locally from the ready operation's retained private inputs. The proof is cached for relay submission and managed encrypted persistence. Only `broadcaster.submit` enforces Source acceptance before broadcasting. The same NativeProver configured in Invisi can generate the proof there if not explicitly prepared. Credit/zero-private-input operations skip Note source proving.
 
 `provenance.submit(sourceProof)` handles both pre-submission and later delivery through `provenance_submitSourceProof`. It returns the service tracking result without a transaction hash or chain reader. The service matches the bound operation against canonical confirmed chain data, including transactions already indexed. If no match is available, it continues tracking. A payment settled within its deadline can be matched even when proof delivery occurs after that deadline. Repeated submissions reuse the same tracking record. Source submission never sends or repeats the main transaction.
 
 ## Persisting Source recovery
 
-Persist the JSON-serializable `ProvenanceProof` packet before main broadcast: final calldata, chain/protocol/token, main capacity/public statement, operation digest, sidecars and signed root certificates. No opening, witness, private nonce, runtime client or prover enters this packet. A submit-only `new Provenance({client})` can resubmit the saved packet without assets/proving capabilities. Record the returned tracking ID and state separately; use `client.getTracking(id)` to observe matching and recognition.
+Persist the JSON-serializable `ProvenanceProof` packet before main broadcast: final calldata, chain/protocol/token, main capacity/public statement, operation digest, sidecars and signed root certificates. No opening, witness, private nonce, runtime client or prover enters this packet. A submit-only `new Provenance()` can resubmit the saved packet without assets/proving capabilities. Record the returned tracking ID and state separately; use the trusted client’s `getTracking(id)` to observe matching and recognition.
 
 If no proof was produced, retain the original operation's private input openings in the encrypted wallet journal. Existing history `id` links to `session.resume(id)`; the saved plan retains original input data even after spent Note inventory is removed. A resumed ready/confirmed operation can generate Source proof; cached proof retrieval needs no prover. Mere txHash/commitments cannot reconstruct openings. Keep these records for reproof after generation changes; never persist raw witnesses/openings in a public history projection. Examples03/04 show initial direct delivery and packet-only recovery.
 
@@ -100,3 +103,16 @@ Broadcaster use is optional and token support is operator-configured. `estimateQ
 `(await broadcaster.submit(ready)).id` is assigned only by the service and treated as opaque. The SDK does not compute IDs or assume an algorithm. It retains the original body before sending and saves the returned ID; an ID-less lost response replays the exact request for server deduplication. Managed Session persists the externalization fence and original Source proof before sending. Source proof-job idempotency remains independent.
 
 For explicit reproof, call `provenance.prove(restoredOperation, {reprove:true})` with current trusted roots and local proving capabilities. Retain/save the new returned packet. A frozen externalized relay request keeps its original proof/body; reproof does not replace it or send the main transaction again.
+
+## Native defaults and private deployments
+
+```ts
+const prover = new NativeProver({bbBin, threads: 4});
+const provenance = new Provenance({prover});
+const sourceProof = await provenance.prove(ready);
+await provenance.submit(sourceProof);
+```
+
+Constructors perform no network requests or proving. On first use, the deployment comes from the retained operation or saved proof, not a separately entered chain/protocol pair. `NativeProver({provenanceClient})` overrides the official service for private deployments; `new Provenance({prover})` inherits that exact client for both proving and submission. Packet-only private recovery uses `new Provenance({client: provenanceClient})`. `officialProvenanceClient(scope)` provides a separately usable trusted public client without a prover. Bootstrap failures are retryable; an established instance never silently adopts another provider/generation/key history.
+
+Provision native assets in a source checkout with `python3 scripts/sync-provenance.py ../invisi-protocol`. It authenticates all 28 circuit/VK pairs into `packages/prover/provenance`; the package includes those public assets when provisioned for release. `provenanceAssetsPath` optionally selects another locally provisioned asset root. There is no remote proving or witness upload. API version, Source manifest release, and main protocol version are independent; no equality check couples their version numbers. The current service still exposes one configured deployment per chain; multi-instance/version routing is a separate service change.

@@ -9,30 +9,37 @@ import { assertProofBundle, fieldHex, fromHex, makeProofBundle } from "../proofs
 const execFileAsync = promisify(execFile);
 export interface NativeOptions {
     bbBin?: string;
+    crsPath?: string;
     threads?: number;
     timeoutMs?: number;
     signal?: AbortSignal;
 }
-async function run(bbBin: string, args: string[], options: NativeOptions) {
-    return execFileAsync(bbBin, args, {
-        timeout: options.timeoutMs ?? 600_000,
-        maxBuffer: 32 * 1024 * 1024,
-        ...(options.signal ? { signal: options.signal } : {}),
-        env: {
-            ...process.env,
-            BB_MSM_LEGACY: process.env.BB_MSM_LEGACY ?? "1",
-            HARDWARE_CONCURRENCY: String(options.threads ?? 4),
-        },
-    });
+export async function runBB(bbBin: string, args: string[], options: NativeOptions) {
+    return execFileAsync(
+        bbBin,
+        options.crsPath && ["prove", "verify"].includes(args[0]!)
+            ? [...args, "-c", options.crsPath]
+            : args,
+        {
+            timeout: options.timeoutMs ?? 600_000,
+            maxBuffer: 32 * 1024 * 1024,
+            ...(options.signal ? { signal: options.signal } : {}),
+            env: {
+                ...process.env,
+                BB_MSM_LEGACY: process.env.BB_MSM_LEGACY ?? "1",
+                HARDWARE_CONCURRENCY: String(options.threads ?? 4),
+            },
+        }
+    );
 }
-async function assertVersion(bbBin: string, options: NativeOptions): Promise<void> {
-    const result = await run(bbBin, ["--version"], options);
+export async function assertBBVersion(bbBin: string, options: NativeOptions): Promise<void> {
+    const result = await runBB(bbBin, ["--version"], options);
     if (!/(?:^|\s)6\.0\.0(?:\s|$)/.test(result.stdout + result.stderr))
         throw new Error("Barretenberg 6.0.0 is required");
 }
 export async function checkBBAvailable(bbBin = "bb"): Promise<boolean> {
     try {
-        await assertVersion(bbBin, {});
+        await assertBBVersion(bbBin, {});
         return true;
     } catch {
         return false;
@@ -50,7 +57,7 @@ async function verifyInDirectory(
     await writeFile(keyPath, loadVerificationKey(bundle.circuitName, bundle.target));
     await writeFile(proofPath, fromHex(bundle.proofHex));
     await writeFile(inputPath, Buffer.concat(bundle.publicInputs.map((value) => fromHex(value))));
-    const result = await run(
+    const result = await runBB(
         options.bbBin ?? "bb",
         ["verify", "-t", bundle.target, "-k", keyPath, "-p", proofPath, "-i", inputPath],
         options
@@ -62,7 +69,7 @@ export async function verifyWithBB(
     bundle: ProofBundle,
     options: NativeOptions = {}
 ): Promise<boolean> {
-    await assertVersion(options.bbBin ?? "bb", options);
+    await assertBBVersion(options.bbBin ?? "bb", options);
     const directory = await mkdtemp(join(tmpdir(), "invisi-verify-"));
     try {
         await verifyInDirectory(bundle, directory, options);
@@ -84,7 +91,7 @@ export async function proveWithBB(
     // Loading both assets checks identity and rejects unpublished target combinations.
     const circuit = loadCircuit(params.circuitName),
         key = loadVerificationKey(params.circuitName, target);
-    await assertVersion(bbBin, params);
+    await assertBBVersion(bbBin, params);
     const directory = await mkdtemp(join(tmpdir(), "invisi-proof-"));
     try {
         const artifactPath = join(directory, "circuit.json"),
@@ -93,7 +100,7 @@ export async function proveWithBB(
         await writeFile(artifactPath, JSON.stringify(circuit));
         await writeFile(witnessPath, params.witness);
         await writeFile(keyPath, key);
-        await run(
+        await runBB(
             bbBin,
             [
                 "prove",

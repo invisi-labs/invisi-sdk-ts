@@ -132,8 +132,8 @@ for (const format of ["js", "cjs"]) {
     const submitOnlySource = new sourceSdk.Provenance({
         client: { trust: { manifestSha256: "0".repeat(64) } },
     });
-    await assert.rejects(submitOnlySource.prove(quotedDetached), /manifest and prover/);
-    await assert.rejects(submitOnlySource.prove(quotedManaged), /manifest and prover/);
+    await assert.rejects(submitOnlySource.prove(quotedDetached), /NativeProver/);
+    await assert.rejects(submitOnlySource.prove(quotedManaged), /NativeProver/);
 
     await assert.rejects(
         managed.prepareShield({

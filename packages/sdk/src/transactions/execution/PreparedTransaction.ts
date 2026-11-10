@@ -67,6 +67,13 @@ export class PreparedTransaction {
         bindBroadcasterOperation(this, {
             quote: (client, options) => this.#quoteForBroadcaster(client, options),
             submit: (client) => this.#submitViaBroadcaster(client),
+            provenanceContext: async () => {
+                this.current();
+                return {
+                    chainId: this.#saved.plan.context.chainId,
+                    protocolAddress: this.#saved.plan.context.protocolAddress,
+                };
+            },
             readProvenance: async () => {
                 this.current();
                 return structuredClone(this.#saved.provenance);

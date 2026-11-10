@@ -564,6 +564,7 @@ export class ProvenanceClient {
             this.endpoint.replace(/\/$/, "") + `/v1/chains/${uint(this.trust.chainId, 64)}`,
             {
                 method: "POST",
+                redirect: "error",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ jsonrpc: "2.0", id, method, params: query ? [query] : [] }),
                 ...(signal ? { signal } : {}),
@@ -1050,3 +1051,7 @@ export type { RotationRecord, KeyValidity, TrustedKeyring } from "./rotation";
 export * from "./recovery";
 
 export * from "./tracking";
+
+export { OfficialProvenanceClients, officialProvenanceClient } from "./official-clients";
+export { PROVENANCE_MANIFEST_SHA256 } from "./release";
+export type { ProvenanceCapability, ProvenanceProvider } from "./default-client";

@@ -78,6 +78,11 @@ export class Operation {
         bindBroadcasterOperation(this, {
             quote: (client, options) => this.#quoteForBroadcaster(client, options),
             submit: (client) => this.#submitViaBroadcaster(client),
+            provenanceContext: () =>
+                this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+                    const context = this.current(state.operations[this.id]).plan.context;
+                    return { chainId: context.chainId, protocolAddress: context.protocolAddress };
+                }),
             readProvenance: () =>
                 this.#runtime.store.transaction(this.#runtime.scope, (state) =>
                     structuredClone(this.current(state.operations[this.id]).provenance)

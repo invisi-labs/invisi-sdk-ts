@@ -202,7 +202,14 @@ export async function provePreparedProvenance(
 ): Promise<ProvenanceProof> {
     if (!saved.call || !saved.proof || saved.plan.kind !== "transfer" || !saved.plan.inputs.length)
         throw Error("Ready transaction with private Note inputs required");
-    const active = capability ?? runtime.options.provenance;
+    const provider = runtime.options.prover as typeof runtime.options.prover &
+        Partial<import("@invisi-labs/core/provenance").ProvenanceProvider>;
+    const active =
+        capability ??
+        runtime.options.provenance ??
+        (provider?.getProvenanceCapability
+            ? await provider.getProvenanceCapability(saved.plan.context)
+            : undefined);
     if (!active) throw Error("Local Provenance capability required");
     if (saved.provenance && !reprove)
         return validateProvenanceProof(structuredClone(saved.provenance), active.client.trust);

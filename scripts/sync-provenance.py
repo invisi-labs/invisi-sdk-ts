@@ -8,7 +8,7 @@ from pathlib import Path
 PIN = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a"
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("protocol_root", type=Path)
-parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / ".cache" / "provenance")
+parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "packages" / "prover" / "provenance")
 args = parser.parse_args()
 source = args.protocol_root.resolve()
 manifest_bytes = (source / "circuits/provenance/manifest.json").read_bytes()

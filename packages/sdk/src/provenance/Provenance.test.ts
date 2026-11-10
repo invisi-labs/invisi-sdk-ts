@@ -149,7 +149,7 @@ async function fixture() {
         submitSourceProof: vi.fn(async () => ({ tracking: { id: "tracking-id" } })),
         submitProof: vi.fn(async () => ({ jobId: "job" })),
     };
-    const options = { client: client as any, prover: { prove: vi.fn() }, manifest };
+    const options = { client: client as any };
     return { packet, client, options };
 }
 
@@ -163,7 +163,6 @@ it("resubmits a JSON-only packet with the same API before or after main without 
     expect(h.client.submitSourceProof).toHaveBeenCalledTimes(2);
     expect(h.client.submitSourceProof).toHaveBeenLastCalledWith(h.packet.data, h.packet.sidecars);
     expect(h.client.submitProof).not.toHaveBeenCalled();
-    expect(h.options.prover.prove).not.toHaveBeenCalled();
 });
 
 it("rejects mutated native statements, proof bindings, scope and private fields before HTTP", async () => {
@@ -212,6 +211,7 @@ it("requires local proving capability only for proof generation", async () => {
     const h = await fixture();
     const ready = { id: "ready", status: "ready" };
     bindBroadcasterOperation(ready, {
+        provenanceContext: async () => h.packet.context,
         readProvenance: async () => undefined,
         quote: async () => ready,
         submit: async () => ({ id: "service-id", state: "pending" }),
@@ -220,7 +220,7 @@ it("requires local proving capability only for proof generation", async () => {
         },
     });
     await expect(new Provenance({ client: h.options.client }).prove(ready)).rejects.toThrow(
-        /manifest and prover/
+        /NativeProver/
     );
     expect(h.client.submitSourceProof).not.toHaveBeenCalled();
 });

@@ -325,7 +325,12 @@ it("allows explicit source proof generation from ready and reuses its cached pro
     const h = await configured();
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     const ready = await (await externallyAuthorize(quoted)).prove();
-    const source = new Provenance(h.capability);
+    const source = new Provenance({
+        prover: {
+            getProvenanceClient: async () => h.source,
+            getProvenanceCapability: async () => h.capability,
+        },
+    });
     const packet = await source.prove(ready);
     expect(packet.data).toBe((await ready.exportTransaction()).data);
     expect(packet.sidecars).toHaveLength(1);
@@ -371,7 +376,12 @@ it("restores original input openings even if spent-note inventory is pruned and 
         sessionOptions({ ...h.options, prover: backend(), provenance: h.capability })
     );
     const restored = await restarted.resume(ready.id);
-    const packet = await new Provenance(h.capability).prove(restored);
+    const packet = await new Provenance({
+        prover: {
+            getProvenanceClient: async () => h.source,
+            getProvenanceCapability: async () => h.capability,
+        },
+    }).prove(restored);
     const saved = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
     expect(saved.plan.inputs[0].note.nonce).toBeDefined();
     expect(saved.provenance).toEqual(packet);
@@ -425,7 +435,12 @@ it("explicit reproof returns a new packet without replacing an already externali
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     const ready = await (await externallyAuthorize(quoted)).prove();
     await h.client.submit(ready);
-    const provenance = new Provenance(h.capability);
+    const provenance = new Provenance({
+        prover: {
+            getProvenanceClient: async () => h.source,
+            getProvenanceCapability: async () => h.capability,
+        },
+    });
     const original = await provenance.prove(ready);
     h.prover.prove.mockImplementationOnce(async (request: any) => ({
         proof: "0x0304",
@@ -483,4 +498,31 @@ it("allows source-gated quoting without local Source capabilities but blocks sub
     const ready = await (await externallyAuthorize(quoted)).prove();
     await expect(h.client.submit(ready)).rejects.toThrow(/Provenance capability/);
     expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
+});
+
+it("uses one proving provider for main and automatic Source proof without a separate Invisi source configuration", async () => {
+    const h = await configured();
+    const provider = Object.assign(backend(), {
+        getProvenanceClient: async () => h.source,
+        getProvenanceCapability: vi.fn(async () => h.capability),
+    });
+    const invisi = new Invisi({
+        chainReader: h.reader,
+        protocolRpc: h.membership,
+        prover: provider,
+    });
+    const prepared = await invisi.prepareTransfer({
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 40n },
+    });
+    const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
+    expect(provider.getProvenanceCapability).not.toHaveBeenCalled();
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    await h.client.submit(ready);
+    expect(provider.getProvenanceCapability).toHaveBeenCalledTimes(1);
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
 });

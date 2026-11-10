@@ -29,3 +29,6 @@ examples/*.sqlite*
 
 # Authenticated local provenance artifacts (independent of main circuit assets)
 .cache/provenance/
+
+# Provisioned Provenance native assets; manifest stays tracked.
+packages/prover/provenance/circuits/

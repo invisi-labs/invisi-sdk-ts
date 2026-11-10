@@ -24,7 +24,7 @@ const sourceProof = await provenance.prove(ready); // Local data preparation + c
 const submitted = await broadcaster.submit(ready); // Reuses the cached proof; server enforces Source before sending.
 ```
 
-`quote` only converges the fee and obtains a signed quote. It makes no Source request and computes no source proof. `prove()` on the transaction produces the main protocol proof. `provenance.prove(ready)` fetches authenticated recognized-tree data and proves locally; it does not submit a proof to a service. If configured in `Invisi`, the optional local Source capability also lets `broadcaster.submit(ready)` perform this step automatically when no cached proof exists.
+`quote` only converges the fee and obtains a signed quote. It makes no Source request and computes no source proof. `prove()` on the transaction produces the main protocol proof. `provenance.prove(ready)` fetches authenticated recognized-tree data and proves locally; it does not submit a proof to a service. The same `NativeProver` configured in `Invisi` also lets `broadcaster.submit(ready)` perform this step automatically when no cached proof exists.
 
 For direct transactions, the App controls both independent steps:
 
@@ -46,13 +46,15 @@ The same API handles pre-submission and later delivery. Provenance verifies the 
 
 A txHash, amount or commitment alone cannot recover a private opening. History entries already contain the original operation `id`; with managed Session, `session.resume(id)` retains the original input data independently of current Note inventory. Generate with `provenance.prove(restoredOperation)`. If the proof is already cached, this returns the stored packet without loading a prover. Keep this encrypted operation record until Source delivery/recovery is complete; deleting spent-input history must not delete the only remaining openings.
 
-The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance({client})` can call `submit(savedProof)`; example04 shows that path. A generation change may require reproof, which still needs retained openings. A valid proof may precede root publication: poll `client.getTracking(id)` until recognized, never recreate the payment.
+The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance()` can call `submit(savedProof)`; example04 shows that path. A generation change may require reproof, which still needs retained openings. A valid proof may precede root publication: poll `client.getTracking(id)` until recognized, never recreate the payment.
 
 ## Running
 
-Edit the public trust pins at the top of each file and match `../settings.ts` for chain/token/RPC/BB. The default Source endpoint is `https://provenance.invisipay.fi`; applications may configure another trusted endpoint. Authorization uses an ethers signer from `ALICE_PRIVATE_KEY`, matching Alice's public wallet owner. Note decryption uses the explicit App callbacks in `../app-decryptor.ts`.
+The same `NativeProver({bbBin, threads: 4})` instance handles main and Source proofs. Official Provenance is the default: no endpoint, provider ID, signing key, manifest parsing or `loadAssets` callback is needed. On first use, the SDK fetches identity over fixed official HTTPS, validates rotation signatures and pins trust within the instance. It independently checks the packaged Source release. Private deployments pass their explicitly trusted `provenanceClient` to `NativeProver`; `Provenance({prover})` inherits it.
 
-For local proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Set `INVISI_CRS_PATH` if needed. Cached-proof recovery in04 requires none of those assets.
+Match `../settings.ts` for chain/token/RPC/BB. Authorization uses an ethers signer from `ALICE_PRIVATE_KEY`, matching Alice's public wallet owner. Note decryption remains in the App. Constructors do not access the network.
+
+For native proving in a source checkout, sync authenticated packaged assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Set `INVISI_CRS_PATH` if needed. Cached-proof recovery in04 requires none of those assets.
 
 ```sh
 pnpm --filter @invisi-examples/scenarios example:broadcaster:1 --execute
