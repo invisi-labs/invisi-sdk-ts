@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
-import { ViewingCapability } from "@invisi-labs/core";
+import { ViewingCapability } from "@invisi-labs/primitives";
 import { toBeHex } from "ethers";
-import vectors from "../../../core/src/wallet/testdata/wallet-note-vectors.json";
+import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
 import { decryptCandidates, extractDeliveryCandidates, type DeliveryEventLog } from "./discovery";
 const hex = (n: bigint) => toBeHex(n, 32) as `0x${string}`;
 const context = {

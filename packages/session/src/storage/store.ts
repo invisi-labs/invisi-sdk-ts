@@ -1,4 +1,4 @@
-import { FIELD_MODULUS, normalizeCreditDeliveryState } from "@invisi-labs/core";
+import { FIELD_MODULUS, normalizeCreditDeliveryState } from "@invisi-labs/primitives";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 import type { WalletScope, WalletState, WalletStore } from "./state";

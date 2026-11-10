@@ -1,4 +1,4 @@
-import { applyCreditDrawUsage } from "@invisi-labs/core";
+import { applyCreditDrawUsage } from "@invisi-labs/primitives";
 import { fileURLToPath } from "node:url";
 import { JsonRpcProvider, getBytes, Wallet as EthersWallet } from "ethers";
 import { createRequire } from "node:module";

@@ -1,6 +1,6 @@
-import type { TokenProtocol } from "@invisi-labs/protocol";
+import type { TokenProtocol } from "@invisi-labs/rpc";
 import type { OperationPlan } from "../transactions/operation-types";
-import { getDocumentedGasReference, type DocumentedGasShape } from "./documented-reference";
+import { getDocumentedGasReference, type DocumentedGasShape } from "@invisi-labs/protocol";
 import { operationSources } from "../transactions/preparation/inputs";
 /** A pre-proof documented scenario reference; conditions remain visible in the result. */
 export function getOperationGasReference(plan: OperationPlan, _protocol?: TokenProtocol) {
@@ -65,5 +65,5 @@ export function getOperationGasReference(plan: OperationPlan, _protocol?: TokenP
         return getDocumentedGasReference({ kind: "unmeasured-delivery-size" });
     return getDocumentedGasReference(query);
 }
-export { getDocumentedGasReference } from "./documented-reference";
-export type { DocumentedGasReference, DocumentedGasShape } from "./documented-reference";
+export { getDocumentedGasReference } from "@invisi-labs/protocol";
+export type { DocumentedGasReference, DocumentedGasShape } from "@invisi-labs/protocol";

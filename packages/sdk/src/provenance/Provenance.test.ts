@@ -3,9 +3,9 @@ import { createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { hexlify, sha256 } from "ethers";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
+import { authenticateManifest } from "@invisi-labs/prover/provenance-witness";
 import {
-    authenticateManifest,
     bindingDigest,
     inputDigest,
     operationDigest,
@@ -15,7 +15,7 @@ import {
     word,
     type RootCertificate,
     type TrustContext,
-} from "@invisi-labs/core/provenance";
+} from "@invisi-labs/protocol/provenance";
 import { transactUserPublicInputs } from "@invisi-labs/protocol";
 import { decodeBroadcasterIntent } from "../broadcaster/index";
 import { setup, externallyAuthorize } from "../transactions/execution/ExplicitTransaction-fixtures";

@@ -4,13 +4,12 @@ import { expect, it, vi } from "vitest";
 import {
     PROVENANCE_MANIFEST_SHA256,
     RecognizedTree,
-    authenticateManifest,
     noteOpening,
     rootCertificateMessage,
     word,
     type RootCertificate,
-    type OfflineProver,
-} from "@invisi-labs/core/provenance";
+} from "@invisi-labs/protocol/provenance";
+import { authenticateManifest, type OfflineProver } from "@invisi-labs/prover/provenance-witness";
 import { prepareProvenance } from "./provenance-preparation";
 import type { OperationPlan, TransactionRuntime } from "../transactions/operation-types";
 

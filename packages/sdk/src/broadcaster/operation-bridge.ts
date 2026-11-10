@@ -1,4 +1,4 @@
-import type { Scope } from "@invisi-labs/core/provenance";
+import type { Scope } from "@invisi-labs/protocol/provenance";
 import type { PreparedProvenanceCapability } from "./provenance-preparation";
 import type { ProvenanceProof } from "../provenance/proof-record";
 import type { BroadcasterClient, BroadcasterStatus } from "./index";

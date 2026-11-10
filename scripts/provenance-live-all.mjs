@@ -22,7 +22,7 @@ for (const [sdk, command, args, cwd] of [
     [
         "typescript",
         "pnpm",
-        ["--filter", "@invisi-labs/core", "exec", "vitest", "run", "src/provenance/live.test.ts"],
+        ["--filter", "@invisi-labs/rpc", "exec", "vitest", "run", "src/provenance/live.test.ts"],
         join(lab, "invisi-sdk-ts"),
     ],
     [

@@ -4,6 +4,10 @@ export default defineConfig({
     resolve: {
         alias: [
             {
+                find: "@invisi-labs/sdk/provenance",
+                replacement: fileURLToPath(new URL("../sdk/src/provenance.ts", import.meta.url)),
+            },
+            {
                 find: "@invisi-labs/sdk/session-support",
                 replacement: fileURLToPath(
                     new URL("../sdk/src/session-support.ts", import.meta.url)

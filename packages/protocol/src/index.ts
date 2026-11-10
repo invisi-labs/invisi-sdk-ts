@@ -1,5 +1,3 @@
-export * from "./authorization/witness";
-export * from "./client/Protocol";
 export * from "./credit/credit-create";
 export * from "./credit/credit-lifecycle";
 export {
@@ -33,13 +31,15 @@ export {
     validateShieldRequest,
 } from "./note/shield";
 export * from "./interfaces";
-export * from "./registry/AddressRegistry";
 export * from "./registry/registry";
 export * from "./validation";
 export * from "./verification/verify";
 
-export * from "./client/TokenProtocol";
 export * from "./factory/factory";
-export * from "./registry/RegistrationOperation";
 
 export { normalizeFee } from "./fees/fee";
+export type * from "./rpc-types";
+export { CIRCUIT_RELEASE } from "./release-identity";
+export * from "./gas/documented-reference";
+export * from "./note/aggregate-routes";
+export * from "./deployment";

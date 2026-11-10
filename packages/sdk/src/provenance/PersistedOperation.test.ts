@@ -5,19 +5,18 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Wallet as EvmWallet, hexlify, sha256 } from "ethers";
 import { expect, it, vi } from "vitest";
+import { ProvenanceClient } from "@invisi-labs/rpc/provenance";
 import {
-    ProvenanceClient,
     RecognizedTree,
     PROVENANCE_MANIFEST_SHA256,
-    authenticateManifest,
     recognizedLeaf,
     rootCertificateMessage,
     scopeHash,
     word,
     type RootCertificate,
-    type OfflineProver,
     type TrustContext,
-} from "@invisi-labs/core/provenance";
+} from "@invisi-labs/protocol/provenance";
+import { authenticateManifest, type OfflineProver } from "@invisi-labs/prover/provenance-witness";
 import { WalletSession, EncryptedWalletCodec } from "../../../session/src/index";
 import { SQLiteWalletStore, type SQLiteConnection } from "../../../session/src/storage/sqlite";
 import { scopeKey } from "../../../session/src/storage/store";
@@ -221,8 +220,8 @@ it("reopens encrypted original operations and proves only after payment and reco
             );
         });
         const provenance = new Provenance({
+            client,
             prover: {
-                getProvenanceClient: async () => client,
                 getProvenanceCapability: async () => ({
                     client,
                     manifest,

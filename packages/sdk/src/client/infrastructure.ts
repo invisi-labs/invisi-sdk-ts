@@ -1,4 +1,4 @@
-import { MissingCapabilityError } from "@invisi-labs/core";
+import { MissingCapabilityError } from "@invisi-labs/primitives";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { EthersChainReader, EthersFundingVerifier } from "../integrations/ethers";
 import { configureRecipientInfrastructure } from "../notes/recipient-infrastructure";

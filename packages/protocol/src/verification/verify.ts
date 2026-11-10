@@ -4,7 +4,7 @@ import {
     computeNoteCommitment,
     computeNoteIdentity,
     FIELD_MODULUS,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 
 export interface VerifyNoteCommitmentParams {
     ownerAddress: `0x${string}`;
@@ -28,7 +28,7 @@ export async function verifyNoteCommitment(params: VerifyNoteCommitmentParams): 
 }
 
 export interface VerifyCreditCommitmentParams {
-    state: import("@invisi-labs/core").CreditState;
+    state: import("@invisi-labs/primitives").CreditState;
     creditCommitment: `0x${string}`;
 }
 export async function verifyCreditCommitment(p: VerifyCreditCommitmentParams): Promise<boolean> {

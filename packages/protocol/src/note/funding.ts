@@ -1,4 +1,4 @@
-import { walletAuthorizationTypedData } from "@invisi-labs/core";
+import { walletAuthorizationTypedData } from "@invisi-labs/primitives";
 import { AbiCoder, keccak256, ParamType } from "ethers";
 import type { Hex } from "../contracts/index";
 import { type Delivery } from "../contracts/index";

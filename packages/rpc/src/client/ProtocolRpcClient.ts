@@ -1,6 +1,6 @@
 import { getAddress } from "ethers";
-import type { Address, Hex } from "@invisi-labs/core";
-import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
+import type { Address, Hex } from "@invisi-labs/primitives";
+import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/primitives";
 import { MAX_UPDATE_BLOCKS } from "../constants";
 import { defineDeployment, type ProtocolDeployment } from "../deployment/deployment";
 import { getBroadcasters } from "../queries/broadcasters";

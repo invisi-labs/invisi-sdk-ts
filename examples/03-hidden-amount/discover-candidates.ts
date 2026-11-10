@@ -8,7 +8,7 @@ import {
     type DisclosureReference,
 } from "@invisi-labs/sdk";
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
-import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/core";
+import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/primitives";
 /** Discover and authenticate inventory; selection and authorization remain in each scenario. */
 export async function discoverCandidates({
     provider,

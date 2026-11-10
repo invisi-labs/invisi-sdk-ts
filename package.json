@@ -4,7 +4,7 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "pnpm format:check && pnpm lint:english && turbo run lint",
+    "lint": "pnpm format:check && pnpm lint:english && pnpm check:boundaries && turbo run lint",
     "clean": "turbo run clean",
     "changeset": "changeset",
     "version-packages": "changeset version",
@@ -18,7 +18,8 @@
     "format": "prettier --write \"{packages,examples,scripts,test-support}/**/*.{ts,tsx,js,mjs,cjs}\"",
     "format:check": "prettier --check \"{packages,examples,scripts,test-support}/**/*.{ts,tsx,js,mjs,cjs}\"",
     "deploy:local": "node scripts/deploy-local.mjs",
-    "check:session": "node scripts/check-session-boundary.mjs"
+    "check:session": "node scripts/check-session-boundary.mjs",
+    "check:boundaries": "node scripts/check-module-boundaries.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

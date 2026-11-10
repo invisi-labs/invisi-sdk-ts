@@ -18,4 +18,6 @@ export type {
     ProvingRequest,
 } from "./interfaces";
 
-export { CIRCUIT_RELEASE } from "./release-identity";
+export { CIRCUIT_RELEASE } from "@invisi-labs/protocol";
+
+export * from "./authorization/witness";

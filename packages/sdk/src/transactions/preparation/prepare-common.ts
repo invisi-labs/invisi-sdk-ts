@@ -8,15 +8,15 @@ import {
     MissingCapabilityError,
     computeNoteCommitment,
     computeNoteIdentity,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import {
     normalizeFunding,
     type CanonicalBlock,
     type FundingInput,
     type Membership,
-    type NoteMembership,
     type TransactionContext,
 } from "@invisi-labs/protocol";
+import { type NoteMembership } from "@invisi-labs/prover";
 import { verifyMembership } from "../../discovery/membership";
 import type {
     FundingSource,

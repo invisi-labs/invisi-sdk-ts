@@ -1,4 +1,4 @@
-import { NullifierCapability } from "@invisi-labs/core";
+import { NullifierCapability } from "@invisi-labs/primitives";
 import type { CanonicalBlock, ProtocolDataProvider } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {

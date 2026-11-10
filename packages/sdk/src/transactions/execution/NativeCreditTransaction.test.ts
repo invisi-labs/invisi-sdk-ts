@@ -4,7 +4,7 @@ import {
     computeCreditCommitment,
     normalizeCreditPolicy,
     type CreditDeliveryState,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { Wallet as EvmWallet, Interface } from "ethers";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";

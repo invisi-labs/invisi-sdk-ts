@@ -2,7 +2,7 @@ import {
     MissingCapabilityError,
     ReceivingAddress,
     type ReceivingKeyLookup,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { EthersAddressResolver } from "../integrations/ethers";
 import type { TransactionInfrastructure } from "../transactions/operation-types";

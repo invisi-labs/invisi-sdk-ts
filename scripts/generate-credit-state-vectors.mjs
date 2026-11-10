@@ -45,7 +45,7 @@ const commitment = await creditCommitment(context, note),
         2000000100n
     );
 writeFileSync(
-    "packages/core/src/notes/deferred-credit-vectors.json",
+    "packages/primitives/src/notes/deferred-credit-vectors.json",
     JSON.stringify(
         { formatVersion: 1, context, note, commitment, draw, update },
         (_, v) => (typeof v === "bigint" ? v.toString() : v),

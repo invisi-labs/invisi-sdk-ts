@@ -2,17 +2,17 @@ import { createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { Wallet as EvmWallet, getBytes, hexlify, sha256 } from "ethers";
+import { ProvenanceClient } from "@invisi-labs/rpc/provenance";
 import {
-    ProvenanceClient,
     RecognizedTree,
-    authenticateManifest,
     rootCertificateMessage,
     word,
     provenanceIntentHash,
     recognizedLeaf,
     scopeHash,
-} from "@invisi-labs/core/provenance";
-import type { RootCertificate, TrustContext } from "@invisi-labs/core/provenance";
+} from "@invisi-labs/protocol/provenance";
+import { authenticateManifest } from "@invisi-labs/prover/provenance-witness";
+import type { RootCertificate, TrustContext } from "@invisi-labs/protocol/provenance";
 import {
     BroadcasterClient,
     broadcasterQuoteDomain,
@@ -360,8 +360,8 @@ it("allows explicit source proof generation from ready and reuses its cached pro
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     const ready = await (await externallyAuthorize(quoted)).prove();
     const source = new Provenance({
+        client: h.source,
         prover: {
-            getProvenanceClient: async () => h.source,
             getProvenanceCapability: async () => h.capability,
         },
     });
@@ -413,8 +413,8 @@ it("restores original input openings even if spent-note inventory is pruned and 
     );
     const restored = await restarted.resume(ready.id);
     const packet = await new Provenance({
+        client: h.source,
         prover: {
-            getProvenanceClient: async () => h.source,
             getProvenanceCapability: async () => h.capability,
         },
     }).prove(restored);
@@ -473,8 +473,8 @@ it("explicit reproof returns a new packet without replacing an already externali
     const ready = await (await externallyAuthorize(quoted)).prove();
     await h.client.submit(ready);
     const provenance = new Provenance({
+        client: h.source,
         prover: {
-            getProvenanceClient: async () => h.source,
             getProvenanceCapability: async () => h.capability,
         },
     });
@@ -540,13 +540,13 @@ it("allows source-gated quoting without local Source capabilities but blocks sub
 it("uses one proving provider for main and automatic Source proof without a separate Invisi source configuration", async () => {
     const h = await configured();
     const provider = Object.assign(backend(), {
-        getProvenanceClient: async () => h.source,
         getProvenanceCapability: vi.fn(async () => h.capability),
     });
     const invisi = new Invisi({
         chainReader: h.reader,
         protocolRpc: h.membership,
         prover: provider,
+        provenanceClient: h.source,
     });
     const prepared = await invisi.prepareTransfer({
         wallet: Wallet.fromAddress(h.wallet.getAddress()),

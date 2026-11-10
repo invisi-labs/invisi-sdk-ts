@@ -13,7 +13,7 @@ export {
     decodeMemoText,
     encodeMemo,
     fundsV1,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 export type {
     Address,
     CreditDataV1,
@@ -29,10 +29,16 @@ export type {
     Memo,
     Note,
     ReceivingKeys,
-} from "@invisi-labs/core";
-export { RegistrationOperation } from "@invisi-labs/protocol";
+} from "@invisi-labs/primitives";
+export { RegistrationOperation } from "@invisi-labs/rpc";
 export type {
     AddressRegistryOptions,
+    ProtocolOptions,
+    RegistryReader,
+    TokenProtocol,
+    TokenProtocolOptions,
+} from "@invisi-labs/rpc";
+export type {
     CanonicalBlock,
     CanonicalReceipt,
     ChainReader,
@@ -40,12 +46,8 @@ export type {
     Membership,
     ProtocolDataProvider,
     ProtocolDataStatus,
-    ProtocolOptions,
     ProtocolUpdateRange,
     RegistryContext,
-    RegistryReader,
-    TokenProtocol,
-    TokenProtocolOptions,
     TransactionCall,
     TransactionContext,
 } from "@invisi-labs/protocol";
@@ -119,10 +121,10 @@ export type {
     TransactionIdentity,
 } from "./transactions/explicit-types";
 
-export { getDocumentedGasReference } from "./gas/documented-reference";
-export type { DocumentedGasReference, DocumentedGasShape } from "./gas/documented-reference";
+export { getDocumentedGasReference } from "@invisi-labs/protocol";
+export type { DocumentedGasReference, DocumentedGasShape } from "@invisi-labs/protocol";
 
-export type { SigningRequest } from "@invisi-labs/core";
+export type { SigningRequest } from "@invisi-labs/primitives";
 
 // Stateless recovery for applications that supply canonical receipts without a wallet store.
 export { decryptCandidates } from "./discovery/discovery";
@@ -158,5 +160,5 @@ export { TransactionOutput } from "./notes/TransactionOutput";
 
 export type { PreparedProvenanceCapability } from "./broadcaster/provenance-preparation";
 
-export { authenticatedDecryptor, DeliveryDecryptionError } from "@invisi-labs/core";
-export type { DeliveryDecryptor } from "@invisi-labs/core";
+export { authenticatedDecryptor, DeliveryDecryptionError } from "@invisi-labs/primitives";
+export type { DeliveryDecryptor } from "@invisi-labs/primitives";

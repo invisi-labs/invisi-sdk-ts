@@ -1,6 +1,6 @@
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
-import { FIELD_MODULUS, poseidonHash } from "@invisi-labs/core";
+import { FIELD_MODULUS, poseidonHash } from "@invisi-labs/primitives";
 import type {
     CanonicalBlock,
     ChainReader,

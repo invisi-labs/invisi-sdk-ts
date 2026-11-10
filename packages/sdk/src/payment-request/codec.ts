@@ -1,4 +1,4 @@
-import { ReceivingAddress } from "@invisi-labs/core";
+import { ReceivingAddress } from "@invisi-labs/primitives";
 import { decodeBase64, encodeBase64, getBytes, hexlify } from "ethers";
 import { concat, Reader, uint } from "./binary";
 import type { PaymentRequest, NoteOutputRecipient } from "./types";

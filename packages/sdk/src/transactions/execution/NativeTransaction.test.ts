@@ -1,4 +1,4 @@
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { expect, it } from "vitest";
 import { testOutput } from "../../../../../test-support/test-output";
 import { externallyAuthorize, setup } from "./ExplicitTransaction-fixtures";

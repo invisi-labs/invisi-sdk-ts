@@ -1,4 +1,4 @@
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { AddressRegistry, Invisi, InvisiError } from "@invisi-labs/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";

@@ -5,7 +5,7 @@ import {
     acceptWalletResponse,
     type PreparedWalletRequest,
     type WalletResponse,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import {
     authorizationRequest,
     assertCreditUpdatePlan,
@@ -27,7 +27,7 @@ import {
 import { quoteManagedOperation } from "./broadcaster";
 import { currentOperation, runOperationStage } from "./worker";
 
-import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
+import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/primitives";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import {
     encodeOperation,

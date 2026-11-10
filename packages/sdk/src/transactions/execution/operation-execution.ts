@@ -4,8 +4,9 @@ import {
     computeWalletAuthorizationDigest,
     createSigningRequest,
     walletAuthorizationTypedData,
-} from "@invisi-labs/core";
-import { WitnessBuilder, type TokenProtocol } from "@invisi-labs/protocol";
+} from "@invisi-labs/primitives";
+import { WitnessBuilder } from "@invisi-labs/prover";
+import { type TokenProtocol } from "@invisi-labs/rpc";
 import type { Prover } from "@invisi-labs/prover";
 import { Signature, SigningKey, concat, getBytes, verifyTypedData } from "ethers";
 import type {

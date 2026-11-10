@@ -1,5 +1,5 @@
-import type { Hex } from "@invisi-labs/core";
-import { FIELD_MODULUS } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
+import { FIELD_MODULUS } from "@invisi-labs/primitives";
 import { invalid } from "../transport/errors";
 import type { CanonicalBlock } from "../types";
 

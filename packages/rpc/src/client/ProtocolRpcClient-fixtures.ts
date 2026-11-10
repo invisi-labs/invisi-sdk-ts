@@ -1,4 +1,4 @@
-import type { Hex } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
 import { vi } from "vitest";
 import type { ProtocolDeployment } from "../deployment/deployment";
 import { ProtocolRpcClient, type ProtocolRpcReader } from "./ProtocolRpcClient";

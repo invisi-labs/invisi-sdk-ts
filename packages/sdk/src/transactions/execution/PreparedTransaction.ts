@@ -5,11 +5,11 @@ import {
     acceptWalletResponse,
     type PreparedWalletRequest,
     type WalletResponse,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { revocationSigningRequest, acceptRevocationSignature } from "../signing/revocation";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { TransactionOutput } from "../../notes/TransactionOutput";
-import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/core";
+import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/primitives";
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { ProofBundle, Prover } from "@invisi-labs/prover";
 import { exportBroadcasterIntent } from "../../broadcaster/intent";

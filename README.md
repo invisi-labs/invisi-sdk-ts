@@ -1,15 +1,15 @@
 # Invisi TypeScript SDK
 
-Release preparation targets `1.1.8` for all eight packages; see [local package verification](RELEASE.md).
+Release preparation targets `1.2.0` for all eight packages; see [local package verification](RELEASE.md).
 
 A capability SDK for ordinary private Notes and deferred Credit grants. Workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
 
 | Package | Responsibility |
 | --- | --- |
-| `@invisi-labs/core` | Wallet capabilities, Note/Credit commitments, encryption, recovery and delivery primitives. `/note` and `/credit` expose separate business modules. |
-| `@invisi-labs/protocol` | Current contract ABIs, canonical request/statement codecs, local witnesses, deployment bindings and registry operations; separate `/note` and `/credit` entries. |
-| `@invisi-labs/prover` | Authenticated artifacts and explicit `/native`, `/wasm`, `/aggregate` backends. |
-| `@invisi-labs/rpc` | Protocol RPC APIv1 with independent Note/Credit query surfaces and canonical anchor checks. |
+| `@invisi-labs/primitives` | Pure crypto, fields, wallet keys/capabilities, Note/Credit commitments and delivery codecs; no network or proof runtime. `/note` and `/credit` expose separate business modules. |
+| `@invisi-labs/protocol` | Pure current contract ABIs, public DTOs, strict codecs, public inputs, signature digests, capacities and gas references; separate `/note` and `/credit` entries. |
+| `@invisi-labs/prover` | Local witness construction, authenticated artifacts and explicit `/native`, `/wasm`, `/aggregate` backends. |
+| `@invisi-labs/rpc` | Protocol RPC, Broadcaster and Provenance clients, deployment/registry bindings, response validation and transport errors. |
 | `@invisi-labs/sdk` | Stateless preparation, external signing requests, proofs, output factories and calldata. Note/Credit public subpaths retain separate business types. |
 | `@invisi-labs/session` | Inventory, selection, reservations, synchronization, history and operation recovery. |
 | `@invisi-labs/react`, `@invisi-labs/vue` | Thin operation lifecycle bindings. |
@@ -147,4 +147,15 @@ const quoted = await client.quote(prepared, { maxFeeAmount });
 
 Discovery reads registered credentials from Protocol RPC and checks token capability only; it does not estimate gas or fees. Exact shape acceptance and pricing belong to the concrete quote. Client construction requires no Source policy switch; first submission reads service requirements and the server enforces Source acceptance.
 
-The independent [Provenance module](PROVENANCE.md) keeps source recognition separate from protocol spendability. Relay use is optional and restricted to each operator's supported tokens. In the relay route quotation only prices/signs; source proof is generated from the final ready transaction, and Broadcaster verifies source on submit before sending. Direct protocol submission and source submission are independent App-controlled steps, in either order. Successful private-input preflight returns a durable tracking ID; default recovery persists it before broadcast permission and uses automatic chain matching, with bounded tracking waits and primary reconciliation. Normal confirmation does not require another `submitProof`. Explicit `prepareDirect` / `PrepareDirect` / `prepare_direct` and manual submission remain available for an intentionally selected self-broadcast/reproof fallback; missing tracking never silently switches modes. App integration, raw openings, signing and nonce reservations remain host-owned. See the flat [Provenance examples](examples/07-broadcaster/).
+The independent Provenance feature keeps source recognition separate from protocol spendability. Relay use is optional and restricted to each operator's supported tokens. In the relay route quotation only prices/signs; source proof is generated from the final ready transaction, and Broadcaster verifies source on submit before sending. Direct protocol submission and source submission are independent App-controlled steps, in either order. Successful private-input preflight returns a durable tracking ID; default recovery persists it before broadcast permission and uses automatic chain matching, with bounded tracking waits and primary reconciliation. Normal confirmation does not require another `submitProof`. Explicit `prepareDirect` / `PrepareDirect` / `prepare_direct` and manual submission remain available for an intentionally selected self-broadcast/reproof fallback; missing tracking never silently switches modes. App integration, raw openings, signing and nonce reservations remain host-owned. See the flat [Provenance examples](examples/07-broadcaster/).
+
+The dependency order is `primitives → protocol`, then independent `prover` and `rpc`, then stateless `sdk`, then managed `session`. Session also uses public protocol DTOs directly. React/Vue depend on SDK/session only. `pnpm check:boundaries` enforces this DAG and rejects network execution or proof runtimes in pure modules. Long-term protocol and Provenance design lives in the [protocol documentation](https://github.com/invisi-lab/protocol-docs).
+
+Cross-project acceptance belongs to this SDK workspace. From the SDK repository root, run the explicit integration entry points after preparing the current protocol build, local services and SDK toolchains:
+
+```sh
+node test-support/integration/provenance-e2e.mjs --sdk
+node test-support/integration/provenance-broadcaster-e2e.mjs --highlevel=typescript
+```
+
+Add `--browser`, `--reorg` or `--replicas` for the existing optional scenarios. These runners use `invisi-protocol` public fixtures and retain its existing `.tools` run directories; protocol unit tests do not load or build SDK checkouts.

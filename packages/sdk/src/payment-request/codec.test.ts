@@ -1,5 +1,5 @@
 import { TestWallet } from "../../../../test-support/test-wallet";
-import { FIELD_MODULUS } from "@invisi-labs/core";
+import { FIELD_MODULUS } from "@invisi-labs/primitives";
 import { getBytes } from "ethers";
 import { describe, expect, it } from "vitest";
 import { decodePaymentRequest, encodePaymentRequest } from "./codec";

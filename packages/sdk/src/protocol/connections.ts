@@ -1,4 +1,4 @@
-import type { Protocol } from "@invisi-labs/protocol";
+import type { Protocol } from "@invisi-labs/rpc";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
 import type { Provider } from "ethers";
 

@@ -1,5 +1,5 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
-import type { ProofBundle } from "@invisi-labs/prover";
+import type { ProofBundle } from "@invisi-labs/sdk";
 import { expect, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";

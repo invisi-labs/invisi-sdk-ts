@@ -1,4 +1,4 @@
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { prepareWalletRefresh } from "../sync/WalletRefresh";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
@@ -9,8 +9,9 @@ import {
 import { getAddress, type TransactionRequest, type TransactionResponse } from "ethers";
 import { walletHistory, type HistoryOptions } from "../history/history";
 
-import { MissingCapabilityError } from "@invisi-labs/core";
-import type { Protocol, TransactionCall } from "@invisi-labs/protocol";
+import { MissingCapabilityError } from "@invisi-labs/primitives";
+import type { Protocol } from "@invisi-labs/rpc";
+import type { TransactionCall } from "@invisi-labs/protocol";
 import { TransactionPreparation } from "@invisi-labs/sdk/session-support";
 import { Operation } from "../operations/Operation";
 import type {

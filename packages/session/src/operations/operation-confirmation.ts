@@ -1,7 +1,7 @@
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { readProtocolLogs } from "@invisi-labs/sdk/session-support";
 
-import { computeCreditNullifier } from "@invisi-labs/core";
+import { computeCreditNullifier } from "@invisi-labs/primitives";
 import type { CanonicalBlock } from "@invisi-labs/protocol";
 import {
     creditLeaf,

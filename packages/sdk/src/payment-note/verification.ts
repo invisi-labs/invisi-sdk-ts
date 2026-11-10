@@ -5,8 +5,9 @@ import {
     type Wallet,
     type Note,
     computeNoteNullifier,
-} from "@invisi-labs/core";
-import type { CanonicalBlock, ChainReader, Membership, Protocol } from "@invisi-labs/protocol";
+} from "@invisi-labs/primitives";
+import type { CanonicalBlock, ChainReader, Membership } from "@invisi-labs/protocol";
+import type { Protocol } from "@invisi-labs/rpc";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { getAddress, type Provider } from "ethers";
 import { EthersChainReader } from "../integrations/ethers";

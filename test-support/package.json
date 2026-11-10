@@ -3,11 +3,18 @@
   "private": true,
   "type": "module",
   "devDependencies": {
-    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/primitives": "workspace:*",
     "@invisi-labs/protocol": "workspace:*",
     "@invisi-labs/sdk": "workspace:*",
     "@invisi-labs/session": "workspace:*",
     "ethers": "^6.17.0",
     "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "@invisi-labs/rpc": "workspace:*"
+  },
+  "scripts": {
+    "integration:provenance": "node integration/provenance-e2e.mjs",
+    "integration:broadcaster": "node integration/provenance-broadcaster-e2e.mjs"
   }
 }

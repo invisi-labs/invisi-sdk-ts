@@ -1,5 +1,5 @@
-import type { Hex } from "@invisi-labs/core";
-import { ReceivingAddress } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
+import { ReceivingAddress } from "@invisi-labs/primitives";
 import { getBytes } from "ethers";
 import { type ProtocolDeployment } from "../deployment/deployment";
 import { invalid } from "../transport/errors";

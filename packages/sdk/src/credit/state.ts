@@ -4,7 +4,7 @@ import {
     computeCreditCommitment,
     deriveCreditUpdate,
     type CreditDeliveryState,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 export async function creditLeaf(state: CreditDeliveryState): Promise<Hex> {
     return computeCreditCommitment(state.note);
 }

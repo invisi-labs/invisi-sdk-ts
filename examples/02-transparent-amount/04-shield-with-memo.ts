@@ -1,4 +1,4 @@
-import { fundsV1 } from "@invisi-labs/core";
+import { fundsV1 } from "@invisi-labs/primitives";
 import { JsonRpcProvider, Contract, parseUnits } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";

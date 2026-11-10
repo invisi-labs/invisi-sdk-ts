@@ -4,7 +4,7 @@ import {
     normalizeCreditPolicy,
     normalizeCreditUsage,
     type CreditDeliveryState,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { Interface, Wallet as EvmWallet } from "ethers";
 import { it, expect, vi } from "vitest";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
@@ -12,9 +12,9 @@ import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
 const iface = new Interface(invisiProtocolAbi);
 async function creditSetup(
     policy: Partial<
-        import("@invisi-labs/core").CreditPolicy &
-            import("@invisi-labs/core").CreditUsage &
-            Pick<import("@invisi-labs/core").CreditState, "availableCredit" | "unlimited">
+        import("@invisi-labs/primitives").CreditPolicy &
+            import("@invisi-labs/primitives").CreditUsage &
+            Pick<import("@invisi-labs/primitives").CreditState, "availableCredit" | "unlimited">
     > = {}
 ) {
     const h = await setup(),

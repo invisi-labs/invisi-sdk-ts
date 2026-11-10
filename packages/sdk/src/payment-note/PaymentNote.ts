@@ -1,5 +1,6 @@
-import { computeNoteIdentity, computeNoteCommitment, Wallet } from "@invisi-labs/core";
-import type { Protocol, Membership, CanonicalBlock } from "@invisi-labs/protocol";
+import { computeNoteIdentity, computeNoteCommitment, Wallet } from "@invisi-labs/primitives";
+import type { Protocol } from "@invisi-labs/rpc";
+import type { Membership, CanonicalBlock } from "@invisi-labs/protocol";
 import type { NoteInput } from "../transactions/explicit-types";
 import { decodePaymentNote, encodePaymentNote } from "./codec";
 import type { PaymentNoteData } from "./types";

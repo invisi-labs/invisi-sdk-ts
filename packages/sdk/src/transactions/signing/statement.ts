@@ -1,6 +1,6 @@
-import { creditPeriods, type WalletOperation } from "@invisi-labs/core";
+import { creditPeriods, type WalletOperation } from "@invisi-labs/primitives";
+import { WitnessBuilder } from "@invisi-labs/prover";
 import {
-    WitnessBuilder,
     createCreditPublicInputs,
     creditDrawPublicInputs,
     updateCreditPublicInputs,

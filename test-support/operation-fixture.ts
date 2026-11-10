@@ -3,8 +3,9 @@ import { sessionOptions } from "./session-options";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { Interface, keccak256 } from "ethers";
 
-import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/core";
-import { Protocol, type ChainReader, type ProtocolDataProvider } from "@invisi-labs/protocol";
+import { Wallet, computeNoteCommitment, computeNoteIdentity } from "@invisi-labs/primitives";
+import { Protocol } from "@invisi-labs/rpc";
+import { type ChainReader, type ProtocolDataProvider } from "@invisi-labs/protocol";
 import { MerkleFixture } from "./merkle-fixture";
 import { MemoryWalletStore, type WalletScope } from "../packages/session/src/index";
 import { WalletSession } from "../packages/session/src/wallet/WalletSession";

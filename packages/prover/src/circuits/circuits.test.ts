@@ -1,4 +1,5 @@
-import { poseidonHash, AGGREGATE_ROUTES } from "@invisi-labs/core";
+import { poseidonHash } from "@invisi-labs/primitives";
+import { AGGREGATE_ROUTES } from "@invisi-labs/protocol";
 import { describe, it, expect } from "vitest";
 import { getCircuitKey, getCircuitMetadata } from "../proofs/proof-data";
 import { CIRCUIT_NAMES, loadCircuit, loadVerificationKey } from "./circuits";

@@ -1,7 +1,7 @@
 {
   "name": "@invisi-labs/protocol",
-  "version": "1.1.8",
-  "description": "Deployment-scoped protocol statements, witnesses and contract operations",
+  "version": "1.2.0",
+  "description": "Pure Invisi public ABIs, types, strict codecs, statements, signatures, capacities and gas references",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -26,6 +26,11 @@
       "types": "./dist/credit.d.ts",
       "import": "./dist/credit.js",
       "require": "./dist/credit.cjs"
+    },
+    "./provenance": {
+      "types": "./dist/provenance.d.ts",
+      "import": "./dist/provenance.js",
+      "require": "./dist/provenance.cjs"
     }
   },
   "scripts": {
@@ -35,10 +40,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi-labs/core": "workspace:*",
-    "@invisi-labs/prover": "workspace:*",
+    "@invisi-labs/primitives": "workspace:*",
     "ethers": "^6.17.0",
-    "@invisi-labs/rpc": "workspace:*"
+    "@noble/hashes": "1.8.0",
+    "@noble/curves": "1.9.1"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

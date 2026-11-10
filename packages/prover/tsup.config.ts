@@ -1,6 +1,6 @@
 import { defineConfig } from "tsup";
 export default defineConfig({
-    entry: ["src/index.ts", "src/native.ts", "src/aggregate.ts"],
+    entry: ["src/index.ts", "src/native.ts", "src/aggregate.ts", "src/provenance-witness.ts"],
     format: ["esm", "cjs"],
     dts: true,
     sourcemap: false,

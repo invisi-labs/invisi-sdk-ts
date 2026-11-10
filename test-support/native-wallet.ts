@@ -1,5 +1,5 @@
 import { TestWallet } from "./test-wallet";
-import type { DeliveryDecryptor, WalletRequest, WalletResponse } from "@invisi-labs/core";
+import type { DeliveryDecryptor, WalletRequest, WalletResponse } from "@invisi-labs/primitives";
 import type { Operation } from "../packages/session/src/operations/Operation";
 import type { PendingWalletRefresh } from "../packages/session/src/sync/WalletRefresh";
 import type { WalletSession } from "../packages/session/src/wallet/WalletSession";
@@ -21,7 +21,7 @@ export async function authorizeOperation(operation: Operation): Promise<Operatio
     return operation.withWalletResponse(await executeWalletRequest(request));
 }
 export async function executeWalletRequests(requests: WalletRequest[]): Promise<WalletResponse[]> {
-    const { validateWalletBatch } = await import("@invisi-labs/core");
+    const { validateWalletBatch } = await import("@invisi-labs/primitives");
     validateWalletBatch(requests);
     return Promise.all(
         requests.map(async (request) => {
@@ -59,10 +59,10 @@ export const testDecryptor: DeliveryDecryptor = {
 };
 async function decryptForTest(
     method: "wallet.decryptNote" | "wallet.decryptCredit",
-    envelope: import("@invisi-labs/core").NoteBytes,
+    envelope: import("@invisi-labs/primitives").NoteBytes,
     context:
-        | import("@invisi-labs/core").NoteDecryptionContext
-        | import("@invisi-labs/core").CreditStateDecryptionContext
+        | import("@invisi-labs/primitives").NoteDecryptionContext
+        | import("@invisi-labs/primitives").CreditStateDecryptionContext
 ): Promise<Uint8Array | null> {
     const { hexlify, getBytes } = await import("ethers");
     try {

@@ -1,4 +1,4 @@
-import { computeWalletAuthorizationDigest } from "@invisi-labs/core";
+import { computeWalletAuthorizationDigest } from "@invisi-labs/primitives";
 import { expect, it } from "vitest";
 import { assertUserStatement } from "./statements";
 it("validates fee fields before accepting the expanded authorization statement", () => {

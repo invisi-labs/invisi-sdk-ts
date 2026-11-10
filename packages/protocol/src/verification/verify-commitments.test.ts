@@ -1,7 +1,7 @@
-import { FIELD_MODULUS } from "@invisi-labs/core";
+import { FIELD_MODULUS } from "@invisi-labs/primitives";
 import { verifyCreditCommitment, verifyNoteCommitment } from "@invisi-labs/protocol";
 import { describe, expect, it } from "vitest";
-import vectors from "../../../core/src/wallet/testdata/wallet-note-vectors.json";
+import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
 const hex = (n: string | bigint): `0x${string}` => `0x${BigInt(n).toString(16).padStart(64, "0")}`;
 const chainId = BigInt(vectors.context.chainId);
 const tokenAddress = vectors.context.tokenAddress as `0x${string}`;
@@ -50,7 +50,7 @@ const creditState = {
                       : BigInt(v as string),
             ])
     ),
-} as import("@invisi-labs/core").CreditState;
+} as import("@invisi-labs/primitives").CreditState;
 const credit = { state: creditState, creditCommitment: vectors.credit.commitment as `0x${string}` };
 
 describe("verifyNoteCommitment", () => {

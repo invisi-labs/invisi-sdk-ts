@@ -1,5 +1,5 @@
-import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/core";
-import type { DeploymentContext } from "@invisi-labs/rpc";
+import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/primitives";
+import type { DeploymentContext } from "./rpc-types";
 import {
     AbiCoder,
     dataLength,
@@ -11,7 +11,7 @@ import {
 } from "ethers";
 import type { Address, Delivery, FundingParams, Hex, InputSource } from "./contracts/index";
 
-export type { DeploymentContext } from "@invisi-labs/rpc";
+export type { DeploymentContext } from "./rpc-types";
 export interface TransactionContext extends DeploymentContext {
     tokenAddress: Address;
     now?: bigint;

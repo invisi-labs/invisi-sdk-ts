@@ -1,6 +1,6 @@
 import { normalizeFee } from "../fees/fee";
 import { Interface, getAddress } from "ethers";
-import { creditPeriods, walletAuthorizationTypedData } from "@invisi-labs/core";
+import { creditPeriods, walletAuthorizationTypedData } from "@invisi-labs/primitives";
 import {
     invisiProtocolAbi,
     type Hex,

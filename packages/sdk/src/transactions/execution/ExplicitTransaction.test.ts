@@ -1,4 +1,4 @@
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import type { Prover } from "@invisi-labs/prover";
 import { Wallet as EvmWallet, Interface } from "ethers";

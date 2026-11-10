@@ -1,4 +1,4 @@
-import type { Hex } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
 import { keccak256 } from "ethers";
 
 import { describe, expect, it } from "vitest";

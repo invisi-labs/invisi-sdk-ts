@@ -1,6 +1,6 @@
-import { DeliveryDecryptionError } from "@invisi-labs/core";
-import type { authenticatedDecryptor } from "@invisi-labs/core";
-import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/core";
+import { DeliveryDecryptionError } from "@invisi-labs/primitives";
+import type { authenticatedDecryptor } from "@invisi-labs/primitives";
+import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/primitives";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import { isAddress } from "ethers";
 
@@ -9,7 +9,7 @@ import {
     ReceivingAddress,
     type CreditDeliveryState,
     type Note,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { normalizeOpaqueDelivery } from "@invisi-labs/protocol";
 
 export interface DiscoveryContext {

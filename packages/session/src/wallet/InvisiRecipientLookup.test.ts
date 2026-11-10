@@ -1,4 +1,4 @@
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import { Invisi, InvisiError, NoteOutput } from "@invisi-labs/sdk";
 import { Interface, type Provider } from "ethers";

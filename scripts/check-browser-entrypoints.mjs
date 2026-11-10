@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const result = await build({
     stdin: {
         contents:
-            'export * from "./packages/sdk/src/index.ts"; export * from "./packages/prover/src/index.ts";',
+            'export * from "./packages/sdk/dist/index.js"; export * from "./packages/prover/dist/index.js";',
         resolveDir: process.cwd(),
         sourcefile: "capability-entry.ts",
     },

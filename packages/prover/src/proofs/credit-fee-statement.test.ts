@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { computeWalletAuthorizationDigest } from "@invisi-labs/core";
+import { computeWalletAuthorizationDigest } from "@invisi-labs/primitives";
 import raw from "../../../protocol/src/protocol-vectors.json";
 import { assertPublicInputs } from "./proof-data";
 it("rejects inconsistent Credit fee context even with a recomputed authorization digest", () => {

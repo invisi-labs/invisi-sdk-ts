@@ -1,12 +1,13 @@
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { Interface, keccak256 } from "ethers";
 
-import { Disclosure, ViewingCapability } from "@invisi-labs/core";
-import { TokenProtocol, type CanonicalReceipt, type ChainReader } from "@invisi-labs/protocol";
+import { Disclosure, ViewingCapability } from "@invisi-labs/primitives";
+import { TokenProtocol } from "@invisi-labs/rpc";
+import { type CanonicalReceipt, type ChainReader } from "@invisi-labs/protocol";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { describe, expect, it } from "vitest";
-import clues from "../../../core/src/fmd/testdata/fmd-rust-vectors.json";
-import vectors from "../../../core/src/wallet/testdata/wallet-note-vectors.json";
+import clues from "../../../primitives/src/fmd/testdata/fmd-rust-vectors.json";
+import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
 import * as wallet from "../index";
 
 const hex = (value: bigint): Hex => `0x${value.toString(16).padStart(64, "0")}`;

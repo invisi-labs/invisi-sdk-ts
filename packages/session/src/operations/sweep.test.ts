@@ -1,5 +1,5 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
@@ -47,7 +47,7 @@ it("rejects duplicate and unavailable sweep inputs", async () => {
 
 it("builds ready sweep calldata through the public-wallet operation without authorization", async () => {
     const h = await fixture();
-    const prove = vi.fn(async (request: import("@invisi-labs/prover").ProofStatement) => {
+    const prove = vi.fn(async (request: import("@invisi-labs/sdk").ProofStatement) => {
         const proofHex = "0x00" as const;
         const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array([0])));
         return {

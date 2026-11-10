@@ -1,6 +1,6 @@
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
-import type { Prover } from "@invisi-labs/prover";
+import type { Prover } from "@invisi-labs/sdk";
 import { Invisi } from "@invisi-labs/sdk/session-support";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";

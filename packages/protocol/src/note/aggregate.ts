@@ -1,4 +1,4 @@
-import { selectAggregateRoute } from "@invisi-labs/core";
+import { selectAggregateRoute } from "./aggregate-routes";
 import { AbiCoder, Interface, keccak256, ParamType } from "ethers";
 import type { Address, Hex } from "../contracts/index";
 import { invisiProtocolAbi, type TransactRequest } from "../contracts/index";

@@ -1,4 +1,4 @@
-import { FIELD_MODULUS, Wallet, computeNoteIdentity, fundsV1 } from "@invisi-labs/core";
+import { FIELD_MODULUS, Wallet, computeNoteIdentity, fundsV1 } from "@invisi-labs/primitives";
 import { expect, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { Invisi } from "../client/Invisi";

@@ -4,14 +4,14 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const entries = {
-    core: [".", "./address", "./note", "./credit", "./provenance"],
-    protocol: [".", "./contracts", "./note", "./credit"],
-    prover: [".", "./native", "./wasm", "./aggregate", "./provenance"],
-    rpc: ["."],
-    sdk: [".", "./ethers", "./session-support", "./note", "./credit", "./provenance"],
-    session: [".", "./sqlite", "./indexeddb", "./memory"],
-    react: ["."],
-    vue: ["."],
+    "vue": ["."],
+    "protocol": [".", "./contracts", "./note", "./credit", "./provenance"],
+    "primitives": [".", "./address", "./note", "./credit"],
+    "sdk": [".", "./ethers", "./session-support", "./note", "./credit", "./provenance"],
+    "prover": [".", "./native", "./wasm", "./aggregate", "./provenance", "./provenance-witness"],
+    "rpc": [".", "./provenance", "./broadcaster"],
+    "react": ["."],
+    "session": [".", "./sqlite", "./indexeddb", "./memory"],
 };
 const packages = readdirSync("packages").filter((name) =>
     existsSync(`packages/${name}/package.json`)
@@ -59,7 +59,7 @@ const examples = JSON.parse(readFileSync("examples/package.json", "utf8"));
 assert(!examples.scripts.test, "examples use explicit smoke runs");
 assert(!examples.devDependencies?.vitest, "test runtime belongs to packages");
 
-const core = await import(resolve("packages/core/dist/index.js"));
+const primitives = await import(resolve("packages/primitives/dist/index.js"));
 const sdk = await import(resolve("packages/sdk/dist/index.js"));
 const session = await import(resolve("packages/session/dist/index.js"));
 const protocol = await import(resolve("packages/protocol/dist/index.js"));
@@ -69,7 +69,7 @@ function functions(api, names, label) {
         assert.equal(typeof api[name], "function", `${label}.${name} missing`);
 }
 functions(
-    core,
+    primitives,
     [
         "Wallet",
         "ViewingCapability",
@@ -79,7 +79,7 @@ functions(
         "computeCreditCommitment",
         "recoverCreditState",
     ],
-    "core"
+    "primitives"
 );
 functions(
     sdk,
@@ -99,18 +99,24 @@ functions(session, ["WalletSession", "Operation", "EncryptedWalletCodec"], "sess
 functions(rpc, ["ProtocolRpcClient", "defineDeployment"], "rpc");
 functions(
     protocol,
-    ["WitnessBuilder", "registrationTypedData", "registrationDigest", "buildRegistrationCalldata"],
+    ["registrationTypedData", "registrationDigest", "buildRegistrationCalldata"],
     "protocol"
 );
-assert(!existsSync("packages/core/dist/local.js"), "private wallet entry still built");
-functions(core.Wallet, ["fromAddress"], "Wallet");
-assert(!("LocalWallet" in core), "local execution leaked into business entry");
-assert(!("WalletAuthorization" in core), "account signer leaked into business entry");
-assert(!("signWalletAuthorization" in core), "private account signing leaked into business entry");
-assert(!("fromPrivateKey" in core.Wallet), "public wallet acquired private key restoration");
+assert(!existsSync("packages/primitives/dist/local.js"), "private wallet entry still built");
+functions(primitives.Wallet, ["fromAddress"], "Wallet");
+assert(!("LocalWallet" in primitives), "local execution leaked into business entry");
+assert(!("WalletAuthorization" in primitives), "account signer leaked into business entry");
+assert(
+    !("signWalletAuthorization" in primitives),
+    "private account signing leaked into business entry"
+);
+assert(!("fromPrivateKey" in primitives.Wallet), "public wallet acquired private key restoration");
 for (const name of ["getViewer", "getDetector", "exportAuthorization"])
-    assert(!(name in core.Wallet.prototype), `public wallet acquired secret capability: ${name}`);
-functions(core, ["prepareWalletRequest", "acceptWalletResponse"], "core");
+    assert(
+        !(name in primitives.Wallet.prototype),
+        `public wallet acquired secret capability: ${name}`
+    );
+functions(primitives, ["prepareWalletRequest", "acceptWalletResponse"], "primitives");
 functions(sdk.Protocol, ["fromRpc"], "Protocol");
 functions(sdk.Protocol.prototype, ["forToken", "aggregate"], "Protocol");
 functions(rpc.ProtocolRpcClient, ["getChains"], "ProtocolRpcClient");
@@ -164,8 +170,8 @@ functions(
 );
 const rpcManifest = JSON.parse(readFileSync("packages/rpc/package.json", "utf8"));
 assert(
-    !("@invisi-labs/protocol" in rpcManifest.dependencies),
-    "transport must not depend on protocol execution"
+    rpcManifest.dependencies["@invisi-labs/protocol"] === "workspace:*",
+    "RPC must share pure public protocol contracts"
 );
 console.log("Current public surface PASS: explicit package entries and capability boundaries");
 await import("./check-session-boundary.mjs");

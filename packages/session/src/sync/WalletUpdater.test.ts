@@ -12,9 +12,9 @@ import {
     computeNoteCommitment,
     creditV1,
     encryptCreditState,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
+import { Protocol } from "@invisi-labs/rpc";
 import {
-    Protocol,
     type CanonicalBlock,
     type CanonicalReceipt,
     type ChainReader,
@@ -25,8 +25,8 @@ import { Interface, keccak256 } from "ethers";
 import { expect, it, vi } from "vitest";
 import { MerkleFixture } from "../../../../test-support/merkle-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
-import clues from "../../../core/src/fmd/testdata/fmd-rust-vectors.json";
-import vectors from "../../../core/src/wallet/testdata/wallet-note-vectors.json";
+import clues from "../../../primitives/src/fmd/testdata/fmd-rust-vectors.json";
+import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
 import { MemoryWalletStore } from "../index";
 import { WalletSession } from "../wallet/WalletSession";
 import { WalletUpdater } from "./WalletUpdater";

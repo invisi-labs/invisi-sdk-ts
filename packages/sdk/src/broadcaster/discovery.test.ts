@@ -1,4 +1,4 @@
-import { Protocol as BaseProtocol } from "@invisi-labs/protocol";
+import { Protocol as BaseProtocol } from "@invisi-labs/rpc";
 import { afterEach, expect, it, vi } from "vitest";
 import { Protocol } from "../protocol/Protocol";
 const tokenAddress = "0x0000000000000000000000000000000000000042";

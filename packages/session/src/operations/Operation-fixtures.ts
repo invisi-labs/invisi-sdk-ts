@@ -1,5 +1,5 @@
 import type { Hex } from "@invisi-labs/protocol/contracts";
-import type { ProofBundle, ProofStatement, Prover } from "@invisi-labs/prover";
+import type { ProofBundle, ProofStatement, Prover } from "@invisi-labs/sdk";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { Wallet as EvmWallet } from "ethers";

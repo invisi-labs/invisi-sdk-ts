@@ -1,4 +1,4 @@
-import { ReceivingAddress, type ReceivingKeyLookup } from "@invisi-labs/core/address";
+import { ReceivingAddress, type ReceivingKeyLookup } from "@invisi-labs/primitives/address";
 import type {
     CanonicalBlock,
     CanonicalReceipt,
@@ -6,8 +6,8 @@ import type {
     DeploymentContext,
     FactoryReader,
     RegistryContext,
-    RegistryReader,
 } from "@invisi-labs/protocol";
+import type { RegistryReader } from "@invisi-labs/rpc";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import {
     invisiAddressRegistryAbi,

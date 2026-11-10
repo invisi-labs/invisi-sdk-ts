@@ -1,10 +1,6 @@
-import {
-    OfficialProvenanceClients,
-    type PublicResult,
-    type ProvenanceClient,
-    type ProvenanceProvider,
-    type Scope,
-} from "@invisi-labs/core/provenance";
+import { OfficialProvenanceClients, type ProvenanceClient } from "@invisi-labs/rpc/provenance";
+import { type PublicResult, type Scope } from "@invisi-labs/protocol/provenance";
+import { type ProvenanceProvider } from "@invisi-labs/prover/provenance-witness";
 import {
     proveOperationProvenance,
     readOperationProvenance,
@@ -25,11 +21,7 @@ export class Provenance {
     constructor(private readonly options: ProvenanceOptions = {}) {}
 
     private async client(scope: Scope): Promise<ProvenanceClient> {
-        const client =
-            this.options.client ??
-            (await (this.options.prover
-                ? this.options.prover.getProvenanceClient(scope)
-                : this.#official.get(scope)));
+        const client = this.options.client ?? (await this.#official.get(scope));
         if (
             BigInt(client.trust.chainId) !== BigInt(scope.chainId) ||
             BigInt(client.trust.protocolAddress) !== BigInt(scope.protocolAddress)
@@ -48,14 +40,13 @@ export class Provenance {
         const prover = this.options.prover;
         if (!prover) throw Error("NativeProver required to generate Provenance proof");
         const scope = await operationProvenanceContext(ready);
-        const capability = await prover.getProvenanceCapability(scope);
+        const capability = await prover.getProvenanceCapability();
         const client = await this.client(scope);
-        if (capability.client !== client)
-            throw Error("Provenance proving and submission clients differ");
         const proof = await proveOperationProvenance(
             ready,
             {
                 ...capability,
+                client,
                 ...(this.options.maxRootPages === undefined
                     ? {}
                     : { maxRootPages: this.options.maxRootPages }),

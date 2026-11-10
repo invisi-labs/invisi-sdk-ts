@@ -3,7 +3,7 @@
   "commit": false,
   "fixed": [
     [
-      "@invisi-labs/core",
+      "@invisi-labs/primitives",
       "@invisi-labs/protocol",
       "@invisi-labs/prover",
       "@invisi-labs/react",

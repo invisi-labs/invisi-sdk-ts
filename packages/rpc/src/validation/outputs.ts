@@ -1,5 +1,5 @@
-import type { Hex } from "@invisi-labs/core";
-import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
+import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/primitives";
 import { getAddress, isAddress } from "ethers";
 import type { CanonicalReader } from "../queries/context";
 import { invalid } from "../transport/errors";

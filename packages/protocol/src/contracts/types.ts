@@ -8,8 +8,8 @@ export type InvisiFactoryAbi = typeof invisiFactoryAbi;
 export type VerifierRouterAbi = typeof verifierRouterAbi;
 export type CreditVerifierRouterAbi = typeof creditVerifierRouterAbi;
 export type InvisiAddressRegistryAbi = typeof invisiAddressRegistryAbi;
-import type { Hex, Address } from "@invisi-labs/core";
-export type { Hex, Address } from "@invisi-labs/core";
+import type { Hex, Address } from "@invisi-labs/primitives";
+export type { Hex, Address } from "@invisi-labs/primitives";
 export interface InputSource {
     treeId: bigint;
     merkleRoot: Hex;

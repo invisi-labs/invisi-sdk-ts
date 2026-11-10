@@ -1,4 +1,4 @@
-import { poseidonHash } from "@invisi-labs/core";
+import { poseidonHash } from "@invisi-labs/primitives";
 
 const hash = async (left: bigint, right: bigint) => BigInt(await poseidonHash([left, right]));
 

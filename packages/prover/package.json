@@ -1,7 +1,7 @@
 {
   "name": "@invisi-labs/prover",
-  "version": "1.1.8",
-  "description": "Runtime-neutral proving interfaces with explicit native and WASM backends",
+  "version": "1.2.0",
+  "description": "Local witnesses, authenticated proving artifacts and explicit native/WASM proof backends",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -29,6 +29,11 @@
     "./provenance": {
       "types": "./dist/provenance.d.ts",
       "import": "./dist/provenance.js"
+    },
+    "./provenance-witness": {
+      "types": "./dist/provenance-witness.d.ts",
+      "import": "./dist/provenance-witness.js",
+      "require": "./dist/provenance-witness.cjs"
     }
   },
   "engines": {
@@ -42,9 +47,11 @@
     "sync:circuits": "node scripts/sync-circuits.mjs"
   },
   "dependencies": {
-    "@invisi-labs/core": "workspace:*",
+    "@invisi-labs/primitives": "workspace:*",
     "@noir-lang/noir_js": "1.0.0",
-    "ethers": "^6.17.0"
+    "ethers": "^6.17.0",
+    "@invisi-labs/protocol": "workspace:*",
+    "@noble/hashes": "1.8.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

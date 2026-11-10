@@ -1,5 +1,5 @@
-import { selectAggregateRoute } from "@invisi-labs/core";
-import { MissingCapabilityError } from "@invisi-labs/core";
+import { selectAggregateRoute } from "@invisi-labs/protocol";
+import { MissingCapabilityError } from "@invisi-labs/primitives";
 import { assertExpectedProof } from "./backends/backend-service";
 import type { CircuitName, ProofBundle } from "./circuits/circuit-types";
 import {

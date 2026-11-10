@@ -1,0 +1,55 @@
+{
+  "name": "@invisi-labs/primitives",
+  "version": "1.2.0",
+  "description": "Pure Invisi cryptographic primitives, fields, keys, commitments and delivery codecs",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./address": {
+      "types": "./dist/address.d.ts",
+      "import": "./dist/address.js",
+      "require": "./dist/address.cjs"
+    },
+    "./note": {
+      "types": "./dist/note.d.ts",
+      "import": "./dist/note.js",
+      "require": "./dist/note.cjs"
+    },
+    "./credit": {
+      "types": "./dist/credit.d.ts",
+      "import": "./dist/credit.js",
+      "require": "./dist/credit.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@noble/curves": "1.9.1",
+    "@noble/hashes": "1.8.0",
+    "ethers": "^6.17.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
+    "directory": "packages/primitives"
+  }
+}

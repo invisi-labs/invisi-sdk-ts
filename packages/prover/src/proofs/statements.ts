@@ -1,5 +1,5 @@
-import type { Hex } from "@invisi-labs/core";
-import { computeWalletAuthorizationDigest, type WalletOperation } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
+import { computeWalletAuthorizationDigest, type WalletOperation } from "@invisi-labs/primitives";
 
 const capacities = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150,

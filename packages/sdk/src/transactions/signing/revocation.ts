@@ -1,4 +1,4 @@
-import { createSigningRequest } from "@invisi-labs/core";
+import { createSigningRequest } from "@invisi-labs/primitives";
 import { encodeRevokeCreditTypedData } from "@invisi-labs/protocol";
 import { getAddress, verifyTypedData } from "ethers";
 import type { Hex } from "@invisi-labs/protocol/contracts";

@@ -1,5 +1,5 @@
-import { MissingCapabilityError, Wallet } from "@invisi-labs/core";
-import type { RegistrationOperation, RegistrationPreparation } from "@invisi-labs/protocol";
+import { MissingCapabilityError, Wallet } from "@invisi-labs/primitives";
+import type { RegistrationOperation, RegistrationPreparation } from "@invisi-labs/rpc";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { prepareWithErrors } from "../errors";
 import { AddressRegistry } from "../protocol/AddressRegistry";

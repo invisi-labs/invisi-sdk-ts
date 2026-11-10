@@ -1,5 +1,5 @@
 import { TestWallet } from "../../../../test-support/test-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
 import { Wallet as EthereumWallet, Interface, keccak256, type Provider } from "ethers";

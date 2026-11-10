@@ -1,5 +1,5 @@
 import { refreshSession } from "../../../../test-support/native-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { Invisi } from "@invisi-labs/sdk/session-support";
 import { expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { TREE_DEPTH, poseidonHash } from "@invisi-labs/core";
+import { TREE_DEPTH, poseidonHash } from "@invisi-labs/primitives";
 import {
     block,
     context,

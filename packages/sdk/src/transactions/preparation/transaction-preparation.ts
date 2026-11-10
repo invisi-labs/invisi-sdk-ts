@@ -1,9 +1,9 @@
 import {
     normalizeTransactRequest,
     transactUserPublicInputs,
-    WitnessBuilder,
     ZERO_ADDRESS,
 } from "@invisi-labs/protocol";
+import { WitnessBuilder } from "@invisi-labs/prover";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress } from "ethers";
 import { NoteOutput, resolvedOutputSnapshot } from "../../notes/NoteOutput";

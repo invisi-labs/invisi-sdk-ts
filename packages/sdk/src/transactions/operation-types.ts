@@ -1,4 +1,4 @@
-import type { CreditUpdateChanges } from "@invisi-labs/core";
+import type { CreditUpdateChanges } from "@invisi-labs/primitives";
 import type {
     Address,
     RevokeCreditParams,
@@ -14,19 +14,22 @@ import type {
 import type { Provider } from "ethers";
 import type { NoteOutput } from "../notes/NoteOutput";
 
-import type { AuthorizedStatement, CreditDeliveryState, Note, Wallet } from "@invisi-labs/core";
+import type {
+    AuthorizedStatement,
+    CreditDeliveryState,
+    Note,
+    Wallet,
+} from "@invisi-labs/primitives";
 import type {
     CanonicalBlock,
     ChainReader,
-    CreditMembership,
     FundingInput,
-    NoteMembership,
-    Protocol,
     ProtocolDataProvider,
-    TokenProtocol,
     TransactionContext,
     TransactRequestParams,
 } from "@invisi-labs/protocol";
+import type { CreditMembership, NoteMembership } from "@invisi-labs/prover";
+import type { Protocol, TokenProtocol } from "@invisi-labs/rpc";
 import type { AggregateMember, ProofBundle, Prover, ProverOptions } from "@invisi-labs/prover";
 
 import type { Checkpoint, CreditRecord, NoteRecord, WalletScope } from "./records";
@@ -203,6 +206,7 @@ export interface SavedOperation {
     claim?: { stage: string; token: string };
 }
 export interface TransactionInfrastructure {
+    provenanceClient?: import("@invisi-labs/rpc/provenance").ProvenanceClient;
     provenance?: import("../broadcaster/provenance-preparation").PreparedProvenanceCapability;
     wallet: Wallet;
     protocol: Protocol;

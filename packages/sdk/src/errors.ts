@@ -1,4 +1,4 @@
-import { MissingCapabilityError } from "@invisi-labs/core";
+import { MissingCapabilityError } from "@invisi-labs/primitives";
 
 /** Stable codes returned by public SDK prepare* methods; inspect details instead of matching messages. */
 export type InvisiErrorCode =

@@ -1,9 +1,6 @@
 import { it, expect } from "vitest";
-import {
-    AGGREGATE_ROUTES,
-    selectAggregateRoute,
-    computeWalletAuthorizationDigest,
-} from "@invisi-labs/core";
+import { computeWalletAuthorizationDigest } from "@invisi-labs/primitives";
+import { AGGREGATE_ROUTES, selectAggregateRoute } from "@invisi-labs/protocol";
 import type { CircuitName, Hex } from "../circuits/circuit-types";
 import {
     assertPublicInputs,

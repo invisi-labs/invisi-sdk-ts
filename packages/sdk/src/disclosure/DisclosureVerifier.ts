@@ -3,8 +3,9 @@ import type { Provider } from "ethers";
 import { readProtocolLogs } from "../discovery/receipt-logs";
 import { EthersChainReader } from "../integrations/ethers";
 
-import { Disclosure, type DisclosureOutput, type DisclosureResult } from "@invisi-labs/core";
-import { TokenProtocol, type CanonicalBlock, type ChainReader } from "@invisi-labs/protocol";
+import { Disclosure, type DisclosureOutput, type DisclosureResult } from "@invisi-labs/primitives";
+import { TokenProtocol } from "@invisi-labs/rpc";
+import { type CanonicalBlock, type ChainReader } from "@invisi-labs/protocol";
 import { extractDeliveryCandidates } from "../discovery/discovery";
 
 export interface DisclosureReference {

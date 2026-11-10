@@ -1,4 +1,4 @@
-import type { authenticatedDecryptor } from "@invisi-labs/core";
+import type { authenticatedDecryptor } from "@invisi-labs/primitives";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import {
@@ -8,8 +8,9 @@ import {
     recoverCreditState,
     type CreditDeliveryState,
     type ReceivingKeys,
-} from "@invisi-labs/core";
-import type { ChainReader, Protocol } from "@invisi-labs/protocol";
+} from "@invisi-labs/primitives";
+import type { ChainReader } from "@invisi-labs/protocol";
+import type { Protocol } from "@invisi-labs/rpc";
 import type { DeliveryEventLog, DiscoveredCredit } from "@invisi-labs/sdk/session-support";
 import type { StoredCredit, WalletScope, WalletState, WalletStore } from "../storage/state";
 

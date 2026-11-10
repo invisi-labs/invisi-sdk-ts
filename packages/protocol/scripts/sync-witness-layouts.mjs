@@ -38,7 +38,7 @@ for (const path of ["circuits/transact/manifest.json", "circuits/credit/manifest
                 .map((p) => ({
                     name: p.name,
                     count: p.type.kind === "array" ? p.type.length : 1,
-                    array: p.type.kind === "array",
+                    ...(p.type.kind === "array" ? { array: true } : {}),
                 })),
             private: artifact.abi.parameters
                 .filter((p) => p.visibility !== "public")
@@ -47,7 +47,7 @@ for (const path of ["circuits/transact/manifest.json", "circuits/credit/manifest
     }
 }
 writeFileSync(
-    new URL("../src/witness-layouts.json", import.meta.url),
+    new URL("../../prover/src/witness-layouts.json", import.meta.url),
     JSON.stringify(layouts, null, 2) + "\n"
 );
 console.log("Generated " + Object.keys(layouts).length + " authenticated witness layouts");

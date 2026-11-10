@@ -2,7 +2,7 @@ import {
     MissingCapabilityError,
     ReceivingAddress,
     type ReceivingKeyLookup,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { InvisiError, type InvisiErrorDetails } from "../errors";
 
 /** Resolve once during preparation; prepared deliveries keep this public key snapshot. */

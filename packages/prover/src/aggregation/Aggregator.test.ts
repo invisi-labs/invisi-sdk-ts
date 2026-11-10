@@ -1,4 +1,4 @@
-import { computeWalletAuthorizationDigest } from "@invisi-labs/core";
+import { computeWalletAuthorizationDigest } from "@invisi-labs/primitives";
 import { expect, it, vi } from "vitest";
 import { Aggregator } from "../aggregate";
 import type { Hex } from "../circuits/circuit-types";

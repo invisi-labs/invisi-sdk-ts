@@ -62,7 +62,7 @@ export async function discoverIndexedCreditStates(
     return [...states.values()];
 }
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
-import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/core";
+import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/primitives";
 /** Recover current role-scoped states without an application-owned viewing key. */
 export async function discoverCredits({
     provider,

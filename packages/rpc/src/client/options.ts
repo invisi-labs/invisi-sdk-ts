@@ -1,4 +1,4 @@
-import type { Hex } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
 import { type ProtocolDeployment } from "../deployment/deployment";
 import type { CanonicalBlock, DeploymentContext } from "../types";
 

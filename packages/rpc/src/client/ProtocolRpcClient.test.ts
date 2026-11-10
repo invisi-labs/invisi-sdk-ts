@@ -1,4 +1,4 @@
-import { poseidonHash, TREE_DEPTH } from "@invisi-labs/core";
+import { poseidonHash, TREE_DEPTH } from "@invisi-labs/primitives";
 import { inspect } from "node:util";
 import { describe, expect, it, vi } from "vitest";
 import { ProtocolRpcClient, ProtocolRpcError } from "./ProtocolRpcClient";

@@ -1,5 +1,5 @@
-import type { CreditDeliveryState, Note, Wallet } from "@invisi-labs/core";
-import type { Protocol } from "@invisi-labs/protocol";
+import type { CreditDeliveryState, Note, Wallet } from "@invisi-labs/primitives";
+import type { Protocol } from "@invisi-labs/rpc";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import type {
     RevokeCreditPreparation,

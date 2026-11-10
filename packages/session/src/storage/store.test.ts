@@ -1,6 +1,6 @@
-import { fundsV1 } from "@invisi-labs/core";
+import { fundsV1 } from "@invisi-labs/primitives";
 import { expect, it } from "vitest";
-import vectors from "../../../core/src/wallet/testdata/wallet-note-vectors.json";
+import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
 import {
     MemoryAtomicRecords,
     MemoryRecordCodec,

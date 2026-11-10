@@ -9,7 +9,7 @@ import {
     generateNonce,
     type Note,
     type ReceivingKeyLookup,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import type { Delivery, Hex } from "@invisi-labs/protocol/contracts";
 import { AbiCoder, getAddress, hexlify, keccak256 } from "ethers";
 import { InvisiError } from "../errors";

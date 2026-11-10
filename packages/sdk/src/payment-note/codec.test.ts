@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { FIELD_MODULUS, computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/core";
+import { FIELD_MODULUS, computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/primitives";
 import { encodePaymentNote, decodePaymentNote } from "./codec";
 import { PaymentNote } from "./PaymentNote";
 const address = "0x1111111111111111111111111111111111111111" as const;

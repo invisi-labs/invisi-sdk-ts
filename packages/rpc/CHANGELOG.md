@@ -1,9 +1,11 @@
 # @invisi-labs/rpc
 
-## 1.1.8
+## 1.2.0
+
+- Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.
 
 - Provide the current separate Note/Credit query surfaces and canonical broadcaster discovery.
-- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+- Keep the complete workspace release pinned to exact 1.2.0 package dependencies.
 
 
 ## 1.1.7
@@ -28,7 +30,7 @@
 
 ### Patch Changes
 
-- @invisi-labs/core@1.1.4
+- @invisi-labs/primitives@1.1.4
 
 ## 1.1.3
 
@@ -41,7 +43,7 @@
     Refresh real-verifier Credit gas references across creation, all four full/partial draw tiers, unchanged/changed-policy top-ups and cancellation. Synchronize 61 TypeScript/Go estimation vectors and document transaction gas-limit constraints.
 
 - Updated dependencies
-    - @invisi-labs/core@1.1.3
+    - @invisi-labs/primitives@1.1.3
 
 ## 1.1.2
 
@@ -52,7 +54,7 @@
     Use version 2 funds envelopes, version 4 Credit envelopes and length-prefixed aggregate deliveries. Keep the contract and RPC API at version 1, synchronize interoperability vectors, and update the examples. Deployments must support the new envelope formats.
 
 - Updated dependencies
-    - @invisi-labs/core@1.1.2
+    - @invisi-labs/primitives@1.1.2
 
 ## 1.1.1
 
@@ -63,7 +65,7 @@
     Authenticate each Protocol's immutable registry binding, refresh current contract ABIs, and remove the registration circuit and obsolete private registration authorization APIs. Update registry examples and verify shared TS/Go signature vectors.
 
 - Updated dependencies
-    - @invisi-labs/core@1.1.1
+    - @invisi-labs/primitives@1.1.1
 
 ## 1.1.0
 

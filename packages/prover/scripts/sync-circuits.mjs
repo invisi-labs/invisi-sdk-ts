@@ -150,7 +150,7 @@ try {
         entries,
     };
     writeFileSync(join(stage, "manifest.json"), JSON.stringify(release, null, 2) + "\n");
-    const releaseIdentityPath = join(packageRoot, "src/release-identity.ts");
+    const releaseIdentityPath = join(packageRoot, "../protocol/src/release-identity.ts");
     writeFileSync(
         releaseIdentityPath,
         await format(

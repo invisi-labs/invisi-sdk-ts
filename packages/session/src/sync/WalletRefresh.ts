@@ -1,4 +1,4 @@
-import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/core";
+import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/primitives";
 import type { WalletSessionInfrastructure } from "../operations/operation-types";
 import {
     walletBalances,

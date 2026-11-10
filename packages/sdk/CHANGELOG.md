@@ -1,9 +1,11 @@
 # @invisi-labs/sdk
 
-## 1.1.8
+## 1.2.0
+
+- Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.
 
 - Provide ready-statement Source proofs, recoverable public proof packets, local cache reuse and fee-frozen broadcaster submission.
-- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+- Keep the complete workspace release pinned to exact 1.2.0 package dependencies.
 
 
 ## 1.1.7
@@ -34,7 +36,7 @@
 - Remove detached local-signing shortcuts and implicit private-wallet authorization; use portable requests and externally supplied signatures. Keep explicit local signing in WalletSession. Replace workspace examples with flat, configurable English walkthroughs and local account setup.
 
 - Add managed wallet sessions with encrypted persistence, incoming and outgoing history, recovery, and explicit signer capabilities. Support external authorization requests, public wallets, unified transfer preparation, registry discovery, multi-owner credit draws, and raw application payloads with explicit decoding. Select single or aggregate execution when proving.
-    - @invisi-labs/core@1.1.4
+    - @invisi-labs/primitives@1.1.4
     - @invisi-labs/protocol@1.1.4
     - @invisi-labs/prover@1.1.4
     - @invisi-labs/rpc@1.1.4
@@ -50,7 +52,7 @@
     Refresh real-verifier Credit gas references across creation, all four full/partial draw tiers, unchanged/changed-policy top-ups and cancellation. Synchronize 61 TypeScript/Go estimation vectors and document transaction gas-limit constraints.
 
 - Updated dependencies
-    - @invisi-labs/core@1.1.3
+    - @invisi-labs/primitives@1.1.3
     - @invisi-labs/protocol@1.1.3
     - @invisi-labs/prover@1.1.3
     - @invisi-labs/rpc@1.1.3
@@ -64,7 +66,7 @@
     Use version 2 funds envelopes, version 4 Credit envelopes and length-prefixed aggregate deliveries. Keep the contract and RPC API at version 1, synchronize interoperability vectors, and update the examples. Deployments must support the new envelope formats.
 
 - Updated dependencies
-    - @invisi-labs/core@1.1.2
+    - @invisi-labs/primitives@1.1.2
     - @invisi-labs/protocol@1.1.2
     - @invisi-labs/prover@1.1.2
     - @invisi-labs/rpc@1.1.2
@@ -78,7 +80,7 @@
     Authenticate each Protocol's immutable registry binding, refresh current contract ABIs, and remove the registration circuit and obsolete private registration authorization APIs. Update registry examples and verify shared TS/Go signature vectors.
 
 - Updated dependencies
-    - @invisi-labs/core@1.1.1
+    - @invisi-labs/primitives@1.1.1
     - @invisi-labs/protocol@1.1.1
     - @invisi-labs/prover@1.1.1
     - @invisi-labs/rpc@1.1.1

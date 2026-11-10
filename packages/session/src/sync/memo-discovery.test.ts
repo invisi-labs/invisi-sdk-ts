@@ -5,12 +5,12 @@ import {
     fundsV1,
     ViewingCapability,
     viewingPublicKey,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { extractDeliveryCandidates } from "@invisi-labs/sdk/session-support";
 import { hexlify, toBeHex } from "ethers";
 import { expect, it } from "vitest";
-import fmd from "../../../core/src/fmd/testdata/fmd-rust-vectors.json";
-import vectors from "../../../core/src/wallet/testdata/wallet-note-vectors.json";
+import fmd from "../../../primitives/src/fmd/testdata/fmd-rust-vectors.json";
+import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
 import { decryptCandidates, type DeliveryEventLog } from "../../../sdk/src/index";
 const context = {
     chainId: BigInt(vectors.context.chainId),

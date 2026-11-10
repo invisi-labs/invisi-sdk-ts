@@ -1,6 +1,9 @@
 import { normalizeFee } from "../fees/fee";
 import { AbiCoder, Interface, getAddress, isHexString, dataLength } from "ethers";
-import { computeWalletAuthorizationDigest, walletAuthorizationTypedData } from "@invisi-labs/core";
+import {
+    computeWalletAuthorizationDigest,
+    walletAuthorizationTypedData,
+} from "@invisi-labs/primitives";
 import {
     invisiProtocolAbi,
     type Hex,

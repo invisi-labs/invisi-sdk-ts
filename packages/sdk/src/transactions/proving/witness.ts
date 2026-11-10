@@ -1,6 +1,7 @@
 import { assertCreditUpdatePlan } from "../../credit/state";
-import { type AuthorizedStatement } from "@invisi-labs/core";
-import { WitnessBuilder, type TokenProtocol } from "@invisi-labs/protocol";
+import { type AuthorizedStatement } from "@invisi-labs/primitives";
+import { WitnessBuilder } from "@invisi-labs/prover";
+import { type TokenProtocol } from "@invisi-labs/rpc";
 import type { ProvingRequest } from "@invisi-labs/prover";
 import type { OperationPlan } from "../operation-types";
 

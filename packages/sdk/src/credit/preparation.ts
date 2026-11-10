@@ -24,9 +24,9 @@ import {
     deriveCreditState,
     deriveCreditUpdate,
     type CreditDeliveryState,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
+import { WitnessBuilder } from "@invisi-labs/prover";
 import {
-    WitnessBuilder,
     normalizeFee,
     encodeRevokeCreditTypedData,
     createCreditPublicInputs,

@@ -1,7 +1,7 @@
+import { OfficialProvenanceClients } from "@invisi-labs/rpc/provenance";
 import { validateProvenanceProof, type ProvenanceProof } from "../provenance/proof-record";
 import {
     CAPACITIES,
-    exportSidecar,
     noteOpening,
     operationDigest,
     word,
@@ -9,12 +9,15 @@ import {
     validateProofBundle,
     inputDigest,
     type ManifestIdentity,
-    type OfflineProver,
     type ProofSidecar,
-    type ProvenanceClient,
     type RootCertificate,
+} from "@invisi-labs/protocol/provenance";
+import {
+    exportSidecar,
+    type OfflineProver,
     type WitnessInput,
-} from "@invisi-labs/core/provenance";
+} from "@invisi-labs/prover/provenance-witness";
+import { type ProvenanceClient } from "@invisi-labs/rpc/provenance";
 import type {
     OperationPlan,
     TransactionRuntime,
@@ -203,12 +206,17 @@ export async function provePreparedProvenance(
     if (!saved.call || !saved.proof || saved.plan.kind !== "transfer" || !saved.plan.inputs.length)
         throw Error("Ready transaction with private Note inputs required");
     const provider = runtime.options.prover as typeof runtime.options.prover &
-        Partial<import("@invisi-labs/core/provenance").ProvenanceProvider>;
+        Partial<import("@invisi-labs/prover/provenance-witness").ProvenanceProvider>;
     const active =
         capability ??
         runtime.options.provenance ??
         (provider?.getProvenanceCapability
-            ? await provider.getProvenanceCapability(saved.plan.context)
+            ? {
+                  ...(await provider.getProvenanceCapability()),
+                  client:
+                      runtime.options.provenanceClient ??
+                      (await officialProvenance.get(saved.plan.context)),
+              }
             : undefined);
     if (!active) throw Error("Local Provenance capability required");
     if (saved.provenance && !reprove)
@@ -278,3 +286,5 @@ export async function validatePreparedBroadcast(
             await validateProofBundle(sidecar.proofBundle, runtime.options.provenance.client.trust);
     } else if (saved.provenance) throw Error("Unexpected Prepared Provenance evidence");
 }
+
+const officialProvenance = new OfficialProvenanceClients();

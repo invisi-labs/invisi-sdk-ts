@@ -1,8 +1,8 @@
 import {
     deliveryCodec,
     validateDeliveryCiphertext,
-} from "../packages/core/src/delivery/delivery-codec";
-import { detectClue } from "../packages/core/src/fmd/fmd";
+} from "../packages/primitives/src/delivery/delivery-codec";
+import { detectClue } from "../packages/primitives/src/fmd/fmd";
 import {
     validateWalletRequest,
     walletHex,
@@ -11,17 +11,17 @@ import {
     walletDecryptionContext,
     type WalletRequest,
     type WalletResponse,
-} from "../packages/core/src/wallet/wallet-wire";
-import { ReceivingAddress } from "../packages/core/src/address/receiving-address";
+} from "../packages/primitives/src/wallet/wallet-wire";
+import { ReceivingAddress } from "../packages/primitives/src/address/receiving-address";
 import {
     Detector,
     NullifierCapability,
     ViewingCapability,
     WalletAuthorization,
-} from "../packages/core/src/wallet/capabilities";
-import { deriveWallet, type InvisiWallet } from "../packages/core/src/wallet/wallet";
+} from "../packages/primitives/src/wallet/capabilities";
+import { deriveWallet, type InvisiWallet } from "../packages/primitives/src/wallet/wallet";
 
-import { WalletAddress } from "../packages/core/src/wallet/wallet-object";
+import { WalletAddress } from "../packages/primitives/src/wallet/wallet-object";
 /** Fixture-only account execution; excluded from published packages. */
 export class TestWallet extends WalletAddress {
     readonly #viewing: ViewingCapability;
@@ -93,7 +93,7 @@ export class TestWallet extends WalletAddress {
             }
             case "wallet.detect": {
                 const params =
-                    scoped.params as import("../packages/core/src/wallet/wallet-wire").WalletParams["wallet.detect"];
+                    scoped.params as import("../packages/primitives/src/wallet/wallet-wire").WalletParams["wallet.detect"];
                 const key = this.#detection.exportKey();
                 try {
                     result = {
@@ -107,7 +107,7 @@ export class TestWallet extends WalletAddress {
             case "wallet.authorize": {
                 const authorized = await this.#authorization.authorize(
                     walletAuthorizationParams(
-                        scoped.params as import("../packages/core/src/wallet/wallet-wire").WalletParams["wallet.authorize"]
+                        scoped.params as import("../packages/primitives/src/wallet/wallet-wire").WalletParams["wallet.authorize"]
                     )
                 );
                 result = authorized.withWitness((witness) => ({
@@ -133,7 +133,7 @@ export class TestWallet extends WalletAddress {
                 } else {
                     const state = await this.#viewing.decryptCredit(
                         envelope,
-                        context as import("../packages/core/src/delivery/types").CreditStateDecryptionContext
+                        context as import("../packages/primitives/src/delivery/types").CreditStateDecryptionContext
                     );
                     result = { plaintext: walletHex(codec.encode(state)) };
                 }

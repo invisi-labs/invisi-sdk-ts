@@ -1,9 +1,11 @@
 # @invisi-labs/vue
 
-## 1.1.8
+## 1.2.0
 
-- Keep Vue lifecycle bindings aligned with the 1.1.8 SDK and Session APIs.
-- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+- Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.
+
+- Keep Vue lifecycle bindings aligned with the 1.2.0 SDK and Session APIs.
+- Keep the complete workspace release pinned to exact 1.2.0 package dependencies.
 
 
 ## 1.1.7

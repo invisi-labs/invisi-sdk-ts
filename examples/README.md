@@ -98,7 +98,7 @@ The account controls the default database (`examples/accounts/<account>-session.
 
 ## Provenance
 
-Before running native Source proof examples from this checkout, run `python3 scripts/sync-provenance.py ../invisi-protocol` from the SDK repository root. This provisions `packages/prover/provenance`, which `NativeProver` loads by default. If you use `--output <asset-root>`, supply the same root as `provenanceAssetsPath` in `NativeProver`; see [Provenance asset setup](../PROVENANCE.md).
+Before running native Source proof examples from this checkout, run `python3 scripts/sync-provenance.py ../invisi-protocol` from the SDK repository root. This provisions `packages/prover/provenance`, which `NativeProver` loads by default. If you use `--output <asset-root>`, supply the same root as `provenanceAssetsPath` in `NativeProver`; the authenticated manifest and all seven circuit tiers must match the current protocol release.
 
 [Broadcaster and independent Provenance examples](07-broadcaster/) demonstrate relay fees/submission and direct source submission separately. A Note input requires source proof even without a Note output; Credit state inputs do not require a Note source proof.
 

@@ -308,7 +308,7 @@ it("rejects zero Credit service fees and binds positive protocol fees", async ()
     }
 });
 
-import { provenanceIntentHash } from "@invisi-labs/core/provenance";
+import { provenanceIntentHash } from "@invisi-labs/protocol/provenance";
 it("binds the provenance requirement to a signed quote and rejects downgrades", async () => {
     const data = calldata(),
         quote = {

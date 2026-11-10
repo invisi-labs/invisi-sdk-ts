@@ -1,5 +1,5 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { expect, it } from "vitest";
 import { canonicalBlock, fixture, receiptLog } from "../../../../test-support/operation-fixture";

@@ -4,15 +4,13 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { authenticateManifest, witnessJSON, type OfflineProver } from "../provenance-witness";
 import {
-    authenticateManifest,
     PROVENANCE_MANIFEST_SHA256,
-    witnessJSON,
     PUBLIC_INPUTS,
     word,
-    type OfflineProver,
     type ManifestIdentity,
-} from "@invisi-labs/core/provenance";
+} from "@invisi-labs/protocol/provenance";
 import type { CompiledCircuit } from "../circuits/circuit-types";
 import { generateWitness } from "../witness/witness";
 import { runBB, assertBBVersion, type NativeOptions } from "./backend-bb";

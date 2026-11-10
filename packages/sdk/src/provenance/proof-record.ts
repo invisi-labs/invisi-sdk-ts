@@ -6,7 +6,7 @@ import {
     word,
     type ProofSidecar,
     type TrustContext,
-} from "@invisi-labs/core/provenance";
+} from "@invisi-labs/protocol/provenance";
 import { normalizeTransactRequest, transactUserPublicInputs } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { decodeBroadcasterIntent } from "../broadcaster/index";

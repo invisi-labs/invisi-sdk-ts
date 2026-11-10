@@ -1,13 +1,10 @@
 import { hexlify, sha256 } from "ethers";
 import { Noir } from "@noir-lang/noir_js";
 import type { CompiledCircuit } from "@noir-lang/noir_js";
-import {
-    authenticateManifest,
-    PUBLIC_INPUTS,
-    word,
-    witnessJSON,
-} from "@invisi-labs/core/provenance";
-import type { OfflineProver, ManifestIdentity, Witness } from "@invisi-labs/core/provenance";
+import { authenticateManifest, witnessJSON } from "./provenance-witness";
+import { PUBLIC_INPUTS, word } from "@invisi-labs/protocol/provenance";
+import type { OfflineProver, Witness } from "./provenance-witness";
+import type { ManifestIdentity } from "@invisi-labs/protocol/provenance";
 
 export interface ProvenanceAssets {
     manifest: Uint8Array;

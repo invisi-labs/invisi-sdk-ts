@@ -1,5 +1,5 @@
 import { TestWallet } from "../../../../test-support/test-wallet";
-import { ReceivingAddress } from "@invisi-labs/core";
+import { ReceivingAddress } from "@invisi-labs/primitives";
 import { hexlify } from "ethers";
 import { describe, expect, it } from "vitest";
 import { ProtocolRpcClient } from "../client/ProtocolRpcClient";

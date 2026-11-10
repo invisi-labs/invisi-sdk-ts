@@ -11,7 +11,7 @@ import {
 } from "ethers";
 import type { Address, Hex } from "../contracts/index";
 
-import { ReceivingAddress, decodeAddress, type ReceivingKeyLookup } from "@invisi-labs/core";
+import { ReceivingAddress, decodeAddress, type ReceivingKeyLookup } from "@invisi-labs/primitives";
 import { invisiAddressRegistryAbi } from "../contracts/index";
 
 export interface RegistryContext {

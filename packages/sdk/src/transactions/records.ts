@@ -1,4 +1,4 @@
-import type { CreditDeliveryState, Note } from "@invisi-labs/core";
+import type { CreditDeliveryState, Note } from "@invisi-labs/primitives";
 import type { Hex } from "@invisi-labs/prover";
 
 export interface WalletScope {

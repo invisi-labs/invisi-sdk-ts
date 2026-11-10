@@ -1,4 +1,4 @@
-import type { Hex } from "@invisi-labs/core";
+import type { Hex } from "@invisi-labs/primitives";
 import type { Provider } from "ethers";
 import { expect, it, vi } from "vitest";
 import { ProtocolRpcClient } from "./ProtocolRpcClient";

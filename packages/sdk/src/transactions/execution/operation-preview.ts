@@ -1,4 +1,4 @@
-import { normalizeCreditPolicy, normalizeCreditUsage } from "@invisi-labs/core";
+import { normalizeCreditPolicy, normalizeCreditUsage } from "@invisi-labs/primitives";
 import { normalizeFunding } from "@invisi-labs/protocol";
 import type { OperationPlan } from "../operation-types";
 import { inputFacts } from "../preparation/inputs";

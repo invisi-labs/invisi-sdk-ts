@@ -1,5 +1,5 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { it, expect } from "vitest";
 import { Interface, Wallet as EvmWallet } from "ethers";
 import {
@@ -7,7 +7,7 @@ import {
     normalizeCreditPolicy,
     normalizeCreditUsage,
     type CreditDeliveryState,
-} from "@invisi-labs/core";
+} from "@invisi-labs/primitives";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import type { SavedOperation } from "@invisi-labs/sdk/session-support";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -18,7 +18,7 @@ const iface = new Interface(invisiProtocolAbi);
 async function creditFixture(
     changes: Partial<
         Pick<
-            import("@invisi-labs/core").CreditState,
+            import("@invisi-labs/primitives").CreditState,
             "availableCredit" | "unlimited" | "totalSpent"
         >
     > = {}

@@ -1,4 +1,4 @@
-import { type AuthorizedStatement } from "@invisi-labs/core";
+import { type AuthorizedStatement } from "@invisi-labs/primitives";
 import type { OperationRecord, OperationStatus } from "../storage/state";
 import type { OperationRuntime, SavedOperation } from "./operation-types";
 function check(ok: unknown, message: string): asserts ok {

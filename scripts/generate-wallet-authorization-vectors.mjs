@@ -25,7 +25,7 @@ for (const operation of ["transact", "create-credit", "credit-draw", "update-cre
         });
     }
 writeFileSync(
-    "packages/core/src/wallet/testdata/wallet-authorization-vectors.json",
+    "packages/primitives/src/wallet/testdata/wallet-authorization-vectors.json",
     JSON.stringify(
         { source: "Current independent protocol EIP712 helper, Noir1.0.0 release", rows },
         (_, v) => (typeof v === "bigint" ? v.toString() : v),

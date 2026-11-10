@@ -1,5 +1,5 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import { expect, it, vi } from "vitest";

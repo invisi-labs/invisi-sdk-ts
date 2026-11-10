@@ -1,5 +1,5 @@
 import { TestWallet } from "../../../../test-support/test-wallet";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { defineDeployment } from "@invisi-labs/rpc";
 import { Invisi, Protocol, type ChainReader } from "@invisi-labs/sdk";
 import { expect, expectTypeOf, it, vi } from "vitest";
@@ -174,6 +174,7 @@ it("defines infrastructure capabilities independently of signing authority", () 
         | "provider"
         | "transactionTTL"
         | "provenance"
+        | "provenanceClient"
     >();
 });
 

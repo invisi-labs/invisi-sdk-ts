@@ -1,6 +1,6 @@
-import { fundsV1, decodeMemoText } from "@invisi-labs/core";
+import { fundsV1, decodeMemoText } from "@invisi-labs/primitives";
 import { JsonRpcProvider } from "ethers";
-import { Disclosure } from "@invisi-labs/core";
+import { Disclosure } from "@invisi-labs/primitives";
 import { Protocol, ProtocolRpcClient, DisclosureVerifier } from "@invisi-labs/sdk";
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import { settings } from "../settings.js";

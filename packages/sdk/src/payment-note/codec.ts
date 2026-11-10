@@ -1,4 +1,4 @@
-import { FIELD_MODULUS } from "@invisi-labs/core";
+import { FIELD_MODULUS } from "@invisi-labs/primitives";
 import { decodeBase64, encodeBase64, getAddress, getBytes, hexlify, concat } from "ethers";
 import type { PaymentNoteData } from "./types";
 

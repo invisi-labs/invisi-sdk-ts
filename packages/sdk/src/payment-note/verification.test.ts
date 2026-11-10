@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { Wallet } from "@invisi-labs/core";
+import { Wallet } from "@invisi-labs/primitives";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { encodePaymentNote } from "./codec";
 import { PaymentNote } from "./PaymentNote";

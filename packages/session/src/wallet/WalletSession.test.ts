@@ -1,4 +1,9 @@
-import { Wallet, computeNoteCommitment, computeNoteIdentity, fundsV1 } from "@invisi-labs/core";
+import {
+    Wallet,
+    computeNoteCommitment,
+    computeNoteIdentity,
+    fundsV1,
+} from "@invisi-labs/primitives";
 import type { SavedOperation } from "@invisi-labs/sdk/session-support";
 import { expect, expectTypeOf, it } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -96,7 +101,7 @@ it("keeps the requested EVM owner fixed while preparation resolves receiving key
 it("shares a deployment scope while selecting, reserving and reporting each token separately", async () => {
     const h = await fixture();
     const otherToken = "0x3333333333333333333333333333333333333333" as const;
-    const core = await import("@invisi-labs/core");
+    const core = await import("@invisi-labs/primitives");
     const note = { ...h.note, tokenAddress: BigInt(otherToken), amount: 50n, nonce: 456n };
     const commitment = await core.computeNoteCommitment(
         h.context.chainId,

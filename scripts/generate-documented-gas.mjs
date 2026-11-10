@@ -166,7 +166,7 @@ for (const [index, source] of sources.entries()) {
     }
 }
 const catalog = vectorsOnly
-    ? JSON.parse(readFileSync("packages/sdk/src/gas/data/documented-references.json", "utf8"))
+    ? JSON.parse(readFileSync("packages/protocol/src/gas/data/documented-references.json", "utf8"))
     : {
           formatVersion: 1,
           kind: "documented-reference",
@@ -182,7 +182,7 @@ const catalog = vectorsOnly
           ],
           references: rows,
       };
-const target = "packages/sdk/src/gas/data/";
+const target = "packages/protocol/src/gas/data/";
 if (!vectorsOnly)
     writeFileSync(target + "documented-references.json", JSON.stringify(catalog, null, 2) + "\n");
 writeFileSync(

@@ -1,4 +1,4 @@
-import type { Hex } from "@invisi-labs/prover";
+import type { Hex } from "@invisi-labs/sdk";
 
 import type {
     Checkpoint,

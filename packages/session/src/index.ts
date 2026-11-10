@@ -44,3 +44,5 @@ export type {
 export { EncryptedWalletCodec } from "./storage/encrypted-codec";
 
 export type { PendingWalletRefresh } from "./sync/WalletRefresh";
+
+export * from "./recovery";

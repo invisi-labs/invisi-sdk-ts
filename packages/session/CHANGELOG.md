@@ -1,9 +1,11 @@
 # @invisi-labs/session
 
-## 1.1.8
+## 1.2.0
+
+- Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.
 
 - Persist atomic App-decrypted inventory and exact relay retry state with recoverable Source evidence.
-- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+- Keep the complete workspace release pinned to exact 1.2.0 package dependencies.
 
 
 ## 1.1.7

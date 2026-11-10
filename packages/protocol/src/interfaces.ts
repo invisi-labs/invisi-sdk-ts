@@ -1,4 +1,4 @@
-import type { CanonicalBlock } from "@invisi-labs/rpc";
+import type { CanonicalBlock } from "./rpc-types";
 import type { Address, Hex } from "./contracts/index";
 export type {
     CanonicalBlock,
@@ -6,7 +6,7 @@ export type {
     ProtocolDataProvider,
     ProtocolDataStatus,
     ProtocolUpdateRange,
-} from "@invisi-labs/rpc";
+} from "./rpc-types";
 
 import type { DeploymentContext } from "./validation";
 export interface ProtocolLog {

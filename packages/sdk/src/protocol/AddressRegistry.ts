@@ -1,4 +1,4 @@
-import { AddressRegistry as Registry, type RegistrationPreparation } from "@invisi-labs/protocol";
+import { AddressRegistry as Registry, type RegistrationPreparation } from "@invisi-labs/rpc";
 import type { Provider } from "ethers";
 import { prepareWithErrors } from "../errors";
 import { EthersChainReader } from "../integrations/ethers";

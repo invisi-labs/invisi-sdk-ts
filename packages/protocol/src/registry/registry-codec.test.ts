@@ -1,7 +1,7 @@
 import { Interface, TypedDataEncoder, getBytes, toBeHex, verifyTypedData } from "ethers";
 import type { Hex } from "../contracts/index";
 
-import { ReceivingAddress } from "@invisi-labs/core";
+import { ReceivingAddress } from "@invisi-labs/primitives";
 import { describe, expect, it } from "vitest";
 import { invisiAddressRegistryAbi } from "../contracts/index";
 import {
