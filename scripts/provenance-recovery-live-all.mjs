@@ -49,7 +49,7 @@ for (const [sdk, cmd, args, cwd, file] of [
         [
             "test",
             "-p",
-            "invisi-sdk-session",
+            "invisi-labs-session",
             "--features",
             "sqlite",
             "--test",
