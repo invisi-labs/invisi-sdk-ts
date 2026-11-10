@@ -36,3 +36,5 @@ export {
 } from "./transactions/signing/revocation";
 
 export * from "./broadcaster/provenance-preparation";
+
+export { bindBroadcasterOperation } from "./broadcaster/operation-bridge";

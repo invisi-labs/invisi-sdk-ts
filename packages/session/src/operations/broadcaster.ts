@@ -9,7 +9,7 @@ export async function quoteManagedOperation(
     runtime: OperationRuntime,
     snapshot: SavedOperation,
     client: import("@invisi-labs/sdk").BroadcasterClient,
-    options: import("@invisi-labs/sdk/session-support").WithBroadcasterOptions
+    options: import("@invisi-labs/sdk/session-support").BroadcasterQuoteOptions
 ): Promise<SavedOperation> {
     const { prepareIntent, prepareBroadcasterPlan } =
         await import("@invisi-labs/sdk/session-support");

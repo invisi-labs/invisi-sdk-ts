@@ -150,12 +150,12 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
         inputs: h.inputs,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
-    const prepared = await original.withBroadcaster(client, { maxFeeAmount: 10n });
+    const prepared = await client.quote(original, { maxFeeAmount: 10n });
     expect(original.preview().feeAmount).toBe(0n);
     const signed = prepared.broadcasterQuote()!;
     expect(h.prover.prove).not.toHaveBeenCalled();
     const ready = await (await externallyAuthorize(prepared)).prove();
-    const status = await client.submit((await ready.exportTransaction()).data, signed);
+    const status = await client.submitTransaction((await ready.exportTransaction()).data, signed);
     expect(status.state).toBe("submitted");
     expect(ready.preview().outputs.map((output) => output.amount)).toEqual([30n, 60n]);
 });
@@ -170,7 +170,7 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
     });
-    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
     expect(original.preview().fundingAmount).toBe(30n);
     expect(quoted.preview().fundingAmount).toBe(40n);
     expect(original.preview().funding).toMatchObject({
@@ -198,7 +198,7 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
     );
     expect(h.prover.prove).not.toHaveBeenCalled();
     await expect(
-        original.withBroadcaster(quoteClient(h.context), {
+        quoteClient(h.context).quote(original, {
             maxFeeAmount: 10n,
             feeSource: "private-inputs",
         })
@@ -215,19 +215,19 @@ it("rejects excessive or unstable broadcaster fees before signing and preserves 
         inputs: h.inputs,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
-    await expect(
-        prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 9n })
-    ).rejects.toThrow(/limit/);
+    await expect(quoteClient(h.context).quote(prepared, { maxFeeAmount: 9n })).rejects.toThrow(
+        /limit/
+    );
     let amount = 0n;
     await expect(
-        prepared.withBroadcaster(
-            quoteClient(h.context, () => ++amount),
-            { maxFeeAmount: 10n, maxAttempts: 2 }
-        )
+        quoteClient(h.context, () => ++amount).quote(prepared, {
+            maxFeeAmount: 10n,
+            maxAttempts: 2,
+        })
     ).rejects.toThrow(/stabilize/);
     expect(prepared.preview().feeAmount).toBe(0n);
     expect(prepared.broadcasterQuote()).toBeUndefined();
-    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
     await expect(
         (await externallyAuthorize(quoted)).prove({ execution: "aggregate" })
     ).rejects.toThrow(/direct/);
@@ -251,14 +251,14 @@ it("requests an app-owned permit once after the gross funding amount stabilizes"
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller", permit },
     });
-    await expect(
-        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n })
-    ).rejects.toThrow(/existing permit/);
+    await expect(quoteClient(h.context).quote(original, { maxFeeAmount: 10n })).rejects.toThrow(
+        /existing permit/
+    );
     const fundingPermit = vi.fn(async (request: { amount: bigint }) => {
         expect(request.amount).toBe(40n);
         return { ...permit, deadline: 2000007200n };
     });
-    const quoted = await original.withBroadcaster(quoteClient(h.context), {
+    const quoted = await quoteClient(h.context).quote(original, {
         maxFeeAmount: 10n,
         fundingPermit,
     });
@@ -280,11 +280,8 @@ it("re-quotes from the original public funding intent without accumulating fees"
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
     });
-    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
-    const replaced = await quoted.withBroadcaster(
-        quoteClient(h.context, () => 5n),
-        { maxFeeAmount: 10n }
-    );
+    const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
+    const replaced = await quoteClient(h.context, () => 5n).quote(quoted, { maxFeeAmount: 10n });
     expect(original.preview().fundingAmount).toBe(30n);
     expect(quoted.preview().fundingAmount).toBe(40n);
     expect(replaced.preview().fundingAmount).toBe(35n);
@@ -302,7 +299,7 @@ it("broadcasts a zero-input funded transfer while preserving its business paymen
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
         funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
     });
-    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
     expect(quoted.preview().fundingAmount).toBe(110n);
     expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([30n, 70n]);
     expect(quoted.preview().permissions.walletAuthorization).toBe(false);
@@ -330,11 +327,11 @@ it("uses existing private change before increasing mixed public funding", async 
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 130n })],
         funding: { payer: h.wallet.ownerAddress, amount: 50n, authorization: "signature" },
     });
-    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
     expect(quoted.preview().fundingAmount).toBe(50n);
     expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([130n, 10n]);
     expect(prepared.preview().outputs.map((o) => o.amount)).toEqual([130n, 20n]);
-    const explicit = await prepared.withBroadcaster(quoteClient(h.context), {
+    const explicit = await quoteClient(h.context).quote(prepared, {
         maxFeeAmount: 10n,
         feeSource: "public-funding",
     });
@@ -358,7 +355,7 @@ it("refreshes caller-only zero nonce and deadline when attaching a broadcaster",
             deadline: 0n,
         },
     });
-    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
     const request = await quoted.exportFundingAuthorization();
     expect(BigInt(request.message.sigNonce as string)).toBe(7n);
     expect(BigInt(request.message.deadline as bigint)).toBeGreaterThan(0n);
@@ -376,7 +373,7 @@ it("stops fee iteration when rebuilt intent pays at least its recalculated fee",
         inputs: h.inputs,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 80n })],
     });
-    const quoted = await prepared.withBroadcaster(client, { maxFeeAmount: 20n });
+    const quoted = await client.quote(prepared, { maxFeeAmount: 20n });
     expect(quoted.preview().feeAmount).toBe(20n);
     expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([80n]);
     expect(prepared.preview().feeAmount).toBe(0n);

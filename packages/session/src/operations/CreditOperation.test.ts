@@ -199,9 +199,9 @@ it("persists the original update delta across resume and quotes and rejects a ch
     const resumed = await h.ownerSession.resume(prepared.id);
     let calls = 0;
     const client = quoteClient(h.context, () => (++calls === 1 ? 1n : 2n));
-    const quoted = await resumed.withBroadcaster(client, { maxFeeAmount: 3n });
+    const quoted = await client.quote(resumed, { maxFeeAmount: 3n });
     const restored = await h.ownerSession.resume(quoted.id);
-    const requoted = await restored.withBroadcaster(client, { maxFeeAmount: 3n });
+    const requoted = await client.quote(restored, { maxFeeAmount: 3n });
     expect(requoted.preview().creditOutputs![0]).toMatchObject({
         availableCredit: 30n,
         unlimited: false,

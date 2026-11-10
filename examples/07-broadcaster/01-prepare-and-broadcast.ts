@@ -88,7 +88,7 @@ try {
         amount: selected.note.amount / 2n,
         recipient: { type: "invisi", address: bob.receivingAddress },
     });
-    let prepared = await invisi.prepareTransfer({
+    const prepared = await invisi.prepareTransfer({
         wallet: alice.publicWallet,
         protocol,
         tokenAddress,
@@ -101,21 +101,21 @@ try {
     });
     // After fees stabilize, the SDK proves provenance locally; Broadcaster submits its preflight.
     // The SDK authenticates the returned tracking before wallet authorization.
-    prepared = await prepared.withBroadcaster(broadcaster, {
+    const quoted = await broadcaster.quote(prepared, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,
     });
-    const tracking = prepared.provenanceTracking();
+    const tracking = quoted.provenanceTracking();
     if (!tracking) throw Error("Missing Provenance tracking for private Note inputs");
     console.log("Provenance preflight tracking:", json(tracking));
     // Provenance uses this ID to follow chain confirmation and source recognition.
-    const request = await prepared.exportWalletRequest(crypto.randomUUID());
+    const request = await quoted.exportWalletRequest(crypto.randomUUID());
     const responses = await nativeWallet.execute([request]);
     const response = responses.find((item) => item.id === request.id);
     if (!response) throw Error("Missing wallet response");
-    const ready = await (await prepared.withWalletResponse(response)).prove();
+    const ready = await (await quoted.withWalletResponse(response)).prove();
     console.log("Verified quote:", json(ready.broadcasterQuote()));
     const data = (await ready.exportTransaction()).data;
-    const submitted = await ready.submitBroadcaster(broadcaster);
+    const submitted = await broadcaster.submit(ready);
     const record = {
         data,
         submissionId: submitted.id,

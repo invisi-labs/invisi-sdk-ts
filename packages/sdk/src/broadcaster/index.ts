@@ -1,3 +1,6 @@
+import { quoteOperation, submitOperation, type BroadcasterTransaction } from "./operation-bridge";
+import type { BroadcasterQuoteOptions } from "./broadcaster-preparation";
+export type { BroadcasterTransaction } from "./operation-bridge";
 import { provenanceIntentHash } from "@invisi-labs/core";
 import type { ProofSidecar } from "@invisi-labs/core/provenance";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
@@ -316,6 +319,15 @@ export class BroadcasterClient {
         }
         return response.result;
     }
+    quote<T extends BroadcasterTransaction>(
+        transaction: T,
+        options: BroadcasterQuoteOptions
+    ): Promise<T> {
+        return quoteOperation(this, transaction, options);
+    }
+    submit(transaction: BroadcasterTransaction): Promise<BroadcasterStatus> {
+        return submitOperation(this, transaction);
+    }
     async estimateQuote(data: string): Promise<BroadcasterEstimate> {
         decodeBroadcasterIntent(data);
         const estimate = (await this.call("broadcaster_estimateQuote", {
@@ -336,7 +348,7 @@ export class BroadcasterClient {
             throw Error("invalid broadcaster estimate");
         return { ...estimate };
     }
-    async quote(
+    async getQuote(
         data: string,
         context: { chainId: bigint; protocol: string },
         proofSidecars: readonly ProofSidecar[] = []
@@ -379,7 +391,7 @@ export class BroadcasterClient {
                 : { requestHashFormat: signed.requestHashFormat }),
         };
     }
-    async submit(
+    async submitTransaction(
         data: string,
         signed: SignedBroadcasterQuote,
         proofSidecars: readonly ProofSidecar[] = []

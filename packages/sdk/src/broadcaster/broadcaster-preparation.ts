@@ -28,7 +28,7 @@ export type PreparationIntent =
     | { kind: "update-credit"; options: UpdateCreditPreparation }
     | { kind: "revoke-credit"; options: RevokeCreditPreparation };
 export type BroadcasterFeeSource = "public-funding" | "private-inputs";
-export interface WithBroadcasterOptions {
+export interface BroadcasterQuoteOptions {
     maxFeeAmount: bigint;
     feeSource?: BroadcasterFeeSource;
     maxAttempts?: number;
@@ -64,7 +64,7 @@ export async function prepareBroadcasterPlan(
     plan: OperationPlan,
     reprepare: (intent: PreparationIntent) => Promise<OperationPlan>,
     client: BroadcasterClient,
-    options: WithBroadcasterOptions,
+    options: BroadcasterQuoteOptions,
     runtime?: TransactionRuntime
 ): Promise<{
     plan: OperationPlan;
@@ -76,7 +76,7 @@ export async function prepareBroadcasterPlan(
     const finalize = async (final: OperationPlan) => {
         const evidence = await prepareProvenance(final, client, runtime);
         const data = exportBroadcasterIntent(final).data;
-        const quote = await client.quote(
+        const quote = await client.getQuote(
             data,
             { chainId: final.context.chainId, protocol: final.context.protocolAddress },
             structuredClone(evidence?.sidecars ?? [])

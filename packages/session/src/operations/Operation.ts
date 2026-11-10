@@ -1,3 +1,4 @@
+import { bindBroadcasterOperation } from "@invisi-labs/sdk/session-support";
 import {
     Wallet,
     prepareWalletRequest,
@@ -74,6 +75,10 @@ export class Operation {
         this.#saved = structuredClone(saved);
         this.status = status;
         this.#authorization = authorization;
+        bindBroadcasterOperation(this, {
+            quote: (client, options) => this.#quoteForBroadcaster(client, options),
+            submit: (client) => this.#submitViaBroadcaster(client),
+        });
         Object.freeze(this);
     }
 
@@ -166,9 +171,9 @@ export class Operation {
             ? structuredClone(this.#saved.broadcasterQuote)
             : undefined;
     }
-    async withBroadcaster(
+    async #quoteForBroadcaster(
         client: import("@invisi-labs/sdk").BroadcasterClient,
-        options: import("@invisi-labs/sdk/session-support").WithBroadcasterOptions
+        options: import("@invisi-labs/sdk/session-support").BroadcasterQuoteOptions
     ): Promise<Operation> {
         check(this.status === "prepared", "broadcaster must attach before signing");
         const saved = await quoteManagedOperation(this.#runtime, this.#saved, client, options);
@@ -534,7 +539,7 @@ export class Operation {
     provenanceTracking() {
         return structuredClone(this.#saved.provenance?.tracking);
     }
-    async submitBroadcaster(client: import("@invisi-labs/sdk").BroadcasterClient) {
+    async #submitViaBroadcaster(client: import("@invisi-labs/sdk").BroadcasterClient) {
         const { validateBroadcastEnvelope, validatePreparedBroadcast } =
             await import("@invisi-labs/sdk/session-support");
         const durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
@@ -562,7 +567,7 @@ export class Operation {
             current.externalized = true;
             return structuredClone(current);
         });
-        const result = await client.submit(
+        const result = await client.submitTransaction(
             saved.call!.data,
             saved.broadcasterQuote!,
             structuredClone(saved.provenance?.sidecars ?? [])

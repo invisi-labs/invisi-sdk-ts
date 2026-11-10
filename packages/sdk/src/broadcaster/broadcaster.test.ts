@@ -115,10 +115,10 @@ describe("broadcaster final intents", () => {
             }
         );
         await expect(client.estimateQuote(data)).rejects.toThrow("Test response");
-        await expect(client.quote(data, trust)).rejects.toThrow("Test response");
-        await expect(client.submit(data, { quote, signature, context: trust })).rejects.toThrow(
-            "Test response"
-        );
+        await expect(client.getQuote(data, trust)).rejects.toThrow("Test response");
+        await expect(
+            client.submitTransaction(data, { quote, signature, context: trust })
+        ).rejects.toThrow("Test response");
         await expect(client.status("relay-owned-id")).rejects.toThrow("Test response");
         expect(requests.map(({ method, params }) => ({ method, params }))).toEqual([
             { method: "broadcaster_estimateQuote", params: [{ data }] },
@@ -164,7 +164,9 @@ describe("broadcaster final intents", () => {
                 result: { id, state: "uncertain" },
             })
         );
-        await expect(client.submit(data, { ...signed, context: trust })).resolves.toEqual({
+        await expect(
+            client.submitTransaction(data, { ...signed, context: trust })
+        ).resolves.toEqual({
             id,
             state: "uncertain",
         });
@@ -217,7 +219,7 @@ describe("broadcaster final intents", () => {
             },
             async () => ({})
         );
-        await expect(client.quote(calldata(), trust)).rejects.toThrow();
+        await expect(client.getQuote(calldata(), trust)).rejects.toThrow();
     });
     it("preserves registered endpoint paths and refuses redirects", async () => {
         const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -360,8 +362,8 @@ it("binds the provenance requirement to a signed quote and rejects downgrades", 
         },
         transport
     );
-    const bound = await client.quote(data, trust, []);
-    await client.submit(data, bound, []);
+    const bound = await client.getQuote(data, trust, []);
+    await client.submitTransaction(data, bound, []);
     expect(
         (transport.mock.calls[0]![0].params as { proofSidecars: unknown[] }[])[0]!.proofSidecars
     ).toEqual([]);
@@ -389,7 +391,7 @@ it("requires a concrete intent and separates estimate responses from signed firm
         maxGas: "1000",
     });
     expect(transport.mock.calls[0]![0].params).toEqual([{ data: calldata() }]);
-    await expect(client.quote(calldata(), trust)).rejects.toThrow(/quote|undefined/i);
+    await expect(client.getQuote(calldata(), trust)).rejects.toThrow(/quote|undefined/i);
 });
 it("does not accept signing or source tracking metadata in an unsigned estimate", async () => {
     const client = new BroadcasterClient(
@@ -441,4 +443,22 @@ it("treats returned IDs as opaque service-owned values", async () => {
     );
     expect((await client.status(opaque)).id).toBe(opaque);
     expect(transport.mock.calls[0]![0].params).toEqual([{ id: opaque }]);
+});
+
+it("rejects unregistered operation objects before transport access", async () => {
+    const transport = vi.fn(async () => {
+        throw Error("unexpected transport");
+    });
+    const client = new BroadcasterClient(
+        {
+            endpoint: "https://relay.test",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+        },
+        transport
+    );
+    const unknown = { id: "unregistered", status: "prepared" };
+    expect(() => client.quote(unknown, { maxFeeAmount: 1n })).toThrow(/does not support/);
+    expect(() => client.submit(unknown)).toThrow(/does not support/);
+    expect(transport).not.toHaveBeenCalled();
 });

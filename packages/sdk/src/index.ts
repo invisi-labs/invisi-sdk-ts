@@ -154,7 +154,7 @@ export * from "./broadcaster/index";
 
 export type {
     BroadcasterFeeSource,
-    WithBroadcasterOptions,
+    BroadcasterQuoteOptions,
 } from "./broadcaster/broadcaster-preparation";
 
 export { encodePaymentRequest, decodePaymentRequest } from "./payment-request/codec";

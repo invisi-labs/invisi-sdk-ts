@@ -308,14 +308,12 @@ it("requires configured source capability before asking a policy relay for a pri
             throw Error("unexpected quote without capability");
         })
     );
-    await expect(bare.withBroadcaster(relay, { maxFeeAmount: 20n })).rejects.toThrow(
-        /provenance|source/i
-    );
+    await expect(relay.quote(bare, { maxFeeAmount: 20n })).rejects.toThrow(/provenance|source/i);
 });
 it("automatically proves final prepared fields and forwards retained source evidence on normal submit", async () => {
     const h = await configured(),
         original = await h.prepare();
-    const quoted = await original.withBroadcaster(h.client, { maxFeeAmount: 20n });
+    const quoted = await h.client.quote(original, { maxFeeAmount: 20n });
     expect(h.prover.prove).toHaveBeenCalledTimes(1);
     expect(h.events.indexOf("source-prove")).toBeGreaterThan(h.events.lastIndexOf("fee"));
     expect(h.events).not.toContain("provenance_evaluateTransaction");
@@ -324,7 +322,7 @@ it("automatically proves final prepared fields and forwards retained source evid
     expect(original.preview().feeAmount).toBe(0n);
     const ready = await (await externallyAuthorize(quoted)).prove();
     const expectedId = "relay-owned-id";
-    const result = await ready.submitBroadcaster(h.client);
+    const result = await h.client.submit(ready);
     expect(result.id).toBe(expectedId);
     expect(result.state).toBe("submitted");
     const quote = h.requests.find((q) => q.method === "broadcaster_getQuote"),
@@ -339,7 +337,7 @@ it("denied source preflight cannot request a firm quote or mutate the original p
     const h = await configured();
     h.setDeny(true);
     const original = await h.prepare();
-    await expect(original.withBroadcaster(h.client, { maxFeeAmount: 20n })).rejects.toThrow();
+    await expect(h.client.quote(original, { maxFeeAmount: 20n })).rejects.toThrow();
     expect(h.events).not.toContain("quote");
     expect(original.preview().feeAmount).toBe(0n);
 });
@@ -357,18 +355,18 @@ it("persists public evidence and recovers the original managed submission after 
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
-    const quoted = await prepared.withBroadcaster(h.client, { maxFeeAmount: 20n });
+    const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
     const ready = await (await authorizeOperation(quoted)).prove();
     const tracking = ready.provenanceTracking()!;
     tracking.id = "b".repeat(48);
     expect(ready.provenanceTracking()!.id).toBe("a".repeat(48));
-    const firstSubmission = await ready.submitBroadcaster(h.client);
+    const firstSubmission = await h.client.submit(ready);
     h.reader.isSpent = async (_scope, words) => words.map(() => true);
     const resumed = await session.resume(ready.id);
     expect(resumed.provenanceTracking()!.id).toBe("a".repeat(48));
-    expect((await resumed.submitBroadcaster(h.client)).state).toBe("submitted");
+    expect((await h.client.submit(resumed)).state).toBe("submitted");
     expect(h.requests.filter((q) => q.method === "broadcaster_submitTransaction")).toHaveLength(1);
-    expect((await resumed.submitBroadcaster(h.client)).id).toBe(firstSubmission.id);
+    expect((await h.client.submit(resumed)).id).toBe(firstSubmission.id);
     expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).toMatchObject({
         broadcasterSubmissionId: firstSubmission.id,
     });
@@ -382,7 +380,7 @@ it("persists public evidence and recovers the original managed submission after 
 });
 it("rejects changed relay configuration before sending retained source evidence", async () => {
     const h = await configured();
-    const quoted = await (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n });
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     const ready = await (await externallyAuthorize(quoted)).prove();
     const transport = vi.fn(async () => {
         throw Error("must not call changed endpoint");
@@ -391,13 +389,13 @@ it("rejects changed relay configuration before sending retained source evidence"
         { ...h.client.configuration, endpoint: "https://other.test" },
         transport
     );
-    await expect(ready.submitBroadcaster(other)).rejects.toThrow(/context changed/);
+    await expect(other.submit(ready)).rejects.toThrow(/context changed/);
     expect(transport).not.toHaveBeenCalled();
 });
 
 it("finds an input in a previous physical tree using bounded snapshot cursor replay", async () => {
     const h = await configured(true);
-    const quoted = await (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n });
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     expect(quoted.provenanceTracking()).toBeDefined();
     const sidecar = h.requests.find((q) => q.method === "broadcaster_getQuote").proofSidecars[0];
     expect(sidecar.proofBundle.rootCertificates.map((c: any) => String(c.treeId))).toEqual(["1"]);
@@ -407,9 +405,9 @@ it("finds an input in a previous physical tree using bounded snapshot cursor rep
 it("rejects historical root replay beyond the configured page budget before proving or quote", async () => {
     const h = await configured(true);
     h.capability.maxRootPages = 1;
-    await expect(
-        (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n })
-    ).rejects.toThrow(/page budget/);
+    await expect(h.client.quote(await h.prepare(), { maxFeeAmount: 20n })).rejects.toThrow(
+        /page budget/
+    );
     expect(h.prover.prove).not.toHaveBeenCalled();
     expect(h.events).not.toContain("quote");
 });
@@ -425,7 +423,7 @@ it("does not prove, request source validation or silently switch routes for an u
     const h = await configured();
     h.setUnsupportedToken();
     const original = await h.prepare();
-    await expect(original.withBroadcaster(h.client, { maxFeeAmount: 20n })).rejects.toThrow(
+    await expect(h.client.quote(original, { maxFeeAmount: 20n })).rejects.toThrow(
         /Unsupported broadcaster token/
     );
     expect(h.prover.prove).not.toHaveBeenCalled();
@@ -440,7 +438,7 @@ it("requires the relay tracking acknowledgement and authenticates its statement 
         if (mode === "missing") h.setMissingTracking();
         else h.setWrongSourceDigest();
         const original = await h.prepare();
-        await expect(original.withBroadcaster(h.client, { maxFeeAmount: 20n })).rejects.toThrow(
+        await expect(h.client.quote(original, { maxFeeAmount: 20n })).rejects.toThrow(
             /tracking|Tracking/
         );
         expect(original.preview().feeAmount).toBe(0n);
@@ -450,20 +448,20 @@ it("requires the relay tracking acknowledgement and authenticates its statement 
 
 it("replays the exact retained request after an unknown first response without computing an ID", async () => {
     const h = await configured();
-    const quoted = await (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n });
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     const ready = await (await externallyAuthorize(quoted)).prove();
     h.loseSubmitResponse();
-    await expect(ready.submitBroadcaster(h.client)).rejects.toThrow(/lost response/);
+    await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
     const before = h.requests.length;
     h.reader.isSpent = async (_scope, words) => words.map(() => true);
-    const result = await ready.submitBroadcaster(h.client);
+    const result = await h.client.submit(ready);
     expect(result.id).toBe("relay-owned-id");
     expect(h.requests.slice(before).map((q) => q.method)).toEqual([
         "broadcaster_submitTransaction",
     ]);
     const submissions = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
     expect(submissions[1]).toEqual(submissions[0]);
-    await ready.submitBroadcaster(h.client);
+    await h.client.submit(ready);
     expect(h.requests.at(-1).method).toBe("broadcaster_getTransactionStatus");
 });
 it("restores an ID-less uncertain managed send and resubmits its exact body with Source unavailable", async () => {
@@ -480,10 +478,10 @@ it("restores an ID-less uncertain managed send and resubmits its exact body with
         withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
     const ready = await (
-        await authorizeOperation(await prepared.withBroadcaster(h.client, { maxFeeAmount: 20n }))
+        await authorizeOperation(await h.client.quote(prepared, { maxFeeAmount: 20n }))
     ).prove();
     h.loseSubmitResponse();
-    await expect(ready.submitBroadcaster(h.client)).rejects.toThrow(/lost response/);
+    await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
     const uncertain = await h.store.readSnapshot(h.scope);
     expect(uncertain.operations[ready.id]!.payload).toMatchObject({ externalized: true });
     expect(
@@ -493,7 +491,7 @@ it("restores an ID-less uncertain managed send and resubmits its exact body with
     const restarted = new WalletSession(sessionOptions({ ...h.options, prover: backend() }));
     const resumed = await restarted.resume(ready.id);
     const before = h.requests.length;
-    const result = await resumed.submitBroadcaster(h.client);
+    const result = await h.client.submit(resumed);
     expect(result.id).toBe("relay-owned-id");
     expect(h.requests.slice(before).map((q) => q.method)).toEqual([
         "broadcaster_submitTransaction",
@@ -506,6 +504,6 @@ it("restores an ID-less uncertain managed send and resubmits its exact body with
     h.client.status = async () => {
         throw Error("status unavailable");
     };
-    await expect(resumed.submitBroadcaster(h.client)).rejects.toThrow(/status unavailable/);
+    await expect(h.client.submit(resumed)).rejects.toThrow(/status unavailable/);
     expect(h.requests.filter((q) => q.method === "broadcaster_submitTransaction")).toHaveLength(2);
 });

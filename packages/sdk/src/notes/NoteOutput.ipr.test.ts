@@ -80,7 +80,7 @@ it("keeps IPR through EVM resolution, snapshots and broadcaster rebuilding", asy
     expect(prepared.preview().outputs[0]!.commitment).toBe(direct.commitment);
     expect(structuredClone(direct).ipp).toBe(direct.ipp);
     const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
-    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
     expect(quoted.preview().outputs[0]!.commitment).toBe(direct.commitment);
     expect(direct.ipp).toBe(
         encodePaymentRequest({

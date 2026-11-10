@@ -26,7 +26,7 @@ Source-gated Broadcaster quotes bind `keccak256(abi.encode("InvisiBroadcasterPro
 
 - `@invisi-labs/sdk/provenance` (also `@invisi-labs/core/provenance`): primitives, `RecognizedTree`, `buildWitness`, `authenticateManifest`, `exportSidecar`, `validateProofBundle`, `ProvenanceClient`.
 - `@invisi-labs/prover/provenance`: `LocalProvenanceProver`, genuine in-process Noir 1.0.0 and BB 6.0.0 WASM proving plus independent local verification. The host supplies authenticated manifest/artifact/VK bytes through `loadAssets`; no VK URLs or remote prover endpoint are accepted. `crsPath`/`wasmPath` configure the public runtime resources.
-- `BroadcasterClient` accepts optional `provenanceRequired: true` in configuration. Pass sidecars to `quote(data, context, sidecars)` and `submit(data, signedQuote, sidecars)`. Disabled configurations reject provenance metadata.
+- `BroadcasterClient` accepts optional `provenanceRequired: true` in configuration. Pass sidecars to `getQuote(data, context, sidecars)` and `submitTransaction(data, signedQuote, sidecars)`. Disabled configurations reject provenance metadata.
 
 Use `client.syncRecognizedTree(rootId, certificate, {maxLeaves})` for fixed-root public replay. The default replay budget is 100,000 leaves; raise it explicitly for a larger trusted snapshot.
 
@@ -70,9 +70,9 @@ See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local pro
 
 ## Normal Prepared integration
 
-Configure `Invisi({ provenance: { client, manifest, prover, maxRootPages?, maxLeaves? }, ... })`. The client trust and authenticated manifest must be independently pinned; the local prover executes and verifies the source circuit. `prepared.withBroadcaster(client, { maxFeeAmount })` converges fees before building the final source witness, authenticating primary checkpoint anchors and replaying recognized trees locally. It sends the locally generated proof with the quote request. The Broadcaster submits source preflight and returns `provenanceTracking`; the SDK independently authenticates that record with a read-only source lookup before wallet authorization/main proving. The SDK does not submit source preflight on this route. The public evidence survives managed operation snapshots; clients/provers remain runtime capabilities.
+Configure `Invisi({ provenance: { client, manifest, prover, maxRootPages?, maxLeaves? }, ... })`. The client trust and authenticated manifest must be independently pinned; the local prover executes and verifies the source circuit. `client.quote(prepared, { maxFeeAmount })` converges fees before building the final source witness, authenticating primary checkpoint anchors and replaying recognized trees locally. It sends the locally generated proof with the quote request. The Broadcaster submits source preflight and returns `provenanceTracking`; the SDK independently authenticates that record with a read-only source lookup before wallet authorization/main proving. The SDK does not submit source preflight on this route. The public evidence survives managed operation snapshots; clients/provers remain runtime capabilities.
 
-After normal authorization and proving, call `ready.submitBroadcaster(client)`. It uses retained evidence automatically. `provenanceTracking()` returns a detached public tracking record. Credit lifecycle/draw and zero-private-input funding need no source proof. A source-gated relay with private inputs and missing source capabilities fails closed. The bounded replay defaults are 10 root pages and 100,000 total leaves; crossing the limit is explicit failure, never a per-Note network membership fallback.
+After normal authorization and proving, call `client.submit(ready)`. It uses retained evidence automatically. `provenanceTracking()` returns a detached public tracking record. Credit lifecycle/draw and zero-private-input funding need no source proof. A source-gated relay with private inputs and missing source capabilities fails closed. The bounded replay defaults are 10 root pages and 100,000 total leaves; crossing the limit is explicit failure, never a per-Note network membership fallback.
 
 Prepared contains the selected financial Note openings and full final native statement. Recognized-tree paths, signed certificates and a proving backend are additional runtime resources; callers do not manually assemble sidecars. Retry an externalized payment using its original ID/status; do not prepare a replacement while its outcome is uncertain.
 
@@ -82,7 +82,7 @@ Broadcaster use is explicit and optional. Each operator supports its own configu
 
 | Route | Source submission | Protocol transaction |
 |---|---|---|
-| `withBroadcaster` | SDK proves locally; Broadcaster submits preflight and returns tracking in its quote | `submitBroadcaster` attaches retained evidence; the relay broadcasts |
+| `broadcaster.quote` | SDK proves locally; Broadcaster submits preflight and returns tracking in its quote | `broadcaster.submit` attaches retained evidence; the relay broadcasts |
 | Direct, source first | App explicitly calls `evaluateTransaction(data, sidecars)` and retains tracking | App sends the unchanged protocol transaction independently |
 | Direct, transaction first | After canonical confirmation, App explicitly calls `submitProof` with the actual operation locator | App sends the protocol transaction independently before source submission |
 
@@ -90,12 +90,12 @@ The App chooses the direct-step order. Source verification and recognition are a
 
 ## Concrete transaction quotes
 
-`client.estimateQuote(data)` requests an unsigned estimate for this exact transaction shape. `client.quote(data, { chainId, protocol }, sidecars)` requests the verified firm quote. They use `broadcaster_estimateQuote` and `broadcaster_getQuote`, respectively, without a mode parameter; only the firm request submits Source preflight. `withBroadcaster` owns fee convergence and invokes the firm phase after final local source proving. `Protocol.getBroadcasters({ data })` probes each registered operator against the concrete transaction, including token support. Token-only probes and `getFee` are removed.
+`client.estimateQuote(data)` requests an unsigned estimate for this exact transaction shape. `client.getQuote(data, { chainId, protocol }, sidecars)` requests the verified firm quote. They use `broadcaster_estimateQuote` and `broadcaster_getQuote`, respectively, without a mode parameter; only the firm request submits Source preflight. `broadcaster.quote` owns fee convergence and invokes the firm phase after final local source proving. `Protocol.getBroadcasters({ data })` probes each registered operator against the concrete transaction, including token support. Token-only probes and `getFee` are removed.
 
 Only TypeScript is synchronized to this source release in this change. Go/Rust SDKs remain pending user confirmation; their prior artifacts/vectors are not claimed compatible with this manifest.
 
 ## Relay submission identity
 
-`(await ready.submitBroadcaster(client)).id` is assigned only by the configured Broadcaster. The SDK does not compute or expose an ID generator, and does not assume a particular ID algorithm or hash format. No client-supplied idempotency key is sent to `broadcaster_submitTransaction`. Use the returned opaque ID with `broadcaster_getTransactionStatus`.
+`(await client.submit(ready)).id` is assigned only by the configured Broadcaster. The SDK does not compute or expose an ID generator, and does not assume a particular ID algorithm or hash format. No client-supplied idempotency key is sent to `broadcaster_submitTransaction`. Use the returned opaque ID with `broadcaster_getTransactionStatus`.
 
 Before sending, the SDK retains the exact original calldata, quote and sidecars; managed Session persists the externalization fence. A lost first response is retried with that same body, letting the relay return the existing record. Once an ID is known it is saved for status-first recovery. The relay must never overwrite or send the accepted original request again. Runtime Source availability, spent inputs or expiry must not block replay of an already externalized original request; a previously unseen request still undergoes the relay's full validation. Source-proof job idempotency remains separate.

@@ -104,7 +104,7 @@ describe("per-output receiving-key lookup", () => {
         ).toBe(false);
         expect(delivery.ciphertext).not.toBe("0x");
         const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
-        const quoted = await prepared.withBroadcaster(quoteClient(h.h.context), {
+        const quoted = await quoteClient(h.h.context).quote(prepared, {
             maxFeeAmount: 20n,
         });
         const next = (await saved()).operations[quoted.id]!

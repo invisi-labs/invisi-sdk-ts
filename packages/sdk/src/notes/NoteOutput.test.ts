@@ -113,7 +113,7 @@ it("preserves output commitments during Broadcaster fee reconstruction", async (
         outputs: [output],
         funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "signature" },
     });
-    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 20n });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 20n });
     expect(quoted.preview().outputs[0]!.commitment).toBe(output.commitment);
     expect(quoted.preview().funding.amount).toBe(40n);
 });
@@ -209,7 +209,7 @@ it("creates envelope-free EVM and opaque identity outputs without receiving-key 
         })
     ).rejects.toThrow(/funding must equal output total/);
     const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
-    const quoted = await prepared.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 20n });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 20n });
     expect(quoted.preview().outputs[0]!.commitment).toBe(opaque.commitment);
 });
 

@@ -4,6 +4,9 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
+const { Wallet: EvmWallet } = require(
+    require.resolve("ethers", { paths: [resolve("packages/sdk")] })
+);
 const word = (number) => `0x${number.toString(16).padStart(64, "0")}`;
 for (const format of ["js", "cjs"]) {
     const load = (path) => {
@@ -74,6 +77,58 @@ for (const format of ["js", "cjs"]) {
         detached.preview().outputs[0].commitment
     );
     assert.equal(Object.keys((await store.readSnapshot(managed.scope)).operations).length, 1);
+    const operator = new EvmWallet(`0x${"03".repeat(32)}`);
+    const broadcaster = new sdk.BroadcasterClient(
+        {
+            endpoint: "https://relay.test",
+            quoteSigner: operator.address,
+            feeRecipient: operator.address,
+        },
+        async (envelope) => {
+            const params = envelope.params[0];
+            if (envelope.method === "broadcaster_estimateQuote")
+                return {
+                    jsonrpc: "2.0",
+                    id: envelope.id,
+                    result: { feeRecipient: operator.address, feeAmount: "1", maxGas: "1000000" },
+                };
+            const intent = sdk.decodeBroadcasterIntent(params.data).request.params;
+            const quote = {
+                token: intent.token,
+                feeRecipient: operator.address,
+                feeAmount: String(intent.feeAmount),
+                deadline: String(intent.deadline),
+                maxGas: "1000000",
+                requestHash: sdk.broadcasterRequestHash(params.data),
+            };
+            return {
+                jsonrpc: "2.0",
+                id: envelope.id,
+                result: {
+                    quote,
+                    signature: await operator.signTypedData(
+                        sdk.broadcasterQuoteDomain({
+                            chainId,
+                            protocol: protocolAddress,
+                            signer: operator.address,
+                        }),
+                        sdk.broadcasterQuoteTypes,
+                        quote
+                    ),
+                },
+            };
+        }
+    );
+    const quotedDetached = await broadcaster.quote(detached, { maxFeeAmount: 2n });
+    const quotedManaged = await broadcaster.quote(operation, { maxFeeAmount: 2n });
+    assert(
+        quotedDetached instanceof sdk.PreparedTransaction,
+        `${format} detached quote return type`
+    );
+    assert(quotedManaged instanceof session.Operation, `${format} managed quote return type`);
+    assert.equal(quotedDetached.preview().feeAmount, 1n);
+    assert.equal(quotedManaged.preview().feeAmount, 1n);
+
     await assert.rejects(
         managed.prepareShield({
             tokenAddress,
@@ -84,5 +139,5 @@ for (const format of ["js", "cjs"]) {
     );
 }
 console.log(
-    "Built session interoperability PASS: ESM and CommonJS, shared class identity and preparation"
+    "Built session interoperability PASS: ESM and CommonJS, shared class identity, preparation and broadcaster quotation"
 );

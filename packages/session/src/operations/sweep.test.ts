@@ -153,7 +153,7 @@ it("atomically replaces one managed reservation after a firm quote and fences th
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
-    const quoted = await original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n });
+    const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
     expect(original.preview().feeAmount).toBe(0n);
     expect(quoted.id).toBe(original.id);
     expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([30n, 60n]);
@@ -171,13 +171,13 @@ it("retains managed reservations on quote failure and commits only one competing
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
     });
     const before = await h.store.readSnapshot(h.scope);
-    await expect(
-        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 9n })
-    ).rejects.toThrow(/limit/);
+    await expect(quoteClient(h.context).quote(original, { maxFeeAmount: 9n })).rejects.toThrow(
+        /limit/
+    );
     expect(await h.store.readSnapshot(h.scope)).toEqual(before);
     const attempts = await Promise.allSettled([
-        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n }),
-        original.withBroadcaster(quoteClient(h.context), { maxFeeAmount: 10n }),
+        quoteClient(h.context).quote(original, { maxFeeAmount: 10n }),
+        quoteClient(h.context).quote(original, { maxFeeAmount: 10n }),
     ]);
     expect(attempts.filter((value) => value.status === "fulfilled")).toHaveLength(1);
     expect(attempts.filter((value) => value.status === "rejected")).toHaveLength(1);

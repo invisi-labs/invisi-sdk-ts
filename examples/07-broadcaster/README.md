@@ -23,9 +23,9 @@ export TRANSACTION_HASH='0x<canonical-confirmed-hash>'
 pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute
 ```
 
-All scripts exit before configuration/network access unless `--execute` is present. With `--execute`, example01 sends through the relay and example03 submits **only an offchain source proof**. Fees are token base units. The operator may support only some tokens; a fee rejection never silently chooses another route. `broadcaster_estimateQuote` requires concrete transaction data and returns an unsigned estimate without Source submission. `broadcaster_getQuote` validates the final fee and Source proof and returns the signed quote/tracking. Both steps are automatic inside `withBroadcaster`; there is no `mode` argument. There is no token-only estimate or `getFee` endpoint.
+All scripts exit before configuration/network access unless `--execute` is present. With `--execute`, example01 sends through the relay and example03 submits **only an offchain source proof**. Fees are token base units. The operator may support only some tokens; a fee rejection never silently chooses another route. `broadcaster_estimateQuote` requires concrete transaction data and returns an unsigned estimate without Source submission. `broadcaster_getQuote` validates the final fee and Source proof and returns the signed quote/tracking. Both steps are automatic inside `broadcaster.quote`; there is no `mode` argument. There is no token-only estimate or `getFee` endpoint.
 
-In01, `withBroadcaster` converges the fee and generates the source proof locally. The relay submits source preflight and returns tracking; the SDK only reads/authenticates that tracking before approval. `submitBroadcaster` attaches retained evidence. The proof includes no uploaded opening or witness. Normal confirmation needs no second proof upload.
+In01, `broadcaster.quote` converges the fee and generates the source proof locally. The relay submits source preflight and returns tracking; the SDK only reads/authenticates that tracking before approval. `broadcaster.submit` attaches retained evidence. The proof includes no uploaded opening or witness. Normal confirmation needs no second proof upload.
 
 ## Direct submission: independent steps
 
@@ -50,12 +50,12 @@ For an explicit estimate of an already prepared transaction:
 const estimate = await client.estimateQuote((await prepared.exportBroadcasterIntent()).data);
 ```
 
-This does not freeze a fee or sign a quote. Normal applications simply call `withBroadcaster`, which performs estimation, fee convergence, source proving and the final `getQuote` request.
+This does not freeze a fee or sign a quote. Normal applications simply call `broadcaster.quote`, which performs estimation, fee convergence, source proving and the final `getQuote` request.
 
 ## Service-owned submission identity
 
 ```ts
-const submitted = await ready.submitBroadcaster(client);
+const submitted = await client.submit(ready);
 console.log(submitted.id);
 const status = await client.status(submitted.id);
 ```
@@ -63,3 +63,14 @@ const status = await client.status(submitted.id);
 The SDK treats `id` as an opaque Broadcaster-owned string. It does not compute it or assume a hash format; operators may define different ID algorithms. The configured Broadcaster alone recognizes identical requests and returns their existing record without replacing or sending the transaction again.
 
 The SDK retains the original transaction, quote and sidecars before sending; managed Session persists its externalization fence. If the first response/ID is lost, retry the same prepared operation to resend the exact retained request. Once the returned ID is saved, subsequent retries query it first. Do not prepare a replacement payment after an uncertain response. Source `submitProof` still has its own proof-job idempotency key, independently of relay IDs.
+
+## Application flow
+
+```ts
+const quoted = await broadcaster.quote(prepared, { maxFeeAmount });
+const ready = await (await quoted.withWalletResponse(response)).prove();
+const submitted = await broadcaster.submit(ready);
+const status = await broadcaster.status(submitted.id);
+```
+
+The transaction still owns approval/proving. Broadcaster owns estimation, signed quotation, submission and status. Managed Session uses the same calls and retains its existing encrypted persistence, reservations and retry behavior. Advanced raw-calldata integrations use `estimateQuote`, `getQuote` and `submitTransaction`; they do not replace the normal object flow.

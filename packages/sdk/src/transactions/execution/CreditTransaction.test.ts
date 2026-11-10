@@ -356,7 +356,7 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
         await h.invisi.prepareRevokeCredit({ ...h.identity, shard: 1n, slot: 0n }),
     ];
     for (const original of prepared) {
-        const quoted = await original.withBroadcaster(client, { maxFeeAmount: 3n });
+        const quoted = await client.quote(original, { maxFeeAmount: 3n });
         expect(quoted.preview().feeAmount).toBe(3n);
         expect(quoted.preview().fundingAmount).toBe(0n);
         const before = decodeBroadcasterIntent((await original.exportBroadcasterIntent()).data),
@@ -367,11 +367,9 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
             expect(after.request.params.payers).toEqual(before.request.params.payers);
             expect(quoted.preview().outputs[0]!.amount).toBe(27n);
         }
-        await expect(original.withBroadcaster(client, { maxFeeAmount: 2n })).rejects.toThrow(
-            /limit/
-        );
+        await expect(client.quote(original, { maxFeeAmount: 2n })).rejects.toThrow(/limit/);
         await expect(
-            original.withBroadcaster(client, { maxFeeAmount: 3n, feeSource: "public-funding" })
+            client.quote(original, { maxFeeAmount: 3n, feeSource: "public-funding" })
         ).rejects.toThrow(/Credit fees/);
     }
 });
@@ -387,23 +385,21 @@ it("keeps update deltas stable across fee stabilization and repeated quotes", as
         credit: h.commitment,
         increaseAvailableCredit: 10n,
     });
-    const first = await prepared.withBroadcaster(client, { maxFeeAmount: 3n });
+    const first = await client.quote(prepared, { maxFeeAmount: 3n });
     expect(first.preview().creditOutputs![0]).toMatchObject({
         availableCredit: 30n,
         unlimited: false,
         totalSpent: 7n,
     });
     expect(first.preview().creditUpdate).toMatchObject({ increaseAvailableCredit: 10n });
-    const again = await first.withBroadcaster(client, { maxFeeAmount: 3n });
+    const again = await client.quote(first, { maxFeeAmount: 3n });
     expect(again.preview().creditOutputs![0]).toMatchObject({
         availableCredit: 30n,
         totalSpent: 7n,
     });
     expect(calls).toBeGreaterThan(3);
     const authorized = await externallyAuthorize(again);
-    await expect(authorized.withBroadcaster(client, { maxFeeAmount: 3n })).rejects.toThrow(
-        /unsigned/
-    );
+    await expect(client.quote(authorized, { maxFeeAmount: 3n })).rejects.toThrow(/unsigned/);
 });
 
 it("does not revive discarded balances when requoting a switch from unlimited to finite", async () => {
@@ -416,10 +412,7 @@ it("does not revive discarded balances when requoting a switch from unlimited to
         unlimited: false,
         increaseAvailableCredit: 5n,
     });
-    const quoted = await prepared.withBroadcaster(
-        quoteClient(h.context, () => 3n),
-        { maxFeeAmount: 3n }
-    );
+    const quoted = await quoteClient(h.context, () => 3n).quote(prepared, { maxFeeAmount: 3n });
     expect(quoted.preview().creditOutputs![0]).toMatchObject({
         availableCredit: 5n,
         unlimited: false,

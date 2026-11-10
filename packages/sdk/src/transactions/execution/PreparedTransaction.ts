@@ -1,3 +1,4 @@
+import { bindBroadcasterOperation } from "../../broadcaster/operation-bridge";
 import {
     Wallet,
     prepareWalletRequest,
@@ -63,6 +64,10 @@ export class PreparedTransaction {
         this.#lifecycle = lifecycle;
         this.#authorization = authorization;
         this.status = status;
+        bindBroadcasterOperation(this, {
+            quote: (client, options) => this.#quoteForBroadcaster(client, options),
+            submit: (client) => this.#submitViaBroadcaster(client),
+        });
         Object.freeze(this);
     }
     static prepare(runtime: Runtime, plan: OperationPlan): PreparedTransaction {
@@ -78,9 +83,9 @@ export class PreparedTransaction {
             ? structuredClone(this.#saved.broadcasterQuote)
             : undefined;
     }
-    async withBroadcaster(
+    async #quoteForBroadcaster(
         client: import("../../broadcaster/index").BroadcasterClient,
-        options: import("../../broadcaster/broadcaster-preparation").WithBroadcasterOptions
+        options: import("../../broadcaster/broadcaster-preparation").BroadcasterQuoteOptions
     ): Promise<PreparedTransaction> {
         this.current();
         check(
@@ -112,7 +117,7 @@ export class PreparedTransaction {
     provenanceTracking() {
         return structuredClone(this.#saved.provenance?.tracking);
     }
-    async submitBroadcaster(client: import("../../broadcaster/index").BroadcasterClient) {
+    async #submitViaBroadcaster(client: import("../../broadcaster/index").BroadcasterClient) {
         this.current();
         check(this.status === "ready", "transaction is not ready");
         const { validateBroadcastEnvelope, validatePreparedBroadcast } =
@@ -130,7 +135,7 @@ export class PreparedTransaction {
         if (!this.#saved.externalized)
             await validatePreparedBroadcast(this.#saved, client, this.#runtime);
         this.#saved.externalized = true;
-        const result = await client.submit(
+        const result = await client.submitTransaction(
             this.#saved.call!.data,
             this.#saved.broadcasterQuote!,
             structuredClone(this.#saved.provenance?.sidecars ?? [])
