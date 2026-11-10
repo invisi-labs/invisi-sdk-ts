@@ -362,10 +362,10 @@ it("binds the provenance requirement to a signed quote and rejects downgrades", 
         },
         transport
     );
-    const bound = await client.getQuote(data, trust, []);
+    const bound = await client.getQuote(data, trust);
     await client.submitTransaction(data, bound, []);
     expect(
-        (transport.mock.calls[0]![0].params as { proofSidecars: unknown[] }[])[0]!.proofSidecars
+        (transport.mock.calls[1]![0].params as { proofSidecars: unknown[] }[])[0]!.proofSidecars
     ).toEqual([]);
 });
 

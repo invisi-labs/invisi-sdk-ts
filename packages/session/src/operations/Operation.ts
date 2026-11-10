@@ -78,6 +78,11 @@ export class Operation {
         bindBroadcasterOperation(this, {
             quote: (client, options) => this.#quoteForBroadcaster(client, options),
             submit: (client) => this.#submitViaBroadcaster(client),
+            readProvenance: () =>
+                this.#runtime.store.transaction(this.#runtime.scope, (state) =>
+                    structuredClone(this.current(state.operations[this.id]).provenance)
+                ),
+            proveProvenance: (capability, reprove) => this.#proveProvenance(capability, reprove),
         });
         Object.freeze(this);
     }
@@ -536,13 +541,32 @@ export class Operation {
         return result;
     }
 
-    provenanceTracking() {
-        return structuredClone(this.#saved.provenance?.tracking);
+    async #proveProvenance(
+        capability?: import("@invisi-labs/sdk/session-support").PreparedProvenanceCapability,
+        reprove = false
+    ) {
+        const { provePreparedProvenance } = await import("@invisi-labs/sdk/session-support");
+        const original = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
+            structuredClone(this.current(state.operations[this.id]))
+        );
+        check(
+            ["ready", "uncertain", "confirmed"].includes(this.status),
+            "Ready or confirmed operation required for Provenance"
+        );
+        const packet = await provePreparedProvenance(original, this.#runtime, capability, reprove);
+        const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+            const current = this.current(state.operations[this.id]);
+            if (current.provenance && !reprove) return structuredClone(current.provenance);
+            if (!current.broadcasterAttempted) current.provenance = structuredClone(packet);
+            return packet;
+        });
+        if (!original.broadcasterAttempted) this.#saved.provenance = structuredClone(saved);
+        return saved;
     }
     async #submitViaBroadcaster(client: import("@invisi-labs/sdk").BroadcasterClient) {
         const { validateBroadcastEnvelope, validatePreparedBroadcast } =
             await import("@invisi-labs/sdk/session-support");
-        const durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
+        let durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
             structuredClone(this.current(state.operations[this.id]))
         );
         check(this.status === "ready", "operation is not ready");
@@ -555,7 +579,17 @@ export class Operation {
                 if (!(error instanceof BroadcasterRpcError) || error.code !== -32001) throw error;
             }
         }
-        if (!durable.externalized) {
+        if (!durable.broadcasterAttempted) {
+            if (
+                client.configuration.provenanceRequired &&
+                durable.plan.inputs.length &&
+                !durable.provenance
+            ) {
+                await this.#proveProvenance();
+                durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
+                    structuredClone(this.current(state.operations[this.id]))
+                );
+            }
             await this.validateExport();
             await validatePreparedBroadcast(durable, client, this.#runtime);
         }
@@ -565,6 +599,7 @@ export class Operation {
             check(record!.status === "ready" && current.call, "operation is not ready");
             validateBroadcastEnvelope(current, client);
             current.externalized = true;
+            current.broadcasterAttempted = true;
             return structuredClone(current);
         });
         const result = await client.submitTransaction(

@@ -33,7 +33,6 @@ export interface SignedBroadcasterQuote {
     quote: BroadcasterQuote;
     signature: string;
     provenanceRequired?: boolean;
-    provenanceTracking?: import("@invisi-labs/core/provenance").Tracking;
     requestHashFormat?: string;
     context?: { chainId: bigint; protocol: string };
 }
@@ -141,7 +140,6 @@ export function verifyBroadcasterQuote(
                     "signature",
                     "context",
                     "provenanceRequired",
-                    "provenanceTracking",
                     "requestHashFormat",
                 ].includes(k)
         )
@@ -152,9 +150,7 @@ export function verifyBroadcasterQuote(
         required
             ? signed.provenanceRequired !== true ||
               signed.requestHashFormat !== "invisi-broadcaster-provenance-intent-v1"
-            : signed.provenanceRequired !== undefined ||
-              signed.requestHashFormat !== undefined ||
-              signed.provenanceTracking !== undefined
+            : signed.provenanceRequired !== undefined || signed.requestHashFormat !== undefined
     )
         throw new Error("broadcaster provenance requirement mismatch");
     const originalHash = broadcasterRequestHash(data);
@@ -350,17 +346,11 @@ export class BroadcasterClient {
     }
     async getQuote(
         data: string,
-        context: { chainId: bigint; protocol: string },
-        proofSidecars: readonly ProofSidecar[] = []
+        context: { chainId: bigint; protocol: string }
     ): Promise<SignedBroadcasterQuote> {
         decodeBroadcasterIntent(data);
-        const { proofSidecarToWire, validateTracking } =
-            await import("@invisi-labs/core/provenance");
         const signed = (await this.call("broadcaster_getQuote", {
             data,
-            ...(this.configuration.provenanceRequired !== true
-                ? {}
-                : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
         })) as SignedBroadcasterQuote;
         verifyBroadcasterQuote(
             signed,
@@ -375,14 +365,10 @@ export class BroadcasterClient {
         );
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
-        if (signed.provenanceTracking !== undefined) validateTracking(signed.provenanceTracking);
         return {
             quote: signed.quote,
             signature: signed.signature,
             context: { ...context },
-            ...(signed.provenanceTracking === undefined
-                ? {}
-                : { provenanceTracking: structuredClone(signed.provenanceTracking) }),
             ...(signed.provenanceRequired === undefined
                 ? {}
                 : { provenanceRequired: signed.provenanceRequired }),

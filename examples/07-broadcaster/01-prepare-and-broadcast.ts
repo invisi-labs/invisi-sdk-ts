@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { JsonRpcProvider, getBytes } from "ethers";
+import { JsonRpcProvider, Wallet as EthersWallet, getBytes } from "ethers";
 import {
     Invisi,
     Protocol,
@@ -10,6 +10,7 @@ import {
     NoteOutput,
 } from "@invisi-labs/sdk";
 import {
+    Provenance,
     ProvenanceClient,
     authenticateManifest,
     DEFAULT_PROVENANCE_ENDPOINT,
@@ -79,12 +80,14 @@ try {
     if (protocol.context.protocolAddress.toLowerCase() !== protocolAddress.toLowerCase())
         throw Error("Pinned deployment mismatch");
     const [alice, bob] = getAccounts();
+    const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
+    if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase())
+        throw Error("ALICE_PRIVATE_KEY must match Alice's Note owner");
     const tokenAddress = settings.tokenAddress;
     const invisi = new Invisi({
         provider,
         protocolRpc,
         prover: new NativeProver({ bbBin: settings.bbBin }),
-        provenance: { client: source, manifest: manifestIdentity, prover: sourceProver },
     });
     const inputs = await discoverCandidates({
         provider,
@@ -117,28 +120,31 @@ try {
         feeRecipient,
         provenanceRequired: true,
     });
-    // After fees stabilize, the SDK proves provenance locally; Broadcaster submits its preflight.
-    // The SDK authenticates the returned tracking before wallet authorization.
+    // Quoting freezes fees only. Source data/proving is deferred until the ready transaction.
     const quoted = await broadcaster.quote(prepared, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,
     });
-    const tracking = quoted.provenanceTracking();
-    if (!tracking) throw Error("Missing Provenance tracking for private Note inputs");
-    console.log("Provenance preflight tracking:", json(tracking));
-    // Provenance uses this ID to follow chain confirmation and source recognition.
-    const request = await quoted.exportWalletRequest(crypto.randomUUID());
-    const responses = await nativeWallet.execute([request]);
-    const response = responses.find((item) => item.id === request.id);
-    if (!response) throw Error("Missing wallet response");
-    const ready = await (await quoted.withWalletResponse(response)).prove();
+    const authorization = await quoted.exportWalletAuthorization();
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
+    );
+    const authorized = await quoted.withWalletSignature(signature);
+    const ready = await authorized.prove();
     console.log("Verified quote:", json(ready.broadcasterQuote()));
-    const data = (await ready.exportTransaction()).data;
+    const provenance = new Provenance({
+        client: source,
+        manifest: manifestIdentity,
+        prover: sourceProver,
+    });
+    const sourceProof = await provenance.prove(ready);
+    console.log("Save Provenance proof for recovery:", json(sourceProof));
+    // Submission reuses this proof; the relay verifies it before broadcasting.
     const submitted = await broadcaster.submit(ready);
     const record = {
-        data,
+        sourceProof,
         submissionId: submitted.id,
-        trackingId: tracking.id,
-        operationDigest: tracking.operationDigest,
     };
     console.log("Broadcast record:", json(record));
     console.log(json(submitted));

@@ -169,7 +169,4 @@ export type {
 } from "./payment-note/verification";
 export { TransactionOutput } from "./notes/TransactionOutput";
 
-export type {
-    PreparedProvenanceCapability,
-    PreparedProvenanceState,
-} from "./broadcaster/provenance-preparation";
+export type { PreparedProvenanceCapability } from "./broadcaster/provenance-preparation";

@@ -30,13 +30,7 @@ export async function quoteManagedOperation(
             },
             intent
         );
-    const selected = await prepareBroadcasterPlan(
-        snapshot.plan,
-        reprepare,
-        client,
-        options,
-        runtime
-    );
+    const selected = await prepareBroadcasterPlan(snapshot.plan, reprepare, client, options);
     const saved = await runtime.store.transaction(runtime.scope, (state) => {
         const record = state.operations[snapshot.plan.id];
         const old = record?.payload as SavedOperation;
@@ -63,7 +57,6 @@ export async function quoteManagedOperation(
         const next: SavedOperation = {
             plan: nextPlan,
             broadcasterQuote: selected.quote,
-            ...(selected.provenance ? { provenance: selected.provenance } : {}),
             broadcasterBinding: selected.broadcasterBinding,
             generation: old.generation + 1,
         };

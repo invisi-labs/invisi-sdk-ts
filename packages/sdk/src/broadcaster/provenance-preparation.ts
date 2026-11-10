@@ -1,9 +1,9 @@
+import { validateProvenanceProof, type ProvenanceProof } from "../provenance/proof-record";
 import {
     CAPACITIES,
     exportSidecar,
     noteOpening,
     operationDigest,
-    validateTracking,
     word,
     assertCertificateTrust,
     validateProofBundle,
@@ -13,7 +13,6 @@ import {
     type ProofSidecar,
     type ProvenanceClient,
     type RootCertificate,
-    type Tracking,
     type WitnessInput,
 } from "@invisi-labs/core/provenance";
 import type {
@@ -31,18 +30,8 @@ export interface PreparedProvenanceCapability {
     maxRootPages?: number;
     maxLeaves?: number;
 }
-export interface PreparedProvenanceState {
-    operationDigest: string;
-    sidecars: ProofSidecar[];
-    tracking: Tracking;
-}
-export function requirePreparedProvenance(
-    plan: OperationPlan,
-    client: BroadcasterClient,
-    runtime?: TransactionRuntime
-) {
-    if (!client.configuration.provenanceRequired || !plan.inputs.length) return;
-    const cap = runtime?.options.provenance;
+function requireProvenanceCapability(plan: OperationPlan, runtime: TransactionRuntime) {
+    const cap = runtime.options.provenance;
     if (!cap) throw Error("Provenance capability required for private inputs");
     const trust = cap.client.trust;
     if (
@@ -54,11 +43,10 @@ export function requirePreparedProvenance(
 }
 export async function prepareProvenance(
     plan: OperationPlan,
-    client: BroadcasterClient,
-    runtime?: TransactionRuntime
-): Promise<Omit<PreparedProvenanceState, "tracking"> | undefined> {
-    requirePreparedProvenance(plan, client, runtime);
-    if (!client.configuration.provenanceRequired || !plan.inputs.length) return;
+    runtime: TransactionRuntime
+): Promise<{ operationDigest: string; sidecars: ProofSidecar[] }> {
+    requireProvenanceCapability(plan, runtime);
+    if (!plan.inputs.length) throw Error("No private Note inputs require a Provenance proof");
     const {
         client: source,
         manifest,
@@ -206,24 +194,33 @@ export async function prepareProvenance(
     );
     return { operationDigest: digest, sidecars: [sidecar] };
 }
-export async function acceptBroadcasterTracking(
-    evidence: Omit<PreparedProvenanceState, "tracking">,
-    value: unknown,
-    capability: PreparedProvenanceCapability
-): Promise<PreparedProvenanceState> {
-    const candidate = validateTracking(value);
-    if (
-        candidate.operationDigest !== evidence.operationDigest ||
-        !["pending_confirmation", "pending_source", "recognized"].includes(candidate.status)
-    )
-        throw Error("Broadcaster source tracking mismatch");
-    const { tracking } = await capability.client.getTracking(candidate.id);
-    if (
-        tracking.operationDigest !== evidence.operationDigest ||
-        !["pending_confirmation", "pending_source", "recognized"].includes(tracking.status)
-    )
-        throw Error("Source tracking is not active for the prepared statement");
-    return { ...evidence, tracking: structuredClone(tracking) };
+export async function provePreparedProvenance(
+    saved: SavedOperation,
+    runtime: TransactionRuntime,
+    capability?: PreparedProvenanceCapability,
+    reprove = false
+): Promise<ProvenanceProof> {
+    if (!saved.call || !saved.proof || saved.plan.kind !== "transfer" || !saved.plan.inputs.length)
+        throw Error("Ready transaction with private Note inputs required");
+    const active = capability ?? runtime.options.provenance;
+    if (!active) throw Error("Local Provenance capability required");
+    if (saved.provenance && !reprove)
+        return validateProvenanceProof(structuredClone(saved.provenance), active.client.trust);
+    const localRuntime = { ...runtime, options: { ...runtime.options, provenance: active } };
+    const evidence = await prepareProvenance(saved.plan, localRuntime);
+    const packet: ProvenanceProof = {
+        format: "invisi-provenance-submission-v1",
+        data: saved.call.data,
+        context: {
+            chainId: saved.plan.context.chainId.toString(),
+            protocolAddress: saved.plan.context.protocolAddress,
+            tokenAddress: saved.plan.context.tokenAddress,
+        },
+        mainCircuitCapacity: saved.plan.capacity!,
+        publicInputs: [...statement(saved.plan).expectedPublicInputs],
+        ...evidence,
+    };
+    return validateProvenanceProof(packet, active.client.trust);
 }
 export function validateBroadcastEnvelope(saved: SavedOperation, client: BroadcasterClient) {
     if (!saved.broadcasterQuote || !saved.broadcasterBinding || !saved.call)
@@ -249,7 +246,6 @@ export async function validatePreparedBroadcast(
     runtime: TransactionRuntime
 ) {
     validateBroadcastEnvelope(saved, client);
-    requirePreparedProvenance(saved.plan, client, runtime);
     if (client.configuration.provenanceRequired && saved.plan.inputs.length) {
         const source = saved.provenance;
         if (!source || source.sidecars.length !== 1)
@@ -259,7 +255,7 @@ export async function validatePreparedBroadcast(
             mainCircuitCapacity: saved.plan.capacity!,
             publicInputs: statement(saved.plan).expectedPublicInputs,
         });
-        if (source.operationDigest !== digest || source.tracking.operationDigest !== digest)
+        if (source.operationDigest !== digest || source.data !== saved.call!.data)
             throw Error("Prepared Provenance statement changed");
         const sidecar = source.sidecars[0]!;
         const pi = sidecar.proofBundle.publicInputs;
@@ -271,6 +267,7 @@ export async function validatePreparedBroadcast(
             BigInt(pi[9]!) !== (await inputDigest(saved.plan.params!.nullifiers))
         )
             throw Error("Prepared Provenance evidence binding mismatch");
-        await validateProofBundle(sidecar.proofBundle, runtime.options.provenance!.client.trust);
+        if (runtime.options.provenance)
+            await validateProofBundle(sidecar.proofBundle, runtime.options.provenance.client.trust);
     } else if (saved.provenance) throw Error("Unexpected Prepared Provenance evidence");
 }

@@ -41,7 +41,8 @@
     "example:session:8": "tsx 05-wallet-session/08-revoke-credit.ts",
     "example:broadcaster:1": "tsx 07-broadcaster/01-prepare-and-broadcast.ts",
     "example:broadcaster:2": "tsx 07-broadcaster/02-confirm-recognition.ts",
-    "example:broadcaster:3": "tsx 07-broadcaster/03-self-provenance.ts"
+    "example:broadcaster:3": "tsx 07-broadcaster/03-self-provenance.ts",
+    "example:broadcaster:4": "tsx 07-broadcaster/04-resubmit-provenance.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",

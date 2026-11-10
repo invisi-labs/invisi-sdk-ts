@@ -67,6 +67,11 @@ export class PreparedTransaction {
         bindBroadcasterOperation(this, {
             quote: (client, options) => this.#quoteForBroadcaster(client, options),
             submit: (client) => this.#submitViaBroadcaster(client),
+            readProvenance: async () => {
+                this.current();
+                return structuredClone(this.#saved.provenance);
+            },
+            proveProvenance: (capability, reprove) => this.#proveProvenance(capability, reprove),
         });
         Object.freeze(this);
     }
@@ -98,15 +103,13 @@ export class PreparedTransaction {
             this.#saved.plan,
             this.#runtime.reprepare,
             client,
-            options,
-            this.#runtime
+            options
         );
         return new PreparedTransaction(
             this.#runtime,
             {
                 plan: selected.plan,
                 broadcasterQuote: selected.quote,
-                ...(selected.provenance ? { provenance: selected.provenance } : {}),
                 broadcasterBinding: selected.broadcasterBinding,
                 generation: 0,
             },
@@ -114,8 +117,27 @@ export class PreparedTransaction {
             { generation: 0, busy: false }
         );
     }
-    provenanceTracking() {
-        return structuredClone(this.#saved.provenance?.tracking);
+    async #proveProvenance(
+        capability?: import("../../broadcaster/provenance-preparation").PreparedProvenanceCapability,
+        reprove = false
+    ) {
+        this.current();
+        check(this.status === "ready", "Ready transaction required for Provenance");
+        const { provePreparedProvenance } =
+            await import("../../broadcaster/provenance-preparation");
+        this.#lifecycle.busy = true;
+        try {
+            const packet = await provePreparedProvenance(
+                this.#saved,
+                this.#runtime,
+                capability,
+                reprove
+            );
+            if (!this.#saved.broadcasterAttempted) this.#saved.provenance = structuredClone(packet);
+            return packet;
+        } finally {
+            this.#lifecycle.busy = false;
+        }
     }
     async #submitViaBroadcaster(client: import("../../broadcaster/index").BroadcasterClient) {
         this.current();
@@ -132,9 +154,17 @@ export class PreparedTransaction {
             }
         }
         // A lost first response has no ID yet. Resend the retained request; only the relay can deduplicate it.
-        if (!this.#saved.externalized)
+        if (!this.#saved.broadcasterAttempted) {
+            if (
+                client.configuration.provenanceRequired &&
+                this.#saved.plan.inputs.length &&
+                !this.#saved.provenance
+            )
+                await this.#proveProvenance();
             await validatePreparedBroadcast(this.#saved, client, this.#runtime);
+        }
         this.#saved.externalized = true;
+        this.#saved.broadcasterAttempted = true;
         const result = await client.submitTransaction(
             this.#saved.call!.data,
             this.#saved.broadcasterQuote!,

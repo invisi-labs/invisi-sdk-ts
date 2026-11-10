@@ -2,7 +2,7 @@ import { JsonRpcProvider, getBytes } from "ethers";
 import { ProvenanceClient, DEFAULT_PROVENANCE_ENDPOINT } from "@invisi-labs/sdk/provenance";
 import { settings } from "../settings.js";
 import { readHostJson } from "../host-transport.js";
-import type { TrustContext } from "@invisi-labs/sdk/provenance";
+import type { TrustContext, ProvenanceProof } from "@invisi-labs/sdk/provenance";
 
 // Match these public trust pins to the deployment selected in ../settings.ts.
 const provenanceEndpoint = DEFAULT_PROVENANCE_ENDPOINT;
@@ -20,10 +20,8 @@ if (!process.argv.includes("--execute")) {
 }
 console.log("Paste the Broadcast record printed by example01.");
 const record = (await readHostJson()) as {
-    data: string;
+    sourceProof: ProvenanceProof;
     submissionId: string;
-    trackingId: string;
-    operationDigest: string;
 };
 const trust: TrustContext = {
     chainId: settings.chainId,
@@ -48,30 +46,19 @@ try {
         block.hash !== receipt.blockHash ||
         tx.blockHash !== receipt.blockHash ||
         tx.to?.toLowerCase() !== protocolAddress.toLowerCase() ||
-        tx.data.toLowerCase() !== record.data.toLowerCase()
+        tx.data.toLowerCase() !== record.sourceProof.data.toLowerCase()
     )
         throw Error("Canonical transaction mismatch");
     const source = new ProvenanceClient(provenanceEndpoint, trust);
     const locator = { txHash: hash, blockHash: receipt.blockHash, operationIndex: "0" };
-    const tracked = await source.waitTracking(record.trackingId, {
-        timeoutMs: 120000,
-        intervalMs: 2000,
-    });
-    if (tracked.tracking.status !== "recognized")
-        throw Error(
-            `Tracking ${tracked.tracking.status}; retain the frozen transaction and record`
-        );
-    const matched = tracked.tracking.matched!;
-    if (
-        matched.txHash !== hash ||
-        matched.blockHash !== receipt.blockHash ||
-        matched.operationIndex !== "0" ||
-        BigInt(tracked.tracking.operationDigest) !== BigInt(record.operationDigest)
-    )
-        throw Error("Tracking matched another operation");
-    const operation = await source.getOperationRecognition(locator);
+    let operation = await source.getOperationRecognition(locator);
+    const deadline = Date.now() + 120000;
+    while (operation.recognitionState !== "recognized" && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        operation = await source.getOperationRecognition(locator);
+    }
     if (operation.recognitionState !== "recognized")
-        throw Error("Publication pending; retry the same tracking ID");
+        throw Error("Source recognition pending; query the same operation later");
     console.log("Source service confirms operation recognition:", operation);
     // A recipient separately authenticates the published certificate and local membership.
 } finally {

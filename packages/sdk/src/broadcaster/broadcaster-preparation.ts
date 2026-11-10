@@ -1,10 +1,5 @@
-import {
-    prepareProvenance,
-    requirePreparedProvenance,
-    acceptBroadcasterTracking,
-} from "./provenance-preparation";
 import { broadcasterRequestHash } from "./index";
-import type { TransactionRuntime, SavedOperation } from "../transactions/operation-types";
+import type { SavedOperation } from "../transactions/operation-types";
 import { assertCreditUpdatePlan } from "../credit/state";
 import { getAddress } from "ethers";
 import type {
@@ -64,36 +59,21 @@ export async function prepareBroadcasterPlan(
     plan: OperationPlan,
     reprepare: (intent: PreparationIntent) => Promise<OperationPlan>,
     client: BroadcasterClient,
-    options: BroadcasterQuoteOptions,
-    runtime?: TransactionRuntime
+    options: BroadcasterQuoteOptions
 ): Promise<{
     plan: OperationPlan;
     quote: SignedBroadcasterQuote;
-    provenance?: SavedOperation["provenance"];
     broadcasterBinding: NonNullable<SavedOperation["broadcasterBinding"]>;
 }> {
-    requirePreparedProvenance(plan, client, runtime);
     const finalize = async (final: OperationPlan) => {
-        const evidence = await prepareProvenance(final, client, runtime);
         const data = exportBroadcasterIntent(final).data;
-        const quote = await client.getQuote(
-            data,
-            { chainId: final.context.chainId, protocol: final.context.protocolAddress },
-            structuredClone(evidence?.sidecars ?? [])
-        );
-        const provenance = evidence
-            ? await acceptBroadcasterTracking(
-                  evidence,
-                  quote.provenanceTracking,
-                  runtime!.options.provenance!
-              )
-            : undefined;
-        if (!evidence && quote.provenanceTracking)
-            throw Error("Unexpected source tracking for operation without private inputs");
+        const quote = await client.getQuote(data, {
+            chainId: final.context.chainId,
+            protocol: final.context.protocolAddress,
+        });
         return {
             plan: final,
             quote,
-            provenance,
             broadcasterBinding: {
                 configuration: { ...client.configuration },
                 intentHash: broadcasterRequestHash(data),

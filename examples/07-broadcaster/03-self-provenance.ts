@@ -1,26 +1,22 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { JsonRpcProvider, Interface, getBytes, sha256, toUtf8Bytes, toQuantity } from "ethers";
-import { Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
-import { transactUserPublicInputs, selectTransactCapacity } from "@invisi-labs/protocol";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { JsonRpcProvider, getBytes, Wallet as EthersWallet } from "ethers";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import {
+    Provenance,
     ProvenanceClient,
     DEFAULT_PROVENANCE_ENDPOINT,
     authenticateManifest,
-    noteOpening,
-    operationDigest,
-    exportSidecar,
-    word,
 } from "@invisi-labs/sdk/provenance";
-import type { TrustContext, RootCertificate } from "@invisi-labs/sdk/provenance";
+import type { TrustContext } from "@invisi-labs/sdk/provenance";
 import { LocalProvenanceProver } from "@invisi-labs/prover/provenance";
+import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { nativeWallet, json, readHostJson } from "../host-transport.js";
 import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
-
 // Match these public trust pins to the deployment selected in ../settings.ts.
 const provenanceEndpoint = DEFAULT_PROVENANCE_ENDPOINT;
 const protocolAddress = "0x<20-byte-protocol-address>" as `0x${string}`;
@@ -29,11 +25,10 @@ const providerId = "0x<32-byte-provider-id>";
 const signingKeyId = "0x<sha256-of-pinned-public-key>";
 const signingPublicKey = "0x<32-byte-pinned-ed25519-public-key>";
 const assetRoot = fileURLToPath(new URL("../../.cache/provenance/", import.meta.url));
-const sourceRootId: string | undefined = undefined; // Optional historical checkpoint containing the input.
 
 if (!process.argv.includes("--execute")) {
     console.log(
-        "Pass --execute with TRANSACTION_HASH to prove and submit provenance for a self-broadcast one-input transact."
+        "Pass --execute to prepare a direct payment, build its recoverable source proof and submit after host confirmation."
     );
     process.exit(0);
 }
@@ -73,162 +68,72 @@ const provider = new JsonRpcProvider(settings.chainRpcUrl);
 try {
     if ((await provider.getNetwork()).chainId !== settings.chainId)
         throw Error("Primary chain mismatch");
-    const hash = process.env.TRANSACTION_HASH!;
-    const tx = await provider.getTransaction(hash),
-        receipt = await provider.getTransactionReceipt(hash);
-    if (
-        !tx ||
-        !receipt ||
-        receipt.status !== 1 ||
-        tx.to?.toLowerCase() !== protocolAddress.toLowerCase()
-    )
-        throw Error("Successful protocol transaction required");
-    const block = await provider.getBlock(receipt.blockNumber);
-    if (!block || block.hash !== receipt.blockHash || tx.blockHash !== receipt.blockHash)
-        throw Error("Transaction is not canonical");
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: tx.data });
-    if (decoded?.name !== "transact") throw Error("This example supports a direct transact only");
-    const raw = decoded.args[1];
-    if (raw.params.nullifiers.length !== 1)
-        throw Error(
-            "Choose a transact with exactly one private Note input, including a pure withdrawal"
-        );
-    const context = {
-        chainId: settings.chainId,
-        protocolAddress: protocolAddress as `0x${string}`,
-        tokenAddress: raw.params.token as `0x${string}`,
-    };
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    if (protocol.context.protocolAddress.toLowerCase() !== context.protocolAddress.toLowerCase())
+    if (protocol.context.protocolAddress.toLowerCase() !== protocolAddress.toLowerCase())
         throw Error("Pinned deployment mismatch");
-    const [alice] = getAccounts();
-    // Include spent Notes: the host already sent the transaction independently.
+    const [alice, bob] = getAccounts();
+    const tokenAddress = settings.tokenAddress;
+    const invisi = new Invisi({
+        provider,
+        protocolRpc,
+        prover: new NativeProver({ bbBin: settings.bbBin }),
+    });
     const candidates = await discoverCandidates({
         provider,
         protocolRpc,
         protocol,
         wallet: alice.publicWallet,
         nativeWallet,
-        tokenAddress: context.tokenAddress,
-        includeSpent: true,
+        tokenAddress,
     });
-    let selected: (typeof candidates)[number] | undefined;
-    for (const input of candidates) {
-        const opening = await noteOpening({
-            ...context,
-            owner: input.note.ownerAddress,
-            nonce: input.note.nonce,
-            amount: input.note.amount,
-        });
-        if (word(opening.nullifier) === word(raw.params.nullifiers[0])) {
-            selected = input;
-            break;
-        }
+    const input = candidates.find((note) => note.note.amount > 1n);
+    if (!input) throw Error("Fund and recognize Alice's Note first");
+    const output = await NoteOutput.create({
+        ...protocol.context,
+        tokenAddress,
+        amount: input.note.amount / 2n,
+        recipient: { type: "invisi", address: bob.receivingAddress },
+    });
+    const prepared = await invisi.prepareTransfer({
+        wallet: alice.publicWallet,
+        protocol,
+        tokenAddress,
+        inputs: [input],
+        outputs: [output],
+    });
+    const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
+    if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase()) {
+        throw Error("ALICE_PRIVATE_KEY must match Alice's Note owner");
     }
-    if (!selected) throw Error("The local wallet cannot open this transaction's input Note");
-    const status = await source.getStatus();
-    const rootId = sourceRootId ?? `${trust.chainGeneration}:${status.checkpointSequence}`;
-    const root = await source.getRoot(rootId);
-    if (root.allowedForNewProof !== true) throw Error("Source root is not usable");
-    const certificate = root.certificate as RootCertificate;
-    const anchor = await provider.getBlock(toQuantity(BigInt(certificate.confirmedBlockNumber)));
-    if (!anchor || anchor.hash !== word(certificate.confirmedBlockHash))
-        throw Error("Source checkpoint is not canonical");
-    const tree = await source.syncRecognizedTree(rootId, certificate, { maxLeaves: 100000 });
-    const membership = await tree.membershipForCommitment(trust, selected.commitment);
-    if (!membership)
-        throw Error(
-            "Input absent from this tree; set sourceRootId to a usable historical checkpoint containing it"
-        );
-    const params = {
-        token: context.tokenAddress,
-        sources: Array.from(raw.params.sources, (s: any) => ({
-            treeId: s.treeId,
-            merkleRoot: s.merkleRoot,
-        })),
-        nullifiers: [...raw.params.nullifiers],
-        noteCommitments: [...raw.params.noteCommitments],
-        withdrawalAddress: raw.params.withdrawalAddress,
-        withdrawalAmount: raw.params.withdrawalAmount,
-        deadline: raw.params.deadline,
-        feeRecipient: raw.params.feeRecipient,
-        feeAmount: raw.params.feeAmount,
-    };
-    const funding = {
-        payer: raw.funding.payer,
-        amount: raw.funding.amount,
-        sigNonce: raw.funding.sigNonce,
-        deadline: raw.funding.deadline,
-        signature: raw.funding.signature,
-        permit: {
-            deadline: raw.funding.permit.deadline,
-            v: Number(raw.funding.permit.v),
-            r: raw.funding.permit.r,
-            s: raw.funding.permit.s,
-        },
-    };
-    const deliveries = Array.from(raw.deliveries, (d: any) => ({
-        ciphertext: d.ciphertext,
-        clue: d.clue,
-    }));
-    const capacity = selectTransactCapacity(
-        params.nullifiers.length,
-        params.noteCommitments.length
+    const authorization = await prepared.exportWalletAuthorization();
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
     );
-    const digest = operationDigest({
-        ...context,
-        mainCircuitCapacity: capacity,
-        publicInputs: transactUserPublicInputs(context, params, deliveries, funding),
+    const ready = await (await prepared.withWalletSignature(signature)).prove();
+    const provenance = new Provenance({
+        client: source,
+        manifest: manifestIdentity,
+        prover: sourceProver,
+        chainReader: new EthersChainReader(provider),
     });
-    const sidecar = await exportSidecar(
-        {
-            ...trust,
-            capacity: 1,
-            tokenAddress: context.tokenAddress,
-            operationDigest: digest,
-            inputs: [
-                {
-                    owner: selected.note.ownerAddress,
-                    nonce: selected.note.nonce,
-                    amount: selected.note.amount,
-                    sourceIndex: 0,
-                    leafIndex: membership.leafIndex,
-                    path: membership.path,
-                },
-            ],
-            sources: [
-                {
-                    treeId: certificate.treeId,
-                    root: certificate.root,
-                    leafCount: certificate.leafCount,
-                },
-            ],
-        },
-        [certificate],
-        trust,
-        manifestIdentity,
-        sourceProver,
-        0
-    );
-    console.log("Local source proof verified; no Broadcaster is used.");
-    const locator = { txHash: hash, blockHash: receipt.blockHash, operationIndex: "0" };
-    const idempotencyKey = `${hash.slice(2, 18)}:${sha256(toUtf8Bytes(json(sidecar.proofBundle))).slice(2)}`;
+    const sourceProof = await provenance.prove(ready);
+    // The App must persist this public proof packet before sending; do not save any witness/opening in public history.
+    console.log("Save Provenance recovery packet:", json(sourceProof));
     console.log(
-        "Provenance submission:",
-        json({ locator, proofBundle: sidecar.proofBundle, idempotencyKey })
+        "Transaction for independent host submission:",
+        json(await ready.exportTransaction())
     );
-    // Retry a lost response with this exact saved bundle/key, not a newly generated proof.
-    const submitted = await source.submitProof(locator, sidecar.proofBundle, idempotencyKey);
-    if (typeof submitted.jobId !== "string" || !submitted.jobId)
-        throw Error("Missing source proof job ID; retain the saved record");
-    const job = await source.waitProofJob(submitted.jobId);
-    if (job.status !== "valid") throw Error(`Source proof job: ${job.status}`);
-    console.log("Source verification:", json(job));
     console.log(
-        "Current operation recognition:",
-        json(await source.getOperationRecognition(locator))
+        "Send the exact transaction with the host wallet, then return {transactionHash} after confirmation."
     );
+    const sent = (await readHostJson()) as { transactionHash: string };
+    const accepted = await provenance.submit(sourceProof, {
+        transactionHash: sent.transactionHash,
+    });
+    console.log("Provenance submission:", json(accepted));
 } finally {
     provider.destroy();
 }

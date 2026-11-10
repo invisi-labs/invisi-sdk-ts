@@ -20,13 +20,13 @@ Export produces `{operationIndex, proofBundle}`. The bundle has only `format`, `
 
 Use `evaluateTransaction` / `EvaluateTransaction` / `evaluate_transaction` before broadcast. Successful private-input preflight durably admits one opaque tracking task per scope/generation/native operation digest. Retain its tracking ID and use `getTracking` / `GetTracking` / `get_tracking` or the bounded wait method; normal indexing and the source worker match the transaction and automatically collect its already-verified evidence. No transaction-hash notification or duplicate `submitProof` is required. `submitProof` and proof-job polling remain an explicit direct/self-broadcast fallback. Evaluate, submit and job responses must include matching scope, generation, providerId, signingKeyId and manifestSha256. A generation change requires refreshing canonical roots and local paths; it never authorizes changing already signed calldata. Recognition status is independent of whether a Note has been spent. Existing transaction journal schemas are unchanged; the independent recovery coordinator below persists source evidence in its own encrypted namespace.
 
-Source-gated Broadcaster quotes bind `keccak256(abi.encode("InvisiBroadcasterProvenanceIntentV1", originalRequestHash))`. The signed Quote retains its six EIP-712 fields; outer metadata contains `provenanceRequired:true` and `requestHashFormat:"invisi-broadcaster-provenance-intent-v1"`. Missing/unexpected enablement metadata fails closed. `estimateQuote(data)` requires concrete transaction data but no proof; `getQuote(data, proofSidecars)` accepts final source sidecars and returns the signed quote and verified tracking.
+Source-gated Broadcaster quotes bind `keccak256(abi.encode("InvisiBroadcasterProvenanceIntentV1", originalRequestHash))`. The signed Quote retains its six EIP-712 fields; outer metadata contains `provenanceRequired:true` and `requestHashFormat:"invisi-broadcaster-provenance-intent-v1"`. Missing/unexpected enablement metadata fails closed. `estimateQuote(data)` requires concrete transaction data but no proof; `getQuote(data)` prices and signs the final fee without Source checks.
 
 ## TypeScript entrypoints
 
 - `@invisi-labs/sdk/provenance` (also `@invisi-labs/core/provenance`): primitives, `RecognizedTree`, `buildWitness`, `authenticateManifest`, `exportSidecar`, `validateProofBundle`, `ProvenanceClient`.
 - `@invisi-labs/prover/provenance`: `LocalProvenanceProver`, genuine in-process Noir 1.0.0 and BB 6.0.0 WASM proving plus independent local verification. The host supplies authenticated manifest/artifact/VK bytes through `loadAssets`; no VK URLs or remote prover endpoint are accepted. `crsPath`/`wasmPath` configure the public runtime resources.
-- `BroadcasterClient` accepts optional `provenanceRequired: true` in configuration. Pass sidecars to `getQuote(data, context, sidecars)` and `submitTransaction(data, signedQuote, sidecars)`. Disabled configurations reject provenance metadata.
+- `BroadcasterClient` accepts optional `provenanceRequired: true` in configuration. Only `submitTransaction(data, signedQuote, sidecars)` receives source sidecars. Disabled configurations reject provenance metadata.
 
 Use `client.syncRecognizedTree(rootId, certificate, {maxLeaves})` for fixed-root public replay. The default replay budget is 100,000 leaves; raise it explicitly for a larger trusted snapshot.
 
@@ -70,34 +70,33 @@ The official endpoint is `DEFAULT_PROVENANCE_ENDPOINT` (`https://provenance.invi
 
 See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
 
-## Normal Prepared integration
+## Ready-based source proofs
 
-Configure `Invisi({ provenance: { client, manifest, prover, maxRootPages?, maxLeaves? }, ... })`. The client trust and authenticated manifest must be independently pinned; the local prover executes and verifies the source circuit. `client.quote(prepared, { maxFeeAmount })` converges fees before building the final source witness, authenticating primary checkpoint anchors and replaying recognized trees locally. It sends the locally generated proof with the quote request. The Broadcaster submits source preflight and returns `provenanceTracking`; the SDK independently authenticates that record with a read-only source lookup before wallet authorization/main proving. The SDK does not submit source preflight on this route. The public evidence survives managed operation snapshots; clients/provers remain runtime capabilities.
+`broadcaster.quote(prepared, {maxFeeAmount})` only converges fees and obtains the signed final quote. It does not prepare Source data, generate a source proof, submit preflight or return tracking. Keep normal wallet authorization and main proving on the returned transaction.
 
-After normal authorization and proving, call `client.submit(ready)`. It uses retained evidence automatically. `provenanceTracking()` returns a detached public tracking record. Credit lifecycle/draw and zero-private-input funding need no source proof. A source-gated relay with private inputs and missing source capabilities fails closed. The bounded replay defaults are 10 root pages and 100,000 total leaves; crossing the limit is explicit failure, never a per-Note network membership fallback.
+```ts
+const ready = await (await quoted.withWalletResponse(response)).prove();
+const provenance = new Provenance({client, manifest, prover, chainReader});
+const sourceProof = await provenance.prove(ready);
+const submitted = await broadcaster.submit(ready);
+```
 
-Prepared contains the selected financial Note openings and full final native statement. Recognized-tree paths, signed certificates and a proving backend are additional runtime resources; callers do not manually assemble sidecars. Retry an externalized payment using its original ID/status; do not prepare a replacement while its outcome is uncertain.
+Import `Provenance` from `@invisi-labs/sdk/provenance`. Its `prove` prepares public recognized-tree data, authenticates primary anchors and computes locally from the ready operation's retained private inputs. The proof is cached for relay submission and managed encrypted persistence. Only `broadcaster.submit` enforces Source acceptance before broadcasting. A configured optional `Invisi` Source capability can generate the proof there if not explicitly prepared. Credit/zero-private-input operations skip Note source proving.
 
-## Optional relay and independent direct submission
+`provenance.submit(sourceProof)` explicitly submits before the main transaction and returns the service tracking result. `provenance.submit(sourceProof, {transactionHash})` verifies the actual canonical main transaction/receipt and submits afterward. These are independent from main transaction sending; Source stays offchain. Tracking is returned by explicit Source submission.
 
-Broadcaster use is explicit and optional. Each operator supports its own configured token set; transaction estimate rejection leaves the original Prepared unchanged and never silently selects another route. Direct wallet authorization, proof and transaction export do not depend on Broadcaster or Provenance availability.
+## Persisting Source recovery
 
-| Route | Source submission | Protocol transaction |
-|---|---|---|
-| `broadcaster.quote` | SDK proves locally; Broadcaster submits preflight and returns tracking in its quote | `broadcaster.submit` attaches retained evidence; the relay broadcasts |
-| Direct, source first | App explicitly calls `evaluateTransaction(data, sidecars)` and retains tracking | App sends the unchanged protocol transaction independently |
-| Direct, transaction first | After canonical confirmation, App explicitly calls `submitProof` with the actual operation locator | App sends the protocol transaction independently before source submission |
+Persist the JSON-serializable `ProvenanceProof` packet before main broadcast: final calldata, chain/protocol/token, main capacity/public statement, operation digest, sidecars and signed root certificates. No opening, witness, private nonce, runtime client or prover enters this packet. A submit-only `new Provenance({client, chainReader})` can resubmit the saved packet without assets/proving capabilities. Record returned tracking/job IDs and decisions separately.
 
-The App chooses the direct-step order. Source verification and recognition are always off-chain; no additional Provenance transaction is required. `RecoveryCoordinator` remains an optional explicit coordinator, not a prerequisite for direct transaction export.
+If no proof was produced, retain the original operation's private input openings in the encrypted wallet journal. Existing history `id` links to `session.resume(id)`; the saved plan retains original input data even after spent Note inventory is removed. A resumed ready/confirmed operation can generate Source proof; cached proof retrieval needs no prover. Mere txHash/commitments cannot reconstruct openings. Keep these records for reproof after generation changes; never persist raw witnesses/openings in a public history projection. Examples03/04 show initial direct delivery and packet-only recovery.
 
-## Concrete transaction quotes
+## Optional relay and quotes
 
-`client.estimateQuote(data)` requests an unsigned estimate for this exact transaction shape. `client.getQuote(data, { chainId, protocol }, sidecars)` requests the verified firm quote. They use `broadcaster_estimateQuote` and `broadcaster_getQuote`, respectively, without a mode parameter; only the firm request submits Source preflight. `broadcaster.quote` owns fee convergence and invokes the firm phase after final local source proving. `Protocol.getBroadcasters({ data })` probes each registered operator against the concrete transaction, including token support. Token-only probes and `getFee` are removed.
-
-Only TypeScript is synchronized to this source release in this change. Go/Rust SDKs remain pending user confirmation; their prior artifacts/vectors are not claimed compatible with this manifest.
+Broadcaster use is optional and token support is operator-configured. `estimateQuote(data)` and `getQuote(data, context)` require concrete transactions. Quote RPC accepts no sidecars or tracking; it retains the six signed fields and Source-required intent binding. Source validation moves entirely to new-submit admission/pre-send gates. Known accepted retries keep the original journal entry even if Source is unavailable.
 
 ## Relay submission identity
 
-`(await client.submit(ready)).id` is assigned only by the configured Broadcaster. The SDK does not compute or expose an ID generator, and does not assume a particular ID algorithm or hash format. No client-supplied idempotency key is sent to `broadcaster_submitTransaction`. Use the returned opaque ID with `broadcaster_getTransactionStatus`.
+`(await broadcaster.submit(ready)).id` is assigned only by the service and treated as opaque. The SDK does not compute IDs or assume an algorithm. It retains the original body before sending and saves the returned ID; an ID-less lost response replays the exact request for server deduplication. Managed Session persists the externalization fence and original Source proof before sending. Source proof-job idempotency remains independent.
 
-Before sending, the SDK retains the exact original calldata, quote and sidecars; managed Session persists the externalization fence. A lost first response is retried with that same body, letting the relay return the existing record. Once an ID is known it is saved for status-first recovery. The relay must never overwrite or send the accepted original request again. Runtime Source availability, spent inputs or expiry must not block replay of an already externalized original request; a previously unseen request still undergoes the relay's full validation. Source-proof job idempotency remains separate.
+For explicit reproof, call `provenance.prove(restoredOperation, {reprove:true})` with current trusted roots and local proving capabilities. Retain/save the new returned packet. A frozen externalized relay request keeps its original proof/body; reproof does not replace it or send the main transaction again.

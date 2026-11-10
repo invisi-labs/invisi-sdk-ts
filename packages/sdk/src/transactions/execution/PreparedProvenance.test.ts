@@ -193,10 +193,7 @@ async function configured(historical = false) {
                 };
             }
             if (q.method === "broadcaster_getQuote") {
-                if (deny) throw Error("Broadcaster source preflight denied");
                 events.push("quote");
-                const pi = p.proofSidecars[0].proofBundle.publicInputs;
-                digest = word((BigInt(pi[7]) << 128n) | BigInt(pi[8]));
                 const intent = decodeBroadcasterIntent(p.data).request.params;
                 const quote = {
                     token: intent.token,
@@ -222,9 +219,12 @@ async function configured(historical = false) {
                         ),
                         provenanceRequired: true,
                         requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
-                        ...(missingTracking ? {} : { provenanceTracking: tracking() }),
                     },
                 };
+            }
+            if (q.method === "broadcaster_submitTransaction") {
+                if (deny) throw Error("Broadcaster source preflight denied");
+                if (!p.proofSidecars?.length) throw Error("Missing source proof");
             }
             events.push("submit");
             if (q.method === "broadcaster_submitTransaction" && loseNextSubmitResponse) {
@@ -288,64 +288,64 @@ async function configured(historical = false) {
     };
 }
 
-it("requires configured source capability before asking a policy relay for a private quote", async () => {
-    const h = await setup();
-    const bare = await h.invisi.prepareTransfer({
-        wallet: Wallet.fromAddress(h.wallet.getAddress()),
-        protocol: h.protocol,
-        tokenAddress: h.context.tokenAddress,
-        inputs: h.inputs,
-        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 10n })],
-    });
-    const relay = new BroadcasterClient(
-        {
-            endpoint: "https://relay.test",
-            quoteSigner: h.bob.ownerAddress,
-            feeRecipient: h.bob.ownerAddress,
-            provenanceRequired: true,
-        },
-        vi.fn(async () => {
-            throw Error("unexpected quote without capability");
-        })
-    );
-    await expect(relay.quote(bare, { maxFeeAmount: 20n })).rejects.toThrow(/provenance|source/i);
-});
-it("automatically proves final prepared fields and forwards retained source evidence on normal submit", async () => {
-    const h = await configured(),
-        original = await h.prepare();
-    const quoted = await h.client.quote(original, { maxFeeAmount: 20n });
-    expect(h.prover.prove).toHaveBeenCalledTimes(1);
-    expect(h.events.indexOf("source-prove")).toBeGreaterThan(h.events.lastIndexOf("fee"));
-    expect(h.events).not.toContain("provenance_evaluateTransaction");
-    expect(h.events.indexOf("provenance_getTracking")).toBeGreaterThan(h.events.indexOf("quote"));
-    expect(quoted.provenanceTracking()?.id).toBe("a".repeat(48));
-    expect(original.preview().feeAmount).toBe(0n);
-    const ready = await (await externallyAuthorize(quoted)).prove();
-    const expectedId = "relay-owned-id";
-    const result = await h.client.submit(ready);
-    expect(result.id).toBe(expectedId);
-    expect(result.state).toBe("submitted");
-    const quote = h.requests.find((q) => q.method === "broadcaster_getQuote"),
-        submit = h.requests.find((q) => q.method === "broadcaster_submitTransaction");
-    expect(submit.proofSidecars).toEqual(quote.proofSidecars);
-    expect(submit.proofSidecars).toHaveLength(1);
-    for (const request of h.requests) {
-        expect(JSON.stringify(request)).not.toMatch(/"(opening|nonce|witness|privateKey|paths)"/);
-    }
-});
-it("denied source preflight cannot request a firm quote or mutate the original prepared intent", async () => {
+it("quotes without preparing source data or computing a source proof", async () => {
     const h = await configured();
     h.setDeny(true);
-    const original = await h.prepare();
-    await expect(h.client.quote(original, { maxFeeAmount: 20n })).rejects.toThrow();
-    expect(h.events).not.toContain("quote");
-    expect(original.preview().feeAmount).toBe(0n);
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
+    expect(quoted.broadcasterQuote()).toBeDefined();
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
 });
-
-it("persists public evidence and recovers the original managed submission after inputs become spent", async () => {
+it("generates source proof from ready only when submitting and returns an opaque service ID", async () => {
+    const h = await configured();
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    const result = await h.client.submit(ready);
+    expect(result.id).toBe("relay-owned-id");
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+    expect(h.events.indexOf("source-prove")).toBeGreaterThan(h.events.indexOf("quote"));
+    const quote = h.requests.find((q) => q.method === "broadcaster_getQuote");
+    expect(quote).not.toHaveProperty("proofSidecars");
+    expect(
+        h.requests.find((q) => q.method === "broadcaster_submitTransaction").proofSidecars
+    ).toHaveLength(1);
+    for (const request of h.requests)
+        expect(JSON.stringify(request)).not.toMatch(/"(opening|nonce|witness|privateKey|paths)"/);
+});
+it("blocks sending when submit source verification is denied", async () => {
+    const h = await configured();
+    h.setDeny(true);
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    await expect(h.client.submit(ready)).rejects.toThrow(/denied/);
+});
+it("allows explicit source proof generation from ready and reuses its cached proof on relay submission", async () => {
+    const { Provenance } = await import("../../provenance");
+    const h = await configured();
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    const source = new Provenance(h.capability);
+    const packet = await source.prove(ready);
+    expect(packet.data).toBe((await ready.exportTransaction()).data);
+    expect(packet.sidecars).toHaveLength(1);
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(packet)).not.toMatch(/"(opening|nonce|witness|privateKey|path)"/);
+    await h.client.submit(ready);
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+});
+it("keeps source proving independent of main direct transaction preparation", async () => {
+    const h = await configured();
+    const ready = await (await externallyAuthorize(await h.prepare())).prove();
+    expect((await ready.exportTransaction()).data).toMatch(/^0x/);
+    expect(h.requests).toEqual([]);
+    expect(h.prover.prove).not.toHaveBeenCalled();
+});
+it("restores original input openings even if spent-note inventory is pruned and caches its source packet", async () => {
     const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
     const { sessionOptions } = await import("../../../../../test-support/session-options");
     const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const { Provenance } = await import("../../provenance");
     const h = await configured();
     const session = new WalletSession(
         sessionOptions({ ...h.options, prover: backend(), provenance: h.capability })
@@ -355,116 +355,30 @@ it("persists public evidence and recovers the original managed submission after 
         outputs: [],
         withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
-    const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
-    const ready = await (await authorizeOperation(quoted)).prove();
-    const tracking = ready.provenanceTracking()!;
-    tracking.id = "b".repeat(48);
-    expect(ready.provenanceTracking()!.id).toBe("a".repeat(48));
-    const firstSubmission = await h.client.submit(ready);
-    h.reader.isSpent = async (_scope, words) => words.map(() => true);
-    const resumed = await session.resume(ready.id);
-    expect(resumed.provenanceTracking()!.id).toBe("a".repeat(48));
-    expect((await h.client.submit(resumed)).state).toBe("submitted");
-    expect(h.requests.filter((q) => q.method === "broadcaster_submitTransaction")).toHaveLength(1);
-    expect((await h.client.submit(resumed)).id).toBe(firstSubmission.id);
-    expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).toMatchObject({
-        broadcasterSubmissionId: firstSubmission.id,
-    });
-    const snapshot = await h.store.readSnapshot(h.scope);
-    expect(Object.values(snapshot.reservations)).toContain(ready.id);
+    const ready = await (await authorizeOperation(prepared)).prove();
+    await ready.exportTransaction();
+    await ready.trackTransaction(word(90) as `0x${string}`);
     expect(
-        JSON.stringify(snapshot.operations[ready.id]!.payload, (_, v) =>
-            typeof v === "bigint" ? String(v) : v
-        )
-    ).not.toContain("source.test");
-});
-it("rejects changed relay configuration before sending retained source evidence", async () => {
-    const h = await configured();
-    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
-    const transport = vi.fn(async () => {
-        throw Error("must not call changed endpoint");
+        ((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any)
+            .broadcasterAttempted
+    ).toBeUndefined();
+    await h.store.transaction(h.scope, (state) => {
+        state.notes = {};
+        state.reservations = {};
+        state.operations[ready.id]!.status = "confirmed";
     });
-    const other = new BroadcasterClient(
-        { ...h.client.configuration, endpoint: "https://other.test" },
-        transport
+    const restarted = new WalletSession(
+        sessionOptions({ ...h.options, prover: backend(), provenance: h.capability })
     );
-    await expect(other.submit(ready)).rejects.toThrow(/context changed/);
-    expect(transport).not.toHaveBeenCalled();
+    const restored = await restarted.resume(ready.id);
+    const packet = await new Provenance(h.capability).prove(restored);
+    const saved = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
+    expect(saved.plan.inputs[0].note.nonce).toBeDefined();
+    expect(saved.provenance).toEqual(packet);
+    const noProver = new Provenance({ client: h.source });
+    expect(await noProver.prove(restored)).toEqual(packet);
 });
-
-it("finds an input in a previous physical tree using bounded snapshot cursor replay", async () => {
-    const h = await configured(true);
-    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    expect(quoted.provenanceTracking()).toBeDefined();
-    const sidecar = h.requests.find((q) => q.method === "broadcaster_getQuote").proofSidecars[0];
-    expect(sidecar.proofBundle.rootCertificates.map((c: any) => String(c.treeId))).toEqual(["1"]);
-    expect(h.requests.filter((q) => q.method === "provenance_getRoots")).toHaveLength(2);
-    expect(h.requests.some((q) => q.method === "provenance_getMembership")).toBe(false);
-});
-it("rejects historical root replay beyond the configured page budget before proving or quote", async () => {
-    const h = await configured(true);
-    h.capability.maxRootPages = 1;
-    await expect(h.client.quote(await h.prepare(), { maxFeeAmount: 20n })).rejects.toThrow(
-        /page budget/
-    );
-    expect(h.prover.prove).not.toHaveBeenCalled();
-    expect(h.events).not.toContain("quote");
-});
-
-it("keeps direct execution independent of the optional relay and source service", async () => {
-    const h = await configured();
-    const ready = await (await externallyAuthorize(await h.prepare())).prove();
-    expect((await ready.exportTransaction()).data).toMatch(/^0x/);
-    expect(h.requests).toEqual([]);
-    expect(h.prover.prove).not.toHaveBeenCalled();
-});
-it("does not prove, request source validation or silently switch routes for an unsupported relay token", async () => {
-    const h = await configured();
-    h.setUnsupportedToken();
-    const original = await h.prepare();
-    await expect(h.client.quote(original, { maxFeeAmount: 20n })).rejects.toThrow(
-        /Unsupported broadcaster token/
-    );
-    expect(h.prover.prove).not.toHaveBeenCalled();
-    expect(h.events).not.toContain("quote");
-    expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
-    expect(original.preview().feeAmount).toBe(0n);
-});
-
-it("requires the relay tracking acknowledgement and authenticates its statement independently", async () => {
-    for (const mode of ["missing", "wrong-source"]) {
-        const h = await configured();
-        if (mode === "missing") h.setMissingTracking();
-        else h.setWrongSourceDigest();
-        const original = await h.prepare();
-        await expect(h.client.quote(original, { maxFeeAmount: 20n })).rejects.toThrow(
-            /tracking|Tracking/
-        );
-        expect(original.preview().feeAmount).toBe(0n);
-        expect(h.requests.some((q) => q.method === "provenance_evaluateTransaction")).toBe(false);
-    }
-});
-
-it("replays the exact retained request after an unknown first response without computing an ID", async () => {
-    const h = await configured();
-    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
-    h.loseSubmitResponse();
-    await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
-    const before = h.requests.length;
-    h.reader.isSpent = async (_scope, words) => words.map(() => true);
-    const result = await h.client.submit(ready);
-    expect(result.id).toBe("relay-owned-id");
-    expect(h.requests.slice(before).map((q) => q.method)).toEqual([
-        "broadcaster_submitTransaction",
-    ]);
-    const submissions = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
-    expect(submissions[1]).toEqual(submissions[0]);
-    await h.client.submit(ready);
-    expect(h.requests.at(-1).method).toBe("broadcaster_getTransactionStatus");
-});
-it("restores an ID-less uncertain managed send and resubmits its exact body with Source unavailable", async () => {
+it("replays an ID-less uncertain managed send without requiring Source or unspent inputs again", async () => {
     const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
     const { sessionOptions } = await import("../../../../../test-support/session-options");
     const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
@@ -482,28 +396,91 @@ it("restores an ID-less uncertain managed send and resubmits its exact body with
     ).prove();
     h.loseSubmitResponse();
     await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
-    const uncertain = await h.store.readSnapshot(h.scope);
-    expect(uncertain.operations[ready.id]!.payload).toMatchObject({ externalized: true });
-    expect(
-        (uncertain.operations[ready.id]!.payload as any).broadcasterSubmissionId
-    ).toBeUndefined();
     h.reader.isSpent = async (_scope, words) => words.map(() => true);
     const restarted = new WalletSession(sessionOptions({ ...h.options, prover: backend() }));
-    const resumed = await restarted.resume(ready.id);
+    const restored = await restarted.resume(ready.id);
     const before = h.requests.length;
-    const result = await h.client.submit(resumed);
+    const result = await h.client.submit(restored);
     expect(result.id).toBe("relay-owned-id");
     expect(h.requests.slice(before).map((q) => q.method)).toEqual([
         "broadcaster_submitTransaction",
     ]);
-    const submissions = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
-    expect(submissions[1]).toEqual(submissions[0]);
-    expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).toMatchObject({
-        broadcasterSubmissionId: result.id,
+    const requests = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
+    expect(requests[1]).toEqual(requests[0]);
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+});
+it("uses bounded historical source roots only after ready and fails before sending on replay budget exhaustion", async () => {
+    const h = await configured(true);
+    h.capability.maxRootPages = 1;
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
+    expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    await expect(h.client.submit(ready)).rejects.toThrow(/page budget/);
+    expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
+});
+
+it("explicit reproof returns a new packet without replacing an already externalized relay proof", async () => {
+    const { Provenance } = await import("../../provenance");
+    const h = await configured();
+    const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    await h.client.submit(ready);
+    const provenance = new Provenance(h.capability);
+    const original = await provenance.prove(ready);
+    h.prover.prove.mockImplementationOnce(async (request: any) => ({
+        proof: "0x0304",
+        publicInputs: [...request.expectedPublicInputs],
+    }));
+    const refreshed = await provenance.prove(ready, { reprove: true });
+    expect(refreshed.sidecars[0]!.proofBundle.proof).toBe("0x0304");
+    expect(await provenance.prove(ready)).toEqual(original);
+});
+
+it("distinguishes managed transaction export from the first relay attempt", async () => {
+    const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
+    const { sessionOptions } = await import("../../../../../test-support/session-options");
+    const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const h = await configured();
+    const session = new WalletSession(
+        sessionOptions({ ...h.options, prover: backend(), provenance: h.capability })
+    );
+    const prepared = await session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
-    h.client.status = async () => {
-        throw Error("status unavailable");
-    };
-    await expect(h.client.submit(resumed)).rejects.toThrow(/status unavailable/);
-    expect(h.requests.filter((q) => q.method === "broadcaster_submitTransaction")).toHaveLength(2);
+    const ready = await (
+        await authorizeOperation(await h.client.quote(prepared, { maxFeeAmount: 20n }))
+    ).prove();
+    await ready.exportTransaction();
+    const exported = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
+    expect(exported.externalized).toBe(true);
+    expect(exported.broadcasterAttempted).toBeUndefined();
+    const result = await h.client.submit(ready);
+    expect(result.id).toBe("relay-owned-id");
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+    const sent = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
+    expect(sent.broadcasterAttempted).toBe(true);
+    expect(sent.provenance.sidecars).toHaveLength(1);
+});
+
+it("allows source-gated quoting without local Source capabilities but blocks submission before any send", async () => {
+    const h = await configured();
+    const invisi = new Invisi({
+        chainReader: h.reader,
+        protocolRpc: h.membership,
+        prover: backend(),
+    });
+    const prepared = await invisi.prepareTransfer({
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 40n },
+    });
+    const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    await expect(h.client.submit(ready)).rejects.toThrow(/Provenance capability/);
+    expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
 });

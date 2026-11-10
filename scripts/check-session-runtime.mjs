@@ -15,6 +15,7 @@ for (const format of ["js", "cjs"]) {
     };
     const sdk = await load("sdk/dist/index");
     const support = await load("sdk/dist/session-support");
+    const sourceSdk = await load("sdk/dist/provenance");
     const session = await load("session/dist/index");
     const memory = await load("session/dist/memory");
     assert.equal(sdk.InvisiError, support.InvisiError, `${format} error class identity`);
@@ -128,6 +129,11 @@ for (const format of ["js", "cjs"]) {
     assert(quotedManaged instanceof session.Operation, `${format} managed quote return type`);
     assert.equal(quotedDetached.preview().feeAmount, 1n);
     assert.equal(quotedManaged.preview().feeAmount, 1n);
+    const submitOnlySource = new sourceSdk.Provenance({
+        client: { trust: { manifestSha256: "0".repeat(64) } },
+    });
+    await assert.rejects(submitOnlySource.prove(quotedDetached), /manifest and prover/);
+    await assert.rejects(submitOnlySource.prove(quotedManaged), /manifest and prover/);
 
     await assert.rejects(
         managed.prepareShield({

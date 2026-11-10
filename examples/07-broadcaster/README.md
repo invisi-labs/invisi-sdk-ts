@@ -1,77 +1,69 @@
-# Optional Broadcaster and Provenance
+# Broadcaster and independent Provenance
 
-| Example | Shows |
-|---|---|
-| `01-prepare-and-broadcast.ts` | One Note transfer: prepare → fee/quote and source proof → host approval → main proof → relay submission |
-| `02-confirm-recognition.ts` | Verify the primary receipt and wait for automatic source recognition |
-| `03-self-provenance.ts` | Submit a source proof independently after the App has sent its own transaction |
+| Example                       | Shows                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `01-prepare-and-broadcast.ts` | Fee quote → wallet approval/main proof → local source proof from ready → relay validates and broadcasts             |
+| `02-confirm-recognition.ts`   | Canonical primary receipt and automatic operation recognition                                                       |
+| `03-self-provenance.ts`       | Direct payment; save its source proof, let the host send the main transaction, then explicitly submit to Provenance |
+| `04-resubmit-provenance.ts`   | Restore a saved public proof packet and submit after confirmation without openings, proving assets or a Broadcaster |
 
-This category demonstrates the common Broadcaster workflow with one Note transfer. Other transaction preparation scenarios remain in `02-transparent-amount`, `03-hidden-amount` and `04-credit`; there is no scenario switch here.
+Source proofs require ordinary private Note inputs, regardless of Note output count. A pure withdrawal needs one. Credit draw uses Credit state inputs, so it needs no Note source proof; the service screens its actual public payer funding. Create/update/revoke likewise need no Note source proof.
 
-The criterion is **ordinary private Note inputs**, not commitments on both ends. A pure withdrawal still needs a source proof. Draw consumes and replaces Credit state commitments and produces a Note, so it needs no Note source proof; Provenance screens actual public payer funding. Create/update/revoke likewise do not require a Note source proof. Credit state commitments do not serve as recognized Note leaves.
-
-## Configuration and execution
-
-The official network uses one logical recognition service, defaulting to `https://provenance.invisipay.fi` (`DEFAULT_PROVENANCE_ENDPOINT`). Replicas share the same authority and recognition state; chain/protocol instances still have separate trees. For a private deployment, edit `provenanceEndpoint` and its matching trust pins at the top of each script.
-
-All configuration is written directly in each script. Replace the protocol/provider/signing-key placeholders; in01, also replace the relay endpoint, quote signer and fee recipient. `../settings.ts` supplies the chain/RPC endpoints, token, maximum fee and local main BB binary. `../accounts.ts` contains public wallet addresses. Keys, local decryption and authorization stay in the external native wallet host. No external configuration file is needed.
-
-For source proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Each script resolves `assetRoot` to the SDK repository's `.cache/provenance`, including nested artifact/VK paths. Set `INVISI_CRS_PATH` when local CRS configuration is needed. The input Note must already be recognized.
-
-```sh
-pnpm --filter @invisi-examples/scenarios example:broadcaster:1 --execute
-export TRANSACTION_HASH='0x<canonical-confirmed-hash>'
-pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute
-```
-
-All scripts exit before configuration/network access unless `--execute` is present. With `--execute`, example01 sends through the relay and example03 submits **only an offchain source proof**. Fees are token base units. The operator may support only some tokens; a fee rejection never silently chooses another route. `broadcaster_estimateQuote` requires concrete transaction data and returns an unsigned estimate without Source submission. `broadcaster_getQuote` validates the final fee and Source proof and returns the signed quote/tracking. Both steps are automatic inside `broadcaster.quote`; there is no `mode` argument. There is no token-only estimate or `getFee` endpoint.
-
-In01, `broadcaster.quote` converges the fee and generates the source proof locally. The relay submits source preflight and returns tracking; the SDK only reads/authenticates that tracking before approval. `broadcaster.submit` attaches retained evidence. The proof includes no uploaded opening or witness. Normal confirmation needs no second proof upload.
-
-## Direct submission: independent steps
-
-Run an ordinary direct Note transaction from `03-hidden-amount` using the host's own gas, and keep its transaction hash. Then run03:
-
-```sh
-export TRANSACTION_HASH='0x<your-self-broadcast-confirmed-transact>'
-pnpm --filter @invisi-examples/scenarios example:broadcaster:3 --execute
-```
-
-This focused example supports exactly one Alice-owned private Note input, including a pure withdrawal. It reads actual canonical transaction/receipt data, discovers the spent input locally, reconstructs the native statement from the transaction, authenticates a recognized checkpoint against primary, proves K1 locally and explicitly calls `source.submitProof`. It never constructs or calls a Broadcaster client. Its default checkpoint is the latest; edit optional `sourceRootId` at the top of the script for an older physical tree containing the input. Replay is limited to100,000 leaves and discloses no per-Note membership interest.
-
-A valid proof job may precede publication of the next recognized root; poll the same operation recognition without resending the main transaction.
-
-The App chooses the order:03 demonstrates transaction first, proof after confirmation. For source first, the independent `evaluateTransaction(data, sidecars)` API admits tracking before the App broadcasts the unchanged transaction. Neither step automatically sends the other. Provenance verifies/recognizes offchain; there is no extra onchain proof transaction.
-
-Examples print records with `console.log`; they do not write record files. Paste the Broadcast record printed by01 into02 when prompted. Keep tracking IDs private: they are unlisted lookup capabilities. For an uncertain relay response before an ID was returned, retry the same retained operation; if an ID was returned, query it. For an uncertain source response, reuse the exact printed `proofBundle`, locator and idempotency key; do not regenerate a random proof under the same key.
-
-For an explicit estimate of an already prepared transaction:
-
-```ts
-const estimate = await client.estimateQuote((await prepared.exportBroadcasterIntent()).data);
-```
-
-This does not freeze a fee or sign a quote. Normal applications simply call `broadcaster.quote`, which performs estimation, fee convergence, source proving and the final `getQuote` request.
-
-## Service-owned submission identity
-
-```ts
-const submitted = await client.submit(ready);
-console.log(submitted.id);
-const status = await client.status(submitted.id);
-```
-
-The SDK treats `id` as an opaque Broadcaster-owned string. It does not compute it or assume a hash format; operators may define different ID algorithms. The configured Broadcaster alone recognizes identical requests and returns their existing record without replacing or sending the transaction again.
-
-The SDK retains the original transaction, quote and sidecars before sending; managed Session persists its externalization fence. If the first response/ID is lost, retry the same prepared operation to resend the exact retained request. Once the returned ID is saved, subsequent retries query it first. Do not prepare a replacement payment after an uncertain response. Source `submitProof` still has its own proof-job idempotency key, independently of relay IDs.
-
-## Application flow
+## Lifecycle
 
 ```ts
 const quoted = await broadcaster.quote(prepared, { maxFeeAmount });
-const ready = await (await quoted.withWalletResponse(response)).prove();
-const submitted = await broadcaster.submit(ready);
-const status = await broadcaster.status(submitted.id);
+const authorization = await quoted.exportWalletAuthorization();
+const signature = await signer.signTypedData(
+    authorization.domain,
+    authorization.types,
+    authorization.message
+);
+const ready = await (await quoted.withWalletSignature(signature)).prove();
+const sourceProof = await provenance.prove(ready); // Local data preparation + computation.
+const submitted = await broadcaster.submit(ready); // Reuses the cached proof; server enforces Source before sending.
 ```
 
-The transaction still owns approval/proving. Broadcaster owns estimation, signed quotation, submission and status. Managed Session uses the same calls and retains its existing encrypted persistence, reservations and retry behavior. Advanced raw-calldata integrations use `estimateQuote`, `getQuote` and `submitTransaction`; they do not replace the normal object flow.
+`quote` only converges the fee and obtains a signed quote. It makes no Source request and computes no source proof. `prove()` on the transaction produces the main protocol proof. `provenance.prove(ready)` fetches authenticated recognized-tree data and proves locally; it does not submit a proof to a service. If configured in `Invisi`, the optional local Source capability also lets `broadcaster.submit(ready)` perform this step automatically when no cached proof exists.
+
+For direct transactions, the App controls both independent steps:
+
+```ts
+const sourceProof = await provenance.prove(ready);
+await provenance.submit(sourceProof); // Before the host sends the unchanged main transaction.
+// Or, after the host transaction is canonically confirmed:
+await provenance.submit(sourceProof, { transactionHash });
+```
+
+Do not run both submission forms by default. Before-main submission returns the service's tracking result; after-main submission validates the actual primary transaction/receipt and submits a bound proof job. Both are offchain. The SDK never sends or repeats the main transaction in the direct Source path.
+
+## Local records and recovery
+
+| Material                                         | Where to keep it                                               | Purpose                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Local operation ID + transaction hash            | Transaction history                                            | Links history to the original operation and canonical transaction |
+| Original plan and input Note openings            | Encrypted Session operation store, even after inputs are spent | Generate a proof later, or reprove after generation/root changes  |
+| `ProvenanceProof` returned by `provenance.prove` | Persistent local record, preferably encrypted                  | Resubmit the exact proof without private openings or a prover     |
+| Returned tracking/job ID and state               | App's local Source delivery record                             | Poll verification/recognition and reconcile pending work          |
+
+A txHash, amount or commitment alone cannot recover a private opening. History entries already contain the original operation `id`; with managed Session, `session.resume(id)` retains the original input data independently of current Note inventory. Generate with `provenance.prove(restoredOperation)`. If the proof is already cached, this returns the stored packet without loading a prover. Keep this encrypted operation record until Source delivery/recovery is complete; deleting spent-input history must not delete the only remaining openings.
+
+The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance({client, chainReader})` can call `submit(savedProof, {transactionHash})`; example04 shows that path. A generation change may require reproof, which still needs retained openings. A proof job being valid may precede root publication: poll the same operation recognition, never recreate the payment.
+
+## Running
+
+Edit the public trust pins at the top of each file and match `../settings.ts` for chain/token/RPC/BB. The default Source endpoint is `https://provenance.invisipay.fi`; applications may configure another trusted endpoint. Authorization uses an ethers signer from `ALICE_PRIVATE_KEY`, matching Alice's public wallet owner. Note decryption remains in the native host.
+
+For local proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Set `INVISI_CRS_PATH` if needed. Cached-proof recovery in04 requires none of those assets.
+
+```sh
+pnpm --filter @invisi-examples/scenarios example:broadcaster:1 --execute
+export TRANSACTION_HASH='0x<confirmed-hash>'
+pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute
+pnpm --filter @invisi-examples/scenarios example:broadcaster:3 --execute
+pnpm --filter @invisi-examples/scenarios example:broadcaster:4 --execute
+```
+
+Without `--execute`, each script exits before configuration/network access. Examples log records rather than writing files; the App must durably save the printed packet before sending. Relay submission IDs are opaque, assigned only by the service. An ID-less lost response retries the exact retained request; known IDs are queried first. Managed Session persists the externalization fence. Do not prepare a replacement payment while the original outcome is uncertain.
+
+For explicit reproof, call `provenance.prove(restoredOperation, {reprove:true})` with current trusted roots and local proving capabilities. Retain/save the new returned packet. A frozen externalized relay request keeps its original proof/body; reproof does not replace it or send the main transaction again.
