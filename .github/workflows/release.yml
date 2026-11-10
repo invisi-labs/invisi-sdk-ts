@@ -33,7 +33,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test release validation
-        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs
+        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs scripts/release-archive.test.mjs
 
       - name: Validate release versions and dependencies
         run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
