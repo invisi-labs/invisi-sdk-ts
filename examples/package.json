@@ -34,15 +34,18 @@
     "lint": "tsc --noEmit",
     "build": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "example:transparent:5": "tsx 02-transparent-amount/05-shield-via-broadcaster.ts",
     "example:note:output": "tsx 02-transparent-amount/00-note-output.ts",
     "example:session:5": "tsx 05-wallet-session/05-create-credit.ts",
     "example:session:6": "tsx 05-wallet-session/06-draw-credit.ts",
     "example:session:7": "tsx 05-wallet-session/07-update-credit.ts",
     "example:session:8": "tsx 05-wallet-session/08-revoke-credit.ts",
-    "example:hidden:7": "tsx 03-hidden-amount/07-via-broadcaster.ts",
-    "example:hidden:8": "tsx 03-hidden-amount/08-confirm-source.ts",
-    "example:credit:5": "tsx 04-credit/05-draw-via-broadcaster.ts"
+    "example:broadcaster:1": "tsx 07-broadcaster/01-fee-query.ts",
+    "example:broadcaster:2": "tsx 07-broadcaster/02-note-transfer.ts",
+    "example:broadcaster:3": "tsx 07-broadcaster/03-credit-draw.ts",
+    "example:broadcaster:4": "tsx 07-broadcaster/04-note-withdrawal.ts",
+    "example:broadcaster:5": "tsx 07-broadcaster/05-shield.ts",
+    "example:broadcaster:6": "tsx 07-broadcaster/06-confirm-recognition.ts",
+    "example:broadcaster:7": "tsx 07-broadcaster/07-self-provenance.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",

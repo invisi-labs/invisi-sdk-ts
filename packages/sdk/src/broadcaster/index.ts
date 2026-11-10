@@ -21,6 +21,12 @@ export interface BroadcasterQuote {
     maxGas: string;
     requestHash: string;
 }
+export interface BroadcasterEstimate {
+    mode: "estimate";
+    feeRecipient: string;
+    feeAmount: string;
+    maxGas: string;
+}
 export interface SignedBroadcasterQuote {
     quote: BroadcasterQuote;
     signature: string;
@@ -289,43 +295,51 @@ export class BroadcasterClient {
         }
         return response.result;
     }
-    async fee(
-        token: string,
-        data?: string
-    ): Promise<{ feeRecipient: string; feeAmount: string; maxGas: string }> {
-        const fee = (await this.call("broadcaster_getFee", {
-            token: getAddress(token),
-            ...(data ? { data } : {}),
-        })) as {
-            feeRecipient: string;
-            feeAmount: string;
-            maxGas: string;
-        };
-        if (
-            !fee ||
-            getAddress(fee.feeRecipient) !== this.configuration.feeRecipient ||
-            !/^\d+$/.test(fee.feeAmount) ||
-            BigInt(fee.feeAmount) <= 0n ||
-            BigInt(fee.feeAmount) >= 1n << 128n ||
-            !/^\d+$/.test(fee.maxGas) ||
-            BigInt(fee.maxGas) <= 0n
-        )
-            throw new Error("invalid broadcaster fee");
-        return fee;
-    }
+    async quote(data: string, options: { mode: "estimate" }): Promise<BroadcasterEstimate>;
     async quote(
         data: string,
         context: { chainId: bigint; protocol: string },
+        proofSidecars?: readonly ProofSidecar[]
+    ): Promise<SignedBroadcasterQuote>;
+    async quote(
+        data: string,
+        context: { mode: "estimate" } | { chainId: bigint; protocol: string },
         proofSidecars: readonly ProofSidecar[] = []
-    ): Promise<SignedBroadcasterQuote> {
+    ): Promise<SignedBroadcasterQuote | BroadcasterEstimate> {
+        decodeBroadcasterIntent(data);
+        if ("mode" in context) {
+            if (context.mode !== "estimate") throw Error("Invalid broadcaster quote mode");
+            if (proofSidecars.length) throw Error("Estimate cannot submit source proofs");
+            const estimate = (await this.call("broadcaster_getQuote", {
+                mode: "estimate",
+                data,
+            })) as BroadcasterEstimate;
+            if (
+                !estimate ||
+                estimate.mode !== "estimate" ||
+                Object.keys(estimate).some(
+                    (k) => !["mode", "feeRecipient", "feeAmount", "maxGas"].includes(k)
+                ) ||
+                getAddress(estimate.feeRecipient) !== this.configuration.feeRecipient ||
+                !/^[0-9]+$/.test(estimate.feeAmount) ||
+                BigInt(estimate.feeAmount) <= 0n ||
+                BigInt(estimate.feeAmount) >= 1n << 128n ||
+                !/^[0-9]+$/.test(estimate.maxGas) ||
+                BigInt(estimate.maxGas) <= 0n
+            )
+                throw Error("invalid broadcaster estimate");
+            return { ...estimate };
+        }
         const { proofSidecarToWire, validateTracking } =
             await import("@invisi-labs/core/provenance");
         const signed = (await this.call("broadcaster_getQuote", {
+            mode: "firm",
             data,
             ...(this.configuration.provenancePolicyId === undefined
                 ? {}
                 : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
-        })) as SignedBroadcasterQuote;
+        })) as SignedBroadcasterQuote & { mode: "firm" };
+        if (signed.mode !== "firm") throw Error("Expected signed firm broadcaster quote");
         verifyBroadcasterQuote(
             signed,
             {

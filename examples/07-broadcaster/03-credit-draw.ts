@@ -5,7 +5,7 @@ import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
 import { nativeWallet, json } from "../host-transport.js";
-import { discoverCredits } from "./discover-credits.js";
+import { discoverCredits } from "../04-credit/discover-credits.js";
 
 // Alice draws 7 base units from each of up to two current grants into her private note.
 // Different owners remain distinct payers; limits and usage count gross debit, including fees.
@@ -14,22 +14,24 @@ if (!process.argv.includes("--execute")) {
     process.exit(0);
 }
 
-const config = JSON.parse(await readFile(process.env.PROVENANCE_CONFIG!, "utf8"));
+const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
 const broadcaster = new BroadcasterClient({
     ...config.broadcaster,
     provenancePolicyId: config.policyId,
 });
 const accounts = getAccounts();
 const alice = accounts[0];
-const provider = new JsonRpcProvider(settings.chainRpcUrl);
+const provider = new JsonRpcProvider(config.chainRpcUrl);
 try {
-    if ((await provider.getNetwork()).chainId !== settings.chainId) {
+    if ((await provider.getNetwork()).chainId !== BigInt(config.chainId)) {
         throw Error("Configured chain mismatch");
     }
 
     // 1. Validate the chain and trusted deployment before constructing this intent.
-    const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
+    const protocolRpc = new ProtocolRpcClient(config.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
+    if (protocol.context.protocolAddress.toLowerCase() !== config.protocolAddress.toLowerCase())
+        throw Error("Pinned deployment mismatch");
     const tokenAddress = settings.tokenAddress;
     const invisi = new Invisi({
         provider,

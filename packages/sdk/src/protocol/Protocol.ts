@@ -1,12 +1,12 @@
 import { rememberProtocolConnection } from "./connections";
 import { Protocol as BaseProtocol } from "@invisi-labs/protocol";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
-import { getAddress, type Provider } from "ethers";
-import { BroadcasterClient } from "../broadcaster/index";
+import { type Provider } from "ethers";
+import { BroadcasterClient, decodeBroadcasterIntent } from "../broadcaster/index";
 
 const sources = new WeakMap<Protocol, Pick<ProtocolRpcClient, "getBroadcasters">>();
 
-/** Deployment operations and token-compatible broadcaster discovery. */
+/** Deployment operations and transaction-compatible broadcaster discovery. */
 export class Protocol extends BaseProtocol {
     static override async fromRpc(
         rpc: Pick<ProtocolRpcClient, "getDeployment"> &
@@ -27,9 +27,9 @@ export class Protocol extends BaseProtocol {
         return protocol;
     }
 
-    /** Returns enabled services that answer a token fee probe; final quotes are checked by prepared. */
-    async getBroadcasters(options: { tokenAddress: string }): Promise<BroadcasterClient[]> {
-        const token = getAddress(options.tokenAddress);
+    /** Returns enabled services that estimate this concrete transaction; final quotes are checked by prepared. */
+    async getBroadcasters(options: { data: string }): Promise<BroadcasterClient[]> {
+        decodeBroadcasterIntent(options.data);
         if (!this.deployment.broadcasterRegistry)
             throw new Error("broadcaster registry is not configured");
         const rpc = sources.get(this);
@@ -51,7 +51,7 @@ export class Protocol extends BaseProtocol {
                     if (!entry.enabled) return undefined;
                     try {
                         const client = new BroadcasterClient(entry);
-                        await client.fee(token);
+                        await client.quote(options.data, { mode: "estimate" });
                         return client;
                     } catch {
                         return undefined;

@@ -51,7 +51,9 @@ describe("broadcaster final intents", () => {
                 result: {},
             })
         );
-        await expect(wrong.fee(signer.address)).rejects.toThrow("JSON-RPC response");
+        await expect(wrong.quote(calldata(), { mode: "estimate" })).rejects.toThrow(
+            "JSON-RPC response"
+        );
         const failed = new BroadcasterClient(
             {
                 endpoint: "https://example.org",
@@ -81,7 +83,9 @@ describe("broadcaster final intents", () => {
                 error: { code: -32000, message: "Rejected" },
             })
         );
-        await expect(mixed.fee(signer.address)).rejects.toThrow("JSON-RPC response");
+        await expect(mixed.quote(calldata(), { mode: "estimate" })).rejects.toThrow(
+            "JSON-RPC response"
+        );
     });
     it("encodes every operation as one positional query", async () => {
         const data = calldata();
@@ -114,15 +118,15 @@ describe("broadcaster final intents", () => {
                 };
             }
         );
-        await expect(client.fee(signer.address, data)).rejects.toThrow("Test response");
+        await expect(client.quote(data, { mode: "estimate" })).rejects.toThrow("Test response");
         await expect(client.quote(data, trust)).rejects.toThrow("Test response");
         await expect(
             client.submit(data, { quote, signature, context: trust }, "request_positional_01")
         ).rejects.toThrow("Test response");
         await expect(client.status("request_positional_01")).rejects.toThrow("Test response");
         expect(requests.map(({ method, params }) => ({ method, params }))).toEqual([
-            { method: "broadcaster_getFee", params: [{ token: signer.address, data }] },
-            { method: "broadcaster_getQuote", params: [{ data }] },
+            { method: "broadcaster_getQuote", params: [{ mode: "estimate", data }] },
+            { method: "broadcaster_getQuote", params: [{ mode: "firm", data }] },
             {
                 method: "broadcaster_submitTransaction",
                 params: [{ data, quote, signature, idempotencyKey: "request_positional_01" }],
@@ -225,7 +229,12 @@ describe("broadcaster final intents", () => {
                 JSON.stringify({
                     jsonrpc: "2.0",
                     id: 1,
-                    result: { feeRecipient: signer.address, feeAmount: "2", maxGas: "1000" },
+                    result: {
+                        mode: "estimate",
+                        feeRecipient: signer.address,
+                        feeAmount: "2",
+                        maxGas: "1000",
+                    },
                 })
             )
         );
@@ -235,13 +244,13 @@ describe("broadcaster final intents", () => {
                 quoteSigner: trust.signer,
                 feeRecipient: trust.signer,
             });
-            await client.fee(signer.address);
+            await client.quote(calldata(), { mode: "estimate" });
             expect(String(fetcher.mock.calls[0]?.[0])).toBe("https://example.org/api/broadcaster");
             expect(JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string)).toEqual({
                 jsonrpc: "2.0",
                 id: 1,
-                method: "broadcaster_getFee",
-                params: [{ token: signer.address }],
+                method: "broadcaster_getQuote",
+                params: [{ mode: "estimate", data: calldata() }],
             });
             expect(fetcher.mock.calls[0]?.[1]?.redirect).toBe("error");
         } finally {
@@ -288,8 +297,8 @@ it("rejects zero Credit service fees and binds positive protocol fees", async ()
                 result: { feeRecipient: ZeroAddress, feeAmount: "0", maxGas: "100000" },
             })
         );
-        await expect(client.fee(vector.quote.token, vector.data)).rejects.toThrow(
-            "invalid broadcaster fee"
+        await expect(client.quote(vector.data, { mode: "estimate" })).rejects.toThrow(
+            "invalid broadcaster estimate"
         );
         expect(() =>
             verifyBroadcasterQuote(
@@ -345,7 +354,7 @@ it("binds configured provenance policy to signed quote and rejects policy downgr
         id: request.id,
         result:
             request.method === "broadcaster_getQuote"
-                ? signed
+                ? { mode: "firm", ...signed }
                 : { id: "policy-job", state: "pending" },
     }));
     const client = new BroadcasterClient(
@@ -362,4 +371,46 @@ it("binds configured provenance policy to signed quote and rejects policy downgr
     expect(
         (transport.mock.calls[0]![0].params as { proofSidecars: unknown[] }[])[0]!.proofSidecars
     ).toEqual([]);
+});
+
+it("requires a concrete intent and separates estimate responses from signed firm quotes", async () => {
+    const transport = vi.fn(async (request) => ({
+        jsonrpc: "2.0",
+        id: request.id,
+        result: { mode: "estimate", feeRecipient: signer.address, feeAmount: "2", maxGas: "1000" },
+    }));
+    const client = new BroadcasterClient(
+        {
+            endpoint: "https://example.test",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+        },
+        transport
+    );
+    await expect(client.quote("", { mode: "estimate" })).rejects.toThrow();
+    expect(transport).not.toHaveBeenCalled();
+    expect((await client.quote(calldata(), { mode: "estimate" })).mode).toBe("estimate");
+    expect(transport.mock.calls[0]![0].params).toEqual([{ mode: "estimate", data: calldata() }]);
+    await expect(client.quote(calldata(), trust)).rejects.toThrow(/firm/);
+});
+it("does not accept signing or source tracking metadata in an unsigned estimate", async () => {
+    const client = new BroadcasterClient(
+        {
+            endpoint: "https://example.test",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+        },
+        async (request) => ({
+            jsonrpc: "2.0",
+            id: request.id,
+            result: {
+                mode: "estimate",
+                feeRecipient: signer.address,
+                feeAmount: "2",
+                maxGas: "1000",
+                provenanceTracking: {},
+            },
+        })
+    );
+    await expect(client.quote(calldata(), { mode: "estimate" })).rejects.toThrow(/estimate/);
 });

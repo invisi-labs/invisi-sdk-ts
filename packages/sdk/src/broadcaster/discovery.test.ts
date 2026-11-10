@@ -1,3 +1,5 @@
+import quoteVectors from "./testdata/broadcaster-v1.json";
+const concreteData = quoteVectors[0]!.data;
 import { Protocol as BaseProtocol } from "@invisi-labs/protocol";
 import { afterEach, expect, it, vi } from "vitest";
 import { Protocol } from "../protocol/Protocol";
@@ -32,7 +34,7 @@ it("discovers a token-compatible service across pages and pins its registered qu
         .mockResolvedValueOnce({ block, broadcasters: [entry(3)] });
     const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
         const req = JSON.parse(init!.body as string);
-        expect(req.params[0].token.toLowerCase()).toBe(a(200));
+        expect(req.params[0]).toEqual({ mode: "estimate", data: concreteData });
         return new Response(
             JSON.stringify({
                 jsonrpc: "2.0",
@@ -41,6 +43,7 @@ it("discovers a token-compatible service across pages and pins its registered qu
                     ? { error: { code: -32000, message: "unsupported token" } }
                     : {
                           result: {
+                              mode: "estimate",
                               feeRecipient: entry(String(url).includes("relay2") ? 99 : 3)
                                   .feeRecipient,
                               feeAmount: "5",
@@ -52,7 +55,7 @@ it("discovers a token-compatible service across pages and pins its registered qu
     });
     const rpc = { getDeployment: vi.fn().mockResolvedValue(deployment), getBroadcasters: pages };
     const protocol = await discover(rpc);
-    const clients = await protocol.getBroadcasters({ tokenAddress: a(200) });
+    const clients = await protocol.getBroadcasters({ data: concreteData });
     expect(clients).toHaveLength(1);
     const client = clients[0]!;
     expect(client.url).toBe(entry(3).endpoint);
@@ -80,6 +83,7 @@ it("returns all compatible services without a fee ceiling and skips disabled or 
                 jsonrpc: "2.0",
                 id: req.id,
                 result: {
+                    mode: "estimate",
                     feeRecipient: entry(String(url).includes("relay3") ? 3 : 4).feeRecipient,
                     feeAmount: "99999",
                     maxGas: "1000",
@@ -88,9 +92,9 @@ it("returns all compatible services without a fee ceiling and skips disabled or 
         );
     });
     const protocol = await discover(rpc);
-    expect(await protocol.getBroadcasters({ tokenAddress: a(200) })).toHaveLength(2);
+    expect(await protocol.getBroadcasters({ data: concreteData })).toHaveLength(2);
 });
 it("requires a configured registry", async () => {
     const protocol = new Protocol({ deployment: { chainId: 97n, protocol: deployment.protocol } });
-    await expect(protocol.getBroadcasters({ tokenAddress: a(200) })).rejects.toThrow(/registry/i);
+    await expect(protocol.getBroadcasters({ data: concreteData })).rejects.toThrow(/registry/i);
 });

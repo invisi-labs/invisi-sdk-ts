@@ -182,20 +182,21 @@ async function configured(historical = false) {
         async (q) => {
             const p = (q.params as any[])[0];
             requests.push({ method: q.method, ...p });
-            if (q.method === "broadcaster_getFee") {
+            if (q.method === "broadcaster_getQuote" && (q.params as any[])[0].mode === "estimate") {
                 if (unsupportedToken) throw Error("Unsupported broadcaster token");
                 events.push("fee");
                 return {
                     jsonrpc: "2.0",
                     id: q.id,
                     result: {
+                        mode: "estimate",
                         feeRecipient: signer.address,
                         feeAmount: String(fee),
                         maxGas: "2000000",
                     },
                 };
             }
-            if (q.method === "broadcaster_getQuote") {
+            if (q.method === "broadcaster_getQuote" && (q.params as any[])[0].mode === "firm") {
                 if (deny) throw Error("Broadcaster source preflight denied");
                 events.push("quote");
                 const pi = p.proofSidecars[0].proofBundle.publicInputs;
@@ -213,6 +214,7 @@ async function configured(historical = false) {
                     jsonrpc: "2.0",
                     id: q.id,
                     result: {
+                        mode: "firm",
                         quote,
                         signature: await signer.signTypedData(
                             broadcasterQuoteDomain({
@@ -321,7 +323,7 @@ it("automatically proves final prepared fields and forwards retained source evid
     const ready = await (await externallyAuthorize(quoted)).prove();
     const result = await ready.submitBroadcaster(h.client, "normal-source-1");
     expect(result.state).toBe("submitted");
-    const quote = h.requests.find((q) => q.method === "broadcaster_getQuote"),
+    const quote = h.requests.find((q) => q.method === "broadcaster_getQuote" && q.mode === "firm"),
         submit = h.requests.find((q) => q.method === "broadcaster_submitTransaction");
     expect(submit.proofSidecars).toEqual(quote.proofSidecars);
     expect(submit.proofSidecars).toHaveLength(1);
@@ -394,7 +396,8 @@ it("finds an input in a previous physical tree using bounded snapshot cursor rep
     const h = await configured(true);
     const quoted = await (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n });
     expect(quoted.provenanceTracking()).toBeDefined();
-    const sidecar = h.requests.find((q) => q.method === "broadcaster_getQuote").proofSidecars[0];
+    const sidecar = h.requests.find((q) => q.method === "broadcaster_getQuote" && q.mode === "firm")
+        .proofSidecars[0];
     expect(sidecar.proofBundle.rootCertificates.map((c: any) => String(c.treeId))).toEqual(["1"]);
     expect(h.requests.filter((q) => q.method === "provenance_getRoots")).toHaveLength(2);
     expect(h.requests.some((q) => q.method === "provenance_getMembership")).toBe(false);

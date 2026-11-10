@@ -52,15 +52,16 @@ Each wallet response repeats `version`, `id`, `ownerAddress`, and `method` and c
 
 Funding and address registration use separate EVM typed-data requests. Their printed arrays contain an application `id`, `kind`, and the SDK's EIP-712 request. Have the host review and sign that request, then paste `[{"id":"the-printed-id","signature":"0x..."}]`. These application envelopes are not additional native-wallet protocol methods. The SDK checks returned signatures against the retained intent. Caller-funded transactions instead require submission by their specified payer. Token balances, ERC20 allowance, gas, and submission remain host responsibilities; no script approves or broadcasts automatically.
 
-The final output is an unsigned transaction. Review its chain, target, value, calldata, and required caller before host submission. The broadcaster example obtains a verified fee quote and exports the resulting calldata; it does not call the broadcaster's submit endpoint. The Note and Credit Broadcaster walkthroughs demonstrate that endpoint with `--submit`.
+The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, optional relay submission and independent offchain source submission; only its explicit `--submit` paths send requests that submit a transaction or source proof.
 
 ## Scenarios
 
 - `01-address-registry`: initial registration and update, with external EVM authorization.
-- `02-transparent-amount`: offline Note output construction, shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, memo, and verified broadcaster quote.
+- `02-transparent-amount`: offline Note output construction, shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, and memo.
 - `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
 - `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted Note and Credit preparation, grant reservations, and operation reconciliation. There is no injected private executor or automatic signer.
+- `07-broadcaster`: fee queries, Note transfer/withdrawal, Credit draw, Shield relay submission, tracking confirmation and self-submitted source proofs. See its [scenario table](07-broadcaster/README.md).
 - `06-disclosure`: independently read canonical receipt evidence, request native decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the native-authenticated application payload without claiming its financial opening proves the memo.
 
 ## Automatic discovery and recovery
@@ -105,4 +106,4 @@ The account controls the default database (`examples/accounts/<account>-session.
 
 ## Provenance
 
-[Note Broadcaster](03-hidden-amount/BROADCASTER.md) shows local recognized-tree replay, real source proving, policy-bound Broadcaster quote/optional submission, and automatic confirmed-transaction recognition waiting. These examples add an explicit `--submit` switch; the existing examples still only export unsigned transactions.
+[Broadcaster and independent Provenance examples](07-broadcaster/README.md) demonstrate relay fees/submission and direct source submission separately. A Note input requires source proof even without a Note output; Credit state inputs do not require a Note source proof.

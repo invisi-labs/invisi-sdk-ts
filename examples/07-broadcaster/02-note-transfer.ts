@@ -15,13 +15,13 @@ import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
 import { nativeWallet, json } from "../host-transport.js";
-import { discoverCandidates } from "./discover-candidates.js";
+import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 
 if (!process.argv.includes("--execute")) {
     console.log("Pass --execute to prepare/prove; add --submit to broadcast. Review README first.");
     process.exit(0);
 }
-const config = JSON.parse(await readFile(process.env.PROVENANCE_CONFIG!, "utf8"));
+const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
 const pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282";
 const trust: TrustContext = {
     chainId: config.chainId,

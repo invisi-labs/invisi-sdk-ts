@@ -306,8 +306,12 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
         async (request) => {
             const payload = (request.params as unknown[])[0] as { data: string };
             const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
-            if (request.method === "broadcaster_getFee")
+            if (
+                request.method === "broadcaster_getQuote" &&
+                (request.params as any[])[0].mode === "estimate"
+            )
                 return result({
+                    mode: "estimate",
                     feeRecipient: operator.address,
                     feeAmount: "3",
                     maxGas: "2000000",
@@ -322,6 +326,7 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
                 requestHash: broadcasterRequestHash(payload.data),
             };
             return result({
+                mode: "firm",
                 quote,
                 signature: await operator.signTypedData(
                     broadcasterQuoteDomain({

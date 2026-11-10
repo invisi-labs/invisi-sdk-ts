@@ -96,8 +96,12 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
     const transport = vi.fn(
         async (request: { jsonrpc: "2.0"; id: number; method: string; params: unknown }) => {
             const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
-            if (request.method === "broadcaster_getFee")
+            if (
+                request.method === "broadcaster_getQuote" &&
+                (request.params as any[])[0].mode === "estimate"
+            )
                 return result({
+                    mode: "estimate",
                     feeRecipient: operator.address,
                     feeAmount: "10",
                     maxGas: "2000000",
@@ -117,6 +121,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
                     requestHash: broadcasterRequestHash(payload.data),
                 };
                 return result({
+                    mode: "firm",
                     quote,
                     signature: await operator.signTypedData(
                         broadcasterQuoteDomain(trust),

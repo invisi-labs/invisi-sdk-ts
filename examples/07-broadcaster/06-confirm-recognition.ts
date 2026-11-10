@@ -9,7 +9,7 @@ if (!process.argv.includes("--execute")) {
     );
     process.exit(0);
 }
-const config = JSON.parse(await readFile(process.env.PROVENANCE_CONFIG!, "utf8"));
+const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
 const record = JSON.parse(await readFile(process.env.PROVENANCE_RECORD!, "utf8")) as {
     data: string;
     broadcastId: string;

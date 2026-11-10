@@ -66,7 +66,7 @@ TypeScript: `EncryptedRecoveryStore.fromKey(existingAtomicRecordStore, aesGcmKey
 
 ## Flat examples
 
-See [`examples/03-hidden-amount`](examples/03-hidden-amount/BROADCASTER.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
+See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
 
 ## Normal Prepared integration
 
@@ -78,7 +78,7 @@ Prepared contains the selected financial Note openings and full final native sta
 
 ## Optional relay and independent direct submission
 
-Broadcaster use is explicit and optional. Each operator supports its own configured token set; `getFee` rejection leaves the original Prepared unchanged and never silently selects another route. Direct wallet authorization, proof and transaction export do not depend on Broadcaster or Provenance availability.
+Broadcaster use is explicit and optional. Each operator supports its own configured token set; transaction estimate rejection leaves the original Prepared unchanged and never silently selects another route. Direct wallet authorization, proof and transaction export do not depend on Broadcaster or Provenance availability.
 
 | Route | Source submission | Protocol transaction |
 |---|---|---|
@@ -87,3 +87,7 @@ Broadcaster use is explicit and optional. Each operator supports its own configu
 | Direct, transaction first | After canonical confirmation, App explicitly calls `submitProof` with the actual operation locator | App sends the protocol transaction independently before source submission |
 
 The App chooses the direct-step order. Source verification and recognition are always off-chain; no additional Provenance transaction is required. `RecoveryCoordinator` remains an optional explicit coordinator, not a prerequisite for direct transaction export.
+
+## Concrete transaction quotes
+
+`client.quote(data, { mode: "estimate" })` requests an unsigned estimate for this exact transaction shape. `client.quote(data, { chainId, protocol }, sidecars)` requests the verified firm quote. Both use `broadcaster_getQuote` with explicit wire modes; only the firm request submits Source preflight. `withBroadcaster` owns fee convergence and invokes the firm phase after final local source proving. `Protocol.getBroadcasters({ data })` probes each registered operator against the concrete transaction, including token support. Token-only probes and `getFee` are removed.
