@@ -1,11 +1,9 @@
 # Broadcaster and independent Provenance
 
-| Example                       | Shows                                                                                                               |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `01-prepare-and-broadcast.ts` | Fee quote → wallet approval/main proof → local source proof from ready → relay validates and broadcasts             |
-| `02-confirm-recognition.ts`   | Canonical primary receipt and automatic operation recognition                                                       |
-| `03-self-provenance.ts`       | Direct payment; save its source proof, let the host send the main transaction, then explicitly submit to Provenance |
-| `04-resubmit-provenance.ts`   | Restore a saved public proof packet and submit after confirmation without openings, proving assets or a Broadcaster |
+| Example | Shows |
+| --- | --- |
+| `01-prepare-and-broadcast.ts` | Fee quote → wallet approval/main proof → source proof → relay submission |
+| `02-submit-provenance.ts` | Direct payment proof → Source submission → recognition query; `--resume` reuses a saved proof from either example |
 
 Source proofs require ordinary private Note inputs, regardless of Note output count. A pure withdrawal needs one. Credit draw uses Credit state inputs, so it needs no Note source proof; the service screens its actual public payer funding. Create/update/revoke likewise need no Note source proof.
 
@@ -46,7 +44,7 @@ The same API handles pre-submission and later delivery. Provenance verifies the 
 
 A txHash, amount or commitment alone cannot recover a private opening. History entries already contain the original operation `id`; with managed Session, `session.resume(id)` retains the original input data independently of current Note inventory. Generate with `provenance.prove(restoredOperation)`. If the proof is already cached, this returns the stored packet without loading a prover. Keep this encrypted operation record until Source delivery/recovery is complete; deleting spent-input history must not delete the only remaining openings.
 
-The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance()` can call `submit(savedProof)`; example04 shows that path. A generation change may require reproof, which still needs retained openings. A valid proof may precede root publication: poll `client.getTracking(id)` until recognized, never recreate the payment.
+The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance()` can call `submit(savedProof)`; example02 with `--resume` shows that path. A generation change may require reproof, which still needs retained openings. A valid proof may precede root publication: poll `client.getTracking(id)` until recognized, never recreate the payment.
 
 ## Running
 
@@ -54,16 +52,14 @@ The same `NativeProver({bbBin, threads: 4})` instance handles main and Source pr
 
 Match `../settings.ts` for chain/token/RPC/BB. Authorization uses an ethers signer from `ALICE_PRIVATE_KEY`, matching Alice's public wallet owner. Note decryption remains in the App. Constructors do not access the network.
 
-For native proving in a source checkout, sync authenticated packaged assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Set `INVISI_CRS_PATH` if needed. Cached-proof recovery in04 requires none of those assets.
+For native proving in a source checkout, sync authenticated packaged assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Set `INVISI_CRS_PATH` if needed. Cached-proof recovery with `--resume` requires none of those assets.
 
 ```sh
 pnpm --filter @invisi-examples/scenarios example:broadcaster:1 --execute
-export TRANSACTION_HASH='0x<confirmed-hash>'
 pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute
-pnpm --filter @invisi-examples/scenarios example:broadcaster:3 --execute
-pnpm --filter @invisi-examples/scenarios example:broadcaster:4 --execute
+pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute --resume
 ```
 
-Without `--execute`, each script exits before configuration/network access. Examples log records rather than writing files; the App must durably save the printed packet before sending. Relay submission IDs are opaque, assigned only by the service. An ID-less lost response retries the exact retained request; known IDs are queried first. Managed Session persists the externalization fence. Do not prepare a replacement payment while the original outcome is uncertain.
+Without `--execute`, each script exits before configuration/network access. Example02 prints the unsigned main transaction for independent host sending and submits Source before or after that sending. It waits up to two minutes for recognition; timeout leaves service tracking active. With `--resume`, paste `{sourceProof}` saved from either example; the same submission is idempotent. Examples log records rather than writing files; the App must durably save the printed packet before sending. Relay submission IDs are opaque, assigned only by the service. An ID-less lost response retries the exact retained request; known IDs are queried first. Managed Session persists the externalization fence. Do not prepare a replacement payment while the original outcome is uncertain.
 
 For explicit reproof, call `provenance.prove(restoredOperation, {reprove:true})` with current trusted roots and local proving capabilities. Retain/save the new returned packet. A frozen externalized relay request keeps its original proof/body; reproof does not replace it or send the main transaction again.

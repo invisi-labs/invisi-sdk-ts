@@ -42,7 +42,7 @@ Decryption is explicitly injected through `DeliveryDecryptor`. Implement the two
 
 Funding and address registration use separate EIP-712 authorizations, also signed directly with ethers. Funding signatures bind the finalized funding request; hidden-amount transactions are proved before exporting that request. The SDK checks signatures when attaching them. Caller-funded transactions require submission by their specified payer. Token balances, ERC20 allowance, gas, and normal transaction submission remain application responsibilities.
 
-The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, relay submission and independent offchain source submission. With `--execute`, example02 submits its transaction and example04 submits its source proof.
+The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, relay submission and independent offchain source submission. With `--execute`, example01 relays the main transaction; example02 submits its source proof and queries recognition. Example02 `--resume` reuses a saved proof without preparing another transaction.
 
 The App decryptor must authenticate the ciphertext (including the AEAD tag) before returning plaintext. Commitment checks validate financial contents; they do not independently authenticate opaque memo bytes.
 
