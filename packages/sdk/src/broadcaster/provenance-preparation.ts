@@ -41,17 +41,16 @@ export function requirePreparedProvenance(
     client: BroadcasterClient,
     runtime?: TransactionRuntime
 ) {
-    if (!client.configuration.provenancePolicyId || !plan.inputs.length) return;
+    if (!client.configuration.provenanceRequired || !plan.inputs.length) return;
     const cap = runtime?.options.provenance;
     if (!cap) throw Error("Provenance capability required for private inputs");
     const trust = cap.client.trust;
     if (
         BigInt(trust.chainId) !== plan.context.chainId ||
         BigInt(trust.protocolAddress) !== BigInt(plan.context.protocolAddress) ||
-        word(trust.policyId) !== word(client.configuration.provenancePolicyId) ||
         cap.manifest.sha256 !== trust.manifestSha256
     )
-        throw Error("Provenance deployment, policy or manifest mismatch");
+        throw Error("Provenance deployment or manifest mismatch");
 }
 export async function prepareProvenance(
     plan: OperationPlan,
@@ -59,7 +58,7 @@ export async function prepareProvenance(
     runtime?: TransactionRuntime
 ): Promise<Omit<PreparedProvenanceState, "tracking"> | undefined> {
     requirePreparedProvenance(plan, client, runtime);
-    if (!client.configuration.provenancePolicyId || !plan.inputs.length) return;
+    if (!client.configuration.provenanceRequired || !plan.inputs.length) return;
     const {
         client: source,
         manifest,
@@ -226,11 +225,7 @@ export async function acceptBroadcasterTracking(
         throw Error("Source tracking is not active for the prepared statement");
     return { ...evidence, tracking: structuredClone(tracking) };
 }
-export async function validatePreparedBroadcast(
-    saved: SavedOperation,
-    client: BroadcasterClient,
-    runtime: TransactionRuntime
-) {
+export function validateBroadcastEnvelope(saved: SavedOperation, client: BroadcasterClient) {
     if (!saved.broadcasterQuote || !saved.broadcasterBinding || !saved.call)
         throw Error("Prepared broadcaster quote and ready call required");
     if (
@@ -239,8 +234,23 @@ export async function validatePreparedBroadcast(
         saved.broadcasterBinding.intentHash !== broadcasterRequestHash(saved.call.data)
     )
         throw Error("Prepared broadcaster context changed");
+    const context = saved.plan.context;
+    if (
+        BigInt(saved.call.to) !== BigInt(context.protocolAddress) ||
+        saved.call.value !== 0n ||
+        saved.broadcasterQuote.context?.chainId !== context.chainId ||
+        BigInt(saved.broadcasterQuote.context.protocol) !== BigInt(context.protocolAddress)
+    )
+        throw Error("Prepared broadcaster deployment changed");
+}
+export async function validatePreparedBroadcast(
+    saved: SavedOperation,
+    client: BroadcasterClient,
+    runtime: TransactionRuntime
+) {
+    validateBroadcastEnvelope(saved, client);
     requirePreparedProvenance(saved.plan, client, runtime);
-    if (client.configuration.provenancePolicyId && saved.plan.inputs.length) {
+    if (client.configuration.provenanceRequired && saved.plan.inputs.length) {
         const source = saved.provenance;
         if (!source || source.sidecars.length !== 1)
             throw Error("Prepared Provenance evidence required");
@@ -255,10 +265,10 @@ export async function validatePreparedBroadcast(
         const pi = sidecar.proofBundle.publicInputs;
         if (
             sidecar.operationIndex !== "0" ||
-            word((BigInt(pi[9]!) << 128n) | BigInt(pi[10]!)) !== digest ||
+            word((BigInt(pi[7]!) << 128n) | BigInt(pi[8]!)) !== digest ||
             BigInt(pi[2]!) !== BigInt(saved.plan.context.tokenAddress) ||
-            BigInt(pi[8]!) !== BigInt(saved.plan.inputs.length) ||
-            BigInt(pi[11]!) !== (await inputDigest(saved.plan.params!.nullifiers))
+            BigInt(pi[6]!) !== BigInt(saved.plan.inputs.length) ||
+            BigInt(pi[9]!) !== (await inputDigest(saved.plan.params!.nullifiers))
         )
             throw Error("Prepared Provenance evidence binding mismatch");
         await validateProofBundle(sidecar.proofBundle, runtime.options.provenance!.client.trust);

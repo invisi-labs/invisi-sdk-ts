@@ -102,7 +102,7 @@ export class LocalProvenanceProver implements OfflineProver {
                 settings,
             });
             const publicInputs = result.publicInputs.map((v) => hexlify(v));
-            if (publicInputs.length !== 13 || publicInputs.some((v, i) => v !== expected[i]))
+            if (publicInputs.length !== 11 || publicInputs.some((v, i) => v !== expected[i]))
                 throw new Error("Provenance statement mismatch");
             const checked = await api.circuitVerify({
                 verificationKey: assets.verificationKey,

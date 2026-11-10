@@ -22,7 +22,6 @@ export interface BroadcasterQuote {
     requestHash: string;
 }
 export interface BroadcasterEstimate {
-    mode: "estimate";
     feeRecipient: string;
     feeAmount: string;
     maxGas: string;
@@ -30,7 +29,7 @@ export interface BroadcasterEstimate {
 export interface SignedBroadcasterQuote {
     quote: BroadcasterQuote;
     signature: string;
-    provenancePolicyId?: string;
+    provenanceRequired?: boolean;
     provenanceTracking?: import("@invisi-labs/core/provenance").Tracking;
     requestHashFormat?: string;
     context?: { chainId: bigint; protocol: string };
@@ -39,7 +38,7 @@ export interface BroadcasterTrust {
     chainId: bigint;
     protocol: string;
     signer: string;
-    provenancePolicyId?: string;
+    provenanceRequired?: boolean;
 }
 export function broadcasterQuoteDomain(trust: BroadcasterTrust) {
     return {
@@ -131,20 +130,32 @@ export function verifyBroadcasterQuote(
     now = BigInt(Math.floor(Date.now() / 1000))
 ) {
     const { quote } = signed;
-    const policy = trust.provenancePolicyId;
     if (
-        policy === undefined
-            ? signed.provenancePolicyId !== undefined ||
+        Object.keys(signed).some(
+            (k) =>
+                ![
+                    "quote",
+                    "signature",
+                    "context",
+                    "provenanceRequired",
+                    "provenanceTracking",
+                    "requestHashFormat",
+                ].includes(k)
+        )
+    )
+        throw Error("Unknown broadcaster quote field");
+    const required = trust.provenanceRequired === true;
+    if (
+        required
+            ? signed.provenanceRequired !== true ||
+              signed.requestHashFormat !== "invisi-broadcaster-provenance-intent-v1"
+            : signed.provenanceRequired !== undefined ||
               signed.requestHashFormat !== undefined ||
               signed.provenanceTracking !== undefined
-            : !/^0x[0-9a-fA-F]{64}$/.test(policy) ||
-              signed.provenancePolicyId?.toLowerCase() !== policy.toLowerCase() ||
-              signed.requestHashFormat !== "invisi-broadcaster-provenance-intent-v1"
     )
-        throw new Error("broadcaster provenance policy mismatch");
+        throw new Error("broadcaster provenance requirement mismatch");
     const originalHash = broadcasterRequestHash(data);
-    const expectedHash =
-        policy === undefined ? originalHash : provenanceIntentHash(originalHash, policy);
+    const expectedHash = required ? provenanceIntentHash(originalHash) : originalHash;
     const { request } = decodeBroadcasterIntent(data);
     const p = request.params;
     if (
@@ -177,11 +188,14 @@ export interface BroadcasterStatus {
     state: "pending" | "submitted" | "confirmed" | "reverted" | "uncertain";
     transactionHash?: string;
 }
-function checkedStatus(value: unknown, id: string): BroadcasterStatus {
+function checkedStatus(value: unknown, id?: string): BroadcasterStatus {
     const status = value as BroadcasterStatus;
     if (
         !status ||
-        status.id !== id ||
+        typeof status.id !== "string" ||
+        !status.id.length ||
+        status.id.length > 256 ||
+        (id !== undefined && status.id !== id) ||
         !["pending", "submitted", "confirmed", "reverted", "uncertain"].includes(status.state) ||
         (status.transactionHash !== undefined &&
             !/^0x[0-9a-fA-F]{64}$/.test(status.transactionHash))
@@ -199,7 +213,7 @@ export interface BroadcasterConfiguration {
     endpoint: string;
     quoteSigner: string;
     feeRecipient: string;
-    provenancePolicyId?: string;
+    provenanceRequired?: boolean;
 }
 export class BroadcasterClient {
     readonly configuration: Readonly<BroadcasterConfiguration>;
@@ -207,10 +221,17 @@ export class BroadcasterClient {
     readonly transport: BroadcasterTransport;
     private requestId = 0;
     constructor(configuration: BroadcasterConfiguration, transport?: BroadcasterTransport) {
+        if (
+            Object.keys(configuration).some(
+                (k) =>
+                    !["endpoint", "quoteSigner", "feeRecipient", "provenanceRequired"].includes(k)
+            )
+        )
+            throw Error("Unknown broadcaster configuration field");
         this.configuration = Object.freeze({
-            ...(configuration.provenancePolicyId === undefined
+            ...(configuration.provenanceRequired !== true
                 ? {}
-                : { provenancePolicyId: configuration.provenancePolicyId }),
+                : { provenanceRequired: configuration.provenanceRequired }),
             endpoint: configuration.endpoint,
             quoteSigner: getAddress(configuration.quoteSigner),
             feeRecipient: getAddress(configuration.feeRecipient),
@@ -221,10 +242,10 @@ export class BroadcasterClient {
         )
             throw new Error("invalid broadcaster configuration");
         if (
-            configuration.provenancePolicyId !== undefined &&
-            !/^0x[0-9a-fA-F]{64}$/.test(configuration.provenancePolicyId)
+            configuration.provenanceRequired !== undefined &&
+            typeof configuration.provenanceRequired !== "boolean"
         )
-            throw new Error("invalid broadcaster provenance policy");
+            throw new Error("invalid broadcaster provenance requirement");
         this.url = configuration.endpoint;
         const base = new URL(this.url);
         if (base.protocol !== "https:" || base.username || base.password)
@@ -295,59 +316,48 @@ export class BroadcasterClient {
         }
         return response.result;
     }
-    async quote(data: string, options: { mode: "estimate" }): Promise<BroadcasterEstimate>;
+    async estimateQuote(data: string): Promise<BroadcasterEstimate> {
+        decodeBroadcasterIntent(data);
+        const estimate = (await this.call("broadcaster_estimateQuote", {
+            data,
+        })) as BroadcasterEstimate;
+        if (
+            !estimate ||
+            Object.keys(estimate).some(
+                (k) => !["feeRecipient", "feeAmount", "maxGas"].includes(k)
+            ) ||
+            getAddress(estimate.feeRecipient) !== this.configuration.feeRecipient ||
+            !/^[0-9]+$/.test(estimate.feeAmount) ||
+            BigInt(estimate.feeAmount) <= 0n ||
+            BigInt(estimate.feeAmount) >= 1n << 128n ||
+            !/^[0-9]+$/.test(estimate.maxGas) ||
+            BigInt(estimate.maxGas) <= 0n
+        )
+            throw Error("invalid broadcaster estimate");
+        return { ...estimate };
+    }
     async quote(
         data: string,
         context: { chainId: bigint; protocol: string },
-        proofSidecars?: readonly ProofSidecar[]
-    ): Promise<SignedBroadcasterQuote>;
-    async quote(
-        data: string,
-        context: { mode: "estimate" } | { chainId: bigint; protocol: string },
         proofSidecars: readonly ProofSidecar[] = []
-    ): Promise<SignedBroadcasterQuote | BroadcasterEstimate> {
+    ): Promise<SignedBroadcasterQuote> {
         decodeBroadcasterIntent(data);
-        if ("mode" in context) {
-            if (context.mode !== "estimate") throw Error("Invalid broadcaster quote mode");
-            if (proofSidecars.length) throw Error("Estimate cannot submit source proofs");
-            const estimate = (await this.call("broadcaster_getQuote", {
-                mode: "estimate",
-                data,
-            })) as BroadcasterEstimate;
-            if (
-                !estimate ||
-                estimate.mode !== "estimate" ||
-                Object.keys(estimate).some(
-                    (k) => !["mode", "feeRecipient", "feeAmount", "maxGas"].includes(k)
-                ) ||
-                getAddress(estimate.feeRecipient) !== this.configuration.feeRecipient ||
-                !/^[0-9]+$/.test(estimate.feeAmount) ||
-                BigInt(estimate.feeAmount) <= 0n ||
-                BigInt(estimate.feeAmount) >= 1n << 128n ||
-                !/^[0-9]+$/.test(estimate.maxGas) ||
-                BigInt(estimate.maxGas) <= 0n
-            )
-                throw Error("invalid broadcaster estimate");
-            return { ...estimate };
-        }
         const { proofSidecarToWire, validateTracking } =
             await import("@invisi-labs/core/provenance");
         const signed = (await this.call("broadcaster_getQuote", {
-            mode: "firm",
             data,
-            ...(this.configuration.provenancePolicyId === undefined
+            ...(this.configuration.provenanceRequired !== true
                 ? {}
                 : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
-        })) as SignedBroadcasterQuote & { mode: "firm" };
-        if (signed.mode !== "firm") throw Error("Expected signed firm broadcaster quote");
+        })) as SignedBroadcasterQuote;
         verifyBroadcasterQuote(
             signed,
             {
                 ...context,
                 signer: this.configuration.quoteSigner,
-                ...(this.configuration.provenancePolicyId === undefined
+                ...(this.configuration.provenanceRequired !== true
                     ? {}
-                    : { provenancePolicyId: this.configuration.provenancePolicyId }),
+                    : { provenanceRequired: this.configuration.provenanceRequired }),
             },
             data
         );
@@ -361,9 +371,9 @@ export class BroadcasterClient {
             ...(signed.provenanceTracking === undefined
                 ? {}
                 : { provenanceTracking: structuredClone(signed.provenanceTracking) }),
-            ...(signed.provenancePolicyId === undefined
+            ...(signed.provenanceRequired === undefined
                 ? {}
-                : { provenancePolicyId: signed.provenancePolicyId }),
+                : { provenanceRequired: signed.provenanceRequired }),
             ...(signed.requestHashFormat === undefined
                 ? {}
                 : { requestHashFormat: signed.requestHashFormat }),
@@ -372,18 +382,18 @@ export class BroadcasterClient {
     async submit(
         data: string,
         signed: SignedBroadcasterQuote,
-        idempotencyKey: string,
         proofSidecars: readonly ProofSidecar[] = []
     ): Promise<BroadcasterStatus> {
+        if (!Array.isArray(proofSidecars)) throw Error("proofSidecars must be an array");
         if (!signed.context) throw new Error("missing verified quote context");
         verifyBroadcasterQuote(
             signed,
             {
                 ...signed.context,
                 signer: this.configuration.quoteSigner,
-                ...(this.configuration.provenancePolicyId === undefined
+                ...(this.configuration.provenanceRequired !== true
                     ? {}
-                    : { provenancePolicyId: this.configuration.provenancePolicyId }),
+                    : { provenanceRequired: this.configuration.provenanceRequired }),
             },
             data,
             0n
@@ -396,15 +406,15 @@ export class BroadcasterClient {
                 data,
                 quote: signed.quote,
                 signature: signed.signature,
-                idempotencyKey,
-                ...(this.configuration.provenancePolicyId === undefined
+                ...(this.configuration.provenanceRequired !== true
                     ? {}
                     : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
-            }),
-            idempotencyKey
+            })
         );
     }
     async status(id: string): Promise<BroadcasterStatus> {
+        if (typeof id !== "string" || !id.length || id.length > 256)
+            throw Error("Invalid broadcaster submission ID");
         return checkedStatus(await this.call("broadcaster_getTransactionStatus", { id }), id);
     }
 }

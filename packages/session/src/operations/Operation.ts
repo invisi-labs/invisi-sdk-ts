@@ -534,53 +534,48 @@ export class Operation {
     provenanceTracking() {
         return structuredClone(this.#saved.provenance?.tracking);
     }
-    async submitBroadcaster(
-        client: import("@invisi-labs/sdk").BroadcasterClient,
-        idempotencyKey: string
-    ) {
-        check(/^[\x21-\x7e]{1,128}$/.test(idempotencyKey), "invalid broadcaster idempotency key");
-        const { validatePreparedBroadcast } = await import("@invisi-labs/sdk/session-support");
+    async submitBroadcaster(client: import("@invisi-labs/sdk").BroadcasterClient) {
+        const { validateBroadcastEnvelope, validatePreparedBroadcast } =
+            await import("@invisi-labs/sdk/session-support");
         const durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
             structuredClone(this.current(state.operations[this.id]))
         );
+        check(this.status === "ready", "operation is not ready");
+        validateBroadcastEnvelope(durable, client);
         if (durable.broadcasterSubmissionId) {
-            check(
-                durable.broadcasterSubmissionId === idempotencyKey,
-                "broadcaster submission id changed"
-            );
-            check(
-                JSON.stringify(durable.broadcasterBinding?.configuration) ===
-                    JSON.stringify(client.configuration),
-                "prepared broadcaster context changed"
-            );
             try {
-                return await client.status(idempotencyKey);
+                return await client.status(durable.broadcasterSubmissionId);
             } catch (error) {
                 const { BroadcasterRpcError } = await import("@invisi-labs/sdk");
                 if (!(error instanceof BroadcasterRpcError) || error.code !== -32001) throw error;
             }
         }
-        await this.validateExport();
-        await validatePreparedBroadcast(this.#saved, client, this.#runtime);
+        if (!durable.externalized) {
+            await this.validateExport();
+            await validatePreparedBroadcast(durable, client, this.#runtime);
+        }
         const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const record = state.operations[this.id];
             const current = this.current(record);
             check(record!.status === "ready" && current.call, "operation is not ready");
-            check(
-                !current.broadcasterSubmissionId ||
-                    current.broadcasterSubmissionId === idempotencyKey,
-                "broadcaster submission id changed"
-            );
+            validateBroadcastEnvelope(current, client);
             current.externalized = true;
-            current.broadcasterSubmissionId = idempotencyKey;
             return structuredClone(current);
         });
-        return client.submit(
+        const result = await client.submit(
             saved.call!.data,
             saved.broadcasterQuote!,
-            idempotencyKey,
             structuredClone(saved.provenance?.sidecars ?? [])
         );
+        await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+            const current = this.current(state.operations[this.id]);
+            check(
+                !current.broadcasterSubmissionId || current.broadcasterSubmissionId === result.id,
+                "broadcaster changed submission ID"
+            );
+            current.broadcasterSubmissionId = result.id;
+        });
+        return result;
     }
 
     async exportAggregateMember(): Promise<OperationAggregateMember> {

@@ -112,46 +112,36 @@ export class PreparedTransaction {
     provenanceTracking() {
         return structuredClone(this.#saved.provenance?.tracking);
     }
-    async submitBroadcaster(
-        client: import("../../broadcaster/index").BroadcasterClient,
-        idempotencyKey: string
-    ) {
+    async submitBroadcaster(client: import("../../broadcaster/index").BroadcasterClient) {
         this.current();
         check(this.status === "ready", "transaction is not ready");
-        check(/^[\x21-\x7e]{1,128}$/.test(idempotencyKey), "invalid broadcaster idempotency key");
-        const { validatePreparedBroadcast } =
+        const { validateBroadcastEnvelope, validatePreparedBroadcast } =
             await import("../../broadcaster/provenance-preparation");
+        validateBroadcastEnvelope(this.#saved, client);
         if (this.#saved.broadcasterSubmissionId) {
-            check(
-                this.#saved.broadcasterSubmissionId === idempotencyKey,
-                "broadcaster submission id changed"
-            );
-            check(
-                JSON.stringify(this.#saved.broadcasterBinding?.configuration) ===
-                    JSON.stringify(client.configuration),
-                "prepared broadcaster context changed"
-            );
             try {
-                return await client.status(idempotencyKey);
+                return await client.status(this.#saved.broadcasterSubmissionId);
             } catch (error) {
                 const { BroadcasterRpcError } = await import("../../broadcaster/index");
                 if (!(error instanceof BroadcasterRpcError) || error.code !== -32001) throw error;
             }
         }
-        await validatePreparedBroadcast(this.#saved, client, this.#runtime);
-        check(
-            !this.#saved.broadcasterSubmissionId ||
-                this.#saved.broadcasterSubmissionId === idempotencyKey,
-            "broadcaster submission id changed"
-        );
+        // A lost first response has no ID yet. Resend the retained request; only the relay can deduplicate it.
+        if (!this.#saved.externalized)
+            await validatePreparedBroadcast(this.#saved, client, this.#runtime);
         this.#saved.externalized = true;
-        this.#saved.broadcasterSubmissionId = idempotencyKey;
-        return client.submit(
+        const result = await client.submit(
             this.#saved.call!.data,
             this.#saved.broadcasterQuote!,
-            idempotencyKey,
             structuredClone(this.#saved.provenance?.sidecars ?? [])
         );
+        check(
+            !this.#saved.broadcasterSubmissionId ||
+                this.#saved.broadcasterSubmissionId === result.id,
+            "broadcaster changed submission ID"
+        );
+        this.#saved.broadcasterSubmissionId = result.id;
+        return result;
     }
     get id() {
         return this.#saved.plan.id;

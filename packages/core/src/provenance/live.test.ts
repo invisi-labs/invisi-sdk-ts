@@ -10,7 +10,7 @@ import {
 } from "./index";
 import type { PublicResult, RootCertificate, RotationRecord, Scope, TrustContext } from "./index";
 const enabled = process.env.INVISI_PROVENANCE_LIVE === "1";
-const pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282";
+const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
 interface LiveTrust {
     format: string;
     endpoint: string;
@@ -67,7 +67,7 @@ it.skipIf(!enabled)(
         );
         const client = new ProvenanceClient(fixture.endpoint, trust);
         const identity = (r: PublicResult) => {
-            for (const k of ["chainId", "protocolAddress", "policyId"] as const)
+            for (const k of ["chainId", "protocolAddress"] as const)
                 expect(BigInt(r.scope[k])).toBe(BigInt(fixture.scope[k]));
             expect(r.chainGeneration).toBe(fixture.chainGeneration);
             expect(r.providerId).toBe(fixture.providerId);
@@ -78,16 +78,16 @@ it.skipIf(!enabled)(
         identity(version);
         expect(version.apiVersion).toBe("v1");
         expect(version.protocolVersion).toBe("1");
-        expect(version.publicInputCount).toBe("13");
+        expect(version.publicInputCount).toBe("11");
         expect(version.proofFormat).toBe("invisi-provenance-proof-v1");
         const status = await client.getStatus();
         identity(status);
         expect(status.workerAvailable).toBe(true);
-        const policy = await client.getPolicy();
-        identity(policy);
-        expect(policy.initialSigningPublicKey).toBe(fixture.initialSigningPublicKey);
-        expect(policy.keyRotations ?? []).toEqual(fixture.keyRotations);
-        const advertised = policy.providerKeys as Record<string, string>;
+        const rules = await client.getRules();
+        identity(rules);
+        expect(rules.initialSigningPublicKey).toBe(fixture.initialSigningPublicKey);
+        expect(rules.keyRotations ?? []).toEqual(fixture.keyRotations);
+        const advertised = rules.providerKeys as Record<string, string>;
         for (const [id, pub] of Object.entries(keys.keys))
             expect(advertised[id]).toBe(hexlify(pub));
         const certificates: RootCertificate[] = [];
@@ -148,9 +148,6 @@ it.skipIf(!enabled)(
         await expect(
             bad({ providerId: word(BigInt(fixture.providerId) ^ 1n) }).getStatus()
         ).rejects.toThrow("Provider mismatch");
-        await expect(
-            bad({ policyId: word(BigInt(fixture.scope.policyId) ^ 1n) }).getVersion()
-        ).rejects.toThrow("POLICY_UNKNOWN");
         await expect(
             bad({ chainGeneration: String(BigInt(fixture.chainGeneration) + 1n) }).getRoot(
                 fixture.rootId

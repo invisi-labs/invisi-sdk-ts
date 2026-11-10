@@ -99,7 +99,6 @@ function publicShape(record: RecoveryRecord) {
     onlyKeys(record.intent, [
         "chainId",
         "protocolAddress",
-        "policyId",
         "tokenAddress",
         "operationDigest",
         "operationIndex",
@@ -126,7 +125,6 @@ function publicShape(record: RecoveryRecord) {
                 "certificateVersion",
                 "providerId",
                 "signingKeyId",
-                "policyId",
                 "chainId",
                 "protocolAddress",
                 "chainGeneration",
@@ -339,7 +337,6 @@ export class RecoveryCoordinator {
         for (const key of [
             "chainId",
             "protocolAddress",
-            "policyId",
             "tokenAddress",
             "operationDigest",
             "operationIndex",
@@ -357,7 +354,7 @@ export class RecoveryCoordinator {
 
         const intent = record.intent,
             t = this.service.trust;
-        for (const key of ["chainId", "protocolAddress", "policyId"] as const)
+        for (const key of ["chainId", "protocolAddress"] as const)
             if (BigInt(intent[key]) !== BigInt(t[key])) throw Error("Recovery scope mismatch");
         if (
             record.manifestSha256 !== t.manifestSha256 ||
@@ -369,16 +366,16 @@ export class RecoveryCoordinator {
             throw Error("Recovery operation index mismatch");
         const p = record.sidecar.proofBundle.publicInputs;
         if (
-            p.length !== 13 ||
+            p.length !== 11 ||
             BigInt(p[2]!) !== BigInt(intent.tokenAddress) ||
-            ((BigInt(p[9]!) << 128n) | BigInt(p[10]!)) !== BigInt(intent.operationDigest) ||
-            BigInt(p[8]!) !== BigInt(intent.inputNullifiers.length)
+            ((BigInt(p[7]!) << 128n) | BigInt(p[8]!)) !== BigInt(intent.operationDigest) ||
+            BigInt(p[6]!) !== BigInt(intent.inputNullifiers.length)
         )
             throw Error("Recovery statement mismatch");
         const nullifiers = intent.inputNullifiers.map((v) => word(v));
         if (new Set(nullifiers).size !== nullifiers.length)
             throw Error("Duplicate recovery nullifier");
-        if ((await inputDigest(intent.inputNullifiers)) !== BigInt(p[11]!))
+        if ((await inputDigest(intent.inputNullifiers)) !== BigInt(p[9]!))
             throw Error("Recovery nullifiers digest mismatch");
         await validateProofBundle(record.sidecar.proofBundle, {
             ...t,

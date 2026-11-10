@@ -57,7 +57,6 @@ it("matches169-byte shared rotation codec and rejects untrusted/time/chain chang
         {
             chainId: c.chainId,
             protocolAddress: c.protocolAddress,
-            policyId: c.policyId,
             chainGeneration: c.chainGeneration,
             providerId: c.providerId,
             manifestSha256: "a".repeat(64),
@@ -89,11 +88,10 @@ it("keeps provenance zero-token/commitment rejection separate from existing Note
 });
 
 import { ProvenanceClient, word } from "./index";
-it("allows reading untrusted policy history without trusting the announced current key", async () => {
+it("allows reading untrusted key-rotation history without trusting the announced current key", async () => {
     const trust: TrustContext = {
         chainId: "1",
         protocolAddress: "2",
-        policyId: "3",
         chainGeneration: "4",
         providerId: "5",
         manifestSha256: "a".repeat(64),
@@ -106,7 +104,7 @@ it("allows reading untrusted policy history without trusting the announced curre
                 jsonrpc: "2.0",
                 id: req.id,
                 result: {
-                    scope: { chainId: "1", protocolAddress: "2", policyId: "3" },
+                    scope: { chainId: "1", protocolAddress: "2" },
                     chainGeneration: "4",
                     providerId: "5",
                     signingKeyId: "7",
@@ -117,7 +115,7 @@ it("allows reading untrusted policy history without trusting the announced curre
         );
     }) as typeof fetch;
     const client = new ProvenanceClient("https://example.test", trust, transport);
-    expect((await client.getPolicy()).keyRotations).toEqual([vector.rotation]);
+    expect((await client.getRules()).keyRotations).toEqual([vector.rotation]);
     expect(trust.signingKeys[word("7")]).toBeUndefined();
     await expect(client.getStatus()).rejects.toThrow("Untrusted signing key");
 });

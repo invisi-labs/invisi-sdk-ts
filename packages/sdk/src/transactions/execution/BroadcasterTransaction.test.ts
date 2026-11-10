@@ -96,12 +96,8 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
     const transport = vi.fn(
         async (request: { jsonrpc: "2.0"; id: number; method: string; params: unknown }) => {
             const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
-            if (
-                request.method === "broadcaster_getQuote" &&
-                (request.params as any[])[0].mode === "estimate"
-            )
+            if (request.method === "broadcaster_estimateQuote")
                 return result({
-                    mode: "estimate",
                     feeRecipient: operator.address,
                     feeAmount: "10",
                     maxGas: "2000000",
@@ -121,7 +117,6 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
                     requestHash: broadcasterRequestHash(payload.data),
                 };
                 return result({
-                    mode: "firm",
                     quote,
                     signature: await operator.signTypedData(
                         broadcasterQuoteDomain(trust),
@@ -132,14 +127,9 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
             }
             expect(request.method).toBe("broadcaster_submitTransaction");
             expect(broadcasterRequestHash(payload.data)).toBe(payload.quote!.requestHash);
-            expect(Object.keys(payload).sort()).toEqual([
-                "data",
-                "idempotencyKey",
-                "quote",
-                "signature",
-            ]);
+            expect(Object.keys(payload).sort()).toEqual(["data", "quote", "signature"]);
             return result({
-                id: payload.idempotencyKey!,
+                id: "relay-owned-id",
                 state: "submitted",
                 transactionHash: `0x${"45".repeat(32)}`,
             });
@@ -165,11 +155,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
     const signed = prepared.broadcasterQuote()!;
     expect(h.prover.prove).not.toHaveBeenCalled();
     const ready = await (await externallyAuthorize(prepared)).prove();
-    const status = await client.submit(
-        (await ready.exportTransaction()).data,
-        signed,
-        "paid-request-1"
-    );
+    const status = await client.submit((await ready.exportTransaction()).data, signed);
     expect(status.state).toBe("submitted");
     expect(ready.preview().outputs.map((output) => output.amount)).toEqual([30n, 60n]);
 });

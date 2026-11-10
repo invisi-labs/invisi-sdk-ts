@@ -116,9 +116,7 @@ export async function prepareBroadcasterPlan(
         let current = plan;
         let previousAmount = 0n;
         for (let i = 0; i < attempts; i++) {
-            const schedule = await client.quote(exportBroadcasterIntent(current).data, {
-                mode: "estimate",
-            });
+            const schedule = await client.estimateQuote(exportBroadcasterIntent(current).data);
             const minimum = BigInt(schedule.feeAmount),
                 amount = minimum > previousAmount ? minimum : previousAmount;
             const recipient = getAddress(schedule.feeRecipient) as `0x${string}`;
@@ -131,7 +129,7 @@ export async function prepareBroadcasterPlan(
             if (current.credit?.revocation)
                 current.credit.revocationCaller = client.configuration.quoteSigner as `0x${string}`;
             const data = exportBroadcasterIntent(current).data;
-            const recalculated = await client.quote(data, { mode: "estimate" });
+            const recalculated = await client.estimateQuote(data);
             if (
                 getAddress(recalculated.feeRecipient) !== recipient ||
                 BigInt(recalculated.feeAmount) <= 0n ||
@@ -155,7 +153,7 @@ export async function prepareBroadcasterPlan(
     if (source === "public-funding" && !funding)
         throw new Error("public funding fee requires an explicit payer");
     const permitCallback = options.fundingPermit;
-    let schedule = await client.quote(exportBroadcasterIntent(plan).data, { mode: "estimate" });
+    let schedule = await client.estimateQuote(exportBroadcasterIntent(plan).data);
     let previousAmount = 0n;
     for (let i = 0; i < attempts; i++) {
         const minimum = BigInt(schedule.feeAmount);
@@ -205,9 +203,7 @@ export async function prepareBroadcasterPlan(
         const next = await reprepare(request);
         if (source === "private-inputs" && next.inputs.length === 0)
             throw new Error("private-inputs fee requires private funds");
-        const recalculated = await client.quote(exportBroadcasterIntent(next).data, {
-            mode: "estimate",
-        });
+        const recalculated = await client.estimateQuote(exportBroadcasterIntent(next).data);
         const required = BigInt(recalculated.feeAmount);
         if (
             getAddress(recalculated.feeRecipient) !== recipient ||
@@ -229,9 +225,7 @@ export async function prepareBroadcasterPlan(
                 if (!permit) throw new Error("fundingPermit did not return a permit");
                 request.options.funding = { ...request.options.funding!, permit };
                 final = await reprepare(request);
-                const permitted = await client.quote(exportBroadcasterIntent(final).data, {
-                    mode: "estimate",
-                });
+                const permitted = await client.estimateQuote(exportBroadcasterIntent(final).data);
                 if (
                     getAddress(permitted.feeRecipient) !== recipient ||
                     BigInt(permitted.feeAmount) > amount

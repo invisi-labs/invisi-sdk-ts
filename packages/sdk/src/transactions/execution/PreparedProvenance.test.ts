@@ -39,13 +39,11 @@ async function configured(historical = false) {
         createPublicKey(key).export({ format: "der", type: "spki" }).subarray(-32)
     );
     const tree = new RecognizedTree();
-    for (const input of h.inputs)
-        await tree.appendCommitment({ ...h.context, policyId: word(17) }, input.commitment);
+    for (const input of h.inputs) await tree.appendCommitment({ ...h.context }, input.commitment);
     const cert: RootCertificate = {
         certificateVersion: "1",
         providerId: word(19),
         signingKeyId: sha256(pub),
-        policyId: word(17),
         chainId: h.context.chainId,
         protocolAddress: h.context.protocolAddress,
         chainGeneration: "1",
@@ -73,11 +71,10 @@ async function configured(historical = false) {
     if (historical) latest.signature = hexlify(sign(null, rootCertificateMessage(latest), key));
     const manifest = authenticateManifest(
         readFileSync(new URL("../../../../prover/provenance/manifest.json", import.meta.url)),
-        "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282"
+        "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a"
     );
     const trust: TrustContext = {
         ...h.context,
-        policyId: cert.policyId,
         chainGeneration: "1",
         providerId: cert.providerId,
         signingKeys: { [String(cert.signingKeyId)]: pub },
@@ -91,6 +88,7 @@ async function configured(historical = false) {
         operationDigest: digest,
     });
     let unsupportedToken = false;
+    let loseNextSubmitResponse = false;
     let missingTracking = false,
         wrongSourceDigest = false;
     let deny = false,
@@ -106,7 +104,6 @@ async function configured(historical = false) {
                 scope: {
                     chainId: String(trust.chainId),
                     protocolAddress: trust.protocolAddress,
-                    policyId: trust.policyId,
                 },
                 chainGeneration: "1",
                 providerId: trust.providerId,
@@ -177,30 +174,29 @@ async function configured(historical = false) {
             endpoint: "https://relay.test",
             quoteSigner: signer.address,
             feeRecipient: signer.address,
-            provenancePolicyId: word(17),
+            provenanceRequired: true,
         },
         async (q) => {
             const p = (q.params as any[])[0];
             requests.push({ method: q.method, ...p });
-            if (q.method === "broadcaster_getQuote" && (q.params as any[])[0].mode === "estimate") {
+            if (q.method === "broadcaster_estimateQuote") {
                 if (unsupportedToken) throw Error("Unsupported broadcaster token");
                 events.push("fee");
                 return {
                     jsonrpc: "2.0",
                     id: q.id,
                     result: {
-                        mode: "estimate",
                         feeRecipient: signer.address,
                         feeAmount: String(fee),
                         maxGas: "2000000",
                     },
                 };
             }
-            if (q.method === "broadcaster_getQuote" && (q.params as any[])[0].mode === "firm") {
+            if (q.method === "broadcaster_getQuote") {
                 if (deny) throw Error("Broadcaster source preflight denied");
                 events.push("quote");
                 const pi = p.proofSidecars[0].proofBundle.publicInputs;
-                digest = word((BigInt(pi[9]) << 128n) | BigInt(pi[10]));
+                digest = word((BigInt(pi[7]) << 128n) | BigInt(pi[8]));
                 const intent = decodeBroadcasterIntent(p.data).request.params;
                 const quote = {
                     token: intent.token,
@@ -208,13 +204,12 @@ async function configured(historical = false) {
                     feeAmount: String(intent.feeAmount),
                     deadline: String(intent.deadline),
                     maxGas: "2000000",
-                    requestHash: provenanceIntentHash(broadcasterRequestHash(p.data), word(17)),
+                    requestHash: provenanceIntentHash(broadcasterRequestHash(p.data)),
                 };
                 return {
                     jsonrpc: "2.0",
                     id: q.id,
                     result: {
-                        mode: "firm",
                         quote,
                         signature: await signer.signTypedData(
                             broadcasterQuoteDomain({
@@ -225,18 +220,22 @@ async function configured(historical = false) {
                             broadcasterQuoteTypes,
                             quote
                         ),
-                        provenancePolicyId: word(17),
+                        provenanceRequired: true,
                         requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
                         ...(missingTracking ? {} : { provenanceTracking: tracking() }),
                     },
                 };
             }
             events.push("submit");
+            if (q.method === "broadcaster_submitTransaction" && loseNextSubmitResponse) {
+                loseNextSubmitResponse = false;
+                throw Error("lost response after acceptance");
+            }
             return {
                 jsonrpc: "2.0",
                 id: q.id,
                 result: {
-                    id: p.idempotencyKey ?? p.id,
+                    id: q.method === "broadcaster_getTransactionStatus" ? p.id : "relay-owned-id",
                     state: "submitted",
                     transactionHash: word(45),
                 },
@@ -268,6 +267,9 @@ async function configured(historical = false) {
         prepare,
         events,
         requests,
+        loseSubmitResponse: () => {
+            loseNextSubmitResponse = true;
+        },
         setMissingTracking: () => {
             missingTracking = true;
         },
@@ -300,7 +302,7 @@ it("requires configured source capability before asking a policy relay for a pri
             endpoint: "https://relay.test",
             quoteSigner: h.bob.ownerAddress,
             feeRecipient: h.bob.ownerAddress,
-            provenancePolicyId: word(17),
+            provenanceRequired: true,
         },
         vi.fn(async () => {
             throw Error("unexpected quote without capability");
@@ -321,9 +323,11 @@ it("automatically proves final prepared fields and forwards retained source evid
     expect(quoted.provenanceTracking()?.id).toBe("a".repeat(48));
     expect(original.preview().feeAmount).toBe(0n);
     const ready = await (await externallyAuthorize(quoted)).prove();
-    const result = await ready.submitBroadcaster(h.client, "normal-source-1");
+    const expectedId = "relay-owned-id";
+    const result = await ready.submitBroadcaster(h.client);
+    expect(result.id).toBe(expectedId);
     expect(result.state).toBe("submitted");
-    const quote = h.requests.find((q) => q.method === "broadcaster_getQuote" && q.mode === "firm"),
+    const quote = h.requests.find((q) => q.method === "broadcaster_getQuote"),
         submit = h.requests.find((q) => q.method === "broadcaster_submitTransaction");
     expect(submit.proofSidecars).toEqual(quote.proofSidecars);
     expect(submit.proofSidecars).toHaveLength(1);
@@ -358,15 +362,16 @@ it("persists public evidence and recovers the original managed submission after 
     const tracking = ready.provenanceTracking()!;
     tracking.id = "b".repeat(48);
     expect(ready.provenanceTracking()!.id).toBe("a".repeat(48));
-    await ready.submitBroadcaster(h.client, "managed-source-1");
+    const firstSubmission = await ready.submitBroadcaster(h.client);
     h.reader.isSpent = async (_scope, words) => words.map(() => true);
     const resumed = await session.resume(ready.id);
     expect(resumed.provenanceTracking()!.id).toBe("a".repeat(48));
-    expect((await resumed.submitBroadcaster(h.client, "managed-source-1")).state).toBe("submitted");
+    expect((await resumed.submitBroadcaster(h.client)).state).toBe("submitted");
     expect(h.requests.filter((q) => q.method === "broadcaster_submitTransaction")).toHaveLength(1);
-    await expect(resumed.submitBroadcaster(h.client, "replacement-id")).rejects.toThrow(
-        /id changed/
-    );
+    expect((await resumed.submitBroadcaster(h.client)).id).toBe(firstSubmission.id);
+    expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).toMatchObject({
+        broadcasterSubmissionId: firstSubmission.id,
+    });
     const snapshot = await h.store.readSnapshot(h.scope);
     expect(Object.values(snapshot.reservations)).toContain(ready.id);
     expect(
@@ -386,9 +391,7 @@ it("rejects changed relay configuration before sending retained source evidence"
         { ...h.client.configuration, endpoint: "https://other.test" },
         transport
     );
-    await expect(ready.submitBroadcaster(other, "bound-source-1")).rejects.toThrow(
-        /context changed/
-    );
+    await expect(ready.submitBroadcaster(other)).rejects.toThrow(/context changed/);
     expect(transport).not.toHaveBeenCalled();
 });
 
@@ -396,8 +399,7 @@ it("finds an input in a previous physical tree using bounded snapshot cursor rep
     const h = await configured(true);
     const quoted = await (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n });
     expect(quoted.provenanceTracking()).toBeDefined();
-    const sidecar = h.requests.find((q) => q.method === "broadcaster_getQuote" && q.mode === "firm")
-        .proofSidecars[0];
+    const sidecar = h.requests.find((q) => q.method === "broadcaster_getQuote").proofSidecars[0];
     expect(sidecar.proofBundle.rootCertificates.map((c: any) => String(c.treeId))).toEqual(["1"]);
     expect(h.requests.filter((q) => q.method === "provenance_getRoots")).toHaveLength(2);
     expect(h.requests.some((q) => q.method === "provenance_getMembership")).toBe(false);
@@ -444,4 +446,66 @@ it("requires the relay tracking acknowledgement and authenticates its statement 
         expect(original.preview().feeAmount).toBe(0n);
         expect(h.requests.some((q) => q.method === "provenance_evaluateTransaction")).toBe(false);
     }
+});
+
+it("replays the exact retained request after an unknown first response without computing an ID", async () => {
+    const h = await configured();
+    const quoted = await (await h.prepare()).withBroadcaster(h.client, { maxFeeAmount: 20n });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    h.loseSubmitResponse();
+    await expect(ready.submitBroadcaster(h.client)).rejects.toThrow(/lost response/);
+    const before = h.requests.length;
+    h.reader.isSpent = async (_scope, words) => words.map(() => true);
+    const result = await ready.submitBroadcaster(h.client);
+    expect(result.id).toBe("relay-owned-id");
+    expect(h.requests.slice(before).map((q) => q.method)).toEqual([
+        "broadcaster_submitTransaction",
+    ]);
+    const submissions = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
+    expect(submissions[1]).toEqual(submissions[0]);
+    await ready.submitBroadcaster(h.client);
+    expect(h.requests.at(-1).method).toBe("broadcaster_getTransactionStatus");
+});
+it("restores an ID-less uncertain managed send and resubmits its exact body with Source unavailable", async () => {
+    const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
+    const { sessionOptions } = await import("../../../../../test-support/session-options");
+    const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const h = await configured();
+    const session = new WalletSession(
+        sessionOptions({ ...h.options, prover: backend(), provenance: h.capability })
+    );
+    const prepared = await session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 40n },
+    });
+    const ready = await (
+        await authorizeOperation(await prepared.withBroadcaster(h.client, { maxFeeAmount: 20n }))
+    ).prove();
+    h.loseSubmitResponse();
+    await expect(ready.submitBroadcaster(h.client)).rejects.toThrow(/lost response/);
+    const uncertain = await h.store.readSnapshot(h.scope);
+    expect(uncertain.operations[ready.id]!.payload).toMatchObject({ externalized: true });
+    expect(
+        (uncertain.operations[ready.id]!.payload as any).broadcasterSubmissionId
+    ).toBeUndefined();
+    h.reader.isSpent = async (_scope, words) => words.map(() => true);
+    const restarted = new WalletSession(sessionOptions({ ...h.options, prover: backend() }));
+    const resumed = await restarted.resume(ready.id);
+    const before = h.requests.length;
+    const result = await resumed.submitBroadcaster(h.client);
+    expect(result.id).toBe("relay-owned-id");
+    expect(h.requests.slice(before).map((q) => q.method)).toEqual([
+        "broadcaster_submitTransaction",
+    ]);
+    const submissions = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
+    expect(submissions[1]).toEqual(submissions[0]);
+    expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).toMatchObject({
+        broadcasterSubmissionId: result.id,
+    });
+    h.client.status = async () => {
+        throw Error("status unavailable");
+    };
+    await expect(resumed.submitBroadcaster(h.client)).rejects.toThrow(/status unavailable/);
+    expect(h.requests.filter((q) => q.method === "broadcaster_submitTransaction")).toHaveLength(2);
 });

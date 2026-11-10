@@ -34,7 +34,7 @@ it("discovers a token-compatible service across pages and pins its registered qu
         .mockResolvedValueOnce({ block, broadcasters: [entry(3)] });
     const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
         const req = JSON.parse(init!.body as string);
-        expect(req.params[0]).toEqual({ mode: "estimate", data: concreteData });
+        expect(req.params[0]).toEqual({ data: concreteData });
         return new Response(
             JSON.stringify({
                 jsonrpc: "2.0",
@@ -43,7 +43,6 @@ it("discovers a token-compatible service across pages and pins its registered qu
                     ? { error: { code: -32000, message: "unsupported token" } }
                     : {
                           result: {
-                              mode: "estimate",
                               feeRecipient: entry(String(url).includes("relay2") ? 99 : 3)
                                   .feeRecipient,
                               feeAmount: "5",
@@ -83,7 +82,6 @@ it("returns all compatible services without a fee ceiling and skips disabled or 
                 jsonrpc: "2.0",
                 id: req.id,
                 result: {
-                    mode: "estimate",
                     feeRecipient: entry(String(url).includes("relay3") ? 3 : 4).feeRecipient,
                     feeAmount: "99999",
                     maxGas: "1000",

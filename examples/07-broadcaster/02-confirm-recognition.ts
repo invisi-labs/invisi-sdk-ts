@@ -1,28 +1,29 @@
 import { readFile } from "node:fs/promises";
 import { JsonRpcProvider, getBytes } from "ethers";
 import { ProvenanceClient } from "@invisi-labs/sdk/provenance";
+import { readHostJson } from "../host-transport.js";
 import type { TrustContext } from "@invisi-labs/sdk/provenance";
 
 if (!process.argv.includes("--execute")) {
     console.log(
-        "Pass --execute after host confirmation; set TRANSACTION_HASH and retain the public record."
+        "Pass --execute after host confirmation; set TRANSACTION_HASH and paste the logged broadcast record."
     );
     process.exit(0);
 }
 const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
-const record = JSON.parse(await readFile(process.env.PROVENANCE_RECORD!, "utf8")) as {
+console.log("Paste the Broadcast record printed by example02.");
+const record = (await readHostJson()) as {
     data: string;
-    broadcastId: string;
+    submissionId: string;
     trackingId: string;
     operationDigest: string;
 };
 const trust: TrustContext = {
     chainId: config.chainId,
     protocolAddress: config.protocolAddress,
-    policyId: config.policyId,
     chainGeneration: config.generation,
     providerId: config.providerId,
-    manifestSha256: "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282",
+    manifestSha256: "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a",
     signingKeys: { [config.signingKeyId]: getBytes(config.signingPublicKey) },
 };
 const provider = new JsonRpcProvider(config.chainRpcUrl);

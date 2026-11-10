@@ -21,7 +21,7 @@ import {
     type RecoveryHost,
 } from "./recovery";
 const enabled = process.env.INVISI_PROVENANCE_RECOVERY_LIVE === "1";
-const pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282";
+const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
 it.skipIf(!enabled)(
     "LIVE recovery: primary reconciliation,local BB verification,encrypted restart,invalid job and operation recognition",
     async () => {

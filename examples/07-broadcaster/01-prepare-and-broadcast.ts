@@ -1,4 +1,4 @@
-import { readFile, open } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { JsonRpcProvider, getBytes } from "ethers";
 import {
@@ -18,15 +18,14 @@ import { nativeWallet, json } from "../host-transport.js";
 import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 
 if (!process.argv.includes("--execute")) {
-    console.log("Pass --execute to prepare/prove; add --submit to broadcast. Review README first.");
+    console.log("Pass --execute to prepare, prove and broadcast. Review README first.");
     process.exit(0);
 }
 const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
-const pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282";
+const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
 const trust: TrustContext = {
     chainId: config.chainId,
     protocolAddress: config.protocolAddress,
-    policyId: config.policyId,
     chainGeneration: config.generation,
     providerId: config.providerId,
     manifestSha256: pin,
@@ -98,37 +97,33 @@ try {
     });
     const broadcaster = new BroadcasterClient({
         ...config.broadcaster,
-        provenancePolicyId: config.policyId,
+        provenanceRequired: true,
     });
-    // Fee convergence freezes the statement before local source proving and tracked preflight.
+    // After fees stabilize, the SDK proves provenance locally; Broadcaster submits its preflight.
+    // The SDK authenticates the returned tracking before wallet authorization.
     prepared = await prepared.withBroadcaster(broadcaster, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,
     });
+    const tracking = prepared.provenanceTracking();
+    if (!tracking) throw Error("Missing Provenance tracking for private Note inputs");
+    console.log("Provenance preflight tracking:", json(tracking));
+    // Provenance uses this ID to follow chain confirmation and source recognition.
     const request = await prepared.exportWalletRequest(crypto.randomUUID());
     const responses = await nativeWallet.execute([request]);
     const response = responses.find((item) => item.id === request.id);
     if (!response) throw Error("Missing wallet response");
     const ready = await (await prepared.withWalletResponse(response)).prove();
     console.log("Verified quote:", json(ready.broadcasterQuote()));
-    if (process.argv.includes("--submit")) {
-        const broadcastId = crypto.randomUUID();
-        const tracking = ready.provenanceTracking()!;
-        const record = {
-            data: (await ready.exportTransaction()).data,
-            broadcastId,
-            trackingId: tracking.id,
-            operationDigest: tracking.operationDigest,
-        };
-        const file = await open(process.env.PROVENANCE_RECORD!, "wx", 0o600);
-        try {
-            await file.writeFile(json(record));
-            await file.sync();
-        } finally {
-            await file.close();
-        }
-        // Retain this public record if submission times out; query the same broadcast ID.
-        console.log(json(await ready.submitBroadcaster(broadcaster, broadcastId)));
-    }
+    const data = (await ready.exportTransaction()).data;
+    const submitted = await ready.submitBroadcaster(broadcaster);
+    const record = {
+        data,
+        submissionId: submitted.id,
+        trackingId: tracking.id,
+        operationDigest: tracking.operationDigest,
+    };
+    console.log("Broadcast record:", json(record));
+    console.log(json(submitted));
 } finally {
     provider.destroy();
 }

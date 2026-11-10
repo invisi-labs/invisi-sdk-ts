@@ -15,8 +15,6 @@ export const PUBLIC_INPUTS = Object.freeze([
     "chain_id",
     "protocol_address",
     "token_address",
-    "policy_id_hi",
-    "policy_id_lo",
     "chain_generation",
     "source_count",
     "sources_digest",
@@ -68,12 +66,11 @@ export const limbs = (value: Integer): [bigint, bigint] => {
 export interface Scope {
     chainId: Integer;
     protocolAddress: Integer;
-    policyId: Integer;
 }
 export async function scopeHash(s: Scope): Promise<bigint> {
     const protocol = uint(s.protocolAddress, 160);
     if (!protocol) throw new Error("Zero protocol");
-    return hash([DOMAINS.SCOPE, uint(s.chainId, 64), protocol, ...limbs(s.policyId)]);
+    return hash([DOMAINS.SCOPE, uint(s.chainId, 64), protocol]);
 }
 export const recognizedLeaf = (scope: Integer, commitment: Integer): Promise<bigint> => {
     if (field(commitment) === 0n) throw new Error("Zero commitment");
@@ -188,7 +185,6 @@ const CERT_LAYOUT = [
     ["certificateVersion", 1],
     ["providerId", 32],
     ["signingKeyId", 32],
-    ["policyId", 32],
     ["chainId", 8],
     ["protocolAddress", 20],
     ["chainGeneration", 8],
@@ -366,7 +362,6 @@ export async function buildWitness(s: WitnessRequest): Promise<Witness> {
             s.chainId,
             s.protocolAddress,
             s.tokenAddress,
-            ...limbs(s.policyId),
             s.chainGeneration,
             s.sources.length,
             sd,
@@ -469,13 +464,9 @@ export interface TrustContext extends Scope {
     signingKeyValidity?: Readonly<Record<string, { activatedAt: string; retiredAt?: string }>>;
 }
 export function assertCertificateTrust(c: RootCertificate, trust: TrustContext): void {
-    for (const k of [
-        "chainId",
-        "protocolAddress",
-        "policyId",
-        "chainGeneration",
-        "providerId",
-    ] as const)
+    if (Object.keys(c).some((k) => k !== "signature" && !CERT_LAYOUT.some(([name]) => name === k)))
+        throw Error("Unknown root certificate field");
+    for (const k of ["chainId", "protocolAddress", "chainGeneration", "providerId"] as const)
         if (BigInt(c[k]) !== BigInt(trust[k])) throw new Error("Certificate deployment mismatch");
     const key = trust.signingKeys[word(c.signingKeyId)];
     const validity = trust.signingKeyValidity?.[word(c.signingKeyId)],
@@ -498,7 +489,7 @@ export async function exportSidecar(
 ): Promise<ProofSidecar> {
     if (identity.sha256 !== trust.manifestSha256 || certificates.length !== request.sources.length)
         throw new Error("Manifest or certificate count mismatch");
-    for (const k of ["chainId", "protocolAddress", "policyId", "chainGeneration"] as const)
+    for (const k of ["chainId", "protocolAddress", "chainGeneration"] as const)
         if (BigInt(request[k]) !== BigInt(trust[k])) throw new Error("Witness deployment mismatch");
     certificates.forEach((c, i) => {
         assertCertificateTrust(c, trust);
@@ -519,7 +510,7 @@ export async function exportSidecar(
         expectedPublicInputs: expected,
     });
     if (
-        result.publicInputs.length !== 13 ||
+        result.publicInputs.length !== 11 ||
         result.publicInputs.some((v, i) => word(field(v)) !== expected[i]) ||
         !/^0x(?:[0-9a-fA-F]{2})+$/.test(result.proof) ||
         result.proof.length > 131074
@@ -559,7 +550,6 @@ export class ProvenanceClient {
             throw new Error("Invalid service endpoint");
         uint(trust.chainId, 64);
         uint(trust.protocolAddress, 160);
-        uint(trust.policyId, 256);
     }
     private async call<T extends PublicResult>(
         method: string,
@@ -589,6 +579,8 @@ export class ProvenanceClient {
         if (envelope.error) throw new Error(envelope.error.data?.code ?? envelope.error.message);
         const result = envelope.result;
         if (!result?.scope) throw new Error("Missing deployment scope");
+        if (Object.keys(result.scope).some((k) => !["chainId", "protocolAddress"].includes(k)))
+            throw Error("Unknown deployment scope field");
         if (
             [
                 "provenance_evaluateTransaction",
@@ -601,7 +593,7 @@ export class ProvenanceClient {
             )
         )
             throw new Error("Missing response trust identity");
-        for (const k of ["chainId", "protocolAddress", "policyId"] as const)
+        for (const k of ["chainId", "protocolAddress"] as const)
             if (BigInt(result.scope[k]) !== BigInt(this.trust[k]))
                 throw new Error("Deployment mismatch");
         if (
@@ -621,27 +613,23 @@ export class ProvenanceClient {
             throw new Error("Manifest mismatch");
         if (result.signingKeyId !== undefined) {
             const id = word(result.signingKeyId as string);
-            if (method !== "provenance_getPolicy" && !this.trust.signingKeys[id])
+            if (method !== "provenance_getRules" && !this.trust.signingKeys[id])
                 throw new Error("Untrusted signing key");
         }
         return result;
     }
     getVersion(signal?: AbortSignal): Promise<PublicResult> {
-        return this.call("provenance_getVersion", { policyId: word(this.trust.policyId) }, signal);
+        return this.call("provenance_getVersion", {}, signal);
     }
     getStatus(signal?: AbortSignal): Promise<PublicResult> {
-        return this.call("provenance_getStatus", { policyId: word(this.trust.policyId) }, signal);
+        return this.call("provenance_getStatus", {}, signal);
     }
-    getPolicies(query: Record<string, unknown> = {}): Promise<PublicResult> {
-        return this.call("provenance_getPolicies", query);
-    }
-    getPolicy(): Promise<PublicResult> {
-        return this.call("provenance_getPolicy", { policyId: word(this.trust.policyId) });
+    getRules(): Promise<PublicResult> {
+        return this.call("provenance_getRules", {});
     }
     async getRoots(query: Record<string, unknown> = {}): Promise<PublicResult> {
         const r = await this.call("provenance_getRoots", {
             ...query,
-            policyId: word(this.trust.policyId),
         });
         if (!Array.isArray(r.items)) throw new Error("Missing root certificates");
         for (const c of r.items) assertCertificateTrust(c as RootCertificate, this.trust);
@@ -649,7 +637,6 @@ export class ProvenanceClient {
     }
     async getRoot(rootId: string): Promise<PublicResult> {
         const r = await this.call<PublicResult>("provenance_getRoot", {
-            policyId: word(this.trust.policyId),
             rootId,
         });
         if (r.certificate) assertCertificateTrust(r.certificate as RootCertificate, this.trust);
@@ -658,7 +645,6 @@ export class ProvenanceClient {
     getLeaves(rootId: string, fromIndex: string, limit = 50): Promise<PublicResult> {
         if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error("Page limit");
         return this.call("provenance_getLeaves", {
-            policyId: word(this.trust.policyId),
             rootId,
             fromIndex: uint(fromIndex, 64).toString(),
             limit,
@@ -673,7 +659,6 @@ export class ProvenanceClient {
             throw new Error("Membership lookup requires explicit interest disclosure");
         const requested = field(commitment),
             r = await this.call("provenance_getMembership", {
-                policyId: word(this.trust.policyId),
                 commitment: word(requested),
                 rootId,
             });
@@ -731,7 +716,7 @@ export class ProvenanceClient {
                     leafIndex: Integer;
                     checkpointSequence: Integer;
                 };
-                for (const k of ["chainId", "protocolAddress", "policyId"] as const)
+                for (const k of ["chainId", "protocolAddress"] as const)
                     if (BigInt(leaf.scope[k]) !== BigInt(this.trust[k]))
                         throw new Error("Leaf scope mismatch");
                 if (
@@ -754,19 +739,16 @@ export class ProvenanceClient {
     }
     getNoteRecognition(commitment: string): Promise<PublicResult> {
         return this.call("provenance_getNoteRecognition", {
-            policyId: word(this.trust.policyId),
             commitment: word(field(commitment)),
         });
     }
     getOperationRecognition(locator: Record<string, string>): Promise<PublicResult> {
         return this.call("provenance_getOperationRecognition", {
             ...locator,
-            policyId: word(this.trust.policyId),
         });
     }
     getTransactionRecognition(txHash: string): Promise<PublicResult> {
         return this.call("provenance_getTransactionRecognition", {
-            policyId: word(this.trust.policyId),
             txHash: word(txHash),
         });
     }
@@ -780,7 +762,6 @@ export class ProvenanceClient {
             await validateProofBundle(s.proofBundle, this.trust);
         }
         return this.call("provenance_evaluateTransaction", {
-            policyId: word(this.trust.policyId),
             data,
             proofSidecars: proofSidecars.map(proofSidecarToWire),
         });
@@ -796,18 +777,13 @@ export class ProvenanceClient {
         await validateProofBundle(proofBundle, this.trust);
         return this.call("provenance_submitProof", {
             ...locator,
-            policyId: word(this.trust.policyId),
             proofBundle: proofSidecarToWire({ operationIndex: "0", proofBundle }).proofBundle,
             idempotencyKey,
         });
     }
     async getTracking(trackingId: string, signal?: AbortSignal): Promise<TrackingResult> {
         if (!/^[a-f0-9]{48}$/.test(trackingId)) throw Error("Invalid tracking id");
-        const result = await this.call(
-            "provenance_getTracking",
-            { policyId: word(this.trust.policyId), trackingId },
-            signal
-        );
+        const result = await this.call("provenance_getTracking", { trackingId }, signal);
         const tracking = validateTracking(result.tracking, trackingId);
         return { ...result, tracking };
     }
@@ -919,6 +895,8 @@ function assertPublicSubmission(value: unknown): void {
 }
 
 export function certificateToWire(c: RootCertificate): RootCertificate {
+    if (Object.keys(c).some((k) => k !== "signature" && !CERT_LAYOUT.some(([name]) => name === k)))
+        throw Error("Unknown root certificate field");
     rootCertificatePayload(c);
     const out = {} as RootCertificate;
     for (const [key, width] of CERT_LAYOUT) {
@@ -955,27 +933,24 @@ export async function validateProofBundle(b: ProofBundle, t: TrustContext): Prom
         throw new Error("Unsupported provenance proof bundle");
     const match = /^provenance_k([1-9][0-9]*)$/.exec(b.circuitId),
         capacity = Number(match?.[1]);
-    if (!CAPACITIES.includes(capacity) || b.publicInputs.length !== 13)
+    if (!CAPACITIES.includes(capacity) || b.publicInputs.length !== 11)
         throw new Error("Unsupported provenance circuit or ABI");
     const p = b.publicInputs.map((v) => {
         if (!/^0x[0-9a-fA-F]{64}$/.test(v))
             throw new Error("Public inputs must be canonical words");
         return field(v);
     });
-    const [hi, lo] = limbs(t.policyId);
-    uint(p[9]!, 128);
-    uint(p[10]!, 128);
+    uint(p[7]!, 128);
+    uint(p[8]!, 128);
     if (
         p[0] !== BigInt(t.chainId) ||
         p[1] !== BigInt(t.protocolAddress) ||
-        p[3] !== hi ||
-        p[4] !== lo ||
-        p[5] !== BigInt(t.chainGeneration) ||
-        p[6] !== BigInt(b.rootCertificates.length) ||
-        p[8]! < 1n ||
-        p[8]! > BigInt(capacity) ||
+        p[3] !== BigInt(t.chainGeneration) ||
+        p[4] !== BigInt(b.rootCertificates.length) ||
         p[6]! < 1n ||
-        p[6]! > p[8]!
+        p[6]! > BigInt(capacity) ||
+        p[4]! < 1n ||
+        p[4]! > p[6]!
     )
         throw new Error("Proof bundle scope or shape mismatch");
     const sources = b.rootCertificates.map((c) => {
@@ -989,28 +964,45 @@ export async function validateProofBundle(b: ProofBundle, t: TrustContext): Prom
         return { treeId: c.treeId, root: c.root, leafCount: c.leafCount };
     });
     const sd = await sourcesDigest(t.chainGeneration, sources);
-    if (sd !== p[7]) throw new Error("Proof sources digest mismatch");
+    if (sd !== p[5]) throw new Error("Proof sources digest mismatch");
     const binding = await bindingDigest({
         scope: await scopeHash(t),
         tokenAddress: p[2]!,
         chainGeneration: t.chainGeneration,
-        sourceCount: p[6]!,
+        sourceCount: p[4]!,
         sourcesDigest: sd,
-        inputCount: p[8]!,
-        operationDigest: (p[9]! << 128n) | p[10]!,
-        inputDigest: p[11]!,
+        inputCount: p[6]!,
+        operationDigest: (p[7]! << 128n) | p[8]!,
+        inputDigest: p[9]!,
     });
-    if (binding !== p[12]) throw new Error("Proof binding mismatch");
+    if (binding !== p[10]) throw new Error("Proof binding mismatch");
 }
 
 export function proofSidecarToWire(sidecar: ProofSidecar): ProofSidecar {
+    if (Object.keys(sidecar).some((k) => !["operationIndex", "proofBundle"].includes(k)))
+        throw Error("Unknown proof sidecar field");
+    if (
+        Object.keys(sidecar.proofBundle).some(
+            (k) =>
+                ![
+                    "format",
+                    "circuitId",
+                    "manifestSha256",
+                    "target",
+                    "publicInputs",
+                    "proof",
+                    "rootCertificates",
+                ].includes(k)
+        )
+    )
+        throw Error("Unknown proof bundle field");
     const b = sidecar.proofBundle;
     if (
         b.format !== "invisi-provenance-proof-v1" ||
         b.target !== "evm" ||
         !/^provenance_k[1-9][0-9]*$/.test(b.circuitId) ||
         !/^([0-9a-f]{64})$/.test(b.manifestSha256) ||
-        b.publicInputs.length !== 13 ||
+        b.publicInputs.length !== 11 ||
         !/^0x(?:[0-9a-fA-F]{2})+$/.test(b.proof) ||
         b.proof.length > 131074
     )

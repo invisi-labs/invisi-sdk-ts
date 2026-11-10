@@ -1,4 +1,4 @@
-import { readFile, open } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { JsonRpcProvider, Interface, getBytes, sha256, toUtf8Bytes, toQuantity } from "ethers";
 import { Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
@@ -20,16 +20,15 @@ import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 
 if (!process.argv.includes("--execute")) {
     console.log(
-        "Pass --execute with TRANSACTION_HASH for a self-broadcast one-input transact. Add --submit to submit its source proof, never the transaction."
+        "Pass --execute with TRANSACTION_HASH to prove and submit provenance for a self-broadcast one-input transact."
     );
     process.exit(0);
 }
 const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
-const pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282";
+const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
 const trust: TrustContext = {
     chainId: config.chainId,
     protocolAddress: config.protocolAddress,
-    policyId: config.policyId,
     chainGeneration: config.generation,
     providerId: config.providerId,
     manifestSha256: pin,
@@ -201,30 +200,23 @@ try {
         0
     );
     console.log("Local source proof verified; no Broadcaster is used.");
-    if (process.argv.includes("--submit")) {
-        const locator = { txHash: hash, blockHash: receipt.blockHash, operationIndex: "0" };
-        const idempotencyKey = `${hash.slice(2, 18)}:${sha256(toUtf8Bytes(json(sidecar.proofBundle))).slice(2)}`;
-        const file = await open(process.env.PROVENANCE_RECORD!, "wx", 0o600);
-        try {
-            await file.writeFile(
-                json({ locator, proofBundle: sidecar.proofBundle, idempotencyKey })
-            );
-            await file.sync();
-        } finally {
-            await file.close();
-        }
-        // Retry a lost response with this exact saved bundle/key, not a newly generated proof.
-        const submitted = await source.submitProof(locator, sidecar.proofBundle, idempotencyKey);
-        if (typeof submitted.jobId !== "string" || !submitted.jobId)
-            throw Error("Missing source proof job ID; retain the saved record");
-        const job = await source.waitProofJob(submitted.jobId);
-        if (job.status !== "valid") throw Error(`Source proof job: ${job.status}`);
-        console.log("Source verification:", json(job));
-        console.log(
-            "Current operation recognition:",
-            json(await source.getOperationRecognition(locator))
-        );
-    }
+    const locator = { txHash: hash, blockHash: receipt.blockHash, operationIndex: "0" };
+    const idempotencyKey = `${hash.slice(2, 18)}:${sha256(toUtf8Bytes(json(sidecar.proofBundle))).slice(2)}`;
+    console.log(
+        "Provenance submission:",
+        json({ locator, proofBundle: sidecar.proofBundle, idempotencyKey })
+    );
+    // Retry a lost response with this exact saved bundle/key, not a newly generated proof.
+    const submitted = await source.submitProof(locator, sidecar.proofBundle, idempotencyKey);
+    if (typeof submitted.jobId !== "string" || !submitted.jobId)
+        throw Error("Missing source proof job ID; retain the saved record");
+    const job = await source.waitProofJob(submitted.jobId);
+    if (job.status !== "valid") throw Error(`Source proof job: ${job.status}`);
+    console.log("Source verification:", json(job));
+    console.log(
+        "Current operation recognition:",
+        json(await source.getOperationRecognition(locator))
+    );
 } finally {
     provider.destroy();
 }

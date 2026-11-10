@@ -1,6 +1,6 @@
 # TypeScript examples
 
-Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline Note output example runs without `--execute`. The Provenance walkthrough adds a separate explicit `--submit` option.
+Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline Note output example runs without `--execute`. The Broadcaster and self-provenance submission examples submit as part of their `--execute` flow.
 
 ## Setup
 
@@ -52,7 +52,7 @@ Each wallet response repeats `version`, `id`, `ownerAddress`, and `method` and c
 
 Funding and address registration use separate EVM typed-data requests. Their printed arrays contain an application `id`, `kind`, and the SDK's EIP-712 request. Have the host review and sign that request, then paste `[{"id":"the-printed-id","signature":"0x..."}]`. These application envelopes are not additional native-wallet protocol methods. The SDK checks returned signatures against the retained intent. Caller-funded transactions instead require submission by their specified payer. Token balances, ERC20 allowance, gas, and submission remain host responsibilities; no script approves or broadcasts automatically.
 
-The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, optional relay submission and independent offchain source submission; only its explicit `--submit` paths send requests that submit a transaction or source proof.
+The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, relay submission and independent offchain source submission. With `--execute`, example02 submits its transaction and example04 submits its source proof.
 
 ## Scenarios
 
@@ -61,7 +61,7 @@ The normal payment examples export unsigned transactions for host review/submiss
 - `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
 - `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted Note and Credit preparation, grant reservations, and operation reconciliation. There is no injected private executor or automatic signer.
-- `07-broadcaster`: fee queries, Note transfer/withdrawal, Credit draw, Shield relay submission, tracking confirmation and self-submitted source proofs. See its [scenario table](07-broadcaster/README.md).
+- `07-broadcaster`: concrete-transaction estimation, one common prepare/quote/relay submission flow, tracking confirmation and self-submitted source proofs. See its [scenario table](07-broadcaster/README.md).
 - `06-disclosure`: independently read canonical receipt evidence, request native decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the native-authenticated application payload without claiming its financial opening proves the memo.
 
 ## Automatic discovery and recovery

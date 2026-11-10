@@ -1,12 +1,11 @@
 import { it, expect } from "vitest";
 import { ProvenanceClient, word, type TrustContext } from "./index";
-it("requests policy-scoped tracking,terminates bounded waits and rejects unknown/stale/untrusted responses", async () => {
+it("requests deployment-scoped tracking,terminates bounded waits and rejects unknown/stale/untrusted responses", async () => {
     for (const status of ["recognized", "expired", "superseded", "stale_generation", "unknown"]) {
         let calls = 0;
         const trust: TrustContext = {
             chainId: "1",
             protocolAddress: "2",
-            policyId: "7",
             chainGeneration: "3",
             providerId: "4",
             manifestSha256: "a".repeat(64),
@@ -18,7 +17,6 @@ it("requests policy-scoped tracking,terminates bounded waits and rejects unknown
             expect(q.method).toBe("provenance_getTracking");
             expect(q.params).toEqual([
                 {
-                    policyId: word(7),
                     trackingId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 },
             ]);
@@ -27,7 +25,7 @@ it("requests policy-scoped tracking,terminates bounded waits and rejects unknown
                     jsonrpc: "2.0",
                     id: q.id,
                     result: {
-                        scope: { chainId: "1", protocolAddress: "2", policyId: "7" },
+                        scope: { chainId: "1", protocolAddress: "2" },
                         chainGeneration: "3",
                         providerId: "4",
                         signingKeyId: "5",
@@ -88,7 +86,7 @@ it("checks expiry encoding and matched identity without expiring lagging-chain t
     expect(
         preflightTracking(
             {
-                scope: { chainId: "1", protocolAddress: "2", policyId: "7" },
+                scope: { chainId: "1", protocolAddress: "2" },
                 broadcastDecision: "allow",
                 operations: [
                     { ...member, operationIndex: "0", tracking: { ...base, id: "b".repeat(48) } },
@@ -102,7 +100,7 @@ it("checks expiry encoding and matched identity without expiring lagging-chain t
     expect(() =>
         preflightTracking(
             {
-                scope: { chainId: "1", protocolAddress: "2", policyId: "7" },
+                scope: { chainId: "1", protocolAddress: "2" },
                 ...member,
             },
             "1",
@@ -114,7 +112,7 @@ it("checks expiry encoding and matched identity without expiring lagging-chain t
 it("rejects contradictory allowed preflight acknowledgements with terminal tracking", () => {
     for (const status of ["expired", "superseded"]) {
         const result = {
-            scope: { chainId: "1", protocolAddress: "2", policyId: "7" },
+            scope: { chainId: "1", protocolAddress: "2" },
             broadcastDecision: "allow",
             operationDigest: word(9),
             tracking: { id: "a".repeat(48), status, expiresAt: "1", operationDigest: word(9) },

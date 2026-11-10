@@ -39,13 +39,9 @@
     "example:session:6": "tsx 05-wallet-session/06-draw-credit.ts",
     "example:session:7": "tsx 05-wallet-session/07-update-credit.ts",
     "example:session:8": "tsx 05-wallet-session/08-revoke-credit.ts",
-    "example:broadcaster:1": "tsx 07-broadcaster/01-fee-query.ts",
-    "example:broadcaster:2": "tsx 07-broadcaster/02-note-transfer.ts",
-    "example:broadcaster:3": "tsx 07-broadcaster/03-credit-draw.ts",
-    "example:broadcaster:4": "tsx 07-broadcaster/04-note-withdrawal.ts",
-    "example:broadcaster:5": "tsx 07-broadcaster/05-shield.ts",
-    "example:broadcaster:6": "tsx 07-broadcaster/06-confirm-recognition.ts",
-    "example:broadcaster:7": "tsx 07-broadcaster/07-self-provenance.ts"
+    "example:broadcaster:1": "tsx 07-broadcaster/01-prepare-and-broadcast.ts",
+    "example:broadcaster:2": "tsx 07-broadcaster/02-confirm-recognition.ts",
+    "example:broadcaster:3": "tsx 07-broadcaster/03-self-provenance.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",

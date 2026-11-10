@@ -10,7 +10,7 @@ import {
 } from "./index";
 const signer = new Wallet("0x" + "11".repeat(32));
 const trust = { chainId: 31337n, protocol: "0x" + "22".repeat(20), signer: signer.address };
-function calldata(proof = "0x1234", signature = "0x") {
+function calldata(proof = "0x1234", signature = "0x", feeAmount = 2n) {
     return broadcasterTransactInterface.encodeFunctionData("transact", [
         proof,
         {
@@ -23,7 +23,7 @@ function calldata(proof = "0x1234", signature = "0x") {
                 withdrawalAmount: 100n,
                 deadline: 9999999999n,
                 feeRecipient: signer.address,
-                feeAmount: 2n,
+                feeAmount,
             },
             deliveries: [],
             funding: {
@@ -51,9 +51,7 @@ describe("broadcaster final intents", () => {
                 result: {},
             })
         );
-        await expect(wrong.quote(calldata(), { mode: "estimate" })).rejects.toThrow(
-            "JSON-RPC response"
-        );
+        await expect(wrong.estimateQuote(calldata())).rejects.toThrow("JSON-RPC response");
         const failed = new BroadcasterClient(
             {
                 endpoint: "https://example.org",
@@ -66,7 +64,7 @@ describe("broadcaster final intents", () => {
                 error: { code: -32001, message: "Unknown request" },
             })
         );
-        await expect(failed.status("unknown")).rejects.toMatchObject({
+        await expect(failed.status(ZeroHash)).rejects.toMatchObject({
             code: -32001,
             message: "Unknown request",
         });
@@ -83,9 +81,7 @@ describe("broadcaster final intents", () => {
                 error: { code: -32000, message: "Rejected" },
             })
         );
-        await expect(mixed.quote(calldata(), { mode: "estimate" })).rejects.toThrow(
-            "JSON-RPC response"
-        );
+        await expect(mixed.estimateQuote(calldata())).rejects.toThrow("JSON-RPC response");
     });
     it("encodes every operation as one positional query", async () => {
         const data = calldata();
@@ -118,22 +114,22 @@ describe("broadcaster final intents", () => {
                 };
             }
         );
-        await expect(client.quote(data, { mode: "estimate" })).rejects.toThrow("Test response");
+        await expect(client.estimateQuote(data)).rejects.toThrow("Test response");
         await expect(client.quote(data, trust)).rejects.toThrow("Test response");
-        await expect(
-            client.submit(data, { quote, signature, context: trust }, "request_positional_01")
-        ).rejects.toThrow("Test response");
-        await expect(client.status("request_positional_01")).rejects.toThrow("Test response");
+        await expect(client.submit(data, { quote, signature, context: trust })).rejects.toThrow(
+            "Test response"
+        );
+        await expect(client.status("relay-owned-id")).rejects.toThrow("Test response");
         expect(requests.map(({ method, params }) => ({ method, params }))).toEqual([
-            { method: "broadcaster_getQuote", params: [{ mode: "estimate", data }] },
-            { method: "broadcaster_getQuote", params: [{ mode: "firm", data }] },
+            { method: "broadcaster_estimateQuote", params: [{ data }] },
+            { method: "broadcaster_getQuote", params: [{ data }] },
             {
                 method: "broadcaster_submitTransaction",
-                params: [{ data, quote, signature, idempotencyKey: "request_positional_01" }],
+                params: [{ data, quote, signature }],
             },
             {
                 method: "broadcaster_getTransactionStatus",
-                params: [{ id: "request_positional_01" }],
+                params: [{ id: "relay-owned-id" }],
             },
         ]);
     });
@@ -155,7 +151,7 @@ describe("broadcaster final intents", () => {
                 quote
             ),
         };
-        const id = "request_expired_retry_001";
+        const id = "relay-owned-id";
         const client = new BroadcasterClient(
             {
                 endpoint: "https://example.org",
@@ -168,7 +164,7 @@ describe("broadcaster final intents", () => {
                 result: { id, state: "uncertain" },
             })
         );
-        await expect(client.submit(data, { ...signed, context: trust }, id)).resolves.toEqual({
+        await expect(client.submit(data, { ...signed, context: trust })).resolves.toEqual({
             id,
             state: "uncertain",
         });
@@ -230,7 +226,6 @@ describe("broadcaster final intents", () => {
                     jsonrpc: "2.0",
                     id: 1,
                     result: {
-                        mode: "estimate",
                         feeRecipient: signer.address,
                         feeAmount: "2",
                         maxGas: "1000",
@@ -244,13 +239,13 @@ describe("broadcaster final intents", () => {
                 quoteSigner: trust.signer,
                 feeRecipient: trust.signer,
             });
-            await client.quote(calldata(), { mode: "estimate" });
+            await client.estimateQuote(calldata());
             expect(String(fetcher.mock.calls[0]?.[0])).toBe("https://example.org/api/broadcaster");
             expect(JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string)).toEqual({
                 jsonrpc: "2.0",
                 id: 1,
-                method: "broadcaster_getQuote",
-                params: [{ mode: "estimate", data: calldata() }],
+                method: "broadcaster_estimateQuote",
+                params: [{ data: calldata() }],
             });
             expect(fetcher.mock.calls[0]?.[1]?.redirect).toBe("error");
         } finally {
@@ -297,7 +292,7 @@ it("rejects zero Credit service fees and binds positive protocol fees", async ()
                 result: { feeRecipient: ZeroAddress, feeAmount: "0", maxGas: "100000" },
             })
         );
-        await expect(client.quote(vector.data, { mode: "estimate" })).rejects.toThrow(
+        await expect(client.estimateQuote(vector.data)).rejects.toThrow(
             "invalid broadcaster estimate"
         );
         expect(() =>
@@ -312,16 +307,15 @@ it("rejects zero Credit service fees and binds positive protocol fees", async ()
 });
 
 import { provenanceIntentHash } from "@invisi-labs/core/provenance";
-it("binds configured provenance policy to signed quote and rejects policy downgrade", async () => {
+it("binds the provenance requirement to a signed quote and rejects downgrades", async () => {
     const data = calldata(),
-        policy = "0x" + "77".repeat(32),
         quote = {
             token: "0x" + "33".repeat(20),
             feeRecipient: signer.address,
             feeAmount: "2",
             deadline: "9999999999",
             maxGas: "1000000",
-            requestHash: provenanceIntentHash(broadcasterRequestHash(data), policy),
+            requestHash: provenanceIntentHash(broadcasterRequestHash(data)),
         };
     const signed = {
         quote,
@@ -330,44 +324,44 @@ it("binds configured provenance policy to signed quote and rejects policy downgr
             broadcasterQuoteTypes,
             quote
         ),
-        provenancePolicyId: policy,
+        provenanceRequired: true,
         requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
     };
     expect(() =>
-        verifyBroadcasterQuote(signed, { ...trust, provenancePolicyId: policy }, data, 0n)
+        verifyBroadcasterQuote(signed, { ...trust, provenanceRequired: true }, data, 0n)
     ).not.toThrow();
-    expect(() => verifyBroadcasterQuote(signed, trust, data, 0n)).toThrow("policy");
+    expect(() => verifyBroadcasterQuote(signed, trust, data, 0n)).toThrow("requirement");
     expect(() =>
         verifyBroadcasterQuote(
-            { ...signed, provenancePolicyId: "0x" + "78".repeat(32) },
-            { ...trust, provenancePolicyId: policy },
+            { ...signed, provenanceRequired: false },
+            { ...trust, provenanceRequired: true },
             data,
             0n
         )
-    ).toThrow("policy");
-    const { provenancePolicyId: _, ...missing } = signed;
+    ).toThrow("requirement");
+    const { provenanceRequired: _, ...missing } = signed;
     expect(() =>
-        verifyBroadcasterQuote(missing, { ...trust, provenancePolicyId: policy }, data, 0n)
-    ).toThrow("policy");
+        verifyBroadcasterQuote(missing, { ...trust, provenanceRequired: true }, data, 0n)
+    ).toThrow("requirement");
     const transport = vi.fn(async (request) => ({
         jsonrpc: "2.0",
         id: request.id,
         result:
             request.method === "broadcaster_getQuote"
-                ? { mode: "firm", ...signed }
-                : { id: "policy-job", state: "pending" },
+                ? { ...signed }
+                : { id: "relay-owned-id", state: "pending" },
     }));
     const client = new BroadcasterClient(
         {
             endpoint: "https://example.test",
             quoteSigner: signer.address,
             feeRecipient: signer.address,
-            provenancePolicyId: policy,
+            provenanceRequired: true,
         },
         transport
     );
     const bound = await client.quote(data, trust, []);
-    await client.submit(data, bound, "policy-job", []);
+    await client.submit(data, bound, []);
     expect(
         (transport.mock.calls[0]![0].params as { proofSidecars: unknown[] }[])[0]!.proofSidecars
     ).toEqual([]);
@@ -377,7 +371,7 @@ it("requires a concrete intent and separates estimate responses from signed firm
     const transport = vi.fn(async (request) => ({
         jsonrpc: "2.0",
         id: request.id,
-        result: { mode: "estimate", feeRecipient: signer.address, feeAmount: "2", maxGas: "1000" },
+        result: { feeRecipient: signer.address, feeAmount: "2", maxGas: "1000" },
     }));
     const client = new BroadcasterClient(
         {
@@ -387,11 +381,15 @@ it("requires a concrete intent and separates estimate responses from signed firm
         },
         transport
     );
-    await expect(client.quote("", { mode: "estimate" })).rejects.toThrow();
+    await expect(client.estimateQuote("")).rejects.toThrow();
     expect(transport).not.toHaveBeenCalled();
-    expect((await client.quote(calldata(), { mode: "estimate" })).mode).toBe("estimate");
-    expect(transport.mock.calls[0]![0].params).toEqual([{ mode: "estimate", data: calldata() }]);
-    await expect(client.quote(calldata(), trust)).rejects.toThrow(/firm/);
+    expect(await client.estimateQuote(calldata())).toEqual({
+        feeRecipient: signer.address,
+        feeAmount: "2",
+        maxGas: "1000",
+    });
+    expect(transport.mock.calls[0]![0].params).toEqual([{ data: calldata() }]);
+    await expect(client.quote(calldata(), trust)).rejects.toThrow(/quote|undefined/i);
 });
 it("does not accept signing or source tracking metadata in an unsigned estimate", async () => {
     const client = new BroadcasterClient(
@@ -404,7 +402,6 @@ it("does not accept signing or source tracking metadata in an unsigned estimate"
             jsonrpc: "2.0",
             id: request.id,
             result: {
-                mode: "estimate",
                 feeRecipient: signer.address,
                 feeAmount: "2",
                 maxGas: "1000",
@@ -412,5 +409,36 @@ it("does not accept signing or source tracking metadata in an unsigned estimate"
             },
         })
     );
-    await expect(client.quote(calldata(), { mode: "estimate" })).rejects.toThrow(/estimate/);
+    await expect(client.estimateQuote(calldata())).rejects.toThrow(/estimate/);
+});
+
+it("rejects unknown configuration selectors instead of ignoring them", () => {
+    expect(
+        () =>
+            new BroadcasterClient({
+                endpoint: "https://example.test",
+                quoteSigner: signer.address,
+                feeRecipient: signer.address,
+                selector: "unused",
+            } as never)
+    ).toThrow("Unknown broadcaster configuration field");
+});
+
+it("treats returned IDs as opaque service-owned values", async () => {
+    const opaque = "operator/acceptance:uuid-like-42";
+    const transport = vi.fn(async (request) => ({
+        jsonrpc: "2.0",
+        id: request.id,
+        result: { id: opaque, state: "pending" },
+    }));
+    const client = new BroadcasterClient(
+        {
+            endpoint: "https://example.test",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+        },
+        transport
+    );
+    expect((await client.status(opaque)).id).toBe(opaque);
+    expect(transport.mock.calls[0]![0].params).toEqual([{ id: opaque }]);
 });

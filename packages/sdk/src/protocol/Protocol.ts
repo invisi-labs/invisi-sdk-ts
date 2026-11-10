@@ -50,8 +50,12 @@ export class Protocol extends BaseProtocol {
                 page.broadcasters.map(async (entry) => {
                     if (!entry.enabled) return undefined;
                     try {
-                        const client = new BroadcasterClient(entry);
-                        await client.quote(options.data, { mode: "estimate" });
+                        const client = new BroadcasterClient({
+                            endpoint: entry.endpoint,
+                            quoteSigner: entry.quoteSigner,
+                            feeRecipient: entry.feeRecipient,
+                        });
+                        await client.estimateQuote(options.data);
                         return client;
                     } catch {
                         return undefined;

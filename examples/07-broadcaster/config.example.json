@@ -4,7 +4,6 @@
   "chainRpcUrl": "https://your-primary-rpc.example",
   "chainId": "31337",
   "protocolAddress": "0x<20-byte-protocol-address>",
-  "policyId": "0x<32-byte-policy-id>",
   "generation": "1",
   "providerId": "0x<32-byte-provider-id>",
   "signingKeyId": "0x<sha256-of-pinned-public-key>",

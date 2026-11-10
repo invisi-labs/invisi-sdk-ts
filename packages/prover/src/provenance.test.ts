@@ -9,7 +9,7 @@ it.skipIf(!root).each([1, 10])(
     "proves genuine independent provenance witness with local WASM and pinned assets",
     async (capacity) => {
         const manifest = await readFile(join(root!, "circuits/provenance/manifest.json"));
-        const pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282";
+        const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
         const identity = authenticateManifest(manifest, pin);
         const data = JSON.parse(
             await readFile(join(root!, "circuits/provenance/golden-vectors.json"), "utf8")

@@ -28,7 +28,6 @@ function request(w: typeof vectors.witnessK1 | typeof vectors.witnessK10CrossTre
         chainId: w.chain_id,
         protocolAddress: w.protocol_address,
         tokenAddress: w.token_address,
-        policyId: w.policy_id_lo,
         chainGeneration: w.chain_generation,
         operationDigest: w.operation_digest_lo,
         inputs: w.owners.slice(0, count).map((owner, i) => ({
@@ -105,15 +104,15 @@ describe("independent provenance family", () => {
             })
         ).rejects.toThrow("Duplicate");
     });
-    it("matches301-byte certificate,raw64 signature and rejects mutation", () => {
+    it("matches269-byte certificate,raw64 signature and rejects mutation", () => {
         const c = {
             ...Object.fromEntries(
                 Object.entries(vectors.certificate.fields).map(([k, v]) => [k, String(v)])
             ),
             signature: "0x" + vectors.certificate.signatureHex,
         } as RootCertificate;
-        expect(rootCertificatePayload(c).length).toBe(301);
-        expect(rootCertificatePayload({ ...c, leafCount: "0" }).length).toBe(301);
+        expect(rootCertificatePayload(c).length).toBe(269);
+        expect(rootCertificatePayload({ ...c, leafCount: "0" }).length).toBe(269);
         expect(Buffer.from(rootCertificatePayload(c)).toString("hex")).toBe(
             vectors.certificate.payloadHex
         );
@@ -137,7 +136,6 @@ describe("independent provenance family", () => {
         const trust: TrustContext = {
             chainId: "1",
             protocolAddress: "2",
-            policyId: "3",
             chainGeneration: "4",
             providerId: "5",
             manifestSha256: "a".repeat(64),
@@ -154,7 +152,7 @@ describe("independent provenance family", () => {
                     jsonrpc: "2.0",
                     id: body.id,
                     result: {
-                        scope: { chainId: "1", protocolAddress: "2", policyId: "3" },
+                        scope: { chainId: "1", protocolAddress: "2" },
                         chainGeneration: generation,
                         providerId: "5",
                         signingKeyId: "6",
@@ -180,7 +178,7 @@ it("exports only public evidence,validates certificates/binding and refuses host
     const bytes = readFileSync(
             new URL("../../../prover/provenance/manifest.json", import.meta.url)
         ),
-        pin = "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282",
+        pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a",
         identity = authenticateManifest(bytes, pin),
         r = request(vectors.witnessK1),
         seed = new Uint8Array(32).fill(7);
@@ -190,7 +188,6 @@ it("exports only public evidence,validates certificates/binding and refuses host
         ),
         chainId: r.chainId,
         protocolAddress: r.protocolAddress,
-        policyId: r.policyId,
         chainGeneration: r.chainGeneration,
         treeId: "1",
         leafCount: "1",
@@ -217,8 +214,18 @@ it("exports only public evidence,validates certificates/binding and refuses host
     expect(proof.proofBundle.circuitId).toBe("provenance_k1");
     expect(JSON.stringify(proof)).not.toMatch(/owners|nonces|paths|witness/);
     await validateProofBundle(proof.proofBundle, trust);
+    const { proofSidecarToWire } = await import("./index");
+    const extraCertificate = structuredClone(proof);
+    Object.assign(extraCertificate.proofBundle.rootCertificates[0]!, { selector: "unused" });
+    expect(() => proofSidecarToWire(extraCertificate)).toThrow("Unknown root certificate field");
+    const extraBundle = structuredClone(proof);
+    Object.assign(extraBundle.proofBundle, { selector: "unused" });
+    expect(() => proofSidecarToWire(extraBundle)).toThrow("Unknown proof bundle field");
+    const obsolete = structuredClone(proof.proofBundle);
+    obsolete.publicInputs.splice(3, 0, word(0), word(3));
+    await expect(validateProofBundle(obsolete, trust)).rejects.toThrow("ABI");
     const tampered = structuredClone(proof.proofBundle);
-    tampered.publicInputs[12] = word(0);
+    tampered.publicInputs[10] = word(0);
     await expect(validateProofBundle(tampered, trust)).rejects.toThrow("binding");
     await expect(
         exportSidecar(
@@ -247,7 +254,6 @@ it("exports only public evidence,validates certificates/binding and refuses host
                         scope: {
                             chainId: r.chainId,
                             protocolAddress: r.protocolAddress,
-                            policyId: r.policyId,
                         },
                         chainGeneration: r.chainGeneration,
                         certificate: c,
@@ -267,7 +273,6 @@ it("exports only public evidence,validates certificates/binding and refuses host
                     scope: {
                         chainId: r.chainId,
                         protocolAddress: r.protocolAddress,
-                        policyId: r.policyId,
                     },
                     chainGeneration: r.chainGeneration,
                     certificate: c,
@@ -278,7 +283,6 @@ it("exports only public evidence,validates certificates/binding and refuses host
                             scope: {
                                 chainId: r.chainId,
                                 protocolAddress: r.protocolAddress,
-                                policyId: r.policyId,
                             },
                             noteCommitment: vectors.note.commitment,
                             leaf: corrupt ? "1" : vectors.note.recognizedLeaf,
@@ -305,46 +309,36 @@ it("exports only public evidence,validates certificates/binding and refuses host
     await expect(client.syncRecognizedTree("1:1", c)).rejects.toThrow("leaf");
 });
 
-it("requests metadata for each pinned policy and rejects another policy response", async () => {
-    let wrongPolicy = false;
-    for (const policyId of ["3", "7"]) {
-        const trust: TrustContext = {
-            chainId: "1",
-            protocolAddress: "2",
-            policyId,
-            chainGeneration: "4",
-            providerId: "5",
-            manifestSha256: "a".repeat(64),
-            signingKeys: { [word("6")]: new Uint8Array(32) },
-        };
-        const transport = (async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
-            const request = JSON.parse(String(init?.body));
-            expect(request.params).toEqual([{ policyId: word(policyId) }]);
-            expect(["provenance_getVersion", "provenance_getStatus"]).toContain(request.method);
-            return new Response(
-                JSON.stringify({
-                    jsonrpc: "2.0",
-                    id: request.id,
-                    result: {
-                        scope: {
-                            chainId: "1",
-                            protocolAddress: "2",
-                            policyId: wrongPolicy ? "3" : policyId,
-                        },
-                        chainGeneration: "4",
-                    },
-                })
-            );
-        }) as typeof fetch;
-        const client = new ProvenanceClient("https://example.test", trust, transport);
-        await client.getVersion();
-        await client.getStatus();
-        if (policyId === "7") {
-            wrongPolicy = true;
-            await expect(client.getVersion()).rejects.toThrow("Deployment mismatch");
-            await expect(client.getStatus()).rejects.toThrow("Deployment mismatch");
-        }
-    }
+it("requests singleton metadata and rejects another deployment", async () => {
+    let wrong = false;
+    const trust: TrustContext = {
+        chainId: "1",
+        protocolAddress: "2",
+        chainGeneration: "4",
+        providerId: "5",
+        manifestSha256: "a".repeat(64),
+        signingKeys: { [word("6")]: new Uint8Array(32) },
+    };
+    const transport = (async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const q = JSON.parse(String(init?.body));
+        expect(q.params).toEqual([{}]);
+        return new Response(
+            JSON.stringify({
+                jsonrpc: "2.0",
+                id: q.id,
+                result: {
+                    scope: { chainId: "1", protocolAddress: wrong ? "3" : "2" },
+                    chainGeneration: "4",
+                },
+            })
+        );
+    }) as typeof fetch;
+    const client = new ProvenanceClient("https://example.test", trust, transport);
+    await client.getVersion();
+    await client.getStatus();
+    wrong = true;
+    await expect(client.getVersion()).rejects.toThrow("Deployment mismatch");
+    await expect(client.getStatus()).rejects.toThrow("Deployment mismatch");
 });
 
 it("waitProofJob terminates after one stale_generation response and rejects unknown job states", async () => {
@@ -353,7 +347,6 @@ it("waitProofJob terminates after one stale_generation response and rejects unkn
         const trust: TrustContext = {
             chainId: "1",
             protocolAddress: "2",
-            policyId: "3",
             chainGeneration: "2",
             providerId: "5",
             manifestSha256: "a".repeat(64),
@@ -368,7 +361,7 @@ it("waitProofJob terminates after one stale_generation response and rejects unkn
                     jsonrpc: "2.0",
                     id: q.id,
                     result: {
-                        scope: { chainId: "1", protocolAddress: "2", policyId: "3" },
+                        scope: { chainId: "1", protocolAddress: "2" },
                         chainGeneration: "2",
                         providerId: "5",
                         signingKeyId: "6",
