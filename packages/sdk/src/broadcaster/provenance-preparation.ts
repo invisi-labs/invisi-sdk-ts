@@ -3,7 +3,7 @@ import {
     exportSidecar,
     noteOpening,
     operationDigest,
-    preflightTracking,
+    validateTracking,
     word,
     assertCertificateTrust,
     validateProofBundle,
@@ -22,7 +22,6 @@ import type {
     SavedOperation,
 } from "../transactions/operation-types";
 import { statement } from "../transactions/signing/statement";
-import { exportBroadcasterIntent } from "./intent";
 import { broadcasterRequestHash, type BroadcasterClient } from "./index";
 
 export interface PreparedProvenanceCapability {
@@ -58,7 +57,7 @@ export async function prepareProvenance(
     plan: OperationPlan,
     client: BroadcasterClient,
     runtime?: TransactionRuntime
-): Promise<PreparedProvenanceState | undefined> {
+): Promise<Omit<PreparedProvenanceState, "tracking"> | undefined> {
     requirePreparedProvenance(plan, client, runtime);
     if (!client.configuration.provenancePolicyId || !plan.inputs.length) return;
     const {
@@ -206,14 +205,26 @@ export async function prepareProvenance(
         prover,
         0
     );
-    const evaluation = await source.evaluateTransaction(exportBroadcasterIntent(plan).data, [
-        sidecar,
-    ]);
-    return {
-        operationDigest: digest,
-        sidecars: [sidecar],
-        tracking: preflightTracking(evaluation, "0", digest),
-    };
+    return { operationDigest: digest, sidecars: [sidecar] };
+}
+export async function acceptBroadcasterTracking(
+    evidence: Omit<PreparedProvenanceState, "tracking">,
+    value: unknown,
+    capability: PreparedProvenanceCapability
+): Promise<PreparedProvenanceState> {
+    const candidate = validateTracking(value);
+    if (
+        candidate.operationDigest !== evidence.operationDigest ||
+        !["pending_confirmation", "pending_source", "recognized"].includes(candidate.status)
+    )
+        throw Error("Broadcaster source tracking mismatch");
+    const { tracking } = await capability.client.getTracking(candidate.id);
+    if (
+        tracking.operationDigest !== evidence.operationDigest ||
+        !["pending_confirmation", "pending_source", "recognized"].includes(tracking.status)
+    )
+        throw Error("Source tracking is not active for the prepared statement");
+    return { ...evidence, tracking: structuredClone(tracking) };
 }
 export async function validatePreparedBroadcast(
     saved: SavedOperation,

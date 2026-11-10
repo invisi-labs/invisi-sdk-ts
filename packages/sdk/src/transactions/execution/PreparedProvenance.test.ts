@@ -83,6 +83,16 @@ async function configured(historical = false) {
         signingKeys: { [String(cert.signingKeyId)]: pub },
         manifestSha256: manifest.sha256,
     };
+    let digest = word(0);
+    const tracking = () => ({
+        id: "a".repeat(48),
+        status: "pending_confirmation",
+        expiresAt: String(Math.floor(Date.now() / 1000) + 3600),
+        operationDigest: digest,
+    });
+    let unsupportedToken = false;
+    let missingTracking = false,
+        wrongSourceDigest = false;
     let deny = false,
         fee = 2n;
     const source = new ProvenanceClient(
@@ -138,19 +148,11 @@ async function configured(historical = false) {
                     ),
                     nextIndex: String(h.inputs.length),
                 };
-            else if (q.method === "provenance_evaluateTransaction") {
-                const p = q.params[0].proofSidecars[0].proofBundle.publicInputs;
-                const digest = word((BigInt(p[9]) << 128n) | BigInt(p[10]));
+            else if (q.method === "provenance_getTracking") {
                 data = {
-                    broadcastDecision: deny ? "deny" : "allow",
-                    operationDigest: digest,
-                    operationIndex: "0",
-                    inputProofStatus: "valid",
                     tracking: {
-                        id: "a".repeat(48),
-                        status: "pending_confirmation",
-                        expiresAt: String(Math.floor(Date.now() / 1000) + 3600),
-                        operationDigest: digest,
+                        ...tracking(),
+                        ...(wrongSourceDigest ? { operationDigest: word(999) } : {}),
                     },
                 };
             } else throw Error(q.method);
@@ -181,6 +183,7 @@ async function configured(historical = false) {
             const p = (q.params as any[])[0];
             requests.push({ method: q.method, ...p });
             if (q.method === "broadcaster_getFee") {
+                if (unsupportedToken) throw Error("Unsupported broadcaster token");
                 events.push("fee");
                 return {
                     jsonrpc: "2.0",
@@ -193,7 +196,10 @@ async function configured(historical = false) {
                 };
             }
             if (q.method === "broadcaster_getQuote") {
+                if (deny) throw Error("Broadcaster source preflight denied");
                 events.push("quote");
+                const pi = p.proofSidecars[0].proofBundle.publicInputs;
+                digest = word((BigInt(pi[9]) << 128n) | BigInt(pi[10]));
                 const intent = decodeBroadcasterIntent(p.data).request.params;
                 const quote = {
                     token: intent.token,
@@ -219,6 +225,7 @@ async function configured(historical = false) {
                         ),
                         provenancePolicyId: word(17),
                         requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
+                        ...(missingTracking ? {} : { provenanceTracking: tracking() }),
                     },
                 };
             }
@@ -259,6 +266,15 @@ async function configured(historical = false) {
         prepare,
         events,
         requests,
+        setMissingTracking: () => {
+            missingTracking = true;
+        },
+        setWrongSourceDigest: () => {
+            wrongSourceDigest = true;
+        },
+        setUnsupportedToken: () => {
+            unsupportedToken = true;
+        },
         setDeny: (value: boolean) => {
             deny = value;
         },
@@ -298,9 +314,8 @@ it("automatically proves final prepared fields and forwards retained source evid
     const quoted = await original.withBroadcaster(h.client, { maxFeeAmount: 20n });
     expect(h.prover.prove).toHaveBeenCalledTimes(1);
     expect(h.events.indexOf("source-prove")).toBeGreaterThan(h.events.lastIndexOf("fee"));
-    expect(h.events.indexOf("quote")).toBeGreaterThan(
-        h.events.indexOf("provenance_evaluateTransaction")
-    );
+    expect(h.events).not.toContain("provenance_evaluateTransaction");
+    expect(h.events.indexOf("provenance_getTracking")).toBeGreaterThan(h.events.indexOf("quote"));
     expect(quoted.provenanceTracking()?.id).toBe("a".repeat(48));
     expect(original.preview().feeAmount).toBe(0n);
     const ready = await (await externallyAuthorize(quoted)).prove();
@@ -392,4 +407,38 @@ it("rejects historical root replay beyond the configured page budget before prov
     ).rejects.toThrow(/page budget/);
     expect(h.prover.prove).not.toHaveBeenCalled();
     expect(h.events).not.toContain("quote");
+});
+
+it("keeps direct execution independent of the optional relay and source service", async () => {
+    const h = await configured();
+    const ready = await (await externallyAuthorize(await h.prepare())).prove();
+    expect((await ready.exportTransaction()).data).toMatch(/^0x/);
+    expect(h.requests).toEqual([]);
+    expect(h.prover.prove).not.toHaveBeenCalled();
+});
+it("does not prove, request source validation or silently switch routes for an unsupported relay token", async () => {
+    const h = await configured();
+    h.setUnsupportedToken();
+    const original = await h.prepare();
+    await expect(original.withBroadcaster(h.client, { maxFeeAmount: 20n })).rejects.toThrow(
+        /Unsupported broadcaster token/
+    );
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.events).not.toContain("quote");
+    expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
+    expect(original.preview().feeAmount).toBe(0n);
+});
+
+it("requires the relay tracking acknowledgement and authenticates its statement independently", async () => {
+    for (const mode of ["missing", "wrong-source"]) {
+        const h = await configured();
+        if (mode === "missing") h.setMissingTracking();
+        else h.setWrongSourceDigest();
+        const original = await h.prepare();
+        await expect(original.withBroadcaster(h.client, { maxFeeAmount: 20n })).rejects.toThrow(
+            /tracking|Tracking/
+        );
+        expect(original.preview().feeAmount).toBe(0n);
+        expect(h.requests.some((q) => q.method === "provenance_evaluateTransaction")).toBe(false);
+    }
 });

@@ -1,4 +1,8 @@
-import { prepareProvenance, requirePreparedProvenance } from "./provenance-preparation";
+import {
+    prepareProvenance,
+    requirePreparedProvenance,
+    acceptBroadcasterTracking,
+} from "./provenance-preparation";
 import { broadcasterRequestHash } from "./index";
 import type { TransactionRuntime, SavedOperation } from "../transactions/operation-types";
 import { assertCreditUpdatePlan } from "../credit/state";
@@ -70,13 +74,22 @@ export async function prepareBroadcasterPlan(
 }> {
     requirePreparedProvenance(plan, client, runtime);
     const finalize = async (final: OperationPlan) => {
-        const provenance = await prepareProvenance(final, client, runtime);
+        const evidence = await prepareProvenance(final, client, runtime);
         const data = exportBroadcasterIntent(final).data;
         const quote = await client.quote(
             data,
             { chainId: final.context.chainId, protocol: final.context.protocolAddress },
-            structuredClone(provenance?.sidecars ?? [])
+            structuredClone(evidence?.sidecars ?? [])
         );
+        const provenance = evidence
+            ? await acceptBroadcasterTracking(
+                  evidence,
+                  quote.provenanceTracking,
+                  runtime!.options.provenance!
+              )
+            : undefined;
+        if (!evidence && quote.provenanceTracking)
+            throw Error("Unexpected source tracking for operation without private inputs");
         return {
             plan: final,
             quote,

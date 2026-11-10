@@ -25,6 +25,7 @@ export interface SignedBroadcasterQuote {
     quote: BroadcasterQuote;
     signature: string;
     provenancePolicyId?: string;
+    provenanceTracking?: import("@invisi-labs/core/provenance").Tracking;
     requestHashFormat?: string;
     context?: { chainId: bigint; protocol: string };
 }
@@ -127,7 +128,9 @@ export function verifyBroadcasterQuote(
     const policy = trust.provenancePolicyId;
     if (
         policy === undefined
-            ? signed.provenancePolicyId !== undefined || signed.requestHashFormat !== undefined
+            ? signed.provenancePolicyId !== undefined ||
+              signed.requestHashFormat !== undefined ||
+              signed.provenanceTracking !== undefined
             : !/^0x[0-9a-fA-F]{64}$/.test(policy) ||
               signed.provenancePolicyId?.toLowerCase() !== policy.toLowerCase() ||
               signed.requestHashFormat !== "invisi-broadcaster-provenance-intent-v1"
@@ -315,7 +318,8 @@ export class BroadcasterClient {
         context: { chainId: bigint; protocol: string },
         proofSidecars: readonly ProofSidecar[] = []
     ): Promise<SignedBroadcasterQuote> {
-        const { proofSidecarToWire } = await import("@invisi-labs/core/provenance");
+        const { proofSidecarToWire, validateTracking } =
+            await import("@invisi-labs/core/provenance");
         const signed = (await this.call("broadcaster_getQuote", {
             data,
             ...(this.configuration.provenancePolicyId === undefined
@@ -335,10 +339,14 @@ export class BroadcasterClient {
         );
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
+        if (signed.provenanceTracking !== undefined) validateTracking(signed.provenanceTracking);
         return {
             quote: signed.quote,
             signature: signed.signature,
             context: { ...context },
+            ...(signed.provenanceTracking === undefined
+                ? {}
+                : { provenanceTracking: structuredClone(signed.provenanceTracking) }),
             ...(signed.provenancePolicyId === undefined
                 ? {}
                 : { provenancePolicyId: signed.provenancePolicyId }),

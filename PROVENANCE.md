@@ -70,8 +70,20 @@ See [`examples/03-hidden-amount`](examples/03-hidden-amount/BROADCASTER.md) for 
 
 ## Normal Prepared integration
 
-Configure `Invisi({ provenance: { client, manifest, prover, maxRootPages?, maxLeaves? }, ... })`. The client trust and authenticated manifest must be independently pinned; the local prover executes and verifies the source circuit. `prepared.withBroadcaster(client, { maxFeeAmount })` converges fees before building the final source witness, authenticating primary checkpoint anchors and replaying recognized trees locally. It obtains tracked preflight and the firm quote before wallet authorization/main proving. The public evidence survives managed operation snapshots; clients/provers remain runtime capabilities.
+Configure `Invisi({ provenance: { client, manifest, prover, maxRootPages?, maxLeaves? }, ... })`. The client trust and authenticated manifest must be independently pinned; the local prover executes and verifies the source circuit. `prepared.withBroadcaster(client, { maxFeeAmount })` converges fees before building the final source witness, authenticating primary checkpoint anchors and replaying recognized trees locally. It sends the locally generated proof with the quote request. The Broadcaster submits source preflight and returns `provenanceTracking`; the SDK independently authenticates that record with a read-only source lookup before wallet authorization/main proving. The SDK does not submit source preflight on this route. The public evidence survives managed operation snapshots; clients/provers remain runtime capabilities.
 
 After normal authorization and proving, call `ready.submitBroadcaster(client, stableId)`. It uses retained evidence automatically. `provenanceTracking()` returns a detached public tracking record. Credit lifecycle/draw and zero-private-input funding need no source proof. A policy relay with private inputs and missing source capabilities fails closed. The bounded replay defaults are 10 root pages and 100,000 total leaves; crossing the limit is explicit failure, never a per-Note network membership fallback.
 
 Prepared contains the selected financial Note openings and full final native statement. Recognized-tree paths, signed certificates and a proving backend are additional runtime resources; callers do not manually assemble sidecars. Retry an externalized payment using its original ID/status; do not prepare a replacement while its outcome is uncertain.
+
+## Optional relay and independent direct submission
+
+Broadcaster use is explicit and optional. Each operator supports its own configured token set; `getFee` rejection leaves the original Prepared unchanged and never silently selects another route. Direct wallet authorization, proof and transaction export do not depend on Broadcaster or Provenance availability.
+
+| Route | Source submission | Protocol transaction |
+|---|---|---|
+| `withBroadcaster` | SDK proves locally; Broadcaster submits preflight and returns tracking in its quote | `submitBroadcaster` attaches retained evidence; the relay broadcasts |
+| Direct, source first | App explicitly calls `evaluateTransaction(data, sidecars)` and retains tracking | App sends the unchanged protocol transaction independently |
+| Direct, transaction first | After canonical confirmation, App explicitly calls `submitProof` with the actual operation locator | App sends the protocol transaction independently before source submission |
+
+The App chooses the direct-step order. Source verification and recognition are always off-chain; no additional Provenance transaction is required. `RecoveryCoordinator` remains an optional explicit coordinator, not a prerequisite for direct transaction export.
