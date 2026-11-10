@@ -1,4 +1,4 @@
-import { provenanceIntentHash, proofSidecarToWire } from "@invisi-labs/core/provenance";
+import { provenanceIntentHash } from "@invisi-labs/core";
 import type { ProofSidecar } from "@invisi-labs/core/provenance";
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import { AbiCoder, getAddress, Interface, keccak256, verifyTypedData } from "ethers";
@@ -315,6 +315,7 @@ export class BroadcasterClient {
         context: { chainId: bigint; protocol: string },
         proofSidecars: readonly ProofSidecar[] = []
     ): Promise<SignedBroadcasterQuote> {
+        const { proofSidecarToWire } = await import("@invisi-labs/core/provenance");
         const signed = (await this.call("broadcaster_getQuote", {
             data,
             ...(this.configuration.provenancePolicyId === undefined
@@ -367,6 +368,7 @@ export class BroadcasterClient {
         );
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
+        const { proofSidecarToWire } = await import("@invisi-labs/core/provenance");
         return checkedStatus(
             await this.call("broadcaster_submitTransaction", {
                 data,

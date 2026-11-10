@@ -1,3 +1,6 @@
+import { prepareProvenance, requirePreparedProvenance } from "./provenance-preparation";
+import { broadcasterRequestHash } from "./index";
+import type { TransactionRuntime, SavedOperation } from "../transactions/operation-types";
 import { assertCreditUpdatePlan } from "../credit/state";
 import { getAddress } from "ethers";
 import type {
@@ -57,8 +60,33 @@ export async function prepareBroadcasterPlan(
     plan: OperationPlan,
     reprepare: (intent: PreparationIntent) => Promise<OperationPlan>,
     client: BroadcasterClient,
-    options: WithBroadcasterOptions
-): Promise<{ plan: OperationPlan; quote: SignedBroadcasterQuote }> {
+    options: WithBroadcasterOptions,
+    runtime?: TransactionRuntime
+): Promise<{
+    plan: OperationPlan;
+    quote: SignedBroadcasterQuote;
+    provenance?: SavedOperation["provenance"];
+    broadcasterBinding: NonNullable<SavedOperation["broadcasterBinding"]>;
+}> {
+    requirePreparedProvenance(plan, client, runtime);
+    const finalize = async (final: OperationPlan) => {
+        const provenance = await prepareProvenance(final, client, runtime);
+        const data = exportBroadcasterIntent(final).data;
+        const quote = await client.quote(
+            data,
+            { chainId: final.context.chainId, protocol: final.context.protocolAddress },
+            structuredClone(provenance?.sidecars ?? [])
+        );
+        return {
+            plan: final,
+            quote,
+            provenance,
+            broadcasterBinding: {
+                configuration: { ...client.configuration },
+                intentHash: broadcasterRequestHash(data),
+            },
+        };
+    };
     if (!plan.intent) throw new Error("operation has no supported preparation intent");
     await assertCreditUpdatePlan(plan);
     const intent = structuredClone(plan.intent);
@@ -100,13 +128,7 @@ export async function prepareBroadcasterPlan(
                 throw new Error("broadcaster fee exceeds user limit or recipient changed");
             if (amount >= BigInt(recalculated.feeAmount)) {
                 current.intent = structuredClone(intent);
-                return {
-                    plan: current,
-                    quote: await client.quote(data, {
-                        chainId: current.context.chainId,
-                        protocol: current.context.protocolAddress,
-                    }),
-                };
+                return finalize(current);
             }
             previousAmount = amount;
         }
@@ -207,13 +229,7 @@ export async function prepareBroadcasterPlan(
                     throw new Error("permit changed the required fee; prepare again");
             }
             final.intent = structuredClone(intent);
-            return {
-                plan: final,
-                quote: await client.quote(exportBroadcasterIntent(final).data, {
-                    chainId: final.context.chainId,
-                    protocol: final.context.protocolAddress,
-                }),
-            };
+            return finalize(final);
         }
         previousAmount = amount;
         schedule = recalculated;

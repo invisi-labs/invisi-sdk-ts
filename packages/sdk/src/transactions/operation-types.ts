@@ -188,6 +188,12 @@ export interface OperationPlan {
 }
 export interface SavedOperation {
     plan: OperationPlan;
+    provenance?: import("../broadcaster/provenance-preparation").PreparedProvenanceState;
+    broadcasterBinding?: {
+        configuration: import("../broadcaster/index").BroadcasterConfiguration;
+        intentHash: string;
+    };
+    broadcasterSubmissionId?: string;
     broadcasterQuote?: import("../broadcaster/index").SignedBroadcasterQuote;
     proof?: ProofBundle;
     call?: import("@invisi-labs/protocol").TransactionCall;
@@ -196,6 +202,7 @@ export interface SavedOperation {
     claim?: { stage: string; token: string };
 }
 export interface TransactionInfrastructure {
+    provenance?: import("../broadcaster/provenance-preparation").PreparedProvenanceCapability;
     wallet: Wallet;
     protocol: Protocol;
     chainReader?: ChainReader;

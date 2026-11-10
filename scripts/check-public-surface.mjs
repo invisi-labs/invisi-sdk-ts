@@ -4,12 +4,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const entries = {
-    core: [".", "./address", "./note", "./credit"],
+    core: [".", "./address", "./note", "./credit", "./provenance"],
     "native-wallet": ["."],
     protocol: [".", "./contracts", "./note", "./credit"],
-    prover: [".", "./native", "./wasm", "./aggregate"],
+    prover: [".", "./native", "./wasm", "./aggregate", "./provenance"],
     rpc: ["."],
-    sdk: [".", "./ethers", "./session-support", "./note", "./credit"],
+    sdk: [".", "./ethers", "./session-support", "./note", "./credit", "./provenance"],
     session: [".", "./sqlite", "./indexeddb", "./memory"],
     react: ["."],
     vue: ["."],

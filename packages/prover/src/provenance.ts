@@ -37,7 +37,7 @@ const settings = {
     optimizedSolidityVerifier: false,
 };
 
-/** 宿主只提供本地公开产物，私密 witness 仅交给当前进程内 Noir/BB。 */
+/** The host supplies local public assets; private witness stays in the in-process Noir/BB runtime. */
 export class LocalProvenanceProver implements OfflineProver {
     constructor(private readonly options: LocalProvenanceOptions) {}
     async prove(request: {

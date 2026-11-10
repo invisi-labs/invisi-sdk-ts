@@ -34,3 +34,5 @@ export {
     revocationSigningRequest,
     acceptRevocationSignature,
 } from "./transactions/signing/revocation";
+
+export * from "./broadcaster/provenance-preparation";

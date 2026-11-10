@@ -168,3 +168,8 @@ export type {
     PaymentNoteVerificationSettings,
 } from "./payment-note/verification";
 export { TransactionOutput } from "./notes/TransactionOutput";
+
+export type {
+    PreparedProvenanceCapability,
+    PreparedProvenanceState,
+} from "./broadcaster/provenance-preparation";

@@ -52,7 +52,7 @@ Each wallet response repeats `version`, `id`, `ownerAddress`, and `method` and c
 
 Funding and address registration use separate EVM typed-data requests. Their printed arrays contain an application `id`, `kind`, and the SDK's EIP-712 request. Have the host review and sign that request, then paste `[{"id":"the-printed-id","signature":"0x..."}]`. These application envelopes are not additional native-wallet protocol methods. The SDK checks returned signatures against the retained intent. Caller-funded transactions instead require submission by their specified payer. Token balances, ERC20 allowance, gas, and submission remain host responsibilities; no script approves or broadcasts automatically.
 
-The final output is an unsigned transaction. Review its chain, target, value, calldata, and required caller before host submission. The broadcaster example obtains a verified fee quote and exports the resulting calldata; it does not call the broadcaster's submit endpoint. The separate `07-provenance` walkthrough demonstrates that endpoint with `--submit`.
+The final output is an unsigned transaction. Review its chain, target, value, calldata, and required caller before host submission. The broadcaster example obtains a verified fee quote and exports the resulting calldata; it does not call the broadcaster's submit endpoint. The Note and Credit Broadcaster walkthroughs demonstrate that endpoint with `--submit`.
 
 ## Scenarios
 
@@ -105,4 +105,4 @@ The account controls the default database (`examples/accounts/<account>-session.
 
 ## Provenance
 
-[`07-provenance`](07-provenance/README.md) shows local recognized-tree replay, real source proving, policy-bound Broadcaster quote/optional submission, and confirmed-transaction source-proof submission/publication waiting. These examples add an explicit `--submit` switch; the existing examples still only export unsigned transactions.
+[Note Broadcaster](03-hidden-amount/BROADCASTER.md) shows local recognized-tree replay, real source proving, policy-bound Broadcaster quote/optional submission, and automatic confirmed-transaction recognition waiting. These examples add an explicit `--submit` switch; the existing examples still only export unsigned transactions.

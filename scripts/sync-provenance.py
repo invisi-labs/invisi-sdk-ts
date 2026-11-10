@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从经过固定摘要认证的本地协议工作区同步独立来源证明产物。"""
+"""Synchronize source proof assets from a local protocol checkout authenticated by a pinned digest."""
 import argparse
 import hashlib
 import json

@@ -133,3 +133,5 @@ export type {
     NativeWalletClient,
     PreparedWalletRequest,
 } from "./wallet/wallet-wire";
+
+export { provenanceIntentHash } from "./provenance/intent-hash";

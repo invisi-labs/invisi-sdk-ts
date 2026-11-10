@@ -539,14 +539,7 @@ export async function exportSidecar(
     };
 }
 
-export function provenanceIntentHash(originalRequestHash: string, policyId: Integer): string {
-    return keccak256(
-        AbiCoder.defaultAbiCoder().encode(
-            ["string", "bytes32", "bytes32"],
-            ["InvisiBroadcasterProvenanceIntentV1", word(originalRequestHash), word(policyId)]
-        )
-    );
-}
+export { provenanceIntentHash } from "./intent-hash";
 export type PublicResult = Record<string, unknown> & { scope: Scope };
 export class ProvenanceClient {
     private sequence = 0;

@@ -93,13 +93,64 @@ export class PreparedTransaction {
             this.#saved.plan,
             this.#runtime.reprepare,
             client,
-            options
+            options,
+            this.#runtime
         );
         return new PreparedTransaction(
             this.#runtime,
-            { plan: selected.plan, broadcasterQuote: selected.quote, generation: 0 },
+            {
+                plan: selected.plan,
+                broadcasterQuote: selected.quote,
+                ...(selected.provenance ? { provenance: selected.provenance } : {}),
+                broadcasterBinding: selected.broadcasterBinding,
+                generation: 0,
+            },
             "prepared",
             { generation: 0, busy: false }
+        );
+    }
+    provenanceTracking() {
+        return structuredClone(this.#saved.provenance?.tracking);
+    }
+    async submitBroadcaster(
+        client: import("../../broadcaster/index").BroadcasterClient,
+        idempotencyKey: string
+    ) {
+        this.current();
+        check(this.status === "ready", "transaction is not ready");
+        check(/^[\x21-\x7e]{1,128}$/.test(idempotencyKey), "invalid broadcaster idempotency key");
+        const { validatePreparedBroadcast } =
+            await import("../../broadcaster/provenance-preparation");
+        if (this.#saved.broadcasterSubmissionId) {
+            check(
+                this.#saved.broadcasterSubmissionId === idempotencyKey,
+                "broadcaster submission id changed"
+            );
+            check(
+                JSON.stringify(this.#saved.broadcasterBinding?.configuration) ===
+                    JSON.stringify(client.configuration),
+                "prepared broadcaster context changed"
+            );
+            try {
+                return await client.status(idempotencyKey);
+            } catch (error) {
+                const { BroadcasterRpcError } = await import("../../broadcaster/index");
+                if (!(error instanceof BroadcasterRpcError) || error.code !== -32001) throw error;
+            }
+        }
+        await validatePreparedBroadcast(this.#saved, client, this.#runtime);
+        check(
+            !this.#saved.broadcasterSubmissionId ||
+                this.#saved.broadcasterSubmissionId === idempotencyKey,
+            "broadcaster submission id changed"
+        );
+        this.#saved.externalized = true;
+        this.#saved.broadcasterSubmissionId = idempotencyKey;
+        return client.submit(
+            this.#saved.call!.data,
+            this.#saved.broadcasterQuote!,
+            idempotencyKey,
+            structuredClone(this.#saved.provenance?.sidecars ?? [])
         );
     }
     get id() {

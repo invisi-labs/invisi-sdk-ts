@@ -66,4 +66,12 @@ TypeScript: `EncryptedRecoveryStore.fromKey(existingAtomicRecordStore, aesGcmKey
 
 ## Flat examples
 
-See [`examples/07-provenance`](examples/07-provenance/README.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
+See [`examples/03-hidden-amount`](examples/03-hidden-amount/BROADCASTER.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
+
+## Normal Prepared integration
+
+Configure `Invisi({ provenance: { client, manifest, prover, maxRootPages?, maxLeaves? }, ... })`. The client trust and authenticated manifest must be independently pinned; the local prover executes and verifies the source circuit. `prepared.withBroadcaster(client, { maxFeeAmount })` converges fees before building the final source witness, authenticating primary checkpoint anchors and replaying recognized trees locally. It obtains tracked preflight and the firm quote before wallet authorization/main proving. The public evidence survives managed operation snapshots; clients/provers remain runtime capabilities.
+
+After normal authorization and proving, call `ready.submitBroadcaster(client, stableId)`. It uses retained evidence automatically. `provenanceTracking()` returns a detached public tracking record. Credit lifecycle/draw and zero-private-input funding need no source proof. A policy relay with private inputs and missing source capabilities fails closed. The bounded replay defaults are 10 root pages and 100,000 total leaves; crossing the limit is explicit failure, never a per-Note network membership fallback.
+
+Prepared contains the selected financial Note openings and full final native statement. Recognized-tree paths, signed certificates and a proving backend are additional runtime resources; callers do not manually assemble sidecars. Retry an externalized payment using its original ID/status; do not prepare a replacement while its outcome is uncertain.

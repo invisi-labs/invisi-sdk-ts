@@ -167,7 +167,13 @@ it.each(["signer", "fundingSigner"])(
 
 it("defines infrastructure capabilities independently of signing authority", () => {
     expectTypeOf<keyof import("@invisi-labs/sdk").InvisiOptions>().toEqualTypeOf<
-        "chainReader" | "protocolRpc" | "prover" | "fundingVerifier" | "provider" | "transactionTTL"
+        | "chainReader"
+        | "protocolRpc"
+        | "prover"
+        | "fundingVerifier"
+        | "provider"
+        | "transactionTTL"
+        | "provenance"
     >();
 });
 

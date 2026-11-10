@@ -1,5 +1,6 @@
 {
   "endpoint": "https://your-provenance.example",
+  "protocolRpcUrl": "https://your-protocol-rpc.example/v1/chains/31337",
   "chainRpcUrl": "https://your-primary-rpc.example",
   "chainId": "31337",
   "protocolAddress": "0x<20-byte-protocol-address>",

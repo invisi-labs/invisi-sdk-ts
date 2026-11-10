@@ -23,7 +23,6 @@ import {
     Preparation,
     type PreparationFrame,
 } from "./prepare-common";
-import { CreditPreparation } from "../../credit/preparation";
 
 /** Shared preparation engine for managed sessions and explicitly supplied inputs. */
 export class TransactionPreparation<Result> {
@@ -213,31 +212,31 @@ export class TransactionPreparation<Result> {
         });
     }
 
-    prepareCreateCredit(options: CreateCreditPreparation): Promise<Result> {
-        this.#intent = { kind: "create-credit", options: structuredClone(options) };
-        return new CreditPreparation(this.runtime(options.tokenAddress)).create(
-            structuredClone(options)
-        );
+    async prepareCreateCredit(options: CreateCreditPreparation): Promise<Result> {
+        const copied = structuredClone(options);
+        this.#intent = { kind: "create-credit", options: structuredClone(copied) };
+        const { CreditPreparation } = await import("../../credit/preparation");
+        return new CreditPreparation(this.runtime(copied.tokenAddress)).create(copied);
     }
 
-    prepareDrawCredit(options: DrawCreditPreparation): Promise<Result> {
-        this.#intent = { kind: "draw-credit", options: structuredClone(options) };
-        return new CreditPreparation(this.runtime(options.tokenAddress)).draw(
-            structuredClone(options)
-        );
+    async prepareDrawCredit(options: DrawCreditPreparation): Promise<Result> {
+        const copied = structuredClone(options);
+        this.#intent = { kind: "draw-credit", options: structuredClone(copied) };
+        const { CreditPreparation } = await import("../../credit/preparation");
+        return new CreditPreparation(this.runtime(copied.tokenAddress)).draw(copied);
     }
 
-    prepareUpdateCredit(options: UpdateCreditPreparation): Promise<Result> {
-        this.#intent = { kind: "update-credit", options: structuredClone(options) };
-        return new CreditPreparation(this.runtime(options.tokenAddress)).update(
-            structuredClone(options)
-        );
+    async prepareUpdateCredit(options: UpdateCreditPreparation): Promise<Result> {
+        const copied = structuredClone(options);
+        this.#intent = { kind: "update-credit", options: structuredClone(copied) };
+        const { CreditPreparation } = await import("../../credit/preparation");
+        return new CreditPreparation(this.runtime(copied.tokenAddress)).update(copied);
     }
 
-    prepareRevokeCredit(options: RevokeCreditPreparation): Promise<Result> {
-        this.#intent = { kind: "revoke-credit", options: structuredClone(options) };
-        return new CreditPreparation(this.runtime(options.tokenAddress)).revoke(
-            structuredClone(options)
-        );
+    async prepareRevokeCredit(options: RevokeCreditPreparation): Promise<Result> {
+        const copied = structuredClone(options);
+        this.#intent = { kind: "revoke-credit", options: structuredClone(copied) };
+        const { CreditPreparation } = await import("../../credit/preparation");
+        return new CreditPreparation(this.runtime(copied.tokenAddress)).revoke(copied);
     }
 }

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { JsonRpcProvider, getBytes } from "ethers";
-import { ProvenanceClient, validateProofBundle } from "@invisi-labs/sdk/provenance";
-import type { TrustContext, ProofSidecar } from "@invisi-labs/sdk/provenance";
+import { ProvenanceClient } from "@invisi-labs/sdk/provenance";
+import type { TrustContext } from "@invisi-labs/sdk/provenance";
 
 if (!process.argv.includes("--execute")) {
     console.log(
@@ -12,7 +12,6 @@ if (!process.argv.includes("--execute")) {
 const config = JSON.parse(await readFile(process.env.PROVENANCE_CONFIG!, "utf8"));
 const record = JSON.parse(await readFile(process.env.PROVENANCE_RECORD!, "utf8")) as {
     data: string;
-    sidecar: ProofSidecar;
     broadcastId: string;
     trackingId: string;
     operationDigest: string;
@@ -26,7 +25,6 @@ const trust: TrustContext = {
     manifestSha256: "f90f2ce43218de158c6392fa19e6517dda703c35823a4aa5bfc20b50788ad282",
     signingKeys: { [config.signingKeyId]: getBytes(config.signingPublicKey) },
 };
-await validateProofBundle(record.sidecar.proofBundle, trust);
 const provider = new JsonRpcProvider(config.chainRpcUrl);
 try {
     if ((await provider.getNetwork()).chainId !== BigInt(config.chainId))
