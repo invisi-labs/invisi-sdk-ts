@@ -2,8 +2,8 @@
 
 | Example | Shows |
 | --- | --- |
-| `01-prepare-and-broadcast.ts` | Fee quote → wallet approval/main proof → source proof → relay submission |
-| `02-submit-provenance.ts` | Direct payment proof → Source submission → recognition query; `--resume` reuses a saved proof from either example |
+| `01-prepare-and-broadcast.ts` | Fee quote → wallet approval/main proof → relay submission; Source handling is automatic |
+| `02-submit-provenance.ts` | Direct payment proof → Source submission → recognition query; `--resume` reuses a saved proof from example02 |
 
 Source proofs require ordinary private Note inputs, regardless of Note output count. A pure withdrawal needs one. Credit draw uses Credit state inputs, so it needs no Note source proof; the service screens its actual public payer funding. Create/update/revoke likewise need no Note source proof.
 
@@ -18,11 +18,11 @@ const signature = await signer.signTypedData(
     authorization.message
 );
 const ready = await (await quoted.withWalletSignature(signature)).prove();
-const sourceProof = await provenance.prove(ready); // Local data preparation + computation.
-const submitted = await broadcaster.submit(ready); // Reuses the cached proof; server enforces Source before sending.
+// Source proof generation and service submission are handled automatically.
+const submitted = await broadcaster.submit(ready);
 ```
 
-`quote` only converges the fee and obtains a signed quote. It makes no Source request and computes no source proof. `prove()` on the transaction produces the main protocol proof. `provenance.prove(ready)` fetches authenticated recognized-tree data and proves locally; it does not submit a proof to a service. The same `NativeProver` configured in `Invisi` also lets `broadcaster.submit(ready)` perform this step automatically when no cached proof exists.
+`quote` only converges the fee and obtains a signed quote. It makes no Source request and computes no source proof. `prove()` on the transaction produces the main protocol proof. `broadcaster.submit(ready)` uses the same `NativeProver` to prepare the required Source proof locally; Broadcaster submits it to Provenance and sends the transaction only after acceptance. Example01 needs no separate Provenance calls.
 
 For direct transactions, the App controls both independent steps:
 
@@ -60,6 +60,6 @@ pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute
 pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute --resume
 ```
 
-Without `--execute`, each script exits before configuration/network access. Example02 prints the unsigned main transaction for independent host sending and submits Source before or after that sending. It waits up to two minutes for recognition; timeout leaves service tracking active. With `--resume`, paste `{sourceProof}` saved from either example; the same submission is idempotent. Examples log records rather than writing files; the App must durably save the printed packet before sending. Relay submission IDs are opaque, assigned only by the service. An ID-less lost response retries the exact retained request; known IDs are queried first. Managed Session persists the externalization fence. Do not prepare a replacement payment while the original outcome is uncertain.
+Without `--execute`, each script exits before configuration/network access. Example02 prints the unsigned main transaction for independent host sending and submits Source before or after that sending. It waits up to two minutes for recognition; timeout leaves service tracking active. With `--resume`, paste `{sourceProof}` saved from example02; the same submission is idempotent. Examples log records rather than writing files; in the direct path, the App must durably save the printed proof packet before sending. Relay submission IDs are opaque, assigned only by the service. An ID-less lost response retries the exact retained request; known IDs are queried first. Managed Session persists the externalization fence. Do not prepare a replacement payment while the original outcome is uncertain.
 
 For explicit reproof, call `provenance.prove(restoredOperation, {reprove:true})` with current trusted roots and local proving capabilities. Retain/save the new returned packet. A frozen externalized relay request keeps its original proof/body; reproof does not replace it or send the main transaction again.

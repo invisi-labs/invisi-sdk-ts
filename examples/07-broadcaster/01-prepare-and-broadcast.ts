@@ -6,7 +6,6 @@ import {
     BroadcasterClient,
     NoteOutput,
 } from "@invisi-labs/sdk";
-import { Provenance } from "@invisi-labs/sdk/provenance";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
@@ -88,17 +87,10 @@ try {
     const authorized = await quoted.withWalletSignature(signature);
     const ready = await authorized.prove();
     console.log("Verified quote:", json(ready.broadcasterQuote()));
-    const provenance = new Provenance({ prover });
-    const sourceProof = await provenance.prove(ready);
-    console.log("Save Provenance proof for recovery:", json(sourceProof));
-    // Submission reuses this proof; the relay verifies it before broadcasting.
+    // The SDK generates required Provenance proofs locally. Broadcaster submits them to
+    // Provenance and broadcasts only after acceptance; confirmation tracking is automatic.
     const submitted = await broadcaster.submit(ready);
-    const record = {
-        sourceProof,
-        submissionId: submitted.id,
-    };
-    console.log("Broadcast record:", json(record));
-    console.log(json(submitted));
+    console.log("Broadcast result:", json(submitted));
 } finally {
     provider.destroy();
 }
