@@ -53,7 +53,7 @@ The App decryptor must authenticate the ciphertext (including the AEAD tag) befo
 - `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
 - `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted Note and Credit preparation, grant reservations, and operation reconciliation. There is no injected private executor or automatic signer.
-- `07-broadcaster`: concrete-transaction estimation, one common prepare/quote/relay submission flow, tracking confirmation and self-submitted source proofs. See its [scenario table](07-broadcaster/README.md).
+- `07-broadcaster`: concrete-transaction estimation, one common prepare/quote/relay submission flow, tracking confirmation and self-submitted source proofs. Both use Session inventory discovery and automatic selection.
 - `06-disclosure`: independently read canonical receipt evidence, invoke App decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the App-authenticated application payload without claiming its financial opening proves the memo.
 
 ## Automatic discovery and recovery
@@ -98,4 +98,6 @@ The account controls the default database (`examples/accounts/<account>-session.
 
 ## Provenance
 
-[Broadcaster and independent Provenance examples](07-broadcaster/README.md) demonstrate relay fees/submission and direct source submission separately. A Note input requires source proof even without a Note output; Credit state inputs do not require a Note source proof.
+[Broadcaster and independent Provenance examples](07-broadcaster/) demonstrate relay fees/submission and direct source submission separately. A Note input requires source proof even without a Note output; Credit state inputs do not require a Note source proof.
+
+Run `example:broadcaster:1 --execute` for fee quotation and relay submission. Run `example:broadcaster:2 --execute` for a direct payment and Source submission/query; add `--resume` to paste a saved `{sourceProof}` without recreating the payment. These two examples use ephemeral in-memory inventory; see `05-wallet-session` for encrypted persistent storage and transaction recovery.

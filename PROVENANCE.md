@@ -69,7 +69,7 @@ The official endpoint is `DEFAULT_PROVENANCE_ENDPOINT` (`https://provenance.invi
 
 ## Flat examples
 
-See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
+See [`examples/07-broadcaster`](examples/07-broadcaster/) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.
 
 ## Ready-based source proofs
 
