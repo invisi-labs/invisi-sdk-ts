@@ -12,14 +12,13 @@ The criterion is **ordinary private Note inputs**, not commitments on both ends.
 
 ## Configuration and execution
 
-The official network uses one logical recognition service, defaulting to `https://provenance.invisipay.fi` (`DEFAULT_PROVENANCE_ENDPOINT`). Replicas share the same authority and recognition state; chain/protocol instances still have separate trees. Omit `endpoint` to use the default, or override it with matching trust pins for a private deployment. The endpoint alone never establishes trust in returned keys.
+The official network uses one logical recognition service, defaulting to `https://provenance.invisipay.fi` (`DEFAULT_PROVENANCE_ENDPOINT`). Replicas share the same authority and recognition state; chain/protocol instances still have separate trees. For a private deployment, edit `provenanceEndpoint` and its matching trust pins at the top of each script.
 
-Copy `config.example.json` outside the repository and replace the public deployment, RPC, provider/key and relay pins with trusted values. Set `EXAMPLE_CONFIG` to that file. `../settings.ts` selects the token, maximum fee and local main BB binary; `../accounts.ts` contains public wallet addresses. Keys, local decryption and authorization stay in the external native wallet host.
+All configuration is written directly in each script. Replace the protocol/provider/signing-key placeholders; in01, also replace the relay endpoint, quote signer and fee recipient. `../settings.ts` supplies the chain/RPC endpoints, token, maximum fee and local main BB binary. `../accounts.ts` contains public wallet addresses. Keys, local decryption and authorization stay in the external native wallet host. No external configuration file is needed.
 
-For source proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. `assetRoot` points at `.cache/provenance`, including nested artifact/VK paths. Set `INVISI_CRS_PATH` when local CRS configuration is needed. The input Note must already be recognized.
+For source proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Each script resolves `assetRoot` to the SDK repository's `.cache/provenance`, including nested artifact/VK paths. Set `INVISI_CRS_PATH` when local CRS configuration is needed. The input Note must already be recognized.
 
 ```sh
-export EXAMPLE_CONFIG='/outside/repository/broadcaster-config.json'
 pnpm --filter @invisi-examples/scenarios example:broadcaster:1 --execute
 export TRANSACTION_HASH='0x<canonical-confirmed-hash>'
 pnpm --filter @invisi-examples/scenarios example:broadcaster:2 --execute
@@ -38,7 +37,7 @@ export TRANSACTION_HASH='0x<your-self-broadcast-confirmed-transact>'
 pnpm --filter @invisi-examples/scenarios example:broadcaster:3 --execute
 ```
 
-This focused example supports exactly one Alice-owned private Note input, including a pure withdrawal. It reads actual canonical transaction/receipt data, discovers the spent input locally, reconstructs the native statement from the transaction, authenticates a recognized checkpoint against primary, proves K1 locally and explicitly calls `source.submitProof`. It never constructs or calls a Broadcaster client. Its default checkpoint is the latest; set optional `sourceRootId` in the copied config for an older physical tree containing the input. Replay is limited to100,000 leaves and discloses no per-Note membership interest.
+This focused example supports exactly one Alice-owned private Note input, including a pure withdrawal. It reads actual canonical transaction/receipt data, discovers the spent input locally, reconstructs the native statement from the transaction, authenticates a recognized checkpoint against primary, proves K1 locally and explicitly calls `source.submitProof`. It never constructs or calls a Broadcaster client. Its default checkpoint is the latest; edit optional `sourceRootId` at the top of the script for an older physical tree containing the input. Replay is limited to100,000 leaves and discloses no per-Note membership interest.
 
 A valid proof job may precede publication of the next recognized root; poll the same operation recognition without resending the main transaction.
 
