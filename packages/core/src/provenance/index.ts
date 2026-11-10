@@ -4,6 +4,8 @@ import { ed25519 } from "@noble/curves/ed25519";
 import { AbiCoder, keccak256, getBytes, hexlify, concat } from "ethers";
 import { poseidonHash } from "../crypto/poseidon";
 
+export const DEFAULT_PROVENANCE_ENDPOINT = "https://provenance.invisipay.fi";
+
 export type Integer = bigint | string | number;
 export const FIELD_MODULUS =
     21888242871839275222246405745257275088548364400416034343698204186575808495617n;

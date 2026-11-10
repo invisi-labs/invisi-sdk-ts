@@ -12,6 +12,8 @@ The criterion is **ordinary private Note inputs**, not commitments on both ends.
 
 ## Configuration and execution
 
+The official network uses one logical recognition service, defaulting to `https://provenance.invisipay.fi` (`DEFAULT_PROVENANCE_ENDPOINT`). Replicas share the same authority and recognition state; chain/protocol instances still have separate trees. Omit `endpoint` to use the default, or override it with matching trust pins for a private deployment. The endpoint alone never establishes trust in returned keys.
+
 Copy `config.example.json` outside the repository and replace the public deployment, RPC, provider/key and relay pins with trusted values. Set `EXAMPLE_CONFIG` to that file. `../settings.ts` selects the token, maximum fee and local main BB binary; `../accounts.ts` contains public wallet addresses. Keys, local decryption and authorization stay in the external native wallet host.
 
 For source proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. `assetRoot` points at `.cache/provenance`, including nested artifact/VK paths. Set `INVISI_CRS_PATH` when local CRS configuration is needed. The input Note must already be recognized.

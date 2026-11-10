@@ -64,6 +64,8 @@ Recovery state-machine tests use explicitly marked synthetic proof bytes and rea
 
 TypeScript: `EncryptedRecoveryStore.fromKey(existingAtomicRecordStore, aesGcmKey)` (or `fromBytes`), then `new RecoveryCoordinator(store, provenanceClient, hostCapabilities)`. The existing session `AtomicRecordStore`, including host SQLite/IndexedDB adapters, satisfies the structural ciphertext interface. `prepare` returns `{record, broadcastPermit:true}` only after successful CAS.
 
+The official endpoint is `DEFAULT_PROVENANCE_ENDPOINT` (`https://provenance.invisipay.fi`). Examples use it when their public configuration omits `endpoint`; private deployments can override the address while explicitly pinning their own provider and signing keys. One official logical recognition authority may run multiple replicas.
+
 ## Flat examples
 
 See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local proof generation, public sidecars, verified Broadcaster quote/explicit submission and confirmed source publication.

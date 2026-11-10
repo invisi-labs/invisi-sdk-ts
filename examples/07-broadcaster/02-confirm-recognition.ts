@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { JsonRpcProvider, getBytes } from "ethers";
-import { ProvenanceClient } from "@invisi-labs/sdk/provenance";
+import { ProvenanceClient, DEFAULT_PROVENANCE_ENDPOINT } from "@invisi-labs/sdk/provenance";
 import { readHostJson } from "../host-transport.js";
 import type { TrustContext } from "@invisi-labs/sdk/provenance";
 
@@ -11,7 +11,7 @@ if (!process.argv.includes("--execute")) {
     process.exit(0);
 }
 const config = JSON.parse(await readFile(process.env.EXAMPLE_CONFIG!, "utf8"));
-console.log("Paste the Broadcast record printed by example02.");
+console.log("Paste the Broadcast record printed by example01.");
 const record = (await readHostJson()) as {
     data: string;
     submissionId: string;
@@ -44,7 +44,7 @@ try {
         tx.data.toLowerCase() !== record.data.toLowerCase()
     )
         throw Error("Canonical transaction mismatch");
-    const source = new ProvenanceClient(config.endpoint, trust);
+    const source = new ProvenanceClient(config.endpoint ?? DEFAULT_PROVENANCE_ENDPOINT, trust);
     const locator = { txHash: hash, blockHash: receipt.blockHash, operationIndex: "0" };
     const tracked = await source.waitTracking(record.trackingId, {
         timeoutMs: 120000,

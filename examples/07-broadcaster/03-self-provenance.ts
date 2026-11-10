@@ -6,6 +6,7 @@ import { transactUserPublicInputs, selectTransactCapacity } from "@invisi-labs/p
 import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
 import {
     ProvenanceClient,
+    DEFAULT_PROVENANCE_ENDPOINT,
     authenticateManifest,
     noteOpening,
     operationDigest,
@@ -34,7 +35,7 @@ const trust: TrustContext = {
     manifestSha256: pin,
     signingKeys: { [config.signingKeyId]: getBytes(config.signingPublicKey) },
 };
-const source = new ProvenanceClient(config.endpoint, trust);
+const source = new ProvenanceClient(config.endpoint ?? DEFAULT_PROVENANCE_ENDPOINT, trust);
 const manifest = await readFile(join(config.assetRoot, "manifest.json"));
 const manifestIdentity = authenticateManifest(manifest, pin);
 const sourceProver = new LocalProvenanceProver({

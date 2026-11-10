@@ -1,5 +1,5 @@
 {
-  "endpoint": "https://your-provenance.example",
+  "endpoint": "https://provenance.invisipay.fi",
   "protocolRpcUrl": "https://your-protocol-rpc.example/v1/chains/31337",
   "chainRpcUrl": "https://your-primary-rpc.example",
   "chainId": "31337",

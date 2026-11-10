@@ -8,7 +8,11 @@ import {
     BroadcasterClient,
     NoteOutput,
 } from "@invisi-labs/sdk";
-import { ProvenanceClient, authenticateManifest } from "@invisi-labs/sdk/provenance";
+import {
+    ProvenanceClient,
+    authenticateManifest,
+    DEFAULT_PROVENANCE_ENDPOINT,
+} from "@invisi-labs/sdk/provenance";
 import type { TrustContext } from "@invisi-labs/sdk/provenance";
 import { LocalProvenanceProver } from "@invisi-labs/prover/provenance";
 import { NativeProver } from "@invisi-labs/prover/native";
@@ -31,7 +35,7 @@ const trust: TrustContext = {
     manifestSha256: pin,
     signingKeys: { [config.signingKeyId]: getBytes(config.signingPublicKey) },
 };
-const source = new ProvenanceClient(config.endpoint, trust);
+const source = new ProvenanceClient(config.endpoint ?? DEFAULT_PROVENANCE_ENDPOINT, trust);
 const manifest = await readFile(join(config.assetRoot, "manifest.json"));
 const manifestIdentity = authenticateManifest(manifest, pin);
 const sourceProver = new LocalProvenanceProver({
