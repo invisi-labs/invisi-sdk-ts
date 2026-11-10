@@ -1,5 +1,10 @@
 # @invisi-labs/prover
 
+## 1.1.8
+
+- Ship the current authenticated native/recursive circuits and seven Source proof capacity tiers.
+- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+
 
 ## 1.1.7
 

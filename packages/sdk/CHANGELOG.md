@@ -1,5 +1,10 @@
 # @invisi-labs/sdk
 
+## 1.1.8
+
+- Provide ready-statement Source proofs, recoverable public proof packets, local cache reuse and fee-frozen broadcaster submission.
+- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+
 
 ## 1.1.7
 

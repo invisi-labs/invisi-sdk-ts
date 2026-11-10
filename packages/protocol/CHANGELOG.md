@@ -1,5 +1,10 @@
 # @invisi-labs/protocol
 
+## 1.1.8
+
+- Ship the authenticated current Note, Credit and aggregate statements, deployment bindings and ABI.
+- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+
 
 ## 1.1.7
 

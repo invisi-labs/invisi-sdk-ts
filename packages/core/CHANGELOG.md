@@ -1,5 +1,10 @@
 # @invisi-labs/core
 
+## 1.1.8
+
+- Expose explicit App delivery decryption with context-bound plaintext validation and standard wallet authorization.
+- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+
 
 ## 1.1.7
 

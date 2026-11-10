@@ -1,5 +1,10 @@
 # @invisi-labs/vue
 
+## 1.1.8
+
+- Keep Vue lifecycle bindings aligned with the 1.1.8 SDK and Session APIs.
+- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+
 
 ## 1.1.7
 

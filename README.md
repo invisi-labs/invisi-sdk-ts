@@ -1,5 +1,7 @@
 # Invisi TypeScript SDK
 
+Release preparation targets `1.1.8` for all eight packages; see [local package verification](RELEASE.md).
+
 A capability SDK for ordinary private Notes and deferred Credit grants. Workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
 
 | Package | Responsibility |

@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/core",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "Invisi Protocol core cryptographic primitives",
   "type": "module",
   "main": "./dist/index.cjs",

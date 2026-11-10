@@ -1,5 +1,10 @@
 # @invisi-labs/rpc
 
+## 1.1.8
+
+- Provide the current separate Note/Credit query surfaces and canonical broadcaster discovery.
+- Keep the complete workspace release pinned to exact 1.1.8 package dependencies.
+
 
 ## 1.1.7
 
