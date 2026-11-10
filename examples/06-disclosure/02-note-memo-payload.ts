@@ -5,7 +5,8 @@ import { Protocol, ProtocolRpcClient, DisclosureVerifier } from "@invisi-labs/sd
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 
 // Bob discovers a memo-bearing receipt and decodes the native-authenticated application payload.
@@ -33,7 +34,7 @@ try {
         protocolRpc,
         protocol,
         wallet: bob.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress: settings.tokenAddress,
         includeSpent: true,
     });

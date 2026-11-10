@@ -1,10 +1,11 @@
 import { randomInt } from "node:crypto";
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCandidates } from "./discover-candidates.js";
 import { Aggregator } from "@invisi-labs/prover/aggregate";
 
@@ -44,7 +45,7 @@ try {
         protocolRpc,
         protocol,
         wallet: bob.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress: settings.tokenAddress,
     });
     const bobEligible = bobCandidates.filter((input) => input.note.amount >= 2n);
@@ -72,13 +73,17 @@ try {
             outputs: [output],
         });
 
-        const request = await prepared.exportWalletRequest(crypto.randomUUID());
-        const responses = await nativeWallet.execute([request]);
-        const response = responses.find((item) => item.id === request.id);
-        if (!response) {
-            throw Error("Missing bob authorization response");
+        const signer = new EthersWallet(process.env.BOB_PRIVATE_KEY!, provider);
+        if (signer.address.toLowerCase() !== bob.publicWallet.ownerAddress.toLowerCase()) {
+            throw Error("Signing key must match bob's wallet owner");
         }
-        const authorized = await prepared.withWalletResponse(response);
+        const authorization = await prepared.exportWalletAuthorization();
+        const signature = await signer.signTypedData(
+            authorization.domain,
+            authorization.types,
+            authorization.message
+        );
+        const authorized = await prepared.withWalletSignature(signature);
         // Recursive members cannot be submitted as individual transactions.
         const proved = await authorized.prove({ execution: "aggregate" });
         members.push(proved.exportAggregateMember());
@@ -89,7 +94,7 @@ try {
         protocolRpc,
         protocol,
         wallet: charlie.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress: settings.tokenAddress,
     });
     const charlieEligible = charlieCandidates.filter((input) => input.note.amount >= 2n);
@@ -115,13 +120,17 @@ try {
             inputs: [input],
             outputs: [output],
         });
-        const request = await prepared.exportWalletRequest(crypto.randomUUID());
-        const responses = await nativeWallet.execute([request]);
-        const response = responses.find((item) => item.id === request.id);
-        if (!response) {
-            throw Error("Missing charlie authorization response");
+        const signer = new EthersWallet(process.env.CHARLIE_PRIVATE_KEY!, provider);
+        if (signer.address.toLowerCase() !== charlie.publicWallet.ownerAddress.toLowerCase()) {
+            throw Error("Signing key must match charlie's wallet owner");
         }
-        const authorized = await prepared.withWalletResponse(response);
+        const authorization = await prepared.exportWalletAuthorization();
+        const signature = await signer.signTypedData(
+            authorization.domain,
+            authorization.types,
+            authorization.message
+        );
+        const authorized = await prepared.withWalletSignature(signature);
         // Recursive members cannot be submitted as individual transactions.
         const proved = await authorized.prove({ execution: "aggregate" });
         members.push(proved.exportAggregateMember());

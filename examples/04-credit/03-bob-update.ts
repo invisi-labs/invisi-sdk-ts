@@ -1,9 +1,10 @@
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCredits } from "./discover-credits.js";
 
 // Bob updates his current grant to limits 10/40/60 and adds 100 base units of authority.
@@ -37,7 +38,7 @@ try {
         protocolRpc,
         protocol,
         wallet: bob.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress,
         role: "owner",
     });
@@ -58,14 +59,18 @@ try {
         unlimited: false,
     });
 
-    // 3. Match the host response by ID and validate it against the retained statement.
-    const request = await prepared.exportWalletRequest(crypto.randomUUID());
-    const responses = await nativeWallet.execute([request]);
-    const response = responses.find((item) => item.id === request.id);
-    if (!response) {
-        throw Error("Missing wallet response");
+    // 3. Sign the frozen EIP-712 authorization with ethers.
+    const signer = new EthersWallet(process.env.BOB_PRIVATE_KEY!, provider);
+    if (signer.address.toLowerCase() !== bob.publicWallet.ownerAddress.toLowerCase()) {
+        throw Error("Signing key must match bob's wallet owner");
     }
-    const authorized = await prepared.withWalletResponse(response);
+    const authorization = await prepared.exportWalletAuthorization();
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
+    );
+    const authorized = await prepared.withWalletSignature(signature);
     const ready = await authorized.prove();
     // Export does not approve tokens or submit; the host reviews the required caller and gas.
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));

@@ -29,9 +29,6 @@ importers:
       '@invisi-labs/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@invisi-labs/native-wallet':
-        specifier: workspace:*
-        version: link:../packages/native-wallet
       '@invisi-labs/protocol':
         specifier: workspace:*
         version: link:../packages/protocol
@@ -82,25 +79,6 @@ importers:
       vitest:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@22.7.5)(jsdom@24.1.3)
-
-  packages/native-wallet:
-    dependencies:
-      '@invisi-labs/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.37
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.1(postcss@8.5.8)(tsx@4.23.15)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-      vitest:
-        specifier: ^1.6.0
-        version: 1.6.1(@types/node@20.19.37)(jsdom@24.1.3)
 
   packages/protocol:
     dependencies:

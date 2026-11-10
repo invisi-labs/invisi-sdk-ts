@@ -6,7 +6,7 @@ import {
 } from "@invisi-labs/sdk/provenance";
 import type { TrustContext, ProvenanceProof } from "@invisi-labs/sdk/provenance";
 import { settings } from "../settings.js";
-import { json, readHostJson } from "../host-transport.js";
+import { json, readHostJson } from "../example-io.js";
 // Match these public trust pins to the deployment selected in ../settings.ts.
 const provenanceEndpoint = DEFAULT_PROVENANCE_ENDPOINT;
 const protocolAddress = "0x<20-byte-protocol-address>" as `0x${string}`;

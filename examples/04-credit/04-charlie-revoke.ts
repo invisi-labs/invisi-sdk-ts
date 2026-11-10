@@ -4,7 +4,8 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 
 // Charlie discovers a current grant and revokes its public shard/slot as owner caller.
 // Owner revocation requires neither a private spend proof nor a separate signature.
@@ -35,7 +36,7 @@ try {
         protocolRpc,
         protocol,
         wallet: charlie.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress,
         role: "owner",
     });

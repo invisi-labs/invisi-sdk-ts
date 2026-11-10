@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { JsonRpcProvider, getBytes } from "ethers";
+import { JsonRpcProvider, getBytes, Wallet as EthersWallet } from "ethers";
 import { createRequire } from "node:module";
 import { WalletSession, EncryptedWalletCodec } from "@invisi-labs/session";
 import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/session/sqlite";
@@ -7,7 +7,8 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 
 // Spend Alice's discovered inventory to Bob, preserving the operation and automatic change.
 // The native host authorizes the retained intent; the store contains no account key.
@@ -62,8 +63,7 @@ try {
         fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
     });
     // A malformed batch or operational error must not advance the persisted checkpoint.
-    const responses = await nativeWallet.execute(pending.walletRequests);
-    await pending.applyWalletResponses(responses);
+    await pending.decrypt(decryptor);
     const balance = await session.balance(settings.tokenAddress);
     if (balance.availableKnown === null || balance.availableKnown < 2n) {
         throw Error("Alice has insufficient verified available notes; fund her, then synchronize");
@@ -87,13 +87,17 @@ try {
         "Balance after reserving inputs:",
         json(await session.balance(settings.tokenAddress))
     );
-    const request = await operation.exportWalletRequest(crypto.randomUUID());
-    const authorizationResponses = await nativeWallet.execute([request]);
-    const response = authorizationResponses.find((item) => item.id === request.id);
-    if (!response) {
-        throw Error("Missing native authorization response");
+    const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
+    if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase()) {
+        throw Error("Signing key must match alice's wallet owner");
     }
-    const authorized = await operation.withWalletResponse(response);
+    const authorization = await operation.exportWalletAuthorization();
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
+    );
+    const authorized = await operation.withWalletSignature(signature);
     const ready = await authorized.prove();
     console.log("Persisted operation:", ready.id);
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));

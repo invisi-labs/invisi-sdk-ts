@@ -3,7 +3,7 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Alice sends Bob 1 token and explicitly selects chain-based receiving-key lookup.
 // This choice is attached to the output rather than injected as a global resolver.

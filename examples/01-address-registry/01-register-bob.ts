@@ -1,9 +1,9 @@
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
 import { Invisi, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json, readHostJson, hostSignature } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Bob registers his public receiving keys using an externally signed EIP-712 request.
 // Registry authorization has its own nonce/domain; it is not private spending authorization.
@@ -28,15 +28,19 @@ try {
         prover: new NativeProver({ bbBin: settings.bbBin }),
     });
 
-    // 2. Export registry EIP-712 data for the host; its signature is checked on attachment.
+    // 2. Sign registry EIP-712 data; the SDK checks its signature on attachment.
     const prepared = await invisi.prepareRegistration({ wallet: bob.publicWallet, update: false });
     const authorization = await prepared.exportRegistrationAuthorization();
-    const id = crypto.randomUUID();
-    console.log(
-        "Host EVM typed-data requests:",
-        json([{ id, kind: "registration", ...authorization }])
+    const signer = new EthersWallet(process.env.BOB_PRIVATE_KEY!, provider);
+    if (signer.address.toLowerCase() !== bob.publicWallet.ownerAddress.toLowerCase()) {
+        throw Error("Signing key must match bob's wallet owner");
+    }
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
     );
-    const ready = await prepared.withSignature(hostSignature(await readHostJson(), id));
+    const ready = await prepared.withSignature(signature);
     console.log("Unsigned registry transaction:", json(await ready.exportTransaction()));
 } finally {
     provider.destroy();

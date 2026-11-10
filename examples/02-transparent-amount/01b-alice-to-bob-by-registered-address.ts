@@ -3,7 +3,7 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Bob supplies a registered EVM address; Alice sends 1 token using registry-resolved keys.
 // An unresolved or invalid registration must fail rather than silently remove encryption.

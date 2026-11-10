@@ -3,7 +3,7 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Alice funds Bob with 1 token; the public amount becomes an encrypted private note.
 // Alice remains the required caller and handles token allowance and gas through her host.

@@ -7,7 +7,7 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet } from "../host-transport.js";
+import { decryptor } from "../app-decryptor.js";
 
 // Reopen the selected account's Note and Credit journal after external submission.
 // Recovery never signs or sends again; a timeout does not justify a replacement payment.
@@ -67,8 +67,7 @@ try {
         fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
     });
     // A malformed batch or operational error must not advance the persisted checkpoint.
-    const responses = await nativeWallet.execute(pending.walletRequests);
-    await pending.applyWalletResponses(responses);
+    await pending.decrypt(decryptor);
 
     // 3. Attach host submission hashes to existing operations, then verify canonical receipts.
     const hostTransactions = JSON.parse(process.env.HOST_TRANSACTIONS_JSON ?? "{}");

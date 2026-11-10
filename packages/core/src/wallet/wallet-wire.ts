@@ -1,8 +1,9 @@
+import { authenticatedDecryptor } from "../delivery/decryptor";
 import type { Note, CreditDeliveryState, CreditState } from "../types";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { ReceivingAddress } from "../address/receiving-address";
-import { deliveryCodec, validateDeliveryCiphertext } from "../delivery/delivery-codec";
-import { creditCommitment, noteCommitment, validateContext } from "../delivery/validation";
+import { validateDeliveryCiphertext } from "../delivery/delivery-codec";
+import { validateContext } from "../delivery/validation";
 import type { CreditStateDecryptionContext, NoteDecryptionContext } from "../delivery/types";
 import { AuthorizedStatement } from "./capabilities";
 import { Wallet } from "./wallet-object";
@@ -73,9 +74,6 @@ export type WalletResponse<M extends WalletMethod = WalletMethod> = {
     ownerAddress: WalletHex;
     method: M;
 } & ({ result: WalletResults[M]; error?: never } | { error: { code: string }; result?: never });
-export interface NativeWalletClient {
-    execute(requests: readonly WalletRequest[]): Promise<WalletResponse[]>;
-}
 export interface PreparedWalletRequest<M extends WalletMethod = WalletMethod> {
     readonly request: WalletRequest<M>;
 }
@@ -299,40 +297,14 @@ async function acceptResponse(
     } else {
         const typed = request as WalletRequest<"wallet.decryptNote" | "wallet.decryptCredit">;
         const context = walletDecryptionContext(typed);
-        const envelope = validateDeliveryCiphertext(typed.params.envelope);
-        const codec = deliveryCodec(envelope[0]!);
         const plaintext = walletBytes(result.plaintext);
-        if (plaintext.length + 78 < codec.minimum || plaintext.length + 78 > codec.maximum)
-            throw new Error("invalid plaintext length");
-        if (codec.kind === "funds") {
-            const note = codec.decode(plaintext, context);
-            if (
-                BigInt(note.ownerAddress) !== BigInt(request.ownerAddress) ||
-                note.tokenAddress !== context.tokenAddress
-            )
-                throw new Error("decrypted note context mismatch");
-            await noteCommitment(context, note);
-            return note;
-        }
-        const state = codec.decode(plaintext, context as CreditStateDecryptionContext);
-        const identity =
-            context.role === "owner"
-                ? state.note.ownerWalletIdentity
-                : state.note.spenderWalletIdentity;
-        if (
-            BigInt(identity) !== BigInt(request.ownerAddress) ||
-            state.note.tokenAddress !== context.tokenAddress
-        )
-            throw new Error("decrypted credit context mismatch");
-        if (wallet.getReceivingAddress().kind === "long") {
-            const receiving =
-                context.role === "owner" ? state.ownerReceivingKeys : state.spenderReceivingKeys;
-            if (walletHex(receiving.viewingPublicKey) !== walletHex(wallet.viewingPublicKey)) {
-                throw new Error("decrypted credit receiving key mismatch");
-            }
-        }
-        await creditCommitment(context, state.note);
-        return state;
+        const viewing = authenticatedDecryptor(wallet, {
+            decryptNote: async () => plaintext,
+            decryptCredit: async () => plaintext,
+        });
+        return typed.method === "wallet.decryptNote"
+            ? viewing.decryptNote(typed.params.envelope, context)
+            : viewing.decryptCredit(typed.params.envelope, context as CreditStateDecryptionContext);
     }
     return result;
 }

@@ -1,9 +1,9 @@
-import { JsonRpcProvider, Contract, parseUnits } from "ethers";
+import { JsonRpcProvider, Contract, parseUnits, Wallet as EthersWallet } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json, readHostJson, hostSignature } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Bob funds 9 tokens; the other nine participants each receive 1 token.
 // Bob authorizes the funding and supplies ERC20 allowance; Alice can submit and pay gas.
@@ -67,12 +67,16 @@ try {
 
     // 3. Funding authorization is separate from both ERC20 allowance and gas payment.
     const fundingRequest = await prepared.exportFundingAuthorization();
-    const id = crypto.randomUUID();
-    console.log(
-        "Host EVM typed-data requests:",
-        json([{ id, kind: "funding", ...fundingRequest }])
+    const fundingSigner = new EthersWallet(process.env.BOB_PRIVATE_KEY!, provider);
+    if (fundingSigner.address.toLowerCase() !== bob.address.toLowerCase()) {
+        throw Error("Signing key must match bob's funding address");
+    }
+    const fundingSignature = await fundingSigner.signTypedData(
+        fundingRequest.domain,
+        fundingRequest.types,
+        fundingRequest.message
     );
-    const ready = await prepared.withFundingSignature(hostSignature(await readHostJson(), id));
+    const ready = await prepared.withFundingSignature(fundingSignature);
     // Export does not approve tokens or submit; the host reviews the required caller and gas.
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
     console.log(

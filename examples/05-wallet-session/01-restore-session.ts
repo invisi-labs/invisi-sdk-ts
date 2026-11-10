@@ -7,7 +7,8 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 
 // Restore Alice's encrypted SQLite state and refresh verified inventory through native batches.
 // The independent store encryption key is never derived from account material.
@@ -62,8 +63,7 @@ try {
         fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
     });
     // A malformed batch or operational error must not advance the persisted checkpoint.
-    const responses = await nativeWallet.execute(pending.walletRequests);
-    await pending.applyWalletResponses(responses);
+    await pending.decrypt(decryptor);
     console.log("Verified balance:", json(await session.balance(settings.tokenAddress)));
     console.log(
         "History:",

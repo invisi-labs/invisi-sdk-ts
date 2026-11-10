@@ -3,7 +3,7 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Alice funds 1 token for each of the other nine participants, for 9 tokens total.
 // Each recipient supplies a complete public receiving address; no recipient secret is needed.

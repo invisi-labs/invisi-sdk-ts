@@ -20,7 +20,8 @@ import { LocalProvenanceProver } from "@invisi-labs/prover/provenance";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 
 // Match these public trust pins to the deployment selected in ../settings.ts.
@@ -94,7 +95,7 @@ try {
         protocolRpc,
         protocol,
         wallet: alice.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress,
     });
     const selected = inputs.find(

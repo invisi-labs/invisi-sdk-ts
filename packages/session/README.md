@@ -16,8 +16,7 @@ const session = await WalletSession.connect({
     store: new MemoryWalletStore(),
 });
 const pending = await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
-const responses = await nativeWallet.execute(pending.walletRequests);
-await pending.applyWalletResponses(responses);
+await pending.decrypt(decryptor); // App-supplied DeliveryDecryptor
 const balance = await session.balance(tokenAddress);
 ```
 
@@ -32,21 +31,14 @@ The SDK keeps ordinary Note inventory and deferred Credit states separate. Credi
 
 Private Noir wallet authorization signatures and witnesses are not persisted. Public funding/revocation signatures embedded in final calldata may remain in the encrypted operation journal so recovery can reconcile the exact request; this public authorization material is a separate persistence boundary.
 
-Session owns no native executor. Refresh returns serializable `walletRequests`; the host
-passes the array to `nativeWallet.execute` and supplies its response array directly to
-`applyWalletResponses`. Response order is untrusted: IDs, owner and methods must match
-exactly, with no missing or duplicate entries. Each entry has either `result` or
-`error: {code}`. Only `WALLET_NOT_RECIPIENT` for decryption is a nonmatch; locked accounts,
-rejected approvals and all other failures leave the entire refresh pending.
+Session owns no wallet transport. Refresh stages canonical pages, then `pending.decrypt(decryptor)` invokes the App-supplied `DeliveryDecryptor`. Callbacks return plaintext bytes or `null` for nonrecipients; all other failures reject. SDK validation binds plaintext to owner, token, deployment, commitment and Credit receiving keys. No key storage, unlocking or App bridge is implemented here.
 
-A native batch allows at most 1,024 requests and 16 MiB encoded JSON in each direction.
-Oversized refreshes reject before state changes; use a smaller block range. Apply rechecks
-canonical chain data and commits atomically with the original store revision. Empty
-request lists still require `applyWalletResponses([])` to finalize.
+Decrypt/apply rechecks canonical receipts and commits atomically with the original store revision. A failed callback, invalid plaintext, concurrent state change or reorg leaves the refresh uncommitted. Concurrent apply attempts and reuse after success reject. Even an empty page requires `pending.decrypt(decryptor)` to finalize.
 
-Private authorization uses `operation.exportWalletRequest(id)`, host execution of `[request]`,
-and `operation.withWalletResponse(response)`, identical to detached SDK preparation.
+Authorization uses `operation.exportWalletAuthorization()`, ethers `signTypedData()` and `operation.withWalletSignature(signature)`. Native request/response envelopes are unnecessary.
+
+The App decryptor must authenticate the ciphertext (including the AEAD tag) before returning plaintext. Commitment checks validate financial contents; they do not independently authenticate opaque memo bytes.
 
 ### Managed Credit examples
 
-See [the Credit walkthrough](../../examples/README.md#managed-credit-walkthrough) for four flat SQLite-backed Session mains: create, batch draw across different payers, update remaining quota, and proofless owner revocation. All use the same public Wallet and native array request/response boundary as Note payments. Example 4 recovers both Note and Credit operations with the original account and encrypted store. Credit authority and reservations stay separate from ordinary Note balances; successful draws issue ordinary recipient Notes.
+See [the Credit walkthrough](../../examples/README.md#managed-credit-walkthrough) for four flat SQLite-backed Session mains: create, batch draw across different payers, update remaining quota, and proofless owner revocation. All use the same public Wallet and explicitly injected App decryptor as Note payments. Example 4 recovers both Note and Credit operations with the original account and encrypted store. Credit authority and reservations stay separate from ordinary Note balances; successful draws issue ordinary recipient Notes.

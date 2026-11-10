@@ -7,7 +7,8 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 
 // Bob cancels an existing grant using its public revocation reference.
 // Revocation has no ZK proof and does not reclaim previously issued Notes.
@@ -61,14 +62,13 @@ try {
         namespace: `${account.name}-local-experiments`,
     });
 
-    // 2. Refresh both ledgers through one atomic native request/response exchange.
+    // 2. Validate App-decrypted deliveries before atomically committing both ledgers.
     const history = await session.getHistory();
     const pending = await session.refresh({
         fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
     });
     // A malformed batch or operational error must not advance the persisted checkpoint.
-    const responses = await nativeWallet.execute(pending.walletRequests);
-    await pending.applyWalletResponses(responses);
+    await pending.decrypt(decryptor);
     // Select from the refreshed encrypted store, not a second stateless discovery scan.
     // Credit authority is separate from ordinary spendable Note inventory.
     const snapshot = await store.readSnapshot(session.scope);

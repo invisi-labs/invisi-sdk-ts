@@ -8,20 +8,14 @@ import {
     type DisclosureReference,
 } from "@invisi-labs/sdk";
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
-import {
-    prepareWalletRequest,
-    acceptWalletResponse,
-    NativeWalletError,
-    type NativeWalletClient,
-    type WalletResponse,
-} from "@invisi-labs/core";
+import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/core";
 /** Discover and authenticate inventory; selection and authorization remain in each scenario. */
 export async function discoverCandidates({
     provider,
     protocolRpc,
     protocol,
     wallet,
-    nativeWallet,
+    decryptor,
     tokenAddress,
     includeSpent = false,
 }: {
@@ -29,7 +23,7 @@ export async function discoverCandidates({
     protocolRpc: ProtocolRpcClient;
     protocol: Protocol;
     wallet: Wallet;
-    nativeWallet: NativeWalletClient;
+    decryptor: DeliveryDecryptor;
     tokenAddress: `0x${string}`;
     includeSpent?: boolean;
 }): Promise<
@@ -37,6 +31,7 @@ export async function discoverCandidates({
         reference: DisclosureReference;
     })[]
 > {
+    const viewing = authenticatedDecryptor(wallet, decryptor);
     const rpc = protocolRpc.withProvider(provider);
     const status = await rpc.getStatus(protocol.context);
     if (!status.indexedHead) {
@@ -82,80 +77,45 @@ export async function discoverCandidates({
             positions.set(position, fingerprint);
             return BigInt(output.tokenAddress) === BigInt(tokenAddress);
         });
-        // Each native batch is one owner and at most 1,024 structurally validated requests.
-        for (let offset = 0; offset < outputs.length; offset += 1024) {
-            const batch = outputs.slice(offset, offset + 1024);
-            const prepared = batch.map((output) =>
-                prepareWalletRequest(wallet, crypto.randomUUID(), "wallet.decryptNote", {
-                    envelope: output.ciphertext,
-                    context: {
-                        chainId: protocol.context.chainId.toString(),
-                        protocolAddress: BigInt(protocol.context.protocolAddress).toString(),
-                        tokenAddress: BigInt(tokenAddress).toString(),
-                        outputCommitment: output.commitment,
-                    },
-                })
-            );
-            const responses = await nativeWallet.execute(prepared.map((item) => item.request));
-            for (let index = 0; index < prepared.length; index++) {
-                const request = prepared[index]!,
-                    output = batch[index]!;
-                const response = responses.find((item) => item.id === request.request.id);
-                if (!response) {
-                    throw Error("Missing native note response");
-                }
-                let note;
-                try {
-                    note = await acceptWalletResponse(
-                        request,
-                        response as WalletResponse<"wallet.decryptNote">
-                    );
-                } catch (error) {
-                    if (
-                        error instanceof NativeWalletError &&
-                        error.code === "WALLET_NOT_RECIPIENT"
-                    ) {
-                        continue;
-                    }
-                    throw error;
-                }
-                const reference: DisclosureReference = {
-                    transactionHash: output.transactionHash,
-                    treeId: output.treeId,
-                    leafIndex: output.leafIndex,
-                    role: "funds",
-                };
-                const evidence = await verifier.readOutput(reference);
-                if (
-                    evidence.output.outputCommitment !== output.commitment ||
-                    evidence.output.ciphertext !== output.ciphertext ||
-                    evidence.block.hash !== output.block.hash
-                ) {
-                    throw Error("Indexed note differs from canonical receipt");
-                }
-                // Historical disclosure may include spent notes; payment inventory must exclude them.
-                const nullifier = await wallet
-                    .exportNullifier()
-                    .compute(
-                        note.chainId,
-                        BigInt(note.protocolAddress),
-                        output.commitment,
-                        note.nonce
-                    );
-                if (
-                    !includeSpent &&
-                    (await rpc.isNoteSpent(protocol.context, nullifier, status.indexedHead))
-                ) {
-                    continue;
-                }
-                candidates.push({
-                    note,
-                    commitment: output.commitment,
-                    treeId: output.treeId,
-                    leafIndex: output.leafIndex,
-                    reference,
-                });
+        for (const output of outputs) {
+            const note = await viewing.decryptNote(output.ciphertext, {
+                chainId: protocol.context.chainId,
+                protocolAddress: BigInt(protocol.context.protocolAddress),
+                tokenAddress: BigInt(tokenAddress),
+                outputCommitment: output.commitment,
+            });
+            if (note === null) continue;
+            const reference: DisclosureReference = {
+                transactionHash: output.transactionHash,
+                treeId: output.treeId,
+                leafIndex: output.leafIndex,
+                role: "funds",
+            };
+            const evidence = await verifier.readOutput(reference);
+            if (
+                evidence.output.outputCommitment !== output.commitment ||
+                evidence.output.ciphertext !== output.ciphertext ||
+                evidence.block.hash !== output.block.hash
+            ) {
+                throw Error("Indexed note differs from canonical receipt");
             }
+            // Historical disclosure may include spent notes; payment inventory must exclude them.
+            const nullifier = await wallet
+                .exportNullifier()
+                .compute(note.chainId, BigInt(note.protocolAddress), output.commitment, note.nonce);
+            if (
+                !includeSpent &&
+                (await rpc.isNoteSpent(protocol.context, nullifier, status.indexedHead))
+            ) {
+                continue;
+            }
+            candidates.push({
+                note,
+                commitment: output.commitment,
+                treeId: output.treeId,
+                leafIndex: output.leafIndex,
+                reference,
+            });
         }
     }
     return candidates;

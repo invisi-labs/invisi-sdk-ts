@@ -1,7 +1,7 @@
 import {
+    testDecryptor,
     applyRefresh,
     refreshSession,
-    executeWalletRequest,
 } from "../../../../test-support/native-wallet";
 import {
     Wallet,
@@ -698,31 +698,24 @@ it("serializes entire multi-page refreshes while a provider request is pending",
     expect(Object.keys((await h.store.readSnapshot(session.scope)).notes)).toHaveLength(1);
 });
 
-it("stages native requests without writes and validates all responses before committing", async () => {
+it("stages without writes and validates App plaintext before committing", async () => {
     const h = await harness();
     const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
-    expect(pending.walletRequests).toHaveLength(1);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
-    const request = pending.walletRequests[0]!;
-    const response = await executeWalletRequest(JSON.parse(JSON.stringify(request)));
-    const bad = structuredClone(response);
-    bad.id = "another-request";
-    await expect(pending.applyWalletResponses([bad])).rejects.toThrow(/mismatch/);
+    const forged = {
+        ...testDecryptor,
+        async decryptNote(...args: Parameters<typeof testDecryptor.decryptNote>) {
+            const bytes = (await testDecryptor.decryptNote(...args))!;
+            bytes[47] = bytes[47]! ^ 1;
+            return bytes;
+        },
+    };
+    await expect(pending.decrypt(forged)).rejects.toThrow(/commitment/);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
-    await expect(pending.applyWalletResponses([])).rejects.toThrow(/length|required/);
-    const forged = structuredClone(
-        response
-    ) as import("@invisi-labs/core").WalletResponse<"wallet.decryptNote">;
-    const bytes = Buffer.from(forged.result!.plaintext.slice(2), "hex");
-    bytes[47] = bytes[47]! ^ 1;
-    forged.result!.plaintext = `0x${bytes.toString("hex")}`;
-    await expect(pending.applyWalletResponses([forged])).rejects.toThrow(/commitment/);
-    expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(0);
-
-    const result = await pending.applyWalletResponses([response]);
+    const result = await pending.decrypt(testDecryptor);
     expect(result.notes).toBe(1);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(1);
-    await expect(pending.applyWalletResponses([response])).rejects.toThrow(/applied/);
+    await expect(pending.decrypt(testDecryptor)).rejects.toThrow(/applied/);
 });
 
 it("requires fresh preparation after state changes or canonical history changes", async () => {
@@ -741,38 +734,27 @@ it("requires fresh preparation after state changes or canonical history changes"
     expect(state.revision).toBe(1);
 });
 
-it("accepts explicit no-match responses and rejects simultaneous apply attempts", async () => {
+it("accepts explicit nonrecipients and rejects simultaneous decrypt attempts", async () => {
     const h = await harness();
     const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
-    const responses = pending.walletRequests.map((request) => ({
-        version: request.version,
-        id: request.id,
-        ownerAddress: request.ownerAddress,
-        method: request.method,
-        error: { code: "WALLET_NOT_RECIPIENT" },
-    }));
-    const first = pending.applyWalletResponses(responses);
-    await expect(pending.applyWalletResponses(responses)).rejects.toThrow(/applying/);
+    const decryptor = { decryptNote: async () => null, decryptCredit: async () => null };
+    const first = pending.decrypt(decryptor);
+    await expect(pending.decrypt(decryptor)).rejects.toThrow(/applying/);
     expect((await first).notes).toBe(0);
     expect((await h.store.readSnapshot(h.session.scope)).notes).toEqual({});
 });
 
-it("keeps an entire refresh pending when native account approval fails", async () => {
+it("keeps an entire refresh pending when App decryption fails", async () => {
     const h = await harness();
     const pending = await h.session.refresh({ fromBlock: 12n, toBlock: 12n });
-    const request = pending.walletRequests[0]!;
-    const responses = [
-        {
-            version: request.version,
-            id: request.id,
-            ownerAddress: request.ownerAddress,
-            method: request.method,
-            error: { code: "WALLET_ACCOUNT_LOCKED" },
-        },
-    ];
-    await expect(pending.applyWalletResponses(responses)).rejects.toMatchObject({
-        code: "WALLET_ACCOUNT_LOCKED",
-    });
+    await expect(
+        pending.decrypt({
+            ...testDecryptor,
+            decryptNote: async () => {
+                throw new Error("App wallet locked");
+            },
+        })
+    ).rejects.toThrow("App wallet locked");
     const before = await h.store.readSnapshot(h.session.scope);
     expect(before.revision).toBe(0);
     expect(before.discoveryThrough).toBeUndefined();

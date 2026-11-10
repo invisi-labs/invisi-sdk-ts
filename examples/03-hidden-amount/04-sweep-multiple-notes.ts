@@ -4,7 +4,8 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCandidates } from "./discover-candidates.js";
 
 // Alice samples two notes and withdraws their complete amount publicly to herself.
@@ -38,7 +39,7 @@ try {
         protocolRpc,
         protocol,
         wallet: alice.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress,
     });
     const eligible = candidates.filter((input) => input.note.amount >= 1n);

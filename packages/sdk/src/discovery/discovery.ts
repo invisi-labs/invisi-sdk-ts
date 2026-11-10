@@ -1,3 +1,5 @@
+import { DeliveryDecryptionError } from "@invisi-labs/core";
+import type { authenticatedDecryptor } from "@invisi-labs/core";
 import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/core";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import { isAddress } from "ethers";
@@ -7,7 +9,6 @@ import {
     ReceivingAddress,
     type CreditDeliveryState,
     type Note,
-    type ViewingCapability,
 } from "@invisi-labs/core";
 import { normalizeOpaqueDelivery } from "@invisi-labs/protocol";
 
@@ -284,7 +285,7 @@ export async function decryptCandidates(
     logs: readonly DeliveryEventLog[],
     options: {
         context: DiscoveryContext;
-        viewing: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
+        viewing: ReturnType<typeof authenticatedDecryptor>;
         confirmedThrough: bigint;
     }
 ): Promise<{ notes: DiscoveredNote[]; credits: DiscoveredCredit[] }> {
@@ -330,16 +331,17 @@ export async function decryptCandidates(
             if (role === "funds") {
                 if (delivery.ciphertext === "0x") continue;
                 const note = await options.viewing.decryptNote(delivery.ciphertext, context);
-                notes.push({ ...positionData, note });
+                if (note !== null) notes.push({ ...positionData, note });
             } else {
                 const state = await options.viewing.decryptCredit(delivery.ciphertext, {
                     ...context,
                     role,
                 });
-                credits.push({ ...positionData, role, state });
+                if (state !== null) credits.push({ ...positionData, role, state });
             }
-        } catch {
-            /* Unrelated or invalid output: never add unauthenticated amounts. */
+        } catch (error) {
+            if (error instanceof DeliveryDecryptionError) throw error;
+            /* Unrelated or invalid local ciphertext: never add unauthenticated amounts. */
         }
     }
     return { notes, credits };

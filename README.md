@@ -10,7 +10,6 @@ A capability SDK for ordinary private Notes and deferred Credit grants. Workspac
 | `@invisi-labs/rpc` | Protocol RPC APIv1 with independent Note/Credit query surfaces and canonical anchor checks. |
 | `@invisi-labs/sdk` | Stateless preparation, external signing requests, proofs, output factories and calldata. Note/Credit public subpaths retain separate business types. |
 | `@invisi-labs/session` | Inventory, selection, reservations, synchronization, history and operation recovery. |
-| `@invisi-labs/native-wallet` | React Native request transport; the host provides native account access. |
 | `@invisi-labs/react`, `@invisi-labs/vue` | Thin operation lifecycle bindings. |
 
 ## Ordinary Notes
@@ -28,8 +27,7 @@ const session = await WalletSession.connect({
   invisi, wallet, protocol, store: new MemoryWalletStore(), signer,
 });
 const refresh = await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
-const responses = await nativeWallet.execute(refresh.walletRequests);
-await refresh.applyWalletResponses(responses);
+await refresh.decrypt(decryptor); // App-supplied DeliveryDecryptor
 const output = await NoteOutput.create({
   chainId: protocol.context.chainId,
   protocolAddress: protocol.context.protocolAddress,
@@ -39,9 +37,9 @@ const output = await NoteOutput.create({
 });
 const prepared = await session.prepareTransfer({ tokenAddress, outputs: [output] });
 const review = prepared.preview();
-const request = await prepared.exportWalletRequest("transfer-authorization");
-const [response] = await nativeWallet.execute([request]);
-const ready = await (await prepared.withWalletResponse(response)).prove();
+const authorization = await prepared.exportWalletAuthorization();
+const signature = await signer.signTypedData(authorization.domain, authorization.types, authorization.message);
+const ready = await (await prepared.withWalletSignature(signature)).prove();
 const transaction = await session.sendTransaction(ready);
 await transaction.wait();
 await (await session.resume(ready.id)).reconcile();
@@ -54,9 +52,9 @@ Applications that own their inventory call `invisi.prepareTransfer({wallet,proto
 Private authorization uses an external signing boundary:
 
 ```ts
-const request = await prepared.exportWalletRequest("spend-authorization-1");
-const [response] = await nativeWallet.execute([request]);
-const authorized = await prepared.withWalletResponse(response);
+const authorization = await prepared.exportWalletAuthorization();
+const signature = await signer.signTypedData(authorization.domain, authorization.types, authorization.message);
+const authorized = await prepared.withWalletSignature(signature);
 const ready = await authorized.prove();
 await transactionSigner.sendTransaction(await ready.exportTransaction());
 ```
@@ -124,19 +122,15 @@ pnpm check:session
 
 Artifact synchronization reads the current authenticated manifests and removes retired artifacts. Deterministic protocol/vector and documented-gas generators live in `scripts/` and `packages/protocol/scripts/`. Optional native/WASM integration tests use `BB_BINARY_PATH` and `INVISI_TEST_WASM=1`.
 
-## Native wallet boundary
+## App wallet boundary
 
-`Wallet` contains public receiving material only. Session and stateless callers use
-`prepareWalletRequest` and `acceptWalletResponse` for detection, decryption and private
-authorization. `WalletSession` receives no executor or transport;
-its staged refresh returns requests and accepts validated responses before an atomic store update.
-It never receives viewing or spending keys. The native host owns key storage, unlock and
-approval. EVM transaction signing remains a separate step after final calldata exists.
+`Wallet` contains public receiving material only. The App owns key storage, unlocking, decryption and signing. The SDK includes no native wallet transport or App bridge. Authorization can use ethers EIP-712 signing directly.
 
-The public SDK has no account-private-key wallet constructor or local executor.
-Native algorithms execute in the host; private-key simulation lives only in unpublished
-test support. Decrypted Note/Credit data and witnesses may enter JavaScript, while
-spending, viewing and detection keys remain in the native wallet.
+Inject a `DeliveryDecryptor` with `decryptNote(envelope, context)` and `decryptCredit(envelope, context)`. Each returns plaintext `Uint8Array` or `null` for a nonrecipient; operational failures reject. `authenticatedDecryptor(wallet, decryptor)` validates plaintext context and commitments. Session stages refresh pages and accepts the same interface through `pending.decrypt(decryptor)` before atomic state updates. See [example integration](examples/app-decryptor.ts).
+
+The optional low-level wallet wire codecs remain transport-neutral validation utilities for application-defined integrations; normal examples and Session refresh do not use their request/response envelopes. Keys never enter SDK transaction configuration. Plaintext Note/Credit openings and proving witnesses may enter JavaScript at explicit boundaries.
+
+The App decryptor must authenticate the ciphertext (including the AEAD tag) before returning plaintext. Commitment checks validate financial contents; they do not independently authenticate opaque memo bytes.
 
 ## Optional Provenance tracking
 

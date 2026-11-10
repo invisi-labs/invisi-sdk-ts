@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 
 const entries = {
     core: [".", "./address", "./note", "./credit", "./provenance"],
-    "native-wallet": ["."],
     protocol: [".", "./contracts", "./note", "./credit"],
     prover: [".", "./native", "./wasm", "./aggregate", "./provenance"],
     rpc: ["."],

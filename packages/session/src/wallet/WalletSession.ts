@@ -226,7 +226,7 @@ export class WalletSession {
         return walletBalance(await store.readSnapshot(this.scope), getAddress(tokenAddress) as Hex);
     }
 
-    /** Stage indexed pages and return native requests; apply explicit responses to commit state. */
+    /** Stage indexed pages; inject App decryption to validate and atomically commit state. */
     async refresh(options: RefreshOptions) {
         await this.ready();
         const provider = this.#options.protocolRpc;

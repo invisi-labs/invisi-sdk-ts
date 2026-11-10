@@ -130,8 +130,10 @@ export type {
     WalletResults,
     WalletRequest,
     WalletResponse,
-    NativeWalletClient,
     PreparedWalletRequest,
 } from "./wallet/wallet-wire";
 
 export { provenanceIntentHash } from "./provenance/intent-hash";
+
+export { authenticatedDecryptor, DeliveryDecryptionError } from "./delivery/decryptor";
+export type { DeliveryDecryptor } from "./delivery/decryptor";

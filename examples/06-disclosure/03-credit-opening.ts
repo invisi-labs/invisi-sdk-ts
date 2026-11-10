@@ -4,7 +4,8 @@ import { Protocol, ProtocolRpcClient, DisclosureVerifier } from "@invisi-labs/sd
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCredits } from "../04-credit/discover-credits.js";
 
 // Bob discloses a historical owner Credit opening against independent canonical receipt evidence.
@@ -32,7 +33,7 @@ try {
         protocolRpc,
         protocol,
         wallet: owner.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress: settings.tokenAddress,
         role: "owner",
         includeConsumed: true,

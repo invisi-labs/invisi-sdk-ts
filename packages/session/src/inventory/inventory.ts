@@ -1,3 +1,4 @@
+import type { authenticatedDecryptor } from "@invisi-labs/core";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import {
@@ -7,7 +8,6 @@ import {
     recoverCreditState,
     type CreditDeliveryState,
     type ReceivingKeys,
-    type ViewingCapability,
 } from "@invisi-labs/core";
 import type { ChainReader, Protocol } from "@invisi-labs/protocol";
 import type { DeliveryEventLog, DiscoveredCredit } from "@invisi-labs/sdk/session-support";
@@ -32,7 +32,7 @@ export interface InventoryOptions {
     scope: WalletScope;
     store: WalletStore;
     reader: ChainReader;
-    viewing: Pick<ViewingCapability, "ownerAddress" | "decryptNote" | "decryptCredit">;
+    viewing: ReturnType<typeof authenticatedDecryptor>;
     receivingKeys?: ReceivingKeys;
 }
 

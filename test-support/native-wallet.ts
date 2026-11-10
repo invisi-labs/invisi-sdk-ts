@@ -1,5 +1,5 @@
 import { TestWallet } from "./test-wallet";
-import type { WalletRequest, WalletResponse } from "@invisi-labs/core";
+import type { DeliveryDecryptor, WalletRequest, WalletResponse } from "@invisi-labs/core";
 import type { Operation } from "../packages/session/src/operations/Operation";
 import type { PendingWalletRefresh } from "../packages/session/src/sync/WalletRefresh";
 import type { WalletSession } from "../packages/session/src/wallet/WalletSession";
@@ -47,8 +47,45 @@ export async function executeWalletRequests(requests: WalletRequest[]): Promise<
     );
 }
 export async function applyRefresh(pending: PendingWalletRefresh) {
-    return pending.applyWalletResponses(await executeWalletRequests([...pending.walletRequests]));
+    return pending.decrypt(testDecryptor);
 }
 export async function refreshSession(session: WalletSession, options: RefreshOptions) {
     return applyRefresh(await session.refresh(options));
+}
+
+export const testDecryptor: DeliveryDecryptor = {
+    decryptNote: (envelope, context) => decryptForTest("wallet.decryptNote", envelope, context),
+    decryptCredit: (envelope, context) => decryptForTest("wallet.decryptCredit", envelope, context),
+};
+async function decryptForTest(
+    method: "wallet.decryptNote" | "wallet.decryptCredit",
+    envelope: import("@invisi-labs/core").NoteBytes,
+    context:
+        | import("@invisi-labs/core").NoteDecryptionContext
+        | import("@invisi-labs/core").CreditStateDecryptionContext
+): Promise<Uint8Array | null> {
+    const { hexlify, getBytes } = await import("ethers");
+    try {
+        const response = await executeWalletRequest({
+            version: 1,
+            id: crypto.randomUUID(),
+            ownerAddress: context.ownerAddress,
+            method,
+            params: {
+                envelope: hexlify(envelope) as `0x${string}`,
+                context: {
+                    chainId: context.chainId.toString(),
+                    protocolAddress: BigInt(context.protocolAddress).toString(),
+                    tokenAddress: context.tokenAddress.toString(),
+                    outputCommitment: context.outputCommitment,
+                    ...("role" in context ? { role: context.role } : {}),
+                },
+            },
+        });
+        if ("error" in response) throw new Error(response.error!.code);
+        return getBytes((response.result as { plaintext: string }).plaintext);
+    } catch (error) {
+        if (error instanceof Error && error.name === "OperationError") return null;
+        throw error;
+    }
 }

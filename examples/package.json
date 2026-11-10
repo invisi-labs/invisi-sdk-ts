@@ -50,8 +50,7 @@
     "@invisi-labs/sdk": "workspace:*",
     "ethers": "6.17.0",
     "@invisi-labs/session": "workspace:*",
-    "@invisi-labs/core": "workspace:*",
-    "@invisi-labs/native-wallet": "workspace:*"
+    "@invisi-labs/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

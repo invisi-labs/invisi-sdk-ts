@@ -1,6 +1,6 @@
 import { applyCreditDrawUsage } from "@invisi-labs/core";
 import { fileURLToPath } from "node:url";
-import { JsonRpcProvider, getBytes } from "ethers";
+import { JsonRpcProvider, getBytes, Wallet as EthersWallet } from "ethers";
 import { createRequire } from "node:module";
 import { WalletSession, EncryptedWalletCodec, creditReservationKey } from "@invisi-labs/session";
 import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/session/sqlite";
@@ -8,7 +8,8 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 
 // Alice collects seven base units from each of two different payers for Dave.
 // Credit reservations stay separate from Dave's ordinary Note and Alice's Note balance.
@@ -62,14 +63,13 @@ try {
         namespace: `${account.name}-local-experiments`,
     });
 
-    // 2. Refresh both ledgers through one atomic native request/response exchange.
+    // 2. Validate App-decrypted deliveries before atomically committing both ledgers.
     const history = await session.getHistory();
     const pending = await session.refresh({
         fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
     });
     // A malformed batch or operational error must not advance the persisted checkpoint.
-    const responses = await nativeWallet.execute(pending.walletRequests);
-    await pending.applyWalletResponses(responses);
+    await pending.decrypt(decryptor);
     // Select from the refreshed encrypted store, not a second stateless discovery scan.
     // Credit authority is separate from ordinary spendable Note inventory.
     const snapshot = await store.readSnapshot(session.scope);
@@ -122,16 +122,23 @@ try {
     });
     // Zero fee here: two gross debits of seven produce one 14-base-unit ordinary Note for Dave.
 
-    // 4. Authorize the frozen statement natively, then prove without exporting account keys.
+    // 4. Sign the frozen statement with ethers, then prove.
     console.log("Persisted Credit operation:", operation.id);
     console.log("Credit preview:", json(operation.preview()));
-    const request = await operation.exportWalletRequest(crypto.randomUUID());
-    const authorizationResponses = await nativeWallet.execute([request]);
-    const response = authorizationResponses.find((item) => item.id === request.id);
-    if (!response) {
-        throw Error("Missing native authorization response");
+    const signer = new EthersWallet(
+        process.env[`${account.name.toUpperCase()}_PRIVATE_KEY`]!,
+        provider
+    );
+    if (signer.address.toLowerCase() !== account.publicWallet.ownerAddress.toLowerCase()) {
+        throw Error("Signing key must match account's wallet owner");
     }
-    const authorized = await operation.withWalletResponse(response);
+    const authorization = await operation.exportWalletAuthorization();
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
+    );
+    const authorized = await operation.withWalletSignature(signature);
     const ready = await authorized.prove();
 
     // Export holds reservations until canonical reconciliation; it does not mean payment succeeded.

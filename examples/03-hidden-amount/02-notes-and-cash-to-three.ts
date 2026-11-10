@@ -1,10 +1,11 @@
 import { randomInt } from "node:crypto";
-import { JsonRpcProvider } from "ethers";
+import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json, readHostJson, hostSignature } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCandidates } from "./discover-candidates.js";
 
 // Alice samples two notes; Bob adds matching cash through external EIP-712 funding.
@@ -40,7 +41,7 @@ try {
         protocolRpc,
         protocol,
         wallet: alice.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress,
     });
     const eligible = candidates.filter((input) => input.note.amount >= 2n);
@@ -85,23 +86,31 @@ try {
         funding: { payer: bob.address, amount: cashAmount, authorization: "signature" },
     });
 
-    // 4. Match the host response by ID and validate it against the retained statement.
-    const request = await prepared.exportWalletRequest(crypto.randomUUID());
-    const responses = await nativeWallet.execute([request]);
-    const response = responses.find((item) => item.id === request.id);
-    if (!response) {
-        throw Error("Missing wallet response");
+    // 4. Sign the frozen EIP-712 authorization with ethers.
+    const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
+    if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase()) {
+        throw Error("Signing key must match alice's wallet owner");
     }
-    const authorized = await prepared.withWalletResponse(response);
+    const authorization = await prepared.exportWalletAuthorization();
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
+    );
+    const authorized = await prepared.withWalletSignature(signature);
     const proved = await authorized.prove();
     // Bob signs the finalized funding intent after Alice's private proof has been built.
     const fundingRequest = await proved.exportFundingAuthorization();
-    const fundingId = crypto.randomUUID();
-    console.log(
-        "Host EVM typed-data requests:",
-        json([{ id: fundingId, kind: "funding", ...fundingRequest }])
+    const fundingSigner = new EthersWallet(process.env.BOB_PRIVATE_KEY!, provider);
+    if (fundingSigner.address.toLowerCase() !== bob.address.toLowerCase()) {
+        throw Error("Signing key must match bob's funding address");
+    }
+    const fundingSignature = await fundingSigner.signTypedData(
+        fundingRequest.domain,
+        fundingRequest.types,
+        fundingRequest.message
     );
-    const ready = await proved.withFundingSignature(hostSignature(await readHostJson(), fundingId));
+    const ready = await proved.withFundingSignature(fundingSignature);
     // Export does not approve tokens or submit; the host reviews the required caller and gas.
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
 } finally {

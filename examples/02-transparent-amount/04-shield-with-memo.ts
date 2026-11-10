@@ -4,7 +4,7 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Alice sends Bob 1 token with an encrypted standard-v1 application memo.
 // The financial commitment and opaque application payload have separate validation rules.

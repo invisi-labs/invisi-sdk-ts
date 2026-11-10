@@ -1,7 +1,7 @@
 import { JsonRpcProvider, getBytes } from "ethers";
 import { ProvenanceClient, DEFAULT_PROVENANCE_ENDPOINT } from "@invisi-labs/sdk/provenance";
 import { settings } from "../settings.js";
-import { readHostJson } from "../host-transport.js";
+import { readHostJson } from "../example-io.js";
 import type { TrustContext, ProvenanceProof } from "@invisi-labs/sdk/provenance";
 
 // Match these public trust pins to the deployment selected in ../settings.ts.

@@ -1,6 +1,6 @@
 # TypeScript examples
 
-Each named scenario is a flat, independent script. Account keys, viewing keys, detection keys, EVM signing, and transaction submission belong to the host. These examples contain no local account executor. Only the offline Note output example runs without `--execute`. The Broadcaster and self-provenance submission examples submit as part of their `--execute` flow.
+Each named scenario is a flat, independent script. Authorization signatures use ethers EIP-712 signing. Supply the corresponding account key through `ALICE_PRIVATE_KEY`, `BOB_PRIVATE_KEY`, or `CHARLIE_PRIVATE_KEY`; Session examples use `<SESSION_ACCOUNT in uppercase>_PRIVATE_KEY`. Each signer is checked against the required owner or payer. Keep private keys out of `accounts/accounts.json`. Viewing keys, detection keys, and Note/Credit decryption belong to the App. Configure its explicit callbacks in `app-decryptor.ts` before running decryption examples. Only the offline Note output example runs without `--execute`. The Broadcaster and self-provenance submission examples submit as part of their `--execute` flow.
 
 ## Setup
 
@@ -22,37 +22,29 @@ Without `--execute`, live scripts exit before reading account configuration, env
 
 ## Public Wallet initialization
 
-When the host already supplies a complete receiving address, initialize with `Wallet.fromAddress(receivingAddress)`. If only the EVM owner is available, request its public profile first. `nativeWallet` is the host bridge; it keeps account selection and keys outside the SDK.
+Initialize the public wallet from the App's complete receiving address:
 
 ```ts
-import { Wallet, ReceivingAddress, prepareWalletRequest, acceptWalletResponse } from "@invisi-labs/core";
-import { getBytes } from "ethers";
-
-const owner = Wallet.fromAddress(ownerAddress);
-const request = prepareWalletRequest(owner, "public-profile", "wallet.public", {});
-const responses = await nativeWallet.execute([request]);
-const response = responses.find((item) => item.id === request.id);
-if (!response) throw new Error("Missing public-profile response");
-
-// Validate the response against the retained owner and request before using the keys.
-const profile = await acceptWalletResponse(request, response);
-const wallet = Wallet.fromAddress(ReceivingAddress.from({
-    ownerAddress: owner.ownerAddress,
-    viewingPublicKey: getBytes(profile.viewingPublicKey),
-    clueKey: getBytes(profile.clueKey),
-}));
-console.log(wallet.getAddress());
+const wallet = Wallet.fromAddress(receivingAddress);
 ```
+
+The App owns account selection, key storage, unlocking and public-profile lookup. The SDK does not provide a native module or a JSON bridge.
 
 ## Host request and response boundaries
 
-Private authorization and decryption use the five-method core wallet protocol. A scenario exports its retained request, calls `nativeWallet.execute([request])`, selects the response by ID, and attaches it with `withWalletResponse` or core `acceptWalletResponse`. The shared `host-transport.ts` contains only JSON/terminal framing: it prints the entire request array and reads one response-array line. Implement this boundary with your own native bridge in an application.
+Authorization examples call `exportWalletAuthorization()`, sign its exact `domain`, `types`, and `message` with ethers `signTypedData()`, then attach the signature through `withWalletSignature()`. They do not export native signing requests or match signing responses by ID. Final Broadcaster quotes must be accepted before signing.
 
-Each wallet response repeats `version`, `id`, `ownerAddress`, and `method` and contains exactly one of `result` or `error: { code }`. Errors remain explicit; only `WALLET_NOT_RECIPIENT` is a decryption nonmatch. The SDK validates complete batch envelopes before accepting cryptographic results. Never substitute `null` for failed requests.
+Decryption is explicitly injected through `DeliveryDecryptor`. Implement the two callbacks in `app-decryptor.ts` using your App's wallet. They receive ciphertext and the complete owner/deployment/token/commitment context, plus the Credit delivery role. Return decrypted delivery bytes, or `null` only when the output is not addressed to this wallet. Throw on locked accounts, transport failures, malformed payloads or other operational errors.
 
-Funding and address registration use separate EVM typed-data requests. Their printed arrays contain an application `id`, `kind`, and the SDK's EIP-712 request. Have the host review and sign that request, then paste `[{"id":"the-printed-id","signature":"0x..."}]`. These application envelopes are not additional native-wallet protocol methods. The SDK checks returned signatures against the retained intent. Caller-funded transactions instead require submission by their specified payer. Token balances, ERC20 allowance, gas, and submission remain host responsibilities; no script approves or broadcasts automatically.
+`authenticatedDecryptor(wallet, decryptor)` decodes and checks returned plaintext against the requested owner, token, commitment and Credit receiving key. Discovery independently checks canonical receipt evidence. Session uses `await pending.decrypt(decryptor)` before committing any refreshed state; failures leave the checkpoint unchanged. No request IDs, response matching, native transport or private keys are needed in SDK configuration.
+
+`example-io.ts` only formats log output and reads public recovery records; it performs no wallet operation.
+
+Funding and address registration use separate EIP-712 authorizations, also signed directly with ethers. Funding signatures bind the finalized funding request; hidden-amount transactions are proved before exporting that request. The SDK checks signatures when attaching them. Caller-funded transactions require submission by their specified payer. Token balances, ERC20 allowance, gas, and normal transaction submission remain application responsibilities.
 
 The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, relay submission and independent offchain source submission. With `--execute`, example02 submits its transaction and example04 submits its source proof.
+
+The App decryptor must authenticate the ciphertext (including the AEAD tag) before returning plaintext. Commitment checks validate financial contents; they do not independently authenticate opaque memo bytes.
 
 ## Scenarios
 
@@ -62,17 +54,17 @@ The normal payment examples export unsigned transactions for host review/submiss
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
 - `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted Note and Credit preparation, grant reservations, and operation reconciliation. There is no injected private executor or automatic signer.
 - `07-broadcaster`: concrete-transaction estimation, one common prepare/quote/relay submission flow, tracking confirmation and self-submitted source proofs. See its [scenario table](07-broadcaster/README.md).
-- `06-disclosure`: independently read canonical receipt evidence, request native decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the native-authenticated application payload without claiming its financial opening proves the memo.
+- `06-disclosure`: independently read canonical receipt evidence, invoke App decryption, validate the returned opening, and verify a transferable disclosure. The memo example decodes the App-authenticated application payload without claiming its financial opening proves the memo.
 
 ## Automatic discovery and recovery
 
-Note and Credit examples discover outputs automatically through the configured Protocol RPC. You do not supply plaintext note input JSON. `discover-candidates.ts` and `discover-credits.ts` paginate indexed history, export native decryption batches, accept successful plaintext through core validation, and check the independent canonical receipt. They reject conflicting indexed rows and propagate every error except an explicit `WALLET_NOT_RECIPIENT` nonmatch. Indexed nullifiers and Credit revocation bitmaps filter current inventory; preparation independently checks current on-chain membership and eligibility again.
+Note and Credit examples discover outputs automatically through the configured Protocol RPC. You do not supply plaintext note input JSON. `discover-candidates.ts` and `discover-credits.ts` paginate indexed history, invoke the injected decryptor, validate plaintext and check the independent canonical receipt. They reject conflicting indexed rows and propagate errors; only `null` is a nonrecipient. Indexed nullifiers and Credit revocation bitmaps filter current inventory; preparation independently checks current on-chain membership and eligibility again.
 
 Selection and amount calculations remain visible in each scenario. The cash-only examples create their own outputs; later note scenarios discover those receipts after host submission and indexing. Aggregation discovers each participant's notes separately, requests their authorization separately, and combines only their public proved aggregate members. Credit revocation discovers a current owner grant and uses its public revocation location.
 
-Disclosure examples discover historical outputs, including spent notes or consumed grants, and use canonical receipt evidence before exporting financial openings. The memo example decodes the host-authenticated application payload and explicitly states that a financial opening does not prove memo bytes to a third party. The current five-method native protocol exports plaintext, not a payload decryption key; these examples never introduce an unsupported native method or reconstruct a viewing key. Openings do not establish payer identity or current unspent status.
+Disclosure examples discover historical outputs, including spent notes or consumed grants, and use canonical receipt evidence before exporting financial openings. The memo example decodes the host-authenticated application payload and explicitly states that a financial opening does not prove memo bytes to a third party. The injected interface returns plaintext, not a payload decryption key; examples never reconstruct a viewing key. Openings do not establish payer identity or current unspent status.
 
-Session examples require Node.js 22.13+ and `STORE_ENCRYPTION_KEY_HEX`, a dedicated external 32-byte storage encryption key, plus optional `WALLET_DB` (default `examples/accounts/alice-session.sqlite`, resolved independently of the working directory). This key is solely for the encrypted store and must be supplied by host key management independently of account material. Use the same key, path, and namespace when restoring. Refresh remains visibly two steps: `nativeWallet.execute(pending.walletRequests)` and `pending.applyWalletResponses(responses)`. Keep exported operation IDs so a host can reconcile an existing submission rather than create a second payment.
+Session examples require Node.js 22.13+ and `STORE_ENCRYPTION_KEY_HEX`, a dedicated external 32-byte storage encryption key, plus optional `WALLET_DB` (default `examples/accounts/alice-session.sqlite`, resolved independently of the working directory). This key is solely for the encrypted store and must be supplied by host key management independently of account material. Use the same key, path, and namespace when restoring. Refresh remains visibly two steps: stage through `session.refresh(...)`, then validate and commit through `pending.decrypt(decryptor)`. Keep exported operation IDs so a host can reconcile an existing submission rather than create a second payment.
 
 After external submission, recovery optionally reads `HOST_TRANSACTIONS_JSON`, an object mapping persisted operation IDs to host transaction hashes. It attaches these hashes with `trackTransaction` and reconciles canonical receipts without resending or signing again.
 
@@ -82,13 +74,13 @@ The Session supports `prepareCreateCredit`, `prepareDrawCredit`, `prepareUpdateC
 
 Run each command with `--execute` after configuring the public accounts and external storage key:
 
-| Script | Account | What it demonstrates |
-| --- | --- | --- |
-| `example:session:5` | Bob by default; repeat with `SESSION_ACCOUNT=charlie` | Create a finite grant to Alice without spending Notes or moving principal |
-| `example:session:6` | Alice by default | Refresh durable spender inventory, draw seven base units from each of two different payers, issue one ordinary 14-unit Note to Dave |
-| `example:session:7` | Bob by default | Select a finite owner grant and add 100 base units to remaining quota, preserving usage |
-| `example:session:8` | Bob by default | Select a public grant reference and export owner-submitted revocation without private authorization or proof |
-| `example:session:4` | `SESSION_ACCOUNT` (Alice by default) | Resume and canonically reconcile existing Note or Credit operations by their saved IDs |
+| Script              | Account                                               | What it demonstrates                                                                                                                |
+| ------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `example:session:5` | Bob by default; repeat with `SESSION_ACCOUNT=charlie` | Create a finite grant to Alice without spending Notes or moving principal                                                           |
+| `example:session:6` | Alice by default                                      | Refresh durable spender inventory, draw seven base units from each of two different payers, issue one ordinary 14-unit Note to Dave |
+| `example:session:7` | Bob by default                                        | Select a finite owner grant and add 100 base units to remaining quota, preserving usage                                             |
+| `example:session:8` | Bob by default                                        | Select a public grant reference and export owner-submitted revocation without private authorization or proof                        |
+| `example:session:4` | `SESSION_ACCOUNT` (Alice by default)                  | Resume and canonically reconcile existing Note or Credit operations by their saved IDs                                              |
 
 ```sh
 pnpm --filter @invisi-examples/scenarios example:session:5 --execute
@@ -100,7 +92,7 @@ SESSION_ACCOUNT=bob pnpm --filter @invisi-examples/scenarios example:session:8 -
 
 Submit and confirm each exported transaction through the host before running a dependent step. Bob and Charlie must each supply ERC20 allowance and balance before Alice's draw. Refresh discovers the submitted successor grants automatically; the draw's recipient may be any complete receiving address. Its output is an ordinary Note, discovered by Dave's Session and spent through the normal Note flow.
 
-Each main visibly opens the encrypted store, refreshes with native arrays, selects role-bound Credit state, prepares the managed operation, and exports unsigned calldata. The store snapshot supplies current grant references; Session preparation independently rechecks chain state and reserves the consumed grant across both roles. No second ephemeral discovery scan is needed. Amounts are token base units; these examples use zero fees.
+Each main visibly opens the encrypted store, refreshes through the injected App decryptor, selects role-bound Credit state, prepares the managed operation, and exports unsigned calldata. The store snapshot supplies current grant references; Session preparation independently rechecks chain state and reserves the consumed grant across both roles. No second ephemeral discovery scan is needed. Amounts are token base units; these examples use zero fees.
 
 The account controls the default database (`examples/accounts/<account>-session.sqlite`) and namespace (`<account>-local-experiments`). A `WALLET_DB` override is supported. Use the same account, namespace, database and host storage key for recovery. Set `HOST_TRANSACTIONS_JSON` to map saved operation IDs to the host-submitted transaction hashes, then run `example:session:4`. Exported operations remain reserved until canonical reconciliation: do not recreate a draw after a timeout or expect creating/updating a grant to credit your Note balance.
 

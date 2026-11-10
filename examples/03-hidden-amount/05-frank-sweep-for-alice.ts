@@ -3,7 +3,8 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json } from "../host-transport.js";
+import { json } from "../example-io.js";
+import { decryptor } from "../app-decryptor.js";
 import { discoverCandidates } from "./discover-candidates.js";
 
 // Frank obtains Alice's host-decrypted notes and withdraws their full amount to Alice.
@@ -38,7 +39,7 @@ try {
         protocolRpc,
         protocol,
         wallet: alice.publicWallet,
-        nativeWallet,
+        decryptor,
         tokenAddress,
     });
     const inputAmount = inputs.reduce((total, input) => total + input.note.amount, 0n);

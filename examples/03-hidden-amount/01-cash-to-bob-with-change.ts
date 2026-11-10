@@ -3,7 +3,7 @@ import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sd
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { json } from "../host-transport.js";
+import { json } from "../example-io.js";
 
 // Alice funds 10 tokens: Bob receives 3 and Alice receives 7 as private change.
 // No existing note is spent; public cash funding and EVM submission remain host-owned.

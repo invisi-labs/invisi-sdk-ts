@@ -1,10 +1,4 @@
 export {
-    acceptWalletResponse,
-    acceptWalletResponses,
-    validateWalletBatch,
-    validateWalletResponses,
-    NativeWalletError,
-    prepareWalletRequest,
     Detector,
     Disclosure,
     MAX_MEMO_BYTES,
@@ -21,13 +15,6 @@ export {
     fundsV1,
 } from "@invisi-labs/core";
 export type {
-    WalletRequest,
-    WalletResponse,
-    NativeWalletClient,
-    WalletMethod,
-    WalletParams,
-    WalletResults,
-    PreparedWalletRequest,
     Address,
     CreditDataV1,
     CreditDeliveryState,
@@ -170,3 +157,6 @@ export type {
 export { TransactionOutput } from "./notes/TransactionOutput";
 
 export type { PreparedProvenanceCapability } from "./broadcaster/provenance-preparation";
+
+export { authenticatedDecryptor, DeliveryDecryptionError } from "@invisi-labs/core";
+export type { DeliveryDecryptor } from "@invisi-labs/core";
