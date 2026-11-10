@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JsonRpcProvider, getBytes, Wallet as EthersWallet } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
-import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import {
     Provenance,
     ProvenanceClient,
@@ -15,7 +14,7 @@ import { LocalProvenanceProver } from "@invisi-labs/prover/provenance";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { nativeWallet, json, readHostJson } from "../host-transport.js";
+import { nativeWallet, json } from "../host-transport.js";
 import { discoverCandidates } from "../03-hidden-amount/discover-candidates.js";
 // Match these public trust pins to the deployment selected in ../settings.ts.
 const provenanceEndpoint = DEFAULT_PROVENANCE_ENDPOINT;
@@ -28,7 +27,7 @@ const assetRoot = fileURLToPath(new URL("../../.cache/provenance/", import.meta.
 
 if (!process.argv.includes("--execute")) {
     console.log(
-        "Pass --execute to prepare a direct payment, build its recoverable source proof and submit after host confirmation."
+        "Pass --execute to prepare a direct payment, build its recoverable source proof and submit for automatic chain matching."
     );
     process.exit(0);
 }
@@ -117,7 +116,6 @@ try {
         client: source,
         manifest: manifestIdentity,
         prover: sourceProver,
-        chainReader: new EthersChainReader(provider),
     });
     const sourceProof = await provenance.prove(ready);
     // The App must persist this public proof packet before sending; do not save any witness/opening in public history.
@@ -126,13 +124,8 @@ try {
         "Transaction for independent host submission:",
         json(await ready.exportTransaction())
     );
-    console.log(
-        "Send the exact transaction with the host wallet, then return {transactionHash} after confirmation."
-    );
-    const sent = (await readHostJson()) as { transactionHash: string };
-    const accepted = await provenance.submit(sourceProof, {
-        transactionHash: sent.transactionHash,
-    });
+    // The host independently decides when to send; Source matches a past or future confirmed payment.
+    const accepted = await provenance.submit(sourceProof);
     console.log("Provenance submission:", json(accepted));
 } finally {
     provider.destroy();

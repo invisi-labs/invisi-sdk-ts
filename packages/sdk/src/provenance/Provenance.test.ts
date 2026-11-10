@@ -146,45 +146,23 @@ async function fixture() {
     };
     const client = {
         trust,
-        evaluateTransaction: vi.fn(async () => ({ accepted: true })),
+        submitSourceProof: vi.fn(async () => ({ tracking: { id: "tracking-id" } })),
         submitProof: vi.fn(async () => ({ jobId: "job" })),
     };
-    const block = await h.reader.getBlock(12n);
-    const hash = word(500);
-    const reader = {
-        ...h.reader,
-        getTransaction: vi.fn(async () => ({ ...call, transactionHash: hash })),
-        getReceipt: vi.fn(async () => ({
-            transactionHash: hash,
-            block,
-            status: "success",
-            logs: [],
-        })),
-    };
-    const options = {
-        client: client as any,
-        prover: { prove: vi.fn() },
-        manifest,
-        chainReader: reader as any,
-    };
-    return { packet, client, options, hash, reader };
+    const options = { client: client as any, prover: { prove: vi.fn() }, manifest };
+    return { packet, client, options };
 }
 
-it("resubmits a JSON-only public packet before and after canonical main without reproof", async () => {
+it("resubmits a JSON-only packet with the same API before or after main without a chain reader", async () => {
     const h = await fixture();
     const saved = JSON.stringify(h.packet);
     expect(saved).not.toMatch(/witness|opening|nonce|client|prover/);
-    await new Provenance({ client: h.options.client }).submit(JSON.parse(saved));
-    expect(h.client.evaluateTransaction).toHaveBeenCalledWith(h.packet.data, h.packet.sidecars);
-    await new Provenance({ client: h.options.client, chainReader: h.reader as any }).submit(
-        JSON.parse(saved),
-        { transactionHash: h.hash }
-    );
-    await new Provenance({ client: h.options.client, chainReader: h.reader as any }).submit(
-        JSON.parse(saved),
-        { transactionHash: h.hash }
-    );
-    expect(h.client.submitProof.mock.calls[0]).toEqual(h.client.submitProof.mock.calls[1]);
+    const provenance = new Provenance({ client: h.options.client });
+    await provenance.submit(JSON.parse(saved));
+    await provenance.submit(JSON.parse(saved));
+    expect(h.client.submitSourceProof).toHaveBeenCalledTimes(2);
+    expect(h.client.submitSourceProof).toHaveBeenLastCalledWith(h.packet.data, h.packet.sidecars);
+    expect(h.client.submitProof).not.toHaveBeenCalled();
     expect(h.options.prover.prove).not.toHaveBeenCalled();
 });
 
@@ -226,33 +204,7 @@ it("rejects mutated native statements, proof bindings, scope and private fields 
         mutate(packet);
         await expect(new Provenance(h.options).submit(packet)).rejects.toThrow();
     }
-    expect(h.client.evaluateTransaction).not.toHaveBeenCalled();
-    expect(h.client.submitProof).not.toHaveBeenCalled();
-});
-
-it("requires a canonical successful transaction with exact calldata and an explicit reader", async () => {
-    const h = await fixture();
-    await expect(
-        new Provenance({ client: h.options.client }).submit(h.packet, { transactionHash: h.hash })
-    ).rejects.toThrow(/ChainReader/);
-    h.reader.getReceipt.mockResolvedValueOnce({
-        transactionHash: h.hash,
-        block: { ...(await h.options.chainReader.getBlock(12n)), hash: word(99) },
-        status: "success",
-        logs: [],
-    });
-    await expect(
-        new Provenance(h.options).submit(h.packet, { transactionHash: h.hash })
-    ).rejects.toThrow(/canonical/);
-    h.reader.getTransaction.mockResolvedValueOnce({
-        to: h.packet.context.protocolAddress as `0x${string}`,
-        data: "0x00",
-        value: 0n,
-        transactionHash: h.hash,
-    });
-    await expect(
-        new Provenance(h.options).submit(h.packet, { transactionHash: h.hash })
-    ).rejects.toThrow(/transaction mismatch/);
+    expect(h.client.submitSourceProof).not.toHaveBeenCalled();
     expect(h.client.submitProof).not.toHaveBeenCalled();
 });
 
@@ -270,5 +222,5 @@ it("requires local proving capability only for proof generation", async () => {
     await expect(new Provenance({ client: h.options.client }).prove(ready)).rejects.toThrow(
         /manifest and prover/
     );
-    expect(h.client.evaluateTransaction).not.toHaveBeenCalled();
+    expect(h.client.submitSourceProof).not.toHaveBeenCalled();
 });

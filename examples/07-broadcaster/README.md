@@ -30,12 +30,10 @@ For direct transactions, the App controls both independent steps:
 
 ```ts
 const sourceProof = await provenance.prove(ready);
-await provenance.submit(sourceProof); // Before the host sends the unchanged main transaction.
-// Or, after the host transaction is canonically confirmed:
-await provenance.submit(sourceProof, { transactionHash });
+await provenance.submit(sourceProof); // Before or after independent host transaction submission.
 ```
 
-Do not run both submission forms by default. Before-main submission returns the service's tracking result; after-main submission validates the actual primary transaction/receipt and submits a bound proof job. Both are offchain. The SDK never sends or repeats the main transaction in the direct Source path.
+The same API handles pre-submission and later delivery. Provenance verifies the proof, automatically matches an already confirmed payment or waits for one, then publishes recognition. The App need not provide a transaction hash; repeated delivery returns the same tracking record. A payment confirmed within its deadline remains eligible for later proof delivery. The SDK never sends or repeats the main transaction in this path.
 
 ## Local records and recovery
 
@@ -44,15 +42,15 @@ Do not run both submission forms by default. Before-main submission returns the 
 | Local operation ID + transaction hash            | Transaction history                                            | Links history to the original operation and canonical transaction |
 | Original plan and input Note openings            | Encrypted Session operation store, even after inputs are spent | Generate a proof later, or reprove after generation/root changes  |
 | `ProvenanceProof` returned by `provenance.prove` | Persistent local record, preferably encrypted                  | Resubmit the exact proof without private openings or a prover     |
-| Returned tracking/job ID and state               | App's local Source delivery record                             | Poll verification/recognition and reconcile pending work          |
+| Returned tracking ID and state               | App's local Source delivery record                             | Poll verification/recognition and reconcile pending work          |
 
 A txHash, amount or commitment alone cannot recover a private opening. History entries already contain the original operation `id`; with managed Session, `session.resume(id)` retains the original input data independently of current Note inventory. Generate with `provenance.prove(restoredOperation)`. If the proof is already cached, this returns the stored packet without loading a prover. Keep this encrypted operation record until Source delivery/recovery is complete; deleting spent-input history must not delete the only remaining openings.
 
-The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance({client, chainReader})` can call `submit(savedProof, {transactionHash})`; example04 shows that path. A generation change may require reproof, which still needs retained openings. A proof job being valid may precede root publication: poll the same operation recognition, never recreate the payment.
+The public `ProvenanceProof` packet contains final calldata, deployment/token context, native circuit capacity/public statement, operation digest, source proof and root certificates. It contains no opening, nonce, witness, client or prover. It is JSON-serializable. Once saved, a fresh `Provenance({client})` can call `submit(savedProof)`; example04 shows that path. A generation change may require reproof, which still needs retained openings. A valid proof may precede root publication: poll `client.getTracking(id)` until recognized, never recreate the payment.
 
 ## Running
 
-Edit the public trust pins at the top of each file and match `../settings.ts` for chain/token/RPC/BB. The default Source endpoint is `https://provenance.invisipay.fi`; applications may configure another trusted endpoint. Authorization uses an ethers signer from `ALICE_PRIVATE_KEY`, matching Alice's public wallet owner. Note decryption remains in the native host.
+Edit the public trust pins at the top of each file and match `../settings.ts` for chain/token/RPC/BB. The default Source endpoint is `https://provenance.invisipay.fi`; applications may configure another trusted endpoint. Authorization uses an ethers signer from `ALICE_PRIVATE_KEY`, matching Alice's public wallet owner. Note decryption uses the explicit App callbacks in `../app-decryptor.ts`.
 
 For local proving, sync authenticated assets with `python3 scripts/sync-provenance.py ../invisi-protocol`. Set `INVISI_CRS_PATH` if needed. Cached-proof recovery in04 requires none of those assets.
 

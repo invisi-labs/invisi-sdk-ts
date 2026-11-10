@@ -1,5 +1,4 @@
-import { JsonRpcProvider, getBytes } from "ethers";
-import { EthersChainReader } from "@invisi-labs/sdk/ethers";
+import { getBytes } from "ethers";
 import {
     Provenance,
     ProvenanceClient,
@@ -17,7 +16,7 @@ const signingKeyId = "0x<sha256-of-pinned-public-key>";
 const signingPublicKey = "0x<32-byte-pinned-ed25519-public-key>";
 
 if (!process.argv.includes("--execute")) {
-    console.log("Pass --execute and paste {sourceProof, transactionHash} from local history.");
+    console.log("Pass --execute and paste {sourceProof} from local history.");
     process.exit(0);
 }
 const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
@@ -31,22 +30,7 @@ const trust: TrustContext = {
 };
 const source = new ProvenanceClient(provenanceEndpoint, trust);
 
-const provider = new JsonRpcProvider(settings.chainRpcUrl);
-try {
-    const stored = (await readHostJson()) as {
-        sourceProof: ProvenanceProof;
-        transactionHash: string;
-    };
-    const provenance = new Provenance({
-        client: source,
-        chainReader: new EthersChainReader(provider),
-    });
-    // This validates the packet and actual canonical transaction; it neither signs nor sends a main transaction.
-    console.log(
-        json(
-            await provenance.submit(stored.sourceProof, { transactionHash: stored.transactionHash })
-        )
-    );
-} finally {
-    provider.destroy();
-}
+const stored = (await readHostJson()) as { sourceProof: ProvenanceProof };
+const provenance = new Provenance({ client: source });
+// The service matches an already confirmed payment or continues waiting; no main transaction is sent.
+console.log(json(await provenance.submit(stored.sourceProof)));

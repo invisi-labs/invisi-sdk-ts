@@ -586,6 +586,7 @@ export class ProvenanceClient {
         if (
             [
                 "provenance_evaluateTransaction",
+                "provenance_submitSourceProof",
                 "provenance_submitProof",
                 "provenance_getProofJob",
                 "provenance_getTracking",
@@ -764,6 +765,20 @@ export class ProvenanceClient {
             await validateProofBundle(s.proofBundle, this.trust);
         }
         return this.call("provenance_evaluateTransaction", {
+            data,
+            proofSidecars: proofSidecars.map(proofSidecarToWire),
+        });
+    }
+    async submitSourceProof(
+        data: string,
+        proofSidecars: readonly ProofSidecar[]
+    ): Promise<PublicResult> {
+        assertPublicSubmission({ data, proofSidecars });
+        for (const sidecar of proofSidecars) {
+            uint(sidecar.operationIndex, 32);
+            await validateProofBundle(sidecar.proofBundle, this.trust);
+        }
+        return this.call("provenance_submitSourceProof", {
             data,
             proofSidecars: proofSidecars.map(proofSidecarToWire),
         });

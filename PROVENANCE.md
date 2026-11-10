@@ -76,18 +76,18 @@ See [`examples/07-broadcaster`](examples/07-broadcaster/README.md) for local pro
 
 ```ts
 const ready = await (await quoted.withWalletResponse(response)).prove();
-const provenance = new Provenance({client, manifest, prover, chainReader});
+const provenance = new Provenance({client, manifest, prover});
 const sourceProof = await provenance.prove(ready);
 const submitted = await broadcaster.submit(ready);
 ```
 
 Import `Provenance` from `@invisi-labs/sdk/provenance`. Its `prove` prepares public recognized-tree data, authenticates primary anchors and computes locally from the ready operation's retained private inputs. The proof is cached for relay submission and managed encrypted persistence. Only `broadcaster.submit` enforces Source acceptance before broadcasting. A configured optional `Invisi` Source capability can generate the proof there if not explicitly prepared. Credit/zero-private-input operations skip Note source proving.
 
-`provenance.submit(sourceProof)` explicitly submits before the main transaction and returns the service tracking result. `provenance.submit(sourceProof, {transactionHash})` verifies the actual canonical main transaction/receipt and submits afterward. These are independent from main transaction sending; Source stays offchain. Tracking is returned by explicit Source submission.
+`provenance.submit(sourceProof)` handles both pre-submission and later delivery through `provenance_submitSourceProof`. It returns the service tracking result without a transaction hash or chain reader. The service matches the bound operation against canonical confirmed chain data, including transactions already indexed. If no match is available, it continues tracking. A payment settled within its deadline can be matched even when proof delivery occurs after that deadline. Repeated submissions reuse the same tracking record. Source submission never sends or repeats the main transaction.
 
 ## Persisting Source recovery
 
-Persist the JSON-serializable `ProvenanceProof` packet before main broadcast: final calldata, chain/protocol/token, main capacity/public statement, operation digest, sidecars and signed root certificates. No opening, witness, private nonce, runtime client or prover enters this packet. A submit-only `new Provenance({client, chainReader})` can resubmit the saved packet without assets/proving capabilities. Record returned tracking/job IDs and decisions separately.
+Persist the JSON-serializable `ProvenanceProof` packet before main broadcast: final calldata, chain/protocol/token, main capacity/public statement, operation digest, sidecars and signed root certificates. No opening, witness, private nonce, runtime client or prover enters this packet. A submit-only `new Provenance({client})` can resubmit the saved packet without assets/proving capabilities. Record the returned tracking ID and state separately; use `client.getTracking(id)` to observe matching and recognition.
 
 If no proof was produced, retain the original operation's private input openings in the encrypted wallet journal. Existing history `id` links to `session.resume(id)`; the saved plan retains original input data even after spent Note inventory is removed. A resumed ready/confirmed operation can generate Source proof; cached proof retrieval needs no prover. Mere txHash/commitments cannot reconstruct openings. Keep these records for reproof after generation changes; never persist raw witnesses/openings in a public history projection. Examples03/04 show initial direct delivery and packet-only recovery.
 

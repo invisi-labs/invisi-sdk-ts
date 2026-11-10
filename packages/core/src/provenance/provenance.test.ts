@@ -166,6 +166,9 @@ describe("independent provenance family", () => {
         await c.evaluateTransaction({ calldata: "0x12" }, []);
         expect(captured.method).toBe("provenance_evaluateTransaction");
         expect(JSON.stringify(captured)).not.toMatch(/opening|witness|nonce|privateKey/);
+        await c.submitSourceProof("0x12", []);
+        expect(captured.method).toBe("provenance_submitSourceProof");
+        expect(captured.params).toEqual([{ data: "0x12", proofSidecars: [] }]);
         generation = "5";
         await expect(c.getStatus()).rejects.toThrow("generation");
     });
