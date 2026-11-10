@@ -71,7 +71,7 @@ async function configured(historical = false) {
     if (historical) latest.signature = hexlify(sign(null, rootCertificateMessage(latest), key));
     const manifest = authenticateManifest(
         readFileSync(new URL("../../../../prover/provenance/manifest.json", import.meta.url)),
-        "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a"
+        "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
     );
     const trust: TrustContext = {
         ...h.context,
@@ -247,7 +247,11 @@ async function configured(historical = false) {
             }
             if (q.method === "broadcaster_submitTransaction") {
                 if (deny) throw Error("Broadcaster source preflight denied");
-                if (!p.proofSidecars?.length) throw Error("Missing source proof");
+                if (
+                    decodeBroadcasterIntent(p.data).request.params.nullifiers?.length &&
+                    !p.proofSidecars?.length
+                )
+                    throw Error("Missing source proof");
             }
             events.push("submit");
             if (q.method === "broadcaster_submitTransaction" && loseNextSubmitResponse) {
@@ -364,6 +368,8 @@ it("allows explicit source proof generation from ready and reuses its cached pro
     const packet = await source.prove(ready);
     expect(packet.data).toBe((await ready.exportTransaction()).data);
     expect(packet.sidecars).toHaveLength(1);
+    expect(packet.sidecars[0]!.proofBundle.circuitId).toBe("provenance_k10");
+    expect(h.prover.prove).toHaveBeenCalledWith(expect.objectContaining({ capacity: 10 }));
     expect(h.prover.prove).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(packet)).not.toMatch(/"(opening|nonce|witness|privateKey|path)"/);
     await h.client.submit(ready);
@@ -577,4 +583,26 @@ it("keeps a first submission local when service requirements are unavailable", a
     await expect(h.client.submit(ready)).rejects.toThrow(/status unavailable/);
     expect(h.prover.prove).not.toHaveBeenCalled();
     expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
+});
+
+it("submits public-only funding without requesting or attaching a source proof even when Provenance is enabled", async () => {
+    const h = await configured();
+    const payer = new EvmWallet(`0x${"03".repeat(32)}`);
+    const prepared = await h.invisi.prepareShield({
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+        funding: { payer: payer.address as `0x${string}`, amount: 30n, authorization: "caller" },
+    });
+    const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
+    const request = await quoted.exportFundingAuthorization();
+    const ready = await quoted.withFundingSignature(
+        await payer.signTypedData(request.domain, request.types, request.message)
+    );
+    expect((await h.client.submit(ready)).id).toBe("relay-owned-id");
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
+    const submission = h.requests.find((q) => q.method === "broadcaster_submitTransaction");
+    expect(submission.proofSidecars ?? []).toEqual([]);
 });

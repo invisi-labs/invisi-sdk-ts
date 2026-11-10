@@ -9,10 +9,7 @@ export const DEFAULT_PROVENANCE_ENDPOINT = "https://provenance.invisipay.fi";
 export type Integer = bigint | string | number;
 export const FIELD_MODULUS =
     21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-export const CAPACITIES: readonly number[] = Object.freeze([
-    ...Array.from({ length: 10 }, (_, i) => i + 1),
-    ...Array.from({ length: 18 }, (_, i) => (i + 2) * 10),
-]);
+export const CAPACITIES: readonly number[] = Object.freeze([10, 20, 40, 80, 120, 160, 190]);
 export const PUBLIC_INPUTS = Object.freeze([
     "chain_id",
     "protocol_address",

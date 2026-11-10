@@ -3,9 +3,10 @@
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
-PIN = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a"
+PIN = "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("protocol_root", type=Path)
 parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "packages" / "prover" / "provenance")
@@ -15,7 +16,7 @@ manifest_bytes = (source / "circuits/provenance/manifest.json").read_bytes()
 if hashlib.sha256(manifest_bytes).hexdigest() != PIN:
     raise SystemExit("Untrusted provenance manifest; review and explicitly update the release pin")
 manifest = json.loads(manifest_bytes)
-if manifest["family"] != "provenance" or manifest["target"] != "evm" or len(manifest["circuits"]) != 28:
+if manifest["family"] != "provenance" or manifest["target"] != "evm" or sorted(entry["capacity"] for entry in manifest["circuits"]) != [10, 20, 40, 80, 120, 160, 190]:
     raise SystemExit("Unsupported provenance release")
 payloads = [("manifest.json", manifest_bytes)]
 for entry in manifest["circuits"]:
@@ -30,6 +31,15 @@ for entry in manifest["circuits"]:
         if hashlib.sha256(data).hexdigest() != entry[key + "Sha256"]:
             raise SystemExit(f"Provenance {key} integrity mismatch for K{entry['capacity']}")
         payloads.append((str(relative), data))
+capacities = {"k" + str(entry["capacity"]) for entry in manifest["circuits"]}
+asset_root = args.output / "circuits" / "provenance"
+if asset_root.exists():
+    for directory in asset_root.iterdir():
+        if directory.name.startswith("k") and directory.name[1:].isdigit() and directory.name not in capacities:
+            if directory.is_symlink():
+                directory.unlink()
+            elif directory.is_dir():
+                shutil.rmtree(directory)
 for relative, data in payloads:
     destination = args.output / relative
     destination.parent.mkdir(parents=True, exist_ok=True)

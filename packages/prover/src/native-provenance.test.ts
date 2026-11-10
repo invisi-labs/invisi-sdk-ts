@@ -43,12 +43,12 @@ it("accepts a private client without contacting the official service or loading 
 });
 const root = process.env.INVISI_PROTOCOL_ROOT;
 it.skipIf(!root || !process.env.INVISI_TEST_NATIVE_SOURCE)(
-    "uses the same native BB configuration for genuine K1 source proving and independent verification",
+    "uses the same native BB configuration for genuine K10 source proving and independent verification",
     async () => {
         const vectors = JSON.parse(
             await readFile(join(root!, "circuits/provenance/golden-vectors.json"), "utf8")
         );
-        const witness = vectors.witnessK1 as Witness;
+        const witness = vectors.witnessK10SingleInput as Witness;
         const context = {
             chainId: String(witness.chain_id),
             protocolAddress: String(witness.protocol_address),
@@ -63,7 +63,7 @@ it.skipIf(!root || !process.env.INVISI_TEST_NATIVE_SOURCE)(
         const expected = PUBLIC_INPUTS.map((k) => word(witness[k] as bigint));
         const result = await capability.prover.prove({
             identity: capability.manifest,
-            capacity: 1,
+            capacity: 10,
             witness,
             expectedPublicInputs: expected,
         });

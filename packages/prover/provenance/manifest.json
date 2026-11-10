@@ -54,36 +54,12 @@
       "sha256": "f6cf43fc748a971f21a8c3585212090356edf2904a123d364720955dad5df0ca"
     },
     {
-      "path": "circuits/provenance/k1/Nargo.toml",
-      "sha256": "c6b6b03139ef2ec759e5feef6fb20a7a8829971741da61cd2832bb831700219a"
-    },
-    {
-      "path": "circuits/provenance/k1/src/main.nr",
-      "sha256": "41d85a611945740b8a0332a771fa163541eee5a608de0aa559cb2518504af2a3"
-    },
-    {
       "path": "circuits/provenance/k10/Nargo.toml",
       "sha256": "4dfc68cb8c69870f16a9201f431c637806075959e5fffd318741f9f2b32bed0e"
     },
     {
       "path": "circuits/provenance/k10/src/main.nr",
       "sha256": "4d614521fb709597d5b4738888126dec4748f61e6aa707e412638c6a698afd15"
-    },
-    {
-      "path": "circuits/provenance/k100/Nargo.toml",
-      "sha256": "5530b73d0db8c021cf40bc5c250a54e3ba61ce2279a80bdc5154d342cecc0769"
-    },
-    {
-      "path": "circuits/provenance/k100/src/main.nr",
-      "sha256": "6f771cfa96d16d354cc7b3cbbbb011a477eac3e2dd8dc82eee7a2d091b3f3ac2"
-    },
-    {
-      "path": "circuits/provenance/k110/Nargo.toml",
-      "sha256": "729be15e2f2b8db7bdf4f26c07b04974c19450dee009d277662ecd4fd32ad50f"
-    },
-    {
-      "path": "circuits/provenance/k110/src/main.nr",
-      "sha256": "492603150e932241b2a458f94fc11a75b207ab6913e431087232be6a6249af06"
     },
     {
       "path": "circuits/provenance/k120/Nargo.toml",
@@ -94,52 +70,12 @@
       "sha256": "611bc63cf938c57b4d0cf1abea17f87ea281704e8c113b46b2bcbe9686e3ecb1"
     },
     {
-      "path": "circuits/provenance/k130/Nargo.toml",
-      "sha256": "9e804908aa283890951ab42b0f07c456b4cd490d44611b699fed87bff881bb47"
-    },
-    {
-      "path": "circuits/provenance/k130/src/main.nr",
-      "sha256": "f7fd57be409563629927cf1d4ff2699d9a35d35c478a1c2c11a7d3cd22353c6f"
-    },
-    {
-      "path": "circuits/provenance/k140/Nargo.toml",
-      "sha256": "258fa9142470b63eeef9db317a09fe5bc99385b71aede8fb89547710b77e7788"
-    },
-    {
-      "path": "circuits/provenance/k140/src/main.nr",
-      "sha256": "dea3a91abc0e9ce91d5c852661fb8a106fc20b6611b5119c587f2028ed4fa899"
-    },
-    {
-      "path": "circuits/provenance/k150/Nargo.toml",
-      "sha256": "4fa9a20b184d5a71f907d53891aa0b9f057a6eb60501952090579f18571cc1a6"
-    },
-    {
-      "path": "circuits/provenance/k150/src/main.nr",
-      "sha256": "51c6f6c2d0865a87aa1793ece2ad65cd5b375a750248e3187d944ab0c97e610b"
-    },
-    {
       "path": "circuits/provenance/k160/Nargo.toml",
       "sha256": "33c1357e117b76ab987a6fe4a9f8510f5d08fa0a8091183953f5a0226d7aa2e7"
     },
     {
       "path": "circuits/provenance/k160/src/main.nr",
       "sha256": "bc41d3dc48f71dc1dc718c5dc07b63b94f1252fee27b1bbc14431457057c53a5"
-    },
-    {
-      "path": "circuits/provenance/k170/Nargo.toml",
-      "sha256": "b7859290376520732f8296422ef93d66916a4d69fd9de7a0d828ef9ddc2b0f13"
-    },
-    {
-      "path": "circuits/provenance/k170/src/main.nr",
-      "sha256": "bc1aaa1b6a1e98c9f743b2136bb40e99416c7e5d4f3646ed1ddbb609294eb1a0"
-    },
-    {
-      "path": "circuits/provenance/k180/Nargo.toml",
-      "sha256": "1eb944f20051ec5f58262a14913790c2859644f58f6208261ea15f34887c7d3e"
-    },
-    {
-      "path": "circuits/provenance/k180/src/main.nr",
-      "sha256": "f34d09f5ad2e5b2967367147c2224f93a7b23329f61c11e66f027f74f4c9bc38"
     },
     {
       "path": "circuits/provenance/k190/Nargo.toml",
@@ -150,44 +86,12 @@
       "sha256": "c11bced560fe477d73b345f7ec874f6e4431a87ae779cae334ce463317a71ed2"
     },
     {
-      "path": "circuits/provenance/k2/Nargo.toml",
-      "sha256": "9c57b6f58bee35782a437f1d64f184448b66f03a233c3b015102aaeb5dad5672"
-    },
-    {
-      "path": "circuits/provenance/k2/src/main.nr",
-      "sha256": "656b3cbeb95230705b7224a64690d302a413048f24565c9e7ffcaf35932dd4a8"
-    },
-    {
       "path": "circuits/provenance/k20/Nargo.toml",
       "sha256": "7e13e9ffbd63e1fdbd52ff84aaff7df82320e3fd31578f0eb6ba75d99e85102e"
     },
     {
       "path": "circuits/provenance/k20/src/main.nr",
       "sha256": "b290e2c222d180bbbc93d56891adc5a5a3eefa7b26fce362da207d230174663b"
-    },
-    {
-      "path": "circuits/provenance/k3/Nargo.toml",
-      "sha256": "057af8b0873e47b2241c5b8c415fe9313b7dcc3212d8997b0f40d21b701c5de2"
-    },
-    {
-      "path": "circuits/provenance/k3/src/main.nr",
-      "sha256": "c499a26a3a1eb62c9452a7c73f9e62cd7fea03d48e2cdaf93f2759147c1fda71"
-    },
-    {
-      "path": "circuits/provenance/k30/Nargo.toml",
-      "sha256": "c3709f11ce5833346b195088d64777ff38e56b4483fc5d668a7c5c5aafa60f47"
-    },
-    {
-      "path": "circuits/provenance/k30/src/main.nr",
-      "sha256": "77c6c9034e6d11e310a319d9f4d2bce0874eed00c333cf288c5f5beccd24a694"
-    },
-    {
-      "path": "circuits/provenance/k4/Nargo.toml",
-      "sha256": "6be342b6011e29ac713b7b39efb93fabab65a863df6ae0b20289be36d0101205"
-    },
-    {
-      "path": "circuits/provenance/k4/src/main.nr",
-      "sha256": "fa908963db7947095ff6e8ef79b93d170af1ef7d7e322b3e5edf632adca91f39"
     },
     {
       "path": "circuits/provenance/k40/Nargo.toml",
@@ -198,160 +102,16 @@
       "sha256": "365f446e428dbfe06289985f0be9c893633e21cd6e0d4203a0995c1e16950d71"
     },
     {
-      "path": "circuits/provenance/k5/Nargo.toml",
-      "sha256": "1a7932c9c85b4ff32542aa87d536bacafeea506102911a55de79b7e82d5ba834"
-    },
-    {
-      "path": "circuits/provenance/k5/src/main.nr",
-      "sha256": "2e178052b236f88900ac8bfd07313e297b11c8f6e8480987b6fcc7ad93c69ec8"
-    },
-    {
-      "path": "circuits/provenance/k50/Nargo.toml",
-      "sha256": "da4a572e5c13fc5dfac717277aab189111517fb15c1debc2f1b2da4edccec101"
-    },
-    {
-      "path": "circuits/provenance/k50/src/main.nr",
-      "sha256": "a49778f2f92cb613747e4977086a84a0289630c43f3968bb745f0a7aadc57c56"
-    },
-    {
-      "path": "circuits/provenance/k6/Nargo.toml",
-      "sha256": "8e305ebc4c02abcde80f7b1a677a200bd94a69bbb0adfb9de2d2fcd4914d8052"
-    },
-    {
-      "path": "circuits/provenance/k6/src/main.nr",
-      "sha256": "278c8478576ba13dcd372856996e969f49736e5b3ed8c4d7d078688a307ded6f"
-    },
-    {
-      "path": "circuits/provenance/k60/Nargo.toml",
-      "sha256": "ef245423a21b496aadecf352e14679fa1249fadf41a44941e96bc07883a30b95"
-    },
-    {
-      "path": "circuits/provenance/k60/src/main.nr",
-      "sha256": "b62291b2e9c2a7a38cf4209717e2906d27b588d2ce3df52a0a9d719d1c344dde"
-    },
-    {
-      "path": "circuits/provenance/k7/Nargo.toml",
-      "sha256": "fc6226a24864dc07570d2cc70cef0124d55324265dc2da501a08fbf90c83a6b8"
-    },
-    {
-      "path": "circuits/provenance/k7/src/main.nr",
-      "sha256": "11050c4b700976f233fb916fa51a8c203a63db4f603b6404d4588116132d2444"
-    },
-    {
-      "path": "circuits/provenance/k70/Nargo.toml",
-      "sha256": "eb06d3a70e4f9f98cd1d053a92625f4114abbc258eeacd1e01f13af153e5669c"
-    },
-    {
-      "path": "circuits/provenance/k70/src/main.nr",
-      "sha256": "e0c452e9fcbef40fda8f8b9677dda1cde3b9a70964eacb51ef14c2986d5264be"
-    },
-    {
-      "path": "circuits/provenance/k8/Nargo.toml",
-      "sha256": "8321949fc9d9829b352583496563f9fe84975f20b5305a4b77cedd11e35d6665"
-    },
-    {
-      "path": "circuits/provenance/k8/src/main.nr",
-      "sha256": "59c4e0a9250e26745914ebf5b48315d1010e4f2719c2a8093e803cd20f7b1bea"
-    },
-    {
       "path": "circuits/provenance/k80/Nargo.toml",
       "sha256": "4bd14e425fad7b8f93d2ffee95262b9145692d981c9c623ba37ae58458ed2d32"
     },
     {
       "path": "circuits/provenance/k80/src/main.nr",
       "sha256": "6af1b62acf81a22406ac8d85037fc2f35a3c780e81a8fe847f03f8660c11e848"
-    },
-    {
-      "path": "circuits/provenance/k9/Nargo.toml",
-      "sha256": "4636721c2e5c4296835e8c7e0d44439e78d0f1d6eebbffd0cf213afe6a744b43"
-    },
-    {
-      "path": "circuits/provenance/k9/src/main.nr",
-      "sha256": "6c01bf3b49609629986ed96332c9fa063e9e4e6b0d86d86ae59e921c58d00547"
-    },
-    {
-      "path": "circuits/provenance/k90/Nargo.toml",
-      "sha256": "2d8532f83480e11f622c6fd06e8c924835df232da4c91d6182e691495cb8f60f"
-    },
-    {
-      "path": "circuits/provenance/k90/src/main.nr",
-      "sha256": "3dcb7dd2ad9a639c17b0f74b7d787e6632d9f1154133d09213b06b2b10731e3f"
     }
   ],
-  "sourceClosureSha256": "afe585c052a6d464ddc75b845df86b9c152e6b25a02e106c3c7d65c532b990ea",
+  "sourceClosureSha256": "a3da239c62c7b4b0eecbf6c23b5dd59d375142ba327a9797f360629bf59225d8",
   "circuits": [
-    {
-      "capacity": 1,
-      "package": "circuits/provenance/k1",
-      "artifact": "circuits/provenance/k1/target/provenance_k1.json",
-      "artifactSha256": "b699c90028b94b2b8341b021bdd301f70485a270d630bc625b8f6339e5a31b22",
-      "vk": "circuits/provenance/k1/target/evm/vk",
-      "vkSha256": "e11727b07a5cba4e6ac6ecbbd27a308e33ad7c60b34b4f3d90098e21a30cd319"
-    },
-    {
-      "capacity": 2,
-      "package": "circuits/provenance/k2",
-      "artifact": "circuits/provenance/k2/target/provenance_k2.json",
-      "artifactSha256": "74763a34852c9f52f651b927aaa0c505e91f7b1096242763cef7a0773aef062a",
-      "vk": "circuits/provenance/k2/target/evm/vk",
-      "vkSha256": "f7981f9a293e554bf5d9443830aee13b3e1f36edbff537873c8aeb99618008b9"
-    },
-    {
-      "capacity": 3,
-      "package": "circuits/provenance/k3",
-      "artifact": "circuits/provenance/k3/target/provenance_k3.json",
-      "artifactSha256": "771fe4f499a25455c3e9f1d12293be4d82dea31aeee7ede50cc2b832c1bebff1",
-      "vk": "circuits/provenance/k3/target/evm/vk",
-      "vkSha256": "cffae70773255257ea0d88f64b9176ca316cf5cca25e6b11db2166b49f3de162"
-    },
-    {
-      "capacity": 4,
-      "package": "circuits/provenance/k4",
-      "artifact": "circuits/provenance/k4/target/provenance_k4.json",
-      "artifactSha256": "84e97354dbc716758275fae886b6501da2fcc6a3e653ca08e9082d9aa391b6f0",
-      "vk": "circuits/provenance/k4/target/evm/vk",
-      "vkSha256": "a217a1d6f24d55570fd09b34f9c22cb7e04e96611a6b6348f4b4ebb0c8a347fa"
-    },
-    {
-      "capacity": 5,
-      "package": "circuits/provenance/k5",
-      "artifact": "circuits/provenance/k5/target/provenance_k5.json",
-      "artifactSha256": "6bf8513805377348cfdf5b260111c86390ccf90537b46d3631685efd46711bf5",
-      "vk": "circuits/provenance/k5/target/evm/vk",
-      "vkSha256": "7161ebca39eb99b820e8edf67783894f180ca25337c20f8edb5a03d9887d3b48"
-    },
-    {
-      "capacity": 6,
-      "package": "circuits/provenance/k6",
-      "artifact": "circuits/provenance/k6/target/provenance_k6.json",
-      "artifactSha256": "b27052e1850fcfd129f080a94e061664dcef0502e78b71faaf3e10143e7a612b",
-      "vk": "circuits/provenance/k6/target/evm/vk",
-      "vkSha256": "563657c8dd8477c6a7cb9deaa9128c6a1a845465401f62aa90bbcfbe71b769cd"
-    },
-    {
-      "capacity": 7,
-      "package": "circuits/provenance/k7",
-      "artifact": "circuits/provenance/k7/target/provenance_k7.json",
-      "artifactSha256": "4c4578f032347ac6437e7e821d4ca0b638e77f9f7288fd8fd694d3ab73a77104",
-      "vk": "circuits/provenance/k7/target/evm/vk",
-      "vkSha256": "785208e6cae996718de66a3ac5e55e536f45d733cfd4f9afc58c3ce70f03bb70"
-    },
-    {
-      "capacity": 8,
-      "package": "circuits/provenance/k8",
-      "artifact": "circuits/provenance/k8/target/provenance_k8.json",
-      "artifactSha256": "4d7c4a7590948ebb90891b11fbc370ecae241468abe740243869eec6f996a85e",
-      "vk": "circuits/provenance/k8/target/evm/vk",
-      "vkSha256": "fb2fa6e5f148912b533d172ea7fd75fd0abcd2922bff5750bb96e9bf422b523a"
-    },
-    {
-      "capacity": 9,
-      "package": "circuits/provenance/k9",
-      "artifact": "circuits/provenance/k9/target/provenance_k9.json",
-      "artifactSha256": "638a0fa44bc7fce2a27d40f11d7c4cd7738be57d3a06e38eb6bfaf9f96d353fd",
-      "vk": "circuits/provenance/k9/target/evm/vk",
-      "vkSha256": "1c83d40b4a191bdac39158aff233c6c5a5d1934c94fb9a46eb52b206baf75719"
-    },
     {
       "capacity": 10,
       "package": "circuits/provenance/k10",
@@ -369,44 +129,12 @@
       "vkSha256": "a459eda8c3c7c5e1f6d64ca3136bd48106e605094e2ab057dbba58db8b0b6c05"
     },
     {
-      "capacity": 30,
-      "package": "circuits/provenance/k30",
-      "artifact": "circuits/provenance/k30/target/provenance_k30.json",
-      "artifactSha256": "b7d76e4b02b1c48c973a43a66ef14b157595d94624809892c9513bec74cb57c8",
-      "vk": "circuits/provenance/k30/target/evm/vk",
-      "vkSha256": "bc563e09becdd2897a32af403745375857cb218e2f1d22fa4a01971c59ef3c6e"
-    },
-    {
       "capacity": 40,
       "package": "circuits/provenance/k40",
       "artifact": "circuits/provenance/k40/target/provenance_k40.json",
       "artifactSha256": "6a8473a61eced430d249cd489be9e8687d1949cbb480d4b49eaf386f745da750",
       "vk": "circuits/provenance/k40/target/evm/vk",
       "vkSha256": "74a91473ef425ced687b4080c1f6ee77bf2f21025393951ea82796dcfaa03b3f"
-    },
-    {
-      "capacity": 50,
-      "package": "circuits/provenance/k50",
-      "artifact": "circuits/provenance/k50/target/provenance_k50.json",
-      "artifactSha256": "00ae50c634dd4d5d45fc3fb2c6f7b6c62f1977aee5b2781e9cd13b3ee1b23e3f",
-      "vk": "circuits/provenance/k50/target/evm/vk",
-      "vkSha256": "a6b1221b3d4a8760a426125647acc75470e59cd112bbd6a34e38532cbbf135fa"
-    },
-    {
-      "capacity": 60,
-      "package": "circuits/provenance/k60",
-      "artifact": "circuits/provenance/k60/target/provenance_k60.json",
-      "artifactSha256": "67318ac56409d1f7c6fdce72150ee78d9c31a92d34587c4dceebb46f5dca6290",
-      "vk": "circuits/provenance/k60/target/evm/vk",
-      "vkSha256": "7e6f772706fcbd5d717c2d9c0a2aa5ec31c5f8128fc7b57dbb79c0531d021f7f"
-    },
-    {
-      "capacity": 70,
-      "package": "circuits/provenance/k70",
-      "artifact": "circuits/provenance/k70/target/provenance_k70.json",
-      "artifactSha256": "75438c0c02350289bc2ff93abdae645a40a17c9f9fc6e138ddfa41a216ecf613",
-      "vk": "circuits/provenance/k70/target/evm/vk",
-      "vkSha256": "eea8e65aed9137f64f895fa2fed3ac6b613044ee670352e20e9d9063fc1be13f"
     },
     {
       "capacity": 80,
@@ -417,30 +145,6 @@
       "vkSha256": "e1db3395d7cfc741530551d9db9e05dc480c05a6cd30b50f3f6966c1998677a8"
     },
     {
-      "capacity": 90,
-      "package": "circuits/provenance/k90",
-      "artifact": "circuits/provenance/k90/target/provenance_k90.json",
-      "artifactSha256": "4643231cb659fe50edfb68abe6b1e29c1b92413be15d6518b0470de6613e3441",
-      "vk": "circuits/provenance/k90/target/evm/vk",
-      "vkSha256": "405e92ec39863e26632456550d2957ff71395282664e24768dd0f6f03ab4f6a9"
-    },
-    {
-      "capacity": 100,
-      "package": "circuits/provenance/k100",
-      "artifact": "circuits/provenance/k100/target/provenance_k100.json",
-      "artifactSha256": "c1454e8db35deb166360b0d4009d487863a388e51e442223cdc42d6b588e4e58",
-      "vk": "circuits/provenance/k100/target/evm/vk",
-      "vkSha256": "396ab900fd4d6db00c9b1a30a2787c2f45af715b5f1fabcc78f6d3fd5fdc09ec"
-    },
-    {
-      "capacity": 110,
-      "package": "circuits/provenance/k110",
-      "artifact": "circuits/provenance/k110/target/provenance_k110.json",
-      "artifactSha256": "4c5bc8feb72353d1fcc08fe0366d3a0506e9cddbabb84a3ea82625772cfc1964",
-      "vk": "circuits/provenance/k110/target/evm/vk",
-      "vkSha256": "afdf112e76f23d0efa0fa438a145bc5f905f0188e70ca0061dcbc666e0ee924f"
-    },
-    {
       "capacity": 120,
       "package": "circuits/provenance/k120",
       "artifact": "circuits/provenance/k120/target/provenance_k120.json",
@@ -449,52 +153,12 @@
       "vkSha256": "5151a3abd9afc2f30c4b8086f4da170c826a9869cbf36d8097314274d0e46966"
     },
     {
-      "capacity": 130,
-      "package": "circuits/provenance/k130",
-      "artifact": "circuits/provenance/k130/target/provenance_k130.json",
-      "artifactSha256": "11ba8b9a54a410ecf176d30ea50c8f23f522498ee2ac22502a00caf482ff5c45",
-      "vk": "circuits/provenance/k130/target/evm/vk",
-      "vkSha256": "c293125cfadc8838d6f0fda3cc07c5392019d79ea05e102a024a94247f755faf"
-    },
-    {
-      "capacity": 140,
-      "package": "circuits/provenance/k140",
-      "artifact": "circuits/provenance/k140/target/provenance_k140.json",
-      "artifactSha256": "ca1e604cec91f89751bd59c022139a7d7f7ba17fbd76a41a9973940b16cb3e6a",
-      "vk": "circuits/provenance/k140/target/evm/vk",
-      "vkSha256": "793d0f4bc19d23524012b6b75a7f817cac4eb5515b0cd1b404794d54af7e695a"
-    },
-    {
-      "capacity": 150,
-      "package": "circuits/provenance/k150",
-      "artifact": "circuits/provenance/k150/target/provenance_k150.json",
-      "artifactSha256": "035b8d8be0f82e8894bc39b9652eed0da8495aaaef1d82e32a2236370df492ba",
-      "vk": "circuits/provenance/k150/target/evm/vk",
-      "vkSha256": "dac6d38517f14c7aba34dc2fe6f8f271911199a9b5bb037969b53b2ed1b436a3"
-    },
-    {
       "capacity": 160,
       "package": "circuits/provenance/k160",
       "artifact": "circuits/provenance/k160/target/provenance_k160.json",
       "artifactSha256": "341fb48c90885384a69a46dadba1d256269d7583d13170f0ad76a1a3d85abdc8",
       "vk": "circuits/provenance/k160/target/evm/vk",
       "vkSha256": "c1863479a1ea43601a8c8a68b7d9baf673b45d382e20b8dc9f4c82b07fa892a9"
-    },
-    {
-      "capacity": 170,
-      "package": "circuits/provenance/k170",
-      "artifact": "circuits/provenance/k170/target/provenance_k170.json",
-      "artifactSha256": "eeab16dac098301e1f164c65b9283800471756ed07dfb7284c16a5ff378d0ad8",
-      "vk": "circuits/provenance/k170/target/evm/vk",
-      "vkSha256": "611a8dd6af09f0a651f90971492bb716bbabc657d8a1d4c2c8e7daf794082eb8"
-    },
-    {
-      "capacity": 180,
-      "package": "circuits/provenance/k180",
-      "artifact": "circuits/provenance/k180/target/provenance_k180.json",
-      "artifactSha256": "50a1f3e156b7dc1006aa4941814d5e2b07acca22e2b45064ba724f06f862f1b7",
-      "vk": "circuits/provenance/k180/target/evm/vk",
-      "vkSha256": "0c7b68fa4af2d2220211ead5ceb90829ff84de6185faf89c193146e5f46a17c9"
     },
     {
       "capacity": 190,

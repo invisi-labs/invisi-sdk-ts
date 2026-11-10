@@ -62,7 +62,7 @@ async function fixture() {
     const digest = operationDigest({ ...h.context, mainCircuitCapacity: capacity, publicInputs });
     const manifest = authenticateManifest(
         readFileSync(new URL("../../../prover/provenance/manifest.json", import.meta.url)),
-        "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a"
+        "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
     );
     const key = createPrivateKey({
         key: Buffer.from("302e020100300506032b657004220420" + "07".repeat(32), "hex"),
@@ -122,7 +122,7 @@ async function fixture() {
                 operationIndex: "0",
                 proofBundle: {
                     format: "invisi-provenance-proof-v1",
-                    circuitId: "provenance_k1",
+                    circuitId: "provenance_k10",
                     manifestSha256: manifest.sha256,
                     target: "evm",
                     proof: "0x0102",

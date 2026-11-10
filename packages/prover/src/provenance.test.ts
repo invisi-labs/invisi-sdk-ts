@@ -5,16 +5,17 @@ import { authenticateManifest, PUBLIC_INPUTS, word } from "@invisi-labs/core/pro
 import type { Witness } from "@invisi-labs/core/provenance";
 import { LocalProvenanceProver } from "./provenance";
 const root = process.env.INVISI_PROTOCOL_ROOT;
-it.skipIf(!root).each([1, 10])(
+it.skipIf(!root).each(["witnessK10SingleInput", "witnessK10CrossTree"])(
     "proves genuine independent provenance witness with local WASM and pinned assets",
-    async (capacity) => {
+    async (witnessKey) => {
+        const capacity = 10;
         const manifest = await readFile(join(root!, "circuits/provenance/manifest.json"));
-        const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
+        const pin = "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762";
         const identity = authenticateManifest(manifest, pin);
         const data = JSON.parse(
             await readFile(join(root!, "circuits/provenance/golden-vectors.json"), "utf8")
         );
-        const witness = (capacity === 1 ? data.witnessK1 : data.witnessK10CrossTree) as Witness;
+        const witness = data[witnessKey] as Witness;
         const expected = PUBLIC_INPUTS.map((k) => word(witness[k] as bigint));
         const prover = new LocalProvenanceProver({
             trustedManifestSha256: pin,

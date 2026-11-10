@@ -1,6 +1,8 @@
 # Independent Provenance client
 
-The Provenance family is separate from the existing transaction circuits and Note/Credit spending APIs. It has depth 32, exactly 11 public inputs, and capacities 1–10, then 20–190 in steps of 10. The trusted release manifest SHA-256 is `cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a`.
+The Provenance family is separate from the existing transaction circuits and Note/Credit spending APIs. It has depth 32, exactly 11 public inputs, and capacities 10, 20, 40, 80, 120, 160, and 190. The trusted release manifest SHA-256 is `6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762`.
+
+The SDK automatically selects the smallest supported K covering the actual private Note input count N. Main transaction slot capacity C and outputs do not increase K: C190 with 15 private inputs selects K20; C190 with 5 inputs and 10 outputs selects K10. A public-only operation creates no Provenance proof. Main Note/Credit circuit capacities are unchanged.
 
 Sync authenticated public artifacts from a local protocol checkout:
 
@@ -8,7 +10,7 @@ Sync authenticated public artifacts from a local protocol checkout:
 python3 scripts/sync-provenance.py ../invisi-protocol
 ```
 
-This checks the pinned manifest and every artifact/VK digest before copying 28 independent artifacts and keys into `.cache/provenance/`. Existing main circuit manifests, assets and version numbers remain separate. The cache is generated and ignored by Git. The reviewed manifest is tracked with this SDK; updating its pin requires an explicit release review.
+This checks the pinned manifest and every artifact/VK digest before copying 7 independent artifacts and keys into `packages/prover/provenance/`. Existing main circuit manifests, assets and version numbers remain separate. The circuit artifacts are generated and ignored by Git. The reviewed manifest is tracked with this SDK; updating its pin requires an explicit release review.
 
 Configure scope (chain, protocol), current chain generation, provider, trusted Ed25519 public keys indexed by signingKeyId, and the reviewed manifest digest locally. Responses never establish trust. Certificate payloads use the fixed 269-byte encoding and raw 64-byte Ed25519 signatures. Empty-tree certificates are supported, but proof sources must contain at least one leaf.
 
@@ -31,7 +33,7 @@ Source-gated Broadcaster quotes bind `keccak256(abi.encode("InvisiBroadcasterPro
 
 Use `client.syncRecognizedTree(rootId, certificate, {maxLeaves})` for fixed-root public replay. The default replay budget is 100,000 leaves; raise it explicitly for a larger trusted snapshot.
 
-Genuine local K1/K10 proof integration: `INVISI_PROTOCOL_ROOT=../invisi-protocol INVISI_CRS_PATH=... pnpm --filter @invisi-labs/prover exec vitest run src/provenance.test.ts`.
+Genuine local K10 single-input/cross-tree proof integration: `INVISI_PROTOCOL_ROOT=../invisi-protocol INVISI_CRS_PATH=... pnpm --filter @invisi-labs/prover exec vitest run src/provenance.test.ts`.
 
 ## Signing-key rotation
 
@@ -115,7 +117,7 @@ await provenance.submit(sourceProof);
 
 Constructors perform no network requests or proving. On first use, the deployment comes from the retained operation or saved proof, not a separately entered chain/protocol pair. `NativeProver({provenanceClient})` overrides the official service for private deployments; `new Provenance({prover})` inherits that exact client for both proving and submission. Packet-only private recovery uses `new Provenance({client: provenanceClient})`. `officialProvenanceClient(scope)` provides a separately usable trusted public client without a prover. Bootstrap failures are retryable; an established instance never silently adopts another provider/generation/key history.
 
-Provision native assets in a source checkout with `python3 scripts/sync-provenance.py ../invisi-protocol`. It authenticates all 28 circuit/VK pairs into `packages/prover/provenance`; the package includes those public assets when provisioned for release. `provenanceAssetsPath` optionally selects another locally provisioned asset root. There is no remote proving or witness upload. API version, Source manifest release, and main protocol version are independent; no equality check couples their version numbers. The current service still exposes one configured deployment per chain; multi-instance/version routing is a separate service change.
+Provision native assets in a source checkout with `python3 scripts/sync-provenance.py ../invisi-protocol`. It authenticates all 7 circuit/VK pairs into `packages/prover/provenance`; the package includes those public assets when provisioned for release. `provenanceAssetsPath` optionally selects another locally provisioned asset root. With no override, `NativeProver` loads the package-local `provenance` directory, matching the sync script default. A custom directory must be provisioned with `python3 scripts/sync-provenance.py ../invisi-protocol --output <asset-root>` and passed as `provenanceAssetsPath: "<asset-root>"`; that root contains `manifest.json` and the manifest-relative `circuits/provenance/...` paths. There is no remote proving or witness upload. API version, Source manifest release, and main protocol version are independent; no equality check couples their version numbers. The current service still exposes one configured deployment per chain; multi-instance/version routing is a separate service change.
 
 `protocol.getBroadcasters({tokenAddress, signal?})` discovers enabled registered services and calls `broadcaster_getTokenSupport` without calldata, proof, fee bounds or gas estimates. Support means the token currently has valid pricing and submissions are not halted; quote still checks the specific operation and shape. Returned service identity must match the selected chain/protocol and RPC-registered sender/fee recipient. Cancellation propagates through registry pagination and service reads. Quote metadata derives the signed Source requirement; construction and discovery perform no Source proof verification.
 

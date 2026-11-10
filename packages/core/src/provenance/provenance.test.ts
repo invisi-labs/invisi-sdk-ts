@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { getBytes } from "ethers";
 import vectors from "./golden-vectors.json";
 import {
+    CAPACITIES,
     scopeHash,
     noteOpening,
     recognizedLeaf,
@@ -20,7 +21,9 @@ import {
     PUBLIC_INPUTS,
 } from "./index";
 import type { RootCertificate, WitnessRequest, TrustContext } from "./index";
-function request(w: typeof vectors.witnessK1 | typeof vectors.witnessK10CrossTree): WitnessRequest {
+function request(
+    w: typeof vectors.witnessK10SingleInput | typeof vectors.witnessK10CrossTree
+): WitnessRequest {
     const count = Number(w.input_count),
         sources = Number(w.source_count);
     return {
@@ -44,6 +47,17 @@ function request(w: typeof vectors.witnessK1 | typeof vectors.witnessK10CrossTre
     };
 }
 describe("independent provenance family", () => {
+    it("supports exactly the consolidated source capacities", () => {
+        expect(CAPACITIES).toEqual([10, 20, 40, 80, 120, 160, 190]);
+    });
+    it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 30, 50, 60, 70, 90, 100, 110, 130, 140, 150, 170, 180])(
+        "rejects retired source capacity %i",
+        async (capacity) => {
+            await expect(
+                buildWitness({ ...request(vectors.witnessK10SingleInput), capacity })
+            ).rejects.toThrow("Invalid provenance shape");
+        }
+    );
     it("matches shared domains,scope,opening,leaf and EVM operation vectors", async () => {
         for (const [k, v] of Object.entries(vectors.domains))
             expect(DOMAINS[k as keyof typeof DOMAINS].toString()).toBe(v);
@@ -57,7 +71,7 @@ describe("independent provenance family", () => {
         );
         expect(operationDigest(vectors.operation)).toBe(vectors.operation.digest);
     });
-    it.each([vectors.witnessK1, vectors.witnessK10CrossTree])(
+    it.each([vectors.witnessK10SingleInput, vectors.witnessK10CrossTree])(
         "matches complete padded local witness",
         async (v) => {
             const w = await buildWitness(request(v));
@@ -81,25 +95,25 @@ describe("independent provenance family", () => {
         const t = new RecognizedTree();
         t.append(vectors.note.recognizedLeaf);
         const p = await t.path(0);
-        expect(p.root.toString()).toBe(vectors.witnessK1.roots[0]);
-        expect(p.path.map(String)).toEqual(vectors.witnessK1.paths[0]);
+        expect(p.root.toString()).toBe(vectors.witnessK10SingleInput.roots[0]);
+        expect(p.path.map(String)).toEqual(vectors.witnessK10SingleInput.paths[0]);
         expect(
             (await t.membershipForCommitment(vectors.note.context, vectors.note.commitment))
                 ?.leafIndex
         ).toBe(0);
         expect(await t.membershipForCommitment(vectors.note.context, "1")).toBeUndefined();
-        const r = request(vectors.witnessK1);
+        const r = request(vectors.witnessK10SingleInput);
         r.inputs[0]!.path = [...r.inputs[0]!.path];
         (r.inputs[0]!.path as string[])[0] = "1";
         await expect(buildWitness(r)).rejects.toThrow("Membership");
         await expect(
-            buildWitness({ ...request(vectors.witnessK1), capacity: 11 })
+            buildWitness({ ...request(vectors.witnessK10SingleInput), capacity: 11 })
         ).rejects.toThrow();
-        const duplicate = request(vectors.witnessK1);
+        const duplicate = request(vectors.witnessK10SingleInput);
         await expect(
             buildWitness({
                 ...duplicate,
-                capacity: 2,
+                capacity: 10,
                 inputs: [...duplicate.inputs, ...duplicate.inputs],
             })
         ).rejects.toThrow("Duplicate");
@@ -181,9 +195,9 @@ it("exports only public evidence,validates certificates/binding and refuses host
     const bytes = readFileSync(
             new URL("../../../prover/provenance/manifest.json", import.meta.url)
         ),
-        pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a",
+        pin = "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762",
         identity = authenticateManifest(bytes, pin),
-        r = request(vectors.witnessK1),
+        r = request(vectors.witnessK10SingleInput),
         seed = new Uint8Array(32).fill(7);
     const c = {
         ...Object.fromEntries(
@@ -214,7 +228,7 @@ it("exports only public evidence,validates certificates/binding and refuses host
         0
     );
     expect(proof.proofBundle.format).toBe("invisi-provenance-proof-v1");
-    expect(proof.proofBundle.circuitId).toBe("provenance_k1");
+    expect(proof.proofBundle.circuitId).toBe("provenance_k10");
     expect(JSON.stringify(proof)).not.toMatch(/owners|nonces|paths|witness/);
     await validateProofBundle(proof.proofBundle, trust);
     const { proofSidecarToWire } = await import("./index");

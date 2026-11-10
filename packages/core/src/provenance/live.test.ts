@@ -10,7 +10,7 @@ import {
 } from "./index";
 import type { PublicResult, RootCertificate, RotationRecord, Scope, TrustContext } from "./index";
 const enabled = process.env.INVISI_PROVENANCE_LIVE === "1";
-const pin = "cf07e868bd354382f2137f789e6b049563289b779e061728050936d23076f31a";
+const pin = "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762";
 interface LiveTrust {
     format: string;
     endpoint: string;
