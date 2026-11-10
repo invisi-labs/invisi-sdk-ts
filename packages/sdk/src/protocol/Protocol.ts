@@ -1,8 +1,8 @@
 import { rememberProtocolConnection } from "./connections";
 import { Protocol as BaseProtocol } from "@invisi-labs/protocol";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
-import { type Provider } from "ethers";
-import { BroadcasterClient, decodeBroadcasterIntent } from "../broadcaster/index";
+import { getAddress, type Provider } from "ethers";
+import { BroadcasterClient } from "../broadcaster/index";
 
 const sources = new WeakMap<Protocol, Pick<ProtocolRpcClient, "getBroadcasters">>();
 
@@ -27,9 +27,14 @@ export class Protocol extends BaseProtocol {
         return protocol;
     }
 
-    /** Returns enabled services that estimate this concrete transaction; final quotes are checked by prepared. */
-    async getBroadcasters(options: { data: string }): Promise<BroadcasterClient[]> {
-        decodeBroadcasterIntent(options.data);
+    /** Discover token support without disclosing a transaction or requesting a price. */
+    async getBroadcasters(options: {
+        tokenAddress: string;
+        signal?: AbortSignal;
+    }): Promise<BroadcasterClient[]> {
+        options.signal?.throwIfAborted();
+        const token = getAddress(options.tokenAddress);
+        if (BigInt(token) === 0n) throw Error("Invalid Broadcaster token address");
         if (!this.deployment.broadcasterRegistry)
             throw new Error("broadcaster registry is not configured");
         const rpc = sources.get(this);
@@ -39,9 +44,11 @@ export class Protocol extends BaseProtocol {
         let block: Awaited<ReturnType<ProtocolRpcClient["getBroadcasters"]>>["block"] | undefined;
         const seen = new Set<string>();
         do {
+            options.signal?.throwIfAborted();
             const page = await rpc.getBroadcasters({
                 enabled: true,
                 limit: 100,
+                ...(options.signal ? { signal: options.signal } : {}),
                 ...(after ? { after } : {}),
                 ...(block ? { block } : {}),
             });
@@ -55,13 +62,25 @@ export class Protocol extends BaseProtocol {
                             quoteSigner: entry.quoteSigner,
                             feeRecipient: entry.feeRecipient,
                         });
-                        await client.estimateQuote(options.data);
+                        if (
+                            !(await client.supportsToken(
+                                token,
+                                {
+                                    chainId: this.context.chainId,
+                                    protocol: this.context.protocolAddress,
+                                },
+                                options
+                            ))
+                        )
+                            return undefined;
                         return client;
                     } catch {
+                        options.signal?.throwIfAborted();
                         return undefined;
                     }
                 })
             );
+            options.signal?.throwIfAborted();
             clients.push(
                 ...compatible.filter((client): client is BroadcasterClient => client !== undefined)
             );

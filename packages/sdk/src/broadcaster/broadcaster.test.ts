@@ -329,22 +329,12 @@ it("binds the provenance requirement to a signed quote and rejects downgrades", 
         provenanceRequired: true,
         requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
     };
+    expect(() => verifyBroadcasterQuote(signed, trust, data, 0n)).not.toThrow();
     expect(() =>
-        verifyBroadcasterQuote(signed, { ...trust, provenanceRequired: true }, data, 0n)
-    ).not.toThrow();
-    expect(() => verifyBroadcasterQuote(signed, trust, data, 0n)).toThrow("requirement");
-    expect(() =>
-        verifyBroadcasterQuote(
-            { ...signed, provenanceRequired: false },
-            { ...trust, provenanceRequired: true },
-            data,
-            0n
-        )
+        verifyBroadcasterQuote({ ...signed, provenanceRequired: false }, trust, data, 0n)
     ).toThrow("requirement");
     const { provenanceRequired: _, ...missing } = signed;
-    expect(() =>
-        verifyBroadcasterQuote(missing, { ...trust, provenanceRequired: true }, data, 0n)
-    ).toThrow("requirement");
+    expect(() => verifyBroadcasterQuote(missing, trust, data, 0n)).toThrow("requirement");
     const transport = vi.fn(async (request) => ({
         jsonrpc: "2.0",
         id: request.id,
@@ -358,7 +348,6 @@ it("binds the provenance requirement to a signed quote and rejects downgrades", 
             endpoint: "https://example.test",
             quoteSigner: signer.address,
             feeRecipient: signer.address,
-            provenanceRequired: true,
         },
         transport
     );

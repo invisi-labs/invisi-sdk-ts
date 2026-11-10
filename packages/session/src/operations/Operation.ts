@@ -585,8 +585,9 @@ export class Operation {
             }
         }
         if (!durable.broadcasterAttempted) {
+            const requirements = await client.submissionRequirements(durable.broadcasterQuote!);
             if (
-                client.configuration.provenanceRequired &&
+                requirements.provenanceRequired &&
                 durable.plan.inputs.length &&
                 !durable.provenance
             ) {

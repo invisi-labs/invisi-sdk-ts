@@ -253,7 +253,7 @@ export async function validatePreparedBroadcast(
     runtime: TransactionRuntime
 ) {
     validateBroadcastEnvelope(saved, client);
-    if (client.configuration.provenanceRequired && saved.plan.inputs.length) {
+    if (saved.broadcasterQuote!.provenanceRequired && saved.plan.inputs.length) {
         const source = saved.provenance;
         if (!source || source.sidecars.length !== 1)
             throw Error("Prepared Provenance evidence required");

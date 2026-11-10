@@ -87,6 +87,8 @@ async function configured(historical = false) {
         expiresAt: String(Math.floor(Date.now() / 1000) + 3600),
         operationDigest: digest,
     });
+    let statusOffline = false,
+        statusRequiresSource = true;
     let unsupportedToken = false;
     let loseNextSubmitResponse = false;
     let missingTracking = false,
@@ -174,11 +176,32 @@ async function configured(historical = false) {
             endpoint: "https://relay.test",
             quoteSigner: signer.address,
             feeRecipient: signer.address,
-            provenanceRequired: true,
         },
         async (q) => {
             const p = (q.params as any[])[0];
             requests.push({ method: q.method, ...p });
+            if (q.method === "broadcaster_getStatus") {
+                if (statusOffline) throw Error("Broadcaster status unavailable");
+                return {
+                    jsonrpc: "2.0",
+                    id: q.id,
+                    result: {
+                        apiVersion: "v1",
+                        protocolVersion: "1",
+                        chainId: String(h.context.chainId),
+                        protocol: h.context.protocolAddress,
+                        sender: signer.address,
+                        feeRecipient: signer.address,
+                        submissionHalted: false,
+                        provenance: {
+                            enabled: statusRequiresSource,
+                            trackingRequired: true,
+                            trackingSupported: true,
+                            requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
+                        },
+                    },
+                };
+            }
             if (q.method === "broadcaster_estimateQuote") {
                 if (unsupportedToken) throw Error("Unsupported broadcaster token");
                 events.push("fee");
@@ -260,6 +283,12 @@ async function configured(historical = false) {
         });
     return {
         ...h,
+        setStatusOffline: () => {
+            statusOffline = true;
+        },
+        setStatusRequiresSource: (required: boolean) => {
+            statusRequiresSource = required;
+        },
         source,
         prover,
         client,
@@ -288,12 +317,13 @@ async function configured(historical = false) {
     };
 }
 
-it("quotes without preparing source data or computing a source proof", async () => {
+it("quotes without reading submission policy, preparing source data or computing a source proof", async () => {
     const h = await configured();
     h.setDeny(true);
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     expect(quoted.broadcasterQuote()).toBeDefined();
     expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.requests.some((q) => q.method === "broadcaster_getStatus")).toBe(false);
     expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
 });
 it("generates source proof from ready only when submitting and returns an opaque service ID", async () => {
@@ -407,6 +437,7 @@ it("replays an ID-less uncertain managed send without requiring Source or unspen
     h.loseSubmitResponse();
     await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
     h.reader.isSpent = async (_scope, words) => words.map(() => true);
+    h.setStatusOffline();
     const restarted = new WalletSession(sessionOptions({ ...h.options, prover: backend() }));
     const restored = await restarted.resume(ready.id);
     const before = h.requests.length;
@@ -525,4 +556,25 @@ it("uses one proving provider for main and automatic Source proof without a sepa
     await h.client.submit(ready);
     expect(provider.getProvenanceCapability).toHaveBeenCalledTimes(1);
     expect(h.prover.prove).toHaveBeenCalledTimes(1);
+});
+
+it("rejects a changed Source policy at submit without generating proof or sending payment", async () => {
+    const h = await configured();
+    const ready = await (
+        await externallyAuthorize(await h.client.quote(await h.prepare(), { maxFeeAmount: 20n }))
+    ).prove();
+    h.setStatusRequiresSource(false);
+    await expect(h.client.submit(ready)).rejects.toThrow(/requirement changed/);
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
+});
+it("keeps a first submission local when service requirements are unavailable", async () => {
+    const h = await configured();
+    const ready = await (
+        await externallyAuthorize(await h.client.quote(await h.prepare(), { maxFeeAmount: 20n }))
+    ).prove();
+    h.setStatusOffline();
+    await expect(h.client.submit(ready)).rejects.toThrow(/status unavailable/);
+    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
 });

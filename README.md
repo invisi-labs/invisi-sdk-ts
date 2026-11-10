@@ -134,4 +134,15 @@ The App decryptor must authenticate the ciphertext (including the AEAD tag) befo
 
 ## Optional Provenance tracking
 
+Discover supported-token services before exposing a concrete transaction:
+
+```ts
+const clients = await protocol.getBroadcasters({ tokenAddress, signal });
+const client = clients[0];
+if (!client) throw Error("No broadcaster supports this token");
+const quoted = await client.quote(prepared, { maxFeeAmount });
+```
+
+Discovery reads registered credentials from Protocol RPC and checks token capability only; it does not estimate gas or fees. Exact shape acceptance and pricing belong to the concrete quote. Client construction requires no Source policy switch; first submission reads service requirements and the server enforces Source acceptance.
+
 The independent [Provenance module](PROVENANCE.md) keeps source recognition separate from protocol spendability. Relay use is optional and restricted to each operator's supported tokens. In the relay route quotation only prices/signs; source proof is generated from the final ready transaction, and Broadcaster verifies source on submit before sending. Direct protocol submission and source submission are independent App-controlled steps, in either order. Successful private-input preflight returns a durable tracking ID; default recovery persists it before broadcast permission and uses automatic chain matching, with bounded tracking waits and primary reconciliation. Normal confirmation does not require another `submitProof`. Explicit `prepareDirect` / `PrepareDirect` / `prepare_direct` and manual submission remain available for an intentionally selected self-broadcast/reproof fallback; missing tracking never silently switches modes. App integration, raw openings, signing and nonce reservations remain host-owned. See the flat [Provenance examples](examples/07-broadcaster/).

@@ -1,11 +1,5 @@
 import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
-import {
-    Invisi,
-    Protocol,
-    ProtocolRpcClient,
-    BroadcasterClient,
-    NoteOutput,
-} from "@invisi-labs/sdk";
+import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { WalletSession } from "@invisi-labs/session";
 import { MemoryWalletStore } from "@invisi-labs/session/memory";
@@ -15,10 +9,6 @@ import { json } from "../example-io.js";
 import { decryptor } from "../app-decryptor.js";
 
 // Alice pays Bob from discovered Notes; Broadcaster handles gas and Source submission.
-const broadcasterEndpoint = "https://your-broadcaster.example/v1/chains/97";
-const quoteSigner = "0x<registered-quote-signer>";
-const feeRecipient = "0x<registered-fee-recipient>";
-
 if (!process.argv.includes("--execute")) {
     console.log("Review this scenario, then pass --execute");
     process.exit(0);
@@ -81,14 +71,14 @@ try {
     });
 
     // 3. Obtain the final fee quote before signing the payment.
-    const broadcaster = new BroadcasterClient({
-        endpoint: broadcasterEndpoint,
-        quoteSigner,
-        feeRecipient,
-        provenanceRequired: true,
-    });
+    const clients = await protocol.getBroadcasters({ tokenAddress });
+    const client = clients[0];
+    if (!client) {
+        throw Error("No broadcaster supports this token");
+    }
+
     // Quoting freezes fees only. Source data/proving is deferred until the ready transaction.
-    const quoted = await broadcaster.quote(prepared, {
+    const quoted = await client.quote(prepared, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,
     });
 
@@ -106,7 +96,7 @@ try {
 
     // 5. The SDK generates required Source proofs locally; Broadcaster submits them to Provenance.
     // It broadcasts only after acceptance; confirmation tracking is automatic.
-    const submitted = await broadcaster.submit(ready);
+    const submitted = await client.submit(ready);
     console.log("Broadcast result:", json(submitted));
 } finally {
     provider.destroy();

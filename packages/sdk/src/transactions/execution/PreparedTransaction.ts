@@ -162,8 +162,9 @@ export class PreparedTransaction {
         }
         // A lost first response has no ID yet. Resend the retained request; only the relay can deduplicate it.
         if (!this.#saved.broadcasterAttempted) {
+            const requirements = await client.submissionRequirements(this.#saved.broadcasterQuote!);
             if (
-                client.configuration.provenanceRequired &&
+                requirements.provenanceRequired &&
                 this.#saved.plan.inputs.length &&
                 !this.#saved.provenance
             )

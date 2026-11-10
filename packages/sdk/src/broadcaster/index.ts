@@ -40,7 +40,6 @@ export interface BroadcasterTrust {
     chainId: bigint;
     protocol: string;
     signer: string;
-    provenanceRequired?: boolean;
 }
 export function broadcasterQuoteDomain(trust: BroadcasterTrust) {
     return {
@@ -145,7 +144,7 @@ export function verifyBroadcasterQuote(
         )
     )
         throw Error("Unknown broadcaster quote field");
-    const required = trust.provenanceRequired === true;
+    const required = signed.provenanceRequired === true;
     if (
         required
             ? signed.provenanceRequired !== true ||
@@ -202,17 +201,14 @@ function checkedStatus(value: unknown, id?: string): BroadcasterStatus {
         throw new Error("invalid broadcaster status");
     return status;
 }
-export type BroadcasterTransport = (request: {
-    jsonrpc: "2.0";
-    id: number;
-    method: string;
-    params: unknown;
-}) => Promise<unknown>;
+export type BroadcasterTransport = (
+    request: { jsonrpc: "2.0"; id: number; method: string; params: unknown },
+    options?: { signal?: AbortSignal }
+) => Promise<unknown>;
 export interface BroadcasterConfiguration {
     endpoint: string;
     quoteSigner: string;
     feeRecipient: string;
-    provenanceRequired?: boolean;
 }
 export class BroadcasterClient {
     readonly configuration: Readonly<BroadcasterConfiguration>;
@@ -222,15 +218,11 @@ export class BroadcasterClient {
     constructor(configuration: BroadcasterConfiguration, transport?: BroadcasterTransport) {
         if (
             Object.keys(configuration).some(
-                (k) =>
-                    !["endpoint", "quoteSigner", "feeRecipient", "provenanceRequired"].includes(k)
+                (k) => !["endpoint", "quoteSigner", "feeRecipient"].includes(k)
             )
         )
             throw Error("Unknown broadcaster configuration field");
         this.configuration = Object.freeze({
-            ...(configuration.provenanceRequired !== true
-                ? {}
-                : { provenanceRequired: configuration.provenanceRequired }),
             endpoint: configuration.endpoint,
             quoteSigner: getAddress(configuration.quoteSigner),
             feeRecipient: getAddress(configuration.feeRecipient),
@@ -240,11 +232,6 @@ export class BroadcasterClient {
             BigInt(this.configuration.feeRecipient) === 0n
         )
             throw new Error("invalid broadcaster configuration");
-        if (
-            configuration.provenanceRequired !== undefined &&
-            typeof configuration.provenanceRequired !== "boolean"
-        )
-            throw new Error("invalid broadcaster provenance requirement");
         this.url = configuration.endpoint;
         const base = new URL(this.url);
         if (base.protocol !== "https:" || base.username || base.password)
@@ -252,13 +239,15 @@ export class BroadcasterClient {
 
         this.transport =
             transport ??
-            (async (request) => {
+            (async (request, options) => {
                 const response = await fetch(base, {
                     redirect: "error",
                     method: "POST",
                     body: JSON.stringify(request),
                     headers: { "content-type": "application/json" },
-                    signal: AbortSignal.timeout(30000),
+                    signal: options?.signal
+                        ? AbortSignal.any([options.signal, AbortSignal.timeout(30000)])
+                        : AbortSignal.timeout(30000),
                 });
                 if (!response.ok) throw new Error(`Broadcaster HTTP ${response.status}`);
                 if (!response.body) throw new Error("empty broadcaster response");
@@ -285,19 +274,46 @@ export class BroadcasterClient {
                 return JSON.parse(new TextDecoder().decode(bytes));
             });
     }
-    private async call(method: string, params: unknown): Promise<unknown> {
+    async supportsToken(
+        tokenAddress: string,
+        context: { chainId: bigint; protocol: string },
+        options: { signal?: AbortSignal } = {}
+    ): Promise<boolean> {
+        const { supportsToken } = await import("./service-status");
+        return supportsToken(
+            this.call.bind(this),
+            this.configuration,
+            tokenAddress,
+            context,
+            options.signal
+        );
+    }
+
+    /** Read only when preparing a first submission, never during construction or quotation. */
+    async submissionRequirements(
+        signed: SignedBroadcasterQuote
+    ): Promise<{ provenanceRequired: boolean }> {
+        const { submissionRequirements } = await import("./service-status");
+        return submissionRequirements(this.call.bind(this), this.configuration, signed);
+    }
+
+    private async call(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
         const id = ++this.requestId;
-        const response = (await this.transport({
-            jsonrpc: "2.0",
-            id,
-            method,
-            params: [params],
-        })) as {
+        const response = (await this.transport(
+            {
+                jsonrpc: "2.0",
+                id,
+                method,
+                params: params === undefined ? [] : [params],
+            },
+            signal ? { signal } : undefined
+        )) as {
             jsonrpc?: string;
             id?: unknown;
             result?: unknown;
             error?: { code?: unknown; message?: unknown };
         };
+        signal?.throwIfAborted();
         if (
             !response ||
             response.jsonrpc !== "2.0" ||
@@ -357,9 +373,6 @@ export class BroadcasterClient {
             {
                 ...context,
                 signer: this.configuration.quoteSigner,
-                ...(this.configuration.provenanceRequired !== true
-                    ? {}
-                    : { provenanceRequired: this.configuration.provenanceRequired }),
             },
             data
         );
@@ -383,15 +396,14 @@ export class BroadcasterClient {
         proofSidecars: readonly ProofSidecar[] = []
     ): Promise<BroadcasterStatus> {
         if (!Array.isArray(proofSidecars)) throw Error("proofSidecars must be an array");
+        if (signed.provenanceRequired !== true && proofSidecars.length)
+            throw Error("Quote does not accept provenance evidence");
         if (!signed.context) throw new Error("missing verified quote context");
         verifyBroadcasterQuote(
             signed,
             {
                 ...signed.context,
                 signer: this.configuration.quoteSigner,
-                ...(this.configuration.provenanceRequired !== true
-                    ? {}
-                    : { provenanceRequired: this.configuration.provenanceRequired }),
             },
             data,
             0n
@@ -404,7 +416,7 @@ export class BroadcasterClient {
                 data,
                 quote: signed.quote,
                 signature: signed.signature,
-                ...(this.configuration.provenanceRequired !== true
+                ...(signed.provenanceRequired !== true
                     ? {}
                     : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
             })

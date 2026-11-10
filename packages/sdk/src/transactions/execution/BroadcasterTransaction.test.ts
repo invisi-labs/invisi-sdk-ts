@@ -96,6 +96,17 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
     const transport = vi.fn(
         async (request: { jsonrpc: "2.0"; id: number; method: string; params: unknown }) => {
             const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
+            if (request.method === "broadcaster_getStatus")
+                return result({
+                    apiVersion: "v1",
+                    protocolVersion: "1",
+                    chainId: String(h.context.chainId),
+                    protocol: h.context.protocolAddress,
+                    sender: operator.address,
+                    feeRecipient: operator.address,
+                    submissionHalted: false,
+                    provenance: { enabled: false },
+                });
             if (request.method === "broadcaster_estimateQuote")
                 return result({
                     feeRecipient: operator.address,
