@@ -33,10 +33,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test release validation
-        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs
+        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs
 
       - name: Validate release versions and dependencies
         run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
+
+      - name: Verify provisioned Provenance release assets
+        run: python3 scripts/sync-provenance.py --check-package packages/prover/provenance
 
       - name: Build and pack release packages
         run: |
@@ -55,6 +58,6 @@ jobs:
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          for package in "$RUNNER_TEMP/release-packages/"*.tgz; do
-            node scripts/publish-release.mjs "$package"
+          for package in primitives protocol prover rpc sdk session react vue; do
+            node scripts/publish-release.mjs "$RUNNER_TEMP/release-packages/invisi-labs-$package-${GITHUB_REF_NAME#v}.tgz"
           done

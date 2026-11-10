@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize source proof assets from a local protocol checkout authenticated by a pinned digest."""
+"""Synchronize or verify public Source proof assets authenticated by a pinned manifest digest."""
 import argparse
 import hashlib
 import json
@@ -8,11 +8,15 @@ from pathlib import Path
 
 PIN = "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("protocol_root", type=Path)
+parser.add_argument("protocol_root", type=Path, nargs="?")
+parser.add_argument("--check-package", type=Path, help="Verify a provisioned package without copying files")
 parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "packages" / "prover" / "provenance")
 args = parser.parse_args()
-source = args.protocol_root.resolve()
-manifest_bytes = (source / "circuits/provenance/manifest.json").read_bytes()
+if (args.protocol_root is None) == (args.check_package is None):
+    parser.error("Select a protocol checkout or --check-package, but not both")
+source = (args.check_package or args.protocol_root).resolve()
+manifest_path = source / ("manifest.json" if args.check_package else "circuits/provenance/manifest.json")
+manifest_bytes = manifest_path.read_bytes()
 if hashlib.sha256(manifest_bytes).hexdigest() != PIN:
     raise SystemExit("Untrusted provenance manifest; review and explicitly update the release pin")
 manifest = json.loads(manifest_bytes)
@@ -31,6 +35,13 @@ for entry in manifest["circuits"]:
         if hashlib.sha256(data).hexdigest() != entry[key + "Sha256"]:
             raise SystemExit(f"Provenance {key} integrity mismatch for K{entry['capacity']}")
         payloads.append((str(relative), data))
+if args.check_package:
+    expected = {relative for relative, _ in payloads}
+    actual = {str(path.relative_to(source)) for path in source.rglob("*") if path.is_file()}
+    if actual != expected:
+        raise SystemExit("Unexpected Provenance package asset inventory")
+    print(f"Verified pinned manifest and {len(payloads) - 1} public artifacts/VKs across all seven tiers")
+    raise SystemExit(0)
 capacities = {"k" + str(entry["capacity"]) for entry in manifest["circuits"]}
 asset_root = args.output / "circuits" / "provenance"
 if asset_root.exists():

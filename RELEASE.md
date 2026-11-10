@@ -4,6 +4,7 @@ All eight public packages form one fixed `1.2.0` release. Package versions are s
 
 ```sh
 pnpm install --frozen-lockfile
+python3 scripts/sync-provenance.py --check-package packages/prover/provenance
 pnpm build
 pnpm lint
 pnpm exec turbo run test --concurrency=1 -- --maxWorkers=2 --minWorkers=1
@@ -23,3 +24,5 @@ The packed consumer check validates every declared export and exact sibling depe
 Provenance cache behavior is shared across TS, Go and Rust: validate retained public evidence locally and reuse it without chain reads, Source requests or a prover. Explicit reproof refreshes evidence using the retained original operation; it does not recreate or mutate the payment. Final RPC gas estimates use final calldata and caller and remain distinct from gas benchmark references and relay fees. Token-filtered broadcaster discovery probes authenticated operator capability after pinned registry pagination; no token field is added to the Protocol RPC pagination method.
 
 Publishing requires a separate authorization. These preparation steps do not create Git tags, push branches or run the publishing script.
+
+The seven Provenance tiers ship as 14 public compiled artifacts and verification keys, versioned beside the pinned manifest. Release CI authenticates their manifest pin, individual SHA-256 hashes and exact file inventory before packing; witness data is not part of this asset set. To update the release, authenticate a current protocol checkout with `python3 scripts/sync-provenance.py <protocol-root>` and review the manifest/pin and all public resource changes together.
