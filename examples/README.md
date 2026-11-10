@@ -100,4 +100,14 @@ The account controls the default database (`examples/accounts/<account>-session.
 
 [Broadcaster and independent Provenance examples](07-broadcaster/) demonstrate relay fees/submission and direct source submission separately. A Note input requires source proof even without a Note output; Credit state inputs do not require a Note source proof.
 
-Run `example:broadcaster:1 --execute` to discover `clients` by token, select one, then quote the concrete payment and submit through it. No endpoint, quote signer, fee recipient or Source policy is entered manually. Run `example:broadcaster:2 --execute` for a direct payment and Source submission/query; add `--resume` to paste a saved `{sourceProof}` without recreating the payment. These two examples use ephemeral in-memory inventory; see `05-wallet-session` for encrypted persistent storage and transaction recovery.
+Run `example:broadcaster:1 --execute` to discover `clients` by token, select one, then quote and relay the payment. No service credentials or Source policy are entered manually.
+
+| Command | Order and recovery |
+| --- | --- |
+| `example:broadcaster:2 --execute` | Generate and submit Source proof first; send the main payment only after acceptance |
+| `example:broadcaster:3 --execute` | Encrypt original operation/openings in SQLite, then send the main payment without Provenance access |
+| `example:broadcaster:3 --execute --resume` | Reopen the same journal by `OPERATION_ID`, reconcile confirmation, fetch recognition data, generate Source proof and submit |
+
+Example03 requires `STORE_ENCRYPTION_KEY_HEX`, a dedicated 32-byte storage key retained across runs. `WALLET_DB` optionally overrides `examples/accounts/alice-provenance.sqlite`. Save the operation ID printed before sending, then set `OPERATION_ID` for `--resume`. A crash between sending and journaling the hash can be reconciled with optional `TRANSACTION_HASH`; it is not passed to Provenance. Recovery needs neither `ALICE_PRIVATE_KEY` nor a previously generated Source proof, and never signs or sends a payment. If Source is offline or input recognition is pending, retry the same operation after data becomes available. Keep the encrypted original operation even after spent inventory is pruned.
+
+Examples01/02 use ephemeral inventory; Example03 demonstrates encrypted persistent operation recovery. None serializes a `ready` object or stores openings in public history.
