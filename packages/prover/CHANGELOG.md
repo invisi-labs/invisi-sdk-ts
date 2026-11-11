@@ -1,5 +1,10 @@
 # @invisi-labs/prover
 
+## 1.2.1
+
+- Align internal dependencies with the 1.2.1 workspace release.
+
+
 ## 1.2.0
 
 - Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.

@@ -1,5 +1,10 @@
 # @invisi-labs/sdk
 
+## 1.2.1
+
+- Expose explicit native detection and decryption contracts with complete protocol context.
+
+
 ## 1.2.0
 
 - Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.

@@ -1,5 +1,10 @@
 # @invisi-labs/primitives
 
+## 1.2.1
+
+- Pass complete delivery detection/decryption context and distinguish operational errors from unresolved authentication results.
+
+
 ## 1.2.0
 
 - Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.

@@ -1,5 +1,10 @@
 # @invisi-labs/session
 
+## 1.2.1
+
+- Share bounded public history across accounts; prioritize recent asset discovery, persist independent scan coverage, and expose recovery and spendability status.
+
+
 ## 1.2.0
 
 - Align the six modules: pure primitives/protocol, independent prover/rpc, stateless sdk, managed session; retain React/Vue adapters.

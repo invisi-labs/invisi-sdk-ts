@@ -55,6 +55,13 @@ jobs:
       - name: Verify installed package entry points and types
         run: node scripts/check-packed-release.mjs "$GITHUB_REF_NAME" "$RUNNER_TEMP/release-packages"
 
+      - name: Verify canonical release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/canonical-packages"
+          node scripts/restore-release-archives.mjs "$GITHUB_REF_NAME" "$RUNNER_TEMP/release-packages" "$RUNNER_TEMP/canonical-packages"
+
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
