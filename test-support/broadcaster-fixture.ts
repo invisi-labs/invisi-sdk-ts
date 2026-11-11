@@ -40,6 +40,7 @@ export function quoteClient(
                 deadline: String(params.deadline),
                 maxGas: "2000000",
                 requestHash: broadcasterRequestHash(data),
+                execution: "direct",
             };
             return result({
                 quote,

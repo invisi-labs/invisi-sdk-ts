@@ -9,6 +9,7 @@ export {
 } from "@invisi-labs/rpc/broadcaster";
 export type {
     BroadcasterQuote,
+    BroadcasterMemberProof,
     BroadcasterEstimate,
     SignedBroadcasterQuote,
     BroadcasterTrust,

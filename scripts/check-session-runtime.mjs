@@ -101,6 +101,7 @@ for (const format of ["js", "cjs"]) {
                 deadline: String(intent.deadline),
                 maxGas: "1000000",
                 requestHash: sdk.broadcasterRequestHash(params.data),
+                execution: "direct",
             };
             return {
                 jsonrpc: "2.0",

@@ -16,7 +16,7 @@ import {
     type RootCertificate,
     type TrustContext,
 } from "@invisi-labs/protocol/provenance";
-import { transactUserPublicInputs } from "@invisi-labs/protocol";
+import { buildTransactCalldata, transactUserPublicInputs } from "@invisi-labs/protocol";
 import { decodeBroadcasterIntent } from "../broadcaster/index";
 import { setup, externallyAuthorize } from "../transactions/execution/ExplicitTransaction-fixtures";
 import { testOutput } from "../../../../test-support/test-output";
@@ -24,7 +24,7 @@ import { Provenance } from "./Provenance";
 import type { ProvenanceProof } from "./proof-record";
 
 // Mock proof bytes exercise packet and transport boundaries, not Noir/BB verification.
-async function fixture() {
+async function fixture(execution: "single" | "aggregate" = "single") {
     const h = await setup();
     const ready = await (
         await externallyAuthorize(
@@ -36,8 +36,15 @@ async function fixture() {
                 outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
             })
         )
-    ).prove();
-    const call = await ready.exportTransaction();
+    ).prove({ execution });
+    const member = execution === "aggregate" ? ready.exportAggregateMember() : undefined;
+    const call = member
+        ? buildTransactCalldata({
+              context: member.context,
+              proof: member.bundle.proofHex,
+              ...member.request,
+          })
+        : await ready.exportTransaction();
     const decoded = decodeBroadcasterIntent(call.data);
     const raw = decoded.request.params;
     const params = {
@@ -223,4 +230,20 @@ it("requires local proving capability only for proof generation", async () => {
         /NativeProver/
     );
     expect(h.client.submitSourceProof).not.toHaveBeenCalled();
+});
+
+it("submits canonical recursive member bytes to Source without a quote or witness upload", async () => {
+    const h = await fixture("aggregate");
+    const saved = JSON.stringify(h.packet);
+    const decoded = decodeBroadcasterIntent(h.packet.data);
+    expect(decoded.proof).toHaveLength(2 + 458 * 64);
+    expect(saved).not.toMatch(/witness|opening|nonce|client|prover/);
+    const provenance = new Provenance(h.options);
+    await provenance.submit(JSON.parse(saved));
+    await provenance.submit(JSON.parse(saved));
+    expect(h.client.submitSourceProof).toHaveBeenLastCalledWith(h.packet.data, h.packet.sidecars);
+    expect(JSON.stringify(h.packet)).toBe(saved);
+    h.client.submitSourceProof.mockRejectedValueOnce(Error("Source unavailable"));
+    await expect(provenance.submit(JSON.parse(saved))).rejects.toThrow("Source unavailable");
+    expect(JSON.stringify(h.packet)).toBe(saved);
 });

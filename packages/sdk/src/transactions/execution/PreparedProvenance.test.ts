@@ -26,7 +26,7 @@ import { externallyAuthorize, setup, backend } from "./ExplicitTransaction-fixtu
 import { testOutput } from "../../../../../test-support/test-output";
 
 // Opaque proof bytes test orchestration only; actual Noir/BB and relay execution run in the owned-chain harness.
-async function configured(historical = false) {
+async function configured(historical = false, execution: "direct" | "aggregate" = "direct") {
     const h = await setup(),
         events: string[] = [],
         requests: any[] = [];
@@ -87,6 +87,8 @@ async function configured(historical = false) {
         expiresAt: String(Math.floor(Date.now() / 1000) + 3600),
         operationDigest: digest,
     });
+    let relayState = "submitted";
+    let unknownSubmission = false;
     let statusOffline = false,
         statusRequiresSource = true;
     let unsupportedToken = false;
@@ -195,6 +197,7 @@ async function configured(historical = false) {
                         submissionHalted: false,
                         provenance: {
                             enabled: statusRequiresSource,
+                            aggregateSupported: true,
                             trackingRequired: true,
                             trackingSupported: true,
                             requestHashFormat: "invisi-broadcaster-provenance-intent-v1",
@@ -225,6 +228,7 @@ async function configured(historical = false) {
                     deadline: String(intent.deadline),
                     maxGas: "2000000",
                     requestHash: provenanceIntentHash(broadcasterRequestHash(p.data)),
+                    execution,
                 };
                 return {
                     jsonrpc: "2.0",
@@ -253,6 +257,12 @@ async function configured(historical = false) {
                 )
                     throw Error("Missing source proof");
             }
+            if (q.method === "broadcaster_getTransactionStatus" && unknownSubmission)
+                return {
+                    jsonrpc: "2.0",
+                    id: q.id,
+                    error: { code: -32001, message: "Unknown submission" },
+                };
             events.push("submit");
             if (q.method === "broadcaster_submitTransaction" && loseNextSubmitResponse) {
                 loseNextSubmitResponse = false;
@@ -263,7 +273,7 @@ async function configured(historical = false) {
                 id: q.id,
                 result: {
                     id: q.method === "broadcaster_getTransactionStatus" ? p.id : "relay-owned-id",
-                    state: "submitted",
+                    state: relayState,
                     transactionHash: word(45),
                 },
             };
@@ -287,6 +297,12 @@ async function configured(historical = false) {
         });
     return {
         ...h,
+        setRelayState: (value: string) => {
+            relayState = value;
+        },
+        setUnknownSubmission: () => {
+            unknownSubmission = true;
+        },
         setStatusOffline: () => {
             statusOffline = true;
         },
@@ -605,4 +621,131 @@ it("submits public-only funding without requesting or attaching a source proof e
     expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
     const submission = h.requests.find((q) => q.method === "broadcaster_submitTransaction");
     expect(submission.proofSidecars ?? []).toEqual([]);
+});
+
+it("persists a quoted aggregate member across response loss and restart, observes relay states without releasing inputs, and confirms only its canonical batch", async () => {
+    const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
+    const { sessionOptions } = await import("../../../../../test-support/session-options");
+    const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const { buildTransactAggregateCalldata } = await import("@invisi-labs/protocol");
+    const h = await configured(false, "aggregate");
+    const mainProver = backend();
+    const session = new WalletSession(
+        sessionOptions({ ...h.options, prover: mainProver, provenance: h.capability })
+    );
+    const quoted = await h.client.quote(
+        await session.prepareTransfer({
+            tokenAddress: h.context.tokenAddress,
+            outputs: [],
+            withdrawal: { to: h.bob.ownerAddress, amount: 98n },
+        }),
+        { maxFeeAmount: 20n }
+    );
+    const ready = await (await authorizeOperation(quoted)).prove();
+    expect(mainProver.prove).toHaveBeenCalledWith(
+        expect.objectContaining({ target: "noir-recursive" }),
+        expect.anything()
+    );
+    const member = await ready.exportAggregateMember();
+    h.setRelayState("queued");
+    h.loseSubmitResponse();
+    await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
+    const stored = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
+    expect(stored.call).toBeUndefined();
+    expect(stored.broadcasterQuote.quote.execution).toBe("aggregate");
+    expect(stored.proof.target).toBe("noir-recursive");
+    expect(stored.broadcasterRequest.memberProof).toEqual(member.bundle);
+    expect(stored.broadcasterRequest.data).toBe(stored.provenance.data);
+    expect(stored.broadcasterSubmissionId).toBeUndefined();
+    expect(stored.externalized).toBe(true);
+    expect(stored.broadcasterAttempted).toBe(true);
+    const reservations = (await h.store.readSnapshot(h.scope)).reservations;
+    expect(Object.values(reservations)).toContain(ready.id);
+
+    // ID-less recovery replays the durable request without Source, proving or unspent inventory.
+    h.reader.isSpent = async (_scope, words) => words.map(() => true);
+    h.setStatusOffline();
+    const restarted = new WalletSession(sessionOptions({ ...h.options }));
+    const restored = await restarted.resume(ready.id);
+    let before = h.requests.length;
+    expect((await h.client.submit(restored)).state).toBe("queued");
+    expect(h.requests.slice(before).map((q) => q.method)).toEqual([
+        "broadcaster_submitTransaction",
+    ]);
+    const submissions = h.requests.filter((q) => q.method === "broadcaster_submitTransaction");
+    expect(submissions).toHaveLength(2);
+    expect(submissions[1]).toEqual(submissions[0]);
+    expect(submissions[1].memberProof).toEqual(member.bundle);
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+
+    const known = await new WalletSession(sessionOptions({ ...h.options })).resume(ready.id);
+    const otherTransport = vi.fn(async () => {
+        throw Error("unexpected RPC");
+    });
+    const otherEndpoint = new BroadcasterClient(
+        {
+            ...h.client.configuration,
+            endpoint: "https://other-relay.test",
+        },
+        otherTransport
+    );
+    await expect(otherEndpoint.submit(known)).rejects.toThrow(/context changed/);
+    const otherOperator = new BroadcasterClient(
+        {
+            ...h.client.configuration,
+            quoteSigner: new EvmWallet(`0x${"04".repeat(32)}`).address,
+        },
+        otherTransport
+    );
+    await expect(otherOperator.submit(known)).rejects.toThrow(/context changed/);
+    expect(otherTransport).not.toHaveBeenCalled();
+    for (const state of ["proving", "rejected", "expired"]) {
+        h.setRelayState(state);
+        before = h.requests.length;
+        expect((await h.client.submit(known)).state).toBe(state);
+        expect(h.requests.slice(before).map((q) => q.method)).toEqual([
+            "broadcaster_getTransactionStatus",
+        ]);
+        expect((await h.store.readSnapshot(h.scope)).reservations).toEqual(reservations);
+    }
+    h.setUnknownSubmission();
+    before = h.requests.length;
+    await expect(h.client.submit(known)).rejects.toThrow(/Unknown submission/);
+    expect(h.requests.slice(before).map((q) => q.method)).toEqual([
+        "broadcaster_getTransactionStatus",
+    ]);
+    expect((await h.store.readSnapshot(h.scope)).reservations).toEqual(reservations);
+
+    const hash = word(45) as `0x${string}`;
+    const requests = [structuredClone(member.request)];
+    h.reader.getReceipt = async () => ({
+        block: await h.reader.getBlock(12n),
+        transactionHash: hash,
+        status: "success",
+        logs: [],
+    });
+    h.reader.getTransaction = async () => ({
+        transactionHash: hash,
+        to: h.context.protocolAddress,
+        value: 0n,
+        from: h.wallet.getAddress() as `0x${string}`,
+        nonce: 0n,
+        data: buildTransactAggregateCalldata({
+            context: h.context,
+            proof: "0x00",
+            requests,
+            caller: h.wallet.getAddress() as `0x${string}`,
+        }).data,
+    });
+    requests[0]!.params.withdrawalAmount = 97n;
+    await expect(known.reconcile({ transactionHash: hash })).rejects.toThrow(/frozen|member/);
+    expect((await h.store.readSnapshot(h.scope)).reservations).toEqual(reservations);
+    requests[0]!.params.withdrawalAmount = 98n;
+    requests.push(structuredClone(requests[0]!));
+    await expect(known.reconcile({ transactionHash: hash })).rejects.toThrow(/frozen|member/);
+    requests.pop();
+    expect((await known.reconcile({ transactionHash: hash })).status).toBe("confirmed");
+    expect(Object.values((await h.store.readSnapshot(h.scope)).reservations)).not.toContain(
+        ready.id
+    );
 });

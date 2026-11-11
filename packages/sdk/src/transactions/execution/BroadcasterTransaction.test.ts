@@ -126,6 +126,7 @@ it("carries a pre-authorization firm quote through local proof to public-only pa
                     deadline: String(BigInt(Math.floor(Date.now() / 1000)) + 60n),
                     maxGas: "2000000",
                     requestHash: broadcasterRequestHash(payload.data),
+                    execution: "direct" as const,
                 };
                 return result({
                     quote,

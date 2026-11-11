@@ -92,6 +92,7 @@ describe("broadcaster final intents", () => {
             deadline: "9999999999",
             maxGas: "1000000",
             requestHash: broadcasterRequestHash(data),
+            execution: "direct" as const,
         };
         const signature = await signer.signTypedData(
             broadcasterQuoteDomain(trust),
@@ -142,6 +143,7 @@ describe("broadcaster final intents", () => {
             deadline: "1",
             maxGas: "1000000",
             requestHash: broadcasterRequestHash(data),
+            execution: "direct" as const,
         };
         const signed = {
             quote,
@@ -187,6 +189,7 @@ describe("broadcaster final intents", () => {
             deadline: "9999999999",
             maxGas: "1000000",
             requestHash: broadcasterRequestHash(data),
+            execution: "direct" as const,
         };
         const signed = {
             quote,
@@ -318,6 +321,7 @@ it("binds the provenance requirement to a signed quote and rejects downgrades", 
             deadline: "9999999999",
             maxGas: "1000000",
             requestHash: provenanceIntentHash(broadcasterRequestHash(data)),
+            execution: "direct" as const,
         };
     const signed = {
         quote,

@@ -1,0 +1,204 @@
+import { Wallet, ZeroAddress, ZeroHash } from "ethers";
+import { describe, expect, it } from "vitest";
+import {
+    BroadcasterClient,
+    broadcasterTransactInterface,
+    broadcasterRequestHash,
+    broadcasterQuoteDomain,
+    broadcasterQuoteTypes,
+    verifyBroadcasterQuote,
+    type BroadcasterMemberProof,
+    type SignedBroadcasterQuote,
+} from "./broadcaster";
+const signer = new Wallet(`0x${"11".repeat(32)}`);
+const trust = { chainId: 31337n, protocol: `0x${"22".repeat(20)}`, signer: signer.address };
+function data(amount = 0n) {
+    return broadcasterTransactInterface.encodeFunctionData("transact", [
+        "0x1234",
+        {
+            params: {
+                token: trust.protocol,
+                sources: [{ treeId: 1n, merkleRoot: ZeroHash }],
+                nullifiers: [ZeroHash],
+                noteCommitments: [],
+                withdrawalAddress: signer.address,
+                withdrawalAmount: 100n,
+                deadline: 9999999999n,
+                feeRecipient: signer.address,
+                feeAmount: 2n,
+            },
+            deliveries: [],
+            funding: {
+                payer: ZeroAddress,
+                amount,
+                sigNonce: 0n,
+                deadline: 0n,
+                signature: "0x",
+                permit: { deadline: 0n, v: 0, r: ZeroHash, s: ZeroHash },
+            },
+        },
+    ]);
+}
+async function signed(
+    execution: "direct" | "aggregate" = "direct",
+    calldata = data()
+): Promise<SignedBroadcasterQuote> {
+    const quote = {
+        token: trust.protocol,
+        feeRecipient: signer.address,
+        feeAmount: "2",
+        deadline: "9999999999",
+        maxGas: "1000000",
+        requestHash: broadcasterRequestHash(calldata),
+        execution,
+    };
+    return {
+        quote,
+        signature: await signer.signTypedData(
+            broadcasterQuoteDomain(trust),
+            broadcasterQuoteTypes,
+            quote
+        ),
+        context: trust,
+    };
+}
+function client(result: unknown, capture?: (params: unknown) => void) {
+    return new BroadcasterClient(
+        {
+            endpoint: "https://example.org",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+        },
+        async (request) => {
+            capture?.(request.params);
+            return { jsonrpc: "2.0", id: request.id, result };
+        }
+    );
+}
+function member(): BroadcasterMemberProof {
+    const inputs = Array<string>(20).fill(ZeroHash);
+    inputs[3] = `0x${"0".repeat(63)}1`;
+    return {
+        formatVersion: 1,
+        circuitName: "transact_user_slots1",
+        target: "noir-recursive",
+        bbVersion: "6.0.0",
+        artifactSha256: "a".repeat(64),
+        vkSha256: "b".repeat(64),
+        proofHex: "0x1234",
+        proofSha256: "c".repeat(64),
+        publicInputs: inputs as `0x${string}`[],
+    };
+}
+describe("execution-bound broadcaster wire contract", () => {
+    it("requires the signed seventh field and detects execution tampering", async () => {
+        const quote = await signed();
+        verifyBroadcasterQuote(quote, trust, data());
+        expect(() =>
+            verifyBroadcasterQuote(
+                { ...quote, quote: { ...quote.quote, execution: "aggregate" } },
+                trust,
+                data()
+            )
+        ).toThrow("signature");
+        const legacy = { ...quote.quote } as Partial<typeof quote.quote>;
+        delete legacy.execution;
+        expect(() =>
+            verifyBroadcasterQuote({ ...quote, quote: legacy as typeof quote.quote }, trust, data())
+        ).toThrow("execution");
+    });
+    it("rejects unsigned extra quote fields and malformed quote objects", async () => {
+        const original = await signed();
+        for (const quote of [
+            { ...original.quote, privateWitness: { secret: "must not travel" } },
+            { ...original.quote, aggregateSupported: true },
+            Object.assign([], original.quote),
+            null,
+            "direct",
+        ]) {
+            expect(() =>
+                verifyBroadcasterQuote(
+                    { ...original, quote } as SignedBroadcasterQuote,
+                    trust,
+                    data()
+                )
+            ).toThrow();
+        }
+    });
+    it("rejects funded aggregate quotes", async () => {
+        const quote = await signed("aggregate", data(1n));
+        expect(() => verifyBroadcasterQuote(quote, trust, data(1n))).toThrow("unfunded private");
+    });
+    it("submits public recursive evidence only with aggregate execution", async () => {
+        const proof = member(),
+            quote = await signed("aggregate");
+        let wire: unknown;
+        const rpc = client({ id: "member", state: "queued" }, (value) => {
+            wire = value;
+        });
+        await expect(rpc.submitTransaction(data(), quote, [], proof)).resolves.toMatchObject({
+            state: "queued",
+        });
+        expect(wire).toEqual([
+            { data: data(), quote: quote.quote, signature: quote.signature, memberProof: proof },
+        ]);
+        await expect(rpc.submitTransaction(data(), quote)).rejects.toThrow("execution");
+        await expect(rpc.submitTransaction(data(), await signed(), [], proof)).rejects.toThrow(
+            "execution"
+        );
+        for (const invalid of [
+            { ...proof, privateWitness: {} },
+            { ...proof, target: "evm" },
+            { ...proof, proofHex: "0x1235" },
+            { ...proof, circuitName: "transact_user_slots2" },
+            { ...proof, publicInputs: [] },
+        ])
+            await expect(
+                rpc.submitTransaction(data(), quote, [], invalid as BroadcasterMemberProof)
+            ).rejects.toThrow("member proof");
+    });
+    it("accepts every known lifecycle state and rejects unknown states", async () => {
+        for (const state of [
+            "pending",
+            "submitted",
+            "confirmed",
+            "reverted",
+            "uncertain",
+            "queued",
+            "proving",
+            "rejected",
+            "expired",
+        ])
+            await expect(client({ id: "member", state }).status("member")).resolves.toEqual({
+                id: "member",
+                state,
+            });
+        await expect(client({ id: "member", state: "new-state" }).status("member")).rejects.toThrow(
+            "status"
+        );
+    });
+    it("requires aggregation capability only for aggregate quotes", async () => {
+        const status = {
+            apiVersion: "v1",
+            protocolVersion: "1",
+            chainId: String(trust.chainId),
+            protocol: trust.protocol,
+            sender: signer.address,
+            feeRecipient: signer.address,
+            submissionHalted: false,
+            provenance: { enabled: false, aggregateSupported: true },
+        };
+        await expect(client(status).submissionRequirements(await signed())).resolves.toEqual({
+            provenanceRequired: false,
+        });
+        await expect(
+            client(status).submissionRequirements(await signed("aggregate"))
+        ).resolves.toEqual({ provenanceRequired: false });
+        await expect(
+            client({
+                ...status,
+                provenance: { ...status.provenance, aggregateSupported: false },
+            }).submissionRequirements(await signed("aggregate"))
+        ).rejects.toThrow("aggregation unavailable");
+    });
+});

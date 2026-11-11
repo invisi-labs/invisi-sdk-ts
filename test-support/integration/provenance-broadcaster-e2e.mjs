@@ -162,6 +162,10 @@ async function until(label, fn, { timeout = 90000 } = {}) {
 }
 const fingerprint = (path) => sha(readFileSync(path));
 try {
+    if (options.highlevel) {
+        step("build-current-typescript-sdk");
+        run("pnpm", ["build"], join(repoRoot, "invisi-sdk-ts"));
+    }
     {
         step("build-real-services");
         run("go", ["build", "-mod=readonly", "-o", join(bin, "protocol-rpc"), "./cmd"], rpcRoot);
@@ -181,6 +185,8 @@ try {
             provenanceSha256: fingerprint(join(bin, "provenance")),
         };
     }
+    step("build-current-protocol-artifacts");
+    run("forge", ["build", "--deny", "warnings"], root);
     step("deploy-complete-real-main-release");
     runtime = await createSettlementRuntime({
         root,
@@ -238,16 +244,27 @@ try {
             deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
             funding: funding(amount),
         }),
-        shieldReceipt = await tx(
-            "shield",
-            protocol,
-            proto.encodeFunctionData("shield", [
-                shieldRequest.params,
-                shieldRequest.outputs,
-                shieldRequest.deliveries,
-                shieldRequest.funding,
+        shieldData = proto.encodeFunctionData("shield", [
+            shieldRequest.params,
+            shieldRequest.outputs,
+            shieldRequest.deliveries,
+            shieldRequest.funding,
+        ]);
+    // Preserve the revert reason before sending a fixture transaction or starting dependent services.
+    try {
+        await runtime.rpc("eth_call", [{ from: sender, to: protocol, data: shieldData }, "latest"]);
+    } catch (error) {
+        save(
+            "shield.trace.json",
+            await runtime.rpc("debug_traceCall", [
+                { from: sender, to: protocol, data: shieldData },
+                "latest",
+                { tracer: "callTracer" },
             ])
-        ),
+        );
+        throw error;
+    }
+    const shieldReceipt = await tx("shield", protocol, shieldData),
         sourceC = await noteCommitment(context, sourceNote);
     assert.equal(BigInt(await call(token, tokens[0], "balanceOf", [protocol])), amount);
     assert.equal(BigInt(await call(token, tokens[0], "balanceOf", [sender])), amount * 9n);
@@ -474,6 +491,23 @@ try {
                     maxPriorityFeePerGas: "1000000",
                     gasMarginBps: 2000,
                     markupBps: 3000,
+                    ...(options.highlevel
+                        ? {
+                              aggregation: {
+                                  enabled: true,
+                                  bbPath: join(root, ".tools/bb/bb"),
+                                  noirExecutePath: join(root, ".tools/noir/noir-execute"),
+                                  threads: 4,
+                                  proofTimeoutSeconds: 60,
+                                  maxWaitSeconds: 1,
+                                  activityWindowSeconds: 300,
+                                  minRecentActivity: 1,
+                                  pollIntervalMillis: 100,
+                                  minDeadlineSlackSeconds: 5,
+                                  maxBatchGas: 30000000,
+                              },
+                          }
+                        : {}),
                     prices: {
                         [tokens[0].toLowerCase()]: {
                             numerator: "1",
@@ -632,11 +666,60 @@ try {
             assert.equal(result.complete, true);
             assert.equal(result.manualSidecarsAtCaller, false);
             report.highlevel = result;
+            assert.equal(result.execution, "direct", "a cold service must quote direct");
+            assert.equal(
+                result.changeCommitments.length,
+                1,
+                "first payment must retain recognized change"
+            );
+            step("normal-sdk-async-aggregate-single-fallback");
+            const aggregateOutput = join(directory, "aggregate-highlevel");
+            mkdirSync(aggregateOutput, { recursive: true, mode: 0o700 });
+            const aggregateFixturePath = join(aggregateOutput, "fixture.json");
+            writeFileSync(
+                aggregateFixturePath,
+                json({
+                    ...JSON.parse(readFileSync(fixturePath)),
+                    output: aggregateOutput,
+                    sourceCommitment: result.changeCommitments[0],
+                    knownOtherRecipientCommitments: result.recipientCommitments,
+                    execution: "aggregate",
+                    expectedSourceCheckpoint: "3",
+                }),
+                { mode: 0o600 }
+            );
+            const aggregateChild = start(
+                join(sdkRoot, "examples/node_modules/.bin/tsx"),
+                [
+                    fileURLToPath(new URL("./provenance-highlevel-typescript.ts", import.meta.url)),
+                    "--execute",
+                    "--submit",
+                ],
+                sdkRoot,
+                "highlevel-typescript-aggregate",
+                { INVISI_HIGHLEVEL_FIXTURE: aggregateFixturePath, NODE_EXTRA_CA_CERTS: certPath }
+            );
+            await new Promise((resolve, reject) =>
+                aggregateChild.once("exit", (code) =>
+                    code === 0
+                        ? resolve()
+                        : reject(Error("normal TypeScript aggregate flow failed " + code))
+                )
+            );
+            children.splice(children.indexOf(aggregateChild), 1);
+            const aggregateResult = JSON.parse(
+                readFileSync(join(aggregateOutput, "highlevel-typescript.json"))
+            );
+            assert.equal(aggregateResult.complete, true);
+            assert.equal(aggregateResult.execution, "aggregate");
+            assert.equal(aggregateResult.manualSidecarsAtCaller, false);
+            report.highlevelAggregate = aggregateResult;
             Object.assign(report, {
                 realBroadcaster: true,
                 realNativeProvenanceVerifier: true,
                 sourceRecognitionComplete: true,
                 highlevelSDK: "typescript",
+                realAsyncAggregation: true,
                 completedAt: new Date().toISOString(),
             });
             break sourceFlow;
@@ -1016,6 +1099,7 @@ try {
                     { name: "deadline", type: "uint256" },
                     { name: "maxGas", type: "uint256" },
                     { name: "requestHash", type: "bytes32" },
+                    { name: "execution", type: "string" },
                 ],
             },
             signed.quote,

@@ -97,7 +97,7 @@ const draw = await invisi.prepareDrawCredit({
 
 Current releases pin Noir/Noir JS1.0.0 and BB6.0.0, with Credit manifest7/format8 and fee-binding authorization domains v4. The SDK authenticates77 circuit artifacts and their target-specific verification keys:28 direct Note circuits,34 aggregate outers and15 direct Credit circuits. Direct Note capacities are C1..C10 and C20..C190 by10. Credit draws select C1/2/3/4/5/10/20/30/40/50/60/70/80. Credit create/draw/update are direct-only.
 
-After Note wallet authorization, `prove({execution:"aggregate"})` selects the recursive target for C1..C10; omission selects direct submission. Export recursive results with `exportAggregateMember()` and use `Aggregator` from `/aggregate`. Dedicated outers accept1/2/5 members at one capacity; mixed C1..C5 outers accept2/3/4/5 members. Canonical capacities, request ordering, context, cross-member uniqueness and public trusted key pins are validated. The proving service receives a local witness only through explicit capability access; remote public verification never sends a private witness.
+Without a Broadcaster quote, `prove({execution:"aggregate"})` selects the recursive target for C1..C10 and omission selects direct submission. With a quote, `prove()` follows its signed `quote.execution`: `direct` uses the EVM target and `aggregate` uses a recursive member. A manual `execution:"single"` or `"aggregate"` must agree with the quote. Export standalone recursive results with `exportAggregateMember()` and use `Aggregator` from `/aggregate`. Dedicated outers accept1/2/5 members at one capacity; mixed C1..C5 outers accept2/3/4/5 members. Canonical capacities, request ordering, context, cross-member uniqueness and public trusted key pins are validated. The proving service receives a local witness only through explicit capability access; remote public verification never sends a private witness.
 
 ## Discovery and gas
 
@@ -144,6 +144,10 @@ const client = clients[0];
 if (!client) throw Error("No broadcaster supports this token");
 const quoted = await client.quote(prepared, { maxFeeAmount });
 ```
+
+The seventh EIP-712 quote field is `execution` (`direct` or `aggregate`), after `requestHash`; it is required and verified. Cold-period quotes may choose direct execution. After attaching the wallet signature to the quoted operation, call `authorized.prove()` without manually selecting a route. Aggregate quotes accept unfunded private C1..C10 transfers only. The SDK submits canonical public member data plus `memberProof`; it never exports those bytes as a directly sendable transaction or uploads private openings. The Broadcaster owns batching and one-member fallback, while charging according to its direct-based quote.
+
+`queued` and `proving` are accepted service jobs, not chain confirmation. Save the opaque submission ID and poll `client.status(id)`. Known IDs are queried without resending, including when lookup fails. An ID-less lost response retries the exact frozen data, member proof and Source evidence. Session persists that envelope before network submission and retains input reservations until canonical primary-chain reconciliation; service `rejected` or `expired` alone cannot release them.
 
 Discovery reads registered credentials from Protocol RPC and checks token capability only; it does not estimate gas or fees. Exact shape acceptance and pricing belong to the concrete quote. Client construction requires no Source policy switch; first submission reads service requirements and the server enforces Source acceptance.
 

@@ -13,6 +13,8 @@ import { MissingCapabilityError, type AuthorizedStatement } from "@invisi-labs/p
 import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { ProofBundle, Prover } from "@invisi-labs/prover";
 import { exportBroadcasterIntent } from "../../broadcaster/intent";
+import { resolveQuotedExecution } from "../../broadcaster/execution";
+import { exportBroadcasterSubmission, publicOperationData } from "../../broadcaster/submission";
 import { getOperationGasReference } from "../../gas/gas-estimation";
 import type {
     OperationAggregateMember,
@@ -76,6 +78,11 @@ export class PreparedTransaction {
             },
             readProvenance: async () => {
                 this.current();
+                if (
+                    this.#saved.provenance &&
+                    this.#saved.provenance.data !== publicOperationData(this.#saved)
+                )
+                    throw Error("Prepared Provenance statement changed");
                 return structuredClone(this.#saved.provenance);
             },
             proveProvenance: (capability, reprove) => this.#proveProvenance(capability, reprove),
@@ -153,12 +160,7 @@ export class PreparedTransaction {
             await import("../../broadcaster/provenance-preparation");
         validateBroadcastEnvelope(this.#saved, client);
         if (this.#saved.broadcasterSubmissionId) {
-            try {
-                return await client.status(this.#saved.broadcasterSubmissionId);
-            } catch (error) {
-                const { BroadcasterRpcError } = await import("../../broadcaster/index");
-                if (!(error instanceof BroadcasterRpcError) || error.code !== -32001) throw error;
-            }
+            return client.status(this.#saved.broadcasterSubmissionId);
         }
         // A lost first response has no ID yet. Resend the retained request; only the relay can deduplicate it.
         if (!this.#saved.broadcasterAttempted) {
@@ -172,11 +174,14 @@ export class PreparedTransaction {
             await validatePreparedBroadcast(this.#saved, client, this.#runtime);
         }
         this.#saved.externalized = true;
+        this.#saved.broadcasterRequest ??= exportBroadcasterSubmission(this.#saved);
         this.#saved.broadcasterAttempted = true;
+        const request = this.#saved.broadcasterRequest;
         const result = await client.submitTransaction(
-            this.#saved.call!.data,
+            request.data,
             this.#saved.broadcasterQuote!,
-            structuredClone(this.#saved.provenance?.sidecars ?? [])
+            structuredClone(this.#saved.provenance?.sidecars ?? []),
+            structuredClone(request.memberProof)
         );
         check(
             !this.#saved.broadcasterSubmissionId ||
@@ -417,10 +422,9 @@ export class PreparedTransaction {
         backendOrOptions: Prover | TransactionProveOptions = {},
         suppliedOptions: TransactionProveOptions = {}
     ): Promise<PreparedTransaction> {
-        const options = { ...("prove" in backendOrOptions ? suppliedOptions : backendOrOptions) };
-        check(
-            !this.#saved.broadcasterQuote || options.execution !== "aggregate",
-            "a broadcaster quote requires direct execution"
+        const options = resolveQuotedExecution(
+            this.#saved.broadcasterQuote,
+            "prove" in backendOrOptions ? suppliedOptions : backendOrOptions
         );
         const plan = this.#saved.plan;
         check(

@@ -32,6 +32,9 @@ import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import {
     encodeOperation,
     exportBroadcasterIntent,
+    exportBroadcasterSubmission,
+    publicOperationData,
+    resolveQuotedExecution,
     inputFacts,
     operationExpired,
     operationSources,
@@ -84,9 +87,19 @@ export class Operation {
                     return { chainId: context.chainId, protocolAddress: context.protocolAddress };
                 }),
             readProvenance: () =>
-                this.#runtime.store.transaction(this.#runtime.scope, (state) =>
-                    structuredClone(this.current(state.operations[this.id]).provenance)
-                ),
+                this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+                    const saved = this.current(state.operations[this.id]);
+                    if (saved.provenance) {
+                        check(
+                            saved.provenance.data ===
+                                (saved.broadcasterRequest
+                                    ? exportBroadcasterSubmission(saved).data
+                                    : publicOperationData(saved)),
+                            "cached Provenance differs from the frozen operation"
+                        );
+                    }
+                    return structuredClone(saved.provenance);
+                }),
             proveProvenance: (capability, reprove) => this.#proveProvenance(capability, reprove),
         });
         Object.freeze(this);
@@ -406,11 +419,7 @@ export class Operation {
     }
 
     async prove(suppliedOptions: TransactionProveOptions = {}): Promise<Operation> {
-        const options = { ...suppliedOptions };
-        check(
-            !this.#saved.broadcasterQuote || options.execution !== "aggregate",
-            "a broadcaster quote requires direct execution"
-        );
+        const options = resolveQuotedExecution(this.#saved.broadcasterQuote, suppliedOptions);
         const plan = this.#saved.plan;
         check(
             plan.kind !== "shield" && plan.kind !== "revoke-credit",
@@ -577,12 +586,7 @@ export class Operation {
         check(this.status === "ready", "operation is not ready");
         validateBroadcastEnvelope(durable, client);
         if (durable.broadcasterSubmissionId) {
-            try {
-                return await client.status(durable.broadcasterSubmissionId);
-            } catch (error) {
-                const { BroadcasterRpcError } = await import("@invisi-labs/sdk");
-                if (!(error instanceof BroadcasterRpcError) || error.code !== -32001) throw error;
-            }
+            return client.status(durable.broadcasterSubmissionId);
         }
         if (!durable.broadcasterAttempted) {
             const requirements = await client.submissionRequirements(durable.broadcasterQuote!);
@@ -602,16 +606,18 @@ export class Operation {
         const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const record = state.operations[this.id];
             const current = this.current(record);
-            check(record!.status === "ready" && current.call, "operation is not ready");
+            check(record!.status === "ready", "operation is not ready");
+            current.broadcasterRequest ??= exportBroadcasterSubmission(current);
             validateBroadcastEnvelope(current, client);
             current.externalized = true;
             current.broadcasterAttempted = true;
             return structuredClone(current);
         });
         const result = await client.submitTransaction(
-            saved.call!.data,
+            saved.broadcasterRequest!.data,
             saved.broadcasterQuote!,
-            structuredClone(saved.provenance?.sidecars ?? [])
+            structuredClone(saved.provenance?.sidecars ?? []),
+            structuredClone(saved.broadcasterRequest!.memberProof)
         );
         await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const current = this.current(state.operations[this.id]);

@@ -77,12 +77,13 @@ try {
         throw Error("No broadcaster supports this token");
     }
 
-    // Quoting freezes fees only. Source data/proving is deferred until the ready transaction.
+    // The signed quote freezes fees and execution. A quiet service may choose direct execution.
     const quoted = await client.quote(prepared, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,
     });
+    console.log("Quoted execution:", quoted.broadcasterQuote()?.quote.execution);
 
-    // 4. Authorize the final statement and generate the main proof.
+    // 4. Authorize the final statement; prove() follows the signed execution automatically.
     const authorization = await quoted.exportWalletAuthorization();
     const signature = await signer.signTypedData(
         authorization.domain,
@@ -95,9 +96,10 @@ try {
     console.log("Verified quote:", json(ready.broadcasterQuote()));
 
     // 5. The SDK generates required Source proofs locally; Broadcaster submits them to Provenance.
-    // It broadcasts only after acceptance; confirmation tracking is automatic.
+    // For aggregate execution the service queues, batches and wraps the member, including single-member fallback.
     const submitted = await client.submit(ready);
     console.log("Broadcast result:", json(submitted));
+    // queued/proving are not chain confirmations. Keep the ID and query client.status(submitted.id).
 } finally {
     provider.destroy();
 }

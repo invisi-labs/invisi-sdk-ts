@@ -100,6 +100,9 @@ try {
     const wallet = Wallet.fromAddress(host.getAddress());
     const decryptor: DeliveryDecryptor = {
         async decryptNote(envelope, context) {
+            // The owned prior payment identifies Bob's outputs; unknown authentication failures still abort.
+            if (config.knownOtherRecipientCommitments?.includes(context.outputCommitment))
+                return null;
             decryptedNotes++;
             events.push("app:decryptNote");
             try {
@@ -230,6 +233,7 @@ try {
     assert.equal(sourceProofs, 0, "quoting must not prepare Source evidence");
     const quote = quoted.broadcasterQuote();
     assert(quote && quote.provenanceRequired === true);
+    assert.equal(quote.quote.execution, config.execution ?? "direct");
     const intent = await quoted.exportBroadcasterIntent();
     const abi = new Interface(invisiProtocolAbi);
     const before = abi.parseTransaction({ data: intent.data });
@@ -258,7 +262,24 @@ try {
     const authorized = await quoted.withWalletSignature(signature);
     const ready = await authorized.prove();
     assert.equal(mainProofs, 1);
-    const transaction = await ready.exportTransaction();
+    const single = abi.fragments.find(
+        (f: any) =>
+            f.type === "function" && f.name === "transact" && f.inputs[1].baseType === "tuple"
+    )!;
+    const transaction =
+        quote.quote.execution === "direct"
+            ? await ready.exportTransaction()
+            : (() => {
+                  const member = ready.exportAggregateMember();
+                  return {
+                      data: abi.encodeFunctionData(single, [
+                          member.bundle.proofHex,
+                          member.request,
+                      ]),
+                  };
+              })();
+    if (quote.quote.execution === "aggregate")
+        await assert.rejects(ready.exportTransaction(), /recursive/);
     const after = abi.parseTransaction({ data: transaction.data });
     assert(after && after.args[0] !== "0x");
     assert.equal(sourceProofs, 0, "main proving must not prepare Source evidence");
@@ -296,6 +317,7 @@ try {
         await file.close();
     }
     const accepted = await relay.submit(ready);
+    if (quote.quote.execution === "aggregate") assert.equal(accepted.state, "queued");
     assert.equal(sourceProofs, 1, "first submission prepares Source evidence once");
     assert.deepEqual(sourceCapacities, [10]);
     const sourceIndex = events.indexOf("source:prove");
@@ -304,7 +326,10 @@ try {
     assert.equal(accepted.id, expectedSubmissionId);
     let status = accepted;
     for (let attempt = 0; status.state !== "confirmed" && attempt < 120; attempt++) {
-        assert(!["reverted", "uncertain"].includes(status.state), JSON.stringify(status));
+        assert(
+            !["reverted", "uncertain", "rejected", "expired"].includes(status.state),
+            JSON.stringify(status)
+        );
         await new Promise((resolve) => setTimeout(resolve, 500));
         status = await relay.status(accepted.id);
     }
@@ -313,7 +338,19 @@ try {
     const receipt = await provider.getTransactionReceipt(status.transactionHash);
     const tx = await provider.getTransaction(status.transactionHash);
     assert(receipt && receipt.status === 1 && tx);
-    assert.equal(tx.data.toLowerCase(), transaction.data.toLowerCase());
+    if (quote.quote.execution === "direct") {
+        assert.equal(tx.data.toLowerCase(), transaction.data.toLowerCase());
+    } else {
+        const aggregate = abi.parseTransaction({ data: tx.data });
+        assert(aggregate && aggregate.fragment.inputs[1]?.baseType === "array");
+        assert.equal(aggregate.args[1].length, 1, "single-member server fallback expected");
+        assert.equal(
+            abi
+                .encodeFunctionData(single, [ready.exportProof().proofHex, aggregate.args[1][0]])
+                .toLowerCase(),
+            transaction.data.toLowerCase()
+        );
+    }
     assert.equal(tx.to?.toLowerCase(), config.scope.protocolAddress);
     assert.equal((await provider.getBlock(receipt.blockNumber))?.hash, receipt.blockHash);
     let operation: Record<string, unknown> = {};
@@ -335,7 +372,7 @@ try {
     }
     assert.equal(operation.recognitionState, "recognized");
     const recognition = operation.recognition as Record<string, unknown>;
-    assert.equal(recognition.checkpointSequence, "2");
+    assert.equal(recognition.checkpointSequence, config.expectedSourceCheckpoint ?? "2");
     assert(
         !publicRequests.some((request) =>
             ["provenance_getMembership", "provenance_getNoteRecognition"].includes(request.method)
@@ -371,6 +408,7 @@ try {
         realLocalSourceProver: true,
         walletHostCrypto: "App-owned real local decrypt and ethers EIP-712 signature",
         manualSidecarsAtCaller: false,
+        execution: quote.quote.execution,
         preparedInputOpeningJSON: false,
         mainProofs,
         mainVerifications,
@@ -384,6 +422,14 @@ try {
         calldataHash: keccak256(tx.data),
         sourceCheckpoint: recognition.checkpointSequence,
         outputCommitments: ready.getOutputs().map((item) => item.commitment),
+        changeCommitments: ready
+            .getOutputs()
+            .filter((item) => item.change)
+            .map((item) => item.commitment),
+        recipientCommitments: ready
+            .getOutputs()
+            .filter((item) => !item.change)
+            .map((item) => item.commitment),
         quoteBeforeAuthorizationAndMainProof: true,
         publicRequests,
         events,

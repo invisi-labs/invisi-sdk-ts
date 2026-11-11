@@ -104,6 +104,8 @@ Before running native Source proof examples from this checkout, run `python3 scr
 
 Run `example:broadcaster:1 --execute` to discover `clients` by token, select one, then quote and relay the payment. No service credentials or Source policy are entered manually.
 
+The same example follows the quote's signed `execution` automatically: cold-period `direct` quotes produce EVM proofs, while `aggregate` quotes produce recursive members that the service batches or wraps singly. No manual route or sidecar construction is needed. `queued`/`proving` require service-status polling and later canonical wallet reconciliation; they do not mean that the payment is confirmed.
+
 | Command | Order and recovery |
 | --- | --- |
 | `example:broadcaster:2 --execute` | Generate and submit Source proof first; send the main payment only after acceptance |

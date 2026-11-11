@@ -320,6 +320,7 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
                 deadline: p.deadline.toString(),
                 maxGas: "2000000",
                 requestHash: broadcasterRequestHash(payload.data),
+                execution: "direct" as const,
             };
             return result({
                 quote,

@@ -198,6 +198,10 @@ export interface SavedOperation {
     };
     broadcasterSubmissionId?: string;
     broadcasterAttempted?: boolean;
+    broadcasterRequest?: {
+        data: string;
+        memberProof?: import("@invisi-labs/rpc/broadcaster").BroadcasterMemberProof;
+    };
     broadcasterQuote?: import("../broadcaster/index").SignedBroadcasterQuote;
     proof?: ProofBundle;
     call?: import("@invisi-labs/protocol").TransactionCall;

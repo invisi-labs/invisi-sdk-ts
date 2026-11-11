@@ -11,6 +11,7 @@ export const broadcasterQuoteTypes = {
         { name: "deadline", type: "uint256" },
         { name: "maxGas", type: "uint256" },
         { name: "requestHash", type: "bytes32" },
+        { name: "execution", type: "string" },
     ],
 };
 export interface BroadcasterQuote {
@@ -20,6 +21,7 @@ export interface BroadcasterQuote {
     deadline: string;
     maxGas: string;
     requestHash: string;
+    execution: "direct" | "aggregate";
 }
 export interface BroadcasterEstimate {
     feeRecipient: string;
@@ -141,6 +143,17 @@ export function verifyBroadcasterQuote(
         )
     )
         throw Error("Unknown broadcaster quote field");
+    if (quote?.execution !== "direct" && quote?.execution !== "aggregate")
+        throw new Error("invalid broadcaster quote execution");
+    const quoteFields = broadcasterQuoteTypes.Quote.map(({ name }) => name);
+    if (
+        typeof quote !== "object" ||
+        Array.isArray(quote) ||
+        Object.keys(quote).length !== quoteFields.length ||
+        Object.keys(quote).some((key) => !quoteFields.includes(key))
+    )
+        throw Error("Unknown or missing broadcaster quote field");
+    if (quote.execution === "aggregate") aggregateMemberCapacity(data);
     const required = signed.provenanceRequired === true;
     if (
         required
@@ -178,9 +191,86 @@ export function verifyBroadcasterQuote(
         throw new Error("untrusted quote signature");
     return quote;
 }
+/** Public proof bundle wire shape; RPC does not depend on a prover implementation. */
+export interface BroadcasterMemberProof {
+    formatVersion: 1;
+    circuitName: string;
+    target: "evm" | "noir-recursive";
+    bbVersion: "6.0.0";
+    artifactSha256: string;
+    vkSha256: string;
+    proofHex: `0x${string}`;
+    proofSha256: string;
+    publicInputs: readonly `0x${string}`[];
+}
+function aggregateMemberCapacity(data: string): number {
+    const { method, request } = decodeBroadcasterIntent(data);
+    const capacity = request.params.nullifiers?.length + request.params.noteCommitments?.length;
+    if (
+        method !== "transact" ||
+        request.params.nullifiers.length === 0 ||
+        !Number.isInteger(capacity) ||
+        capacity < 1 ||
+        capacity > 10 ||
+        request.funding.amount !== 0n
+    )
+        throw Error("unfunded private C1 through C10 member required");
+    return capacity;
+}
+function checkedMemberProof(data: string, proof: BroadcasterMemberProof): BroadcasterMemberProof {
+    const capacity = aggregateMemberCapacity(data);
+    const fields = [
+        "formatVersion",
+        "circuitName",
+        "target",
+        "bbVersion",
+        "artifactSha256",
+        "vkSha256",
+        "proofHex",
+        "proofSha256",
+        "publicInputs",
+    ];
+    if (
+        !proof ||
+        typeof proof !== "object" ||
+        Array.isArray(proof) ||
+        Object.keys(proof).length !== fields.length ||
+        Object.keys(proof).some((k) => !fields.includes(k)) ||
+        proof.formatVersion !== 1 ||
+        proof.target !== "noir-recursive" ||
+        proof.bbVersion !== "6.0.0" ||
+        proof.circuitName !== `transact_user_slots${capacity}` ||
+        ![proof.artifactSha256, proof.vkSha256, proof.proofSha256].every(
+            (v) => typeof v === "string" && /^[0-9a-f]{64}$/.test(v)
+        ) ||
+        typeof proof.proofHex !== "string" ||
+        !/^0x(?:[0-9a-fA-F]{2})+$/.test(proof.proofHex) ||
+        proof.proofHex.toLowerCase() !== decodeBroadcasterIntent(data).proof.toLowerCase() ||
+        !Array.isArray(proof.publicInputs) ||
+        proof.publicInputs.length !== 17 + 3 * capacity ||
+        !proof.publicInputs.every((v) => typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v))
+    )
+        throw Error("invalid broadcaster member proof");
+    const params = decodeBroadcasterIntent(data).request.params;
+    if (
+        BigInt(proof.publicInputs[3]!) !== BigInt(params.nullifiers.length) ||
+        BigInt(proof.publicInputs[4]!) !== BigInt(params.noteCommitments.length)
+    )
+        throw Error("member proof public shape mismatch");
+    return { ...proof, publicInputs: [...proof.publicInputs] };
+}
 export interface BroadcasterStatus {
     id: string;
-    state: "pending" | "submitted" | "confirmed" | "reverted" | "uncertain";
+    state:
+        | "pending"
+        | "submitted"
+        | "confirmed"
+        | "reverted"
+        | "uncertain"
+        | "queued"
+        | "proving"
+        | "rejected"
+        | "expired";
     transactionHash?: string;
 }
 function checkedStatus(value: unknown, id?: string): BroadcasterStatus {
@@ -191,7 +281,17 @@ function checkedStatus(value: unknown, id?: string): BroadcasterStatus {
         !status.id.length ||
         status.id.length > 256 ||
         (id !== undefined && status.id !== id) ||
-        !["pending", "submitted", "confirmed", "reverted", "uncertain"].includes(status.state) ||
+        ![
+            "pending",
+            "submitted",
+            "confirmed",
+            "reverted",
+            "uncertain",
+            "queued",
+            "proving",
+            "rejected",
+            "expired",
+        ].includes(status.state) ||
         (status.transactionHash !== undefined &&
             !/^0x[0-9a-fA-F]{64}$/.test(status.transactionHash))
     )
@@ -381,7 +481,8 @@ export class BroadcasterClient {
     async submitTransaction(
         data: string,
         signed: SignedBroadcasterQuote,
-        proofSidecars: readonly ProofSidecar[] = []
+        proofSidecars: readonly ProofSidecar[] = [],
+        memberProof?: BroadcasterMemberProof
     ): Promise<BroadcasterStatus> {
         if (!Array.isArray(proofSidecars)) throw Error("proofSidecars must be an array");
         if (signed.provenanceRequired !== true && proofSidecars.length)
@@ -398,12 +499,17 @@ export class BroadcasterClient {
         );
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
+        if ((signed.quote.execution === "aggregate") !== (memberProof !== undefined))
+            throw Error("quote execution and member proof mismatch");
+        const member =
+            memberProof === undefined ? undefined : checkedMemberProof(data, memberProof);
         const { proofSidecarToWire } = await import("@invisi-labs/protocol/provenance");
         return checkedStatus(
             await this.call("broadcaster_submitTransaction", {
                 data,
                 quote: signed.quote,
                 signature: signed.signature,
+                ...(member === undefined ? {} : { memberProof: member }),
                 ...(signed.provenanceRequired !== true
                     ? {}
                     : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),

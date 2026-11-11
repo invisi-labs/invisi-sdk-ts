@@ -25,6 +25,7 @@ import type {
 } from "../transactions/operation-types";
 import { statement } from "../transactions/signing/statement";
 import { broadcasterRequestHash, type BroadcasterClient } from "./index";
+import { exportBroadcasterSubmission, publicOperationData } from "./submission";
 
 export interface PreparedProvenanceCapability {
     client: ProvenanceClient;
@@ -203,8 +204,11 @@ export async function provePreparedProvenance(
     capability?: PreparedProvenanceCapability,
     reprove = false
 ): Promise<ProvenanceProof> {
-    if (!saved.call || !saved.proof || saved.plan.kind !== "transfer" || !saved.plan.inputs.length)
+    if (!saved.proof || saved.plan.kind !== "transfer" || !saved.plan.inputs.length)
         throw Error("Ready transaction with private Note inputs required");
+    const data = publicOperationData(saved);
+    if (saved.provenance && saved.provenance.data !== data)
+        throw Error("Prepared Provenance operation bytes changed");
     const provider = runtime.options.prover as typeof runtime.options.prover &
         Partial<import("@invisi-labs/prover/provenance-witness").ProvenanceProvider>;
     const active =
@@ -225,7 +229,7 @@ export async function provePreparedProvenance(
     const evidence = await prepareProvenance(saved.plan, localRuntime);
     const packet: ProvenanceProof = {
         format: "invisi-provenance-submission-v1",
-        data: saved.call.data,
+        data,
         context: {
             chainId: saved.plan.context.chainId.toString(),
             protocolAddress: saved.plan.context.protocolAddress,
@@ -238,18 +242,20 @@ export async function provePreparedProvenance(
     return validateProvenanceProof(packet, active.client.trust);
 }
 export function validateBroadcastEnvelope(saved: SavedOperation, client: BroadcasterClient) {
-    if (!saved.broadcasterQuote || !saved.broadcasterBinding || !saved.call)
+    if (!saved.broadcasterQuote || !saved.broadcasterBinding)
         throw Error("Prepared broadcaster quote and ready call required");
+    const submission = exportBroadcasterSubmission(saved);
     if (
         JSON.stringify(saved.broadcasterBinding.configuration) !==
             JSON.stringify(client.configuration) ||
-        saved.broadcasterBinding.intentHash !== broadcasterRequestHash(saved.call.data)
+        saved.broadcasterBinding.intentHash !== broadcasterRequestHash(submission.data)
     )
         throw Error("Prepared broadcaster context changed");
     const context = saved.plan.context;
     if (
-        BigInt(saved.call.to) !== BigInt(context.protocolAddress) ||
-        saved.call.value !== 0n ||
+        (saved.call &&
+            (BigInt(saved.call.to) !== BigInt(context.protocolAddress) ||
+                saved.call.value !== 0n)) ||
         saved.broadcasterQuote.context?.chainId !== context.chainId ||
         BigInt(saved.broadcasterQuote.context.protocol) !== BigInt(context.protocolAddress)
     )
@@ -270,7 +276,7 @@ export async function validatePreparedBroadcast(
             mainCircuitCapacity: saved.plan.capacity!,
             publicInputs: statement(saved.plan).expectedPublicInputs,
         });
-        if (source.operationDigest !== digest || source.data !== saved.call!.data)
+        if (source.operationDigest !== digest || source.data !== publicOperationData(saved))
             throw Error("Prepared Provenance statement changed");
         const sidecar = source.sidecars[0]!;
         const pi = sidecar.proofBundle.publicInputs;

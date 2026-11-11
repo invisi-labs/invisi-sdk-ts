@@ -13,6 +13,7 @@ interface ServiceStatus {
     submissionHalted: boolean;
     provenance: {
         enabled: boolean;
+        aggregateSupported?: boolean;
         requestHashFormat?: string;
         trackingRequired?: boolean;
         trackingSupported?: boolean;
@@ -77,6 +78,8 @@ export async function submissionRequirements(
         signed.context
     );
     if (status.submissionHalted) throw Error("Broadcaster submission halted");
+    if (signed.quote.execution === "aggregate" && status.provenance.aggregateSupported !== true)
+        throw Error("Broadcaster aggregation unavailable; obtain a new quote");
     const required = status.provenance.enabled;
     if (
         required !== (signed.provenanceRequired === true) ||
