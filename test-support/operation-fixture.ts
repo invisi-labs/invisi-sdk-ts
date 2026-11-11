@@ -66,11 +66,9 @@ export async function fixture() {
         getCreditRevocationBitmap: async () => 0n,
     } as unknown as ChainReader;
     const membership: ProtocolDataProvider = {
-        getStatus: async () => ({ indexedHead: block, detectionEnabled: false, checkedBits: 8 }),
+        getStatus: async () => ({ indexedHead: block }),
         getNoteUpdates: async () => ({ block, notes: [] }),
         getCreditTransitions: async () => ({ block, transitions: [] }),
-        detectNotes: async () => ({ block, notes: [] }),
-        detectCreditStates: async () => ({ block, states: [] }),
         getMembership: async (_, input) => {
             const proof = tree.getProof(input.leafIndex);
             return {

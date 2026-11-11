@@ -6,8 +6,6 @@ it("exposes separate Note and Credit methods without mixed aliases", () => {
     for (const name of [
         "getNoteUpdates",
         "getCreditTransitions",
-        "detectNotes",
-        "detectCreditStates",
         "getTransactionNoteUpdates",
         "getTransactionCreditUpdates",
         "getCreditState",
@@ -17,6 +15,8 @@ it("exposes separate Note and Credit methods without mixed aliases", () => {
         expect(typeof (client as unknown as Record<string, unknown>)[name]).toBe("function");
     }
     for (const name of [
+        "detectNotes",
+        "detectCreditStates",
         "getUpdates",
         "getEncryptedOutputs",
         "getOutputs",

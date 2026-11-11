@@ -18,10 +18,6 @@ export async function prepareWalletRefresh(
     history: PublicHistory
 ): Promise<PendingWalletRefresh> {
     const base = await options.store!.readSnapshot(scope);
-    if (settings.detectionKey)
-        throw Error(
-            "WalletSession detection keys must remain in the App; inject batch detection instead"
-        );
     let block: RefreshResult["block"];
     let staged: AcquiredHistoryPage | undefined;
     if (settings.offline) {

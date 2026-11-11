@@ -8,8 +8,6 @@ const block = (number: bigint) => ({ number, hash, parentHash: hash, timestamp: 
 function fixture() {
     const getStatus = vi.fn(async () => ({
         indexedHead: block(260n),
-        detectionEnabled: true,
-        checkedBits: 8,
     }));
     const getNoteUpdates = vi.fn(
         async (...[_context, range]: Parameters<ProtocolDataProvider["getNoteUpdates"]>) => ({
@@ -21,16 +19,10 @@ function fixture() {
         block: block(range.toBlock),
         transitions: [],
     }));
-    const detectCreditStates = vi.fn(async (_context: unknown, range: { toBlock: bigint }) => ({
-        block: block(range.toBlock),
-        states: [],
-    }));
     const provider = {
         getStatus,
         getNoteUpdates,
-        detectNotes: getNoteUpdates,
         getCreditTransitions,
-        detectCreditStates,
         getMembership: vi.fn(),
     } as unknown as ProtocolDataProvider;
     const apply = vi.fn(
@@ -55,7 +47,6 @@ function fixture() {
         getStatus,
         getNoteUpdates,
         getCreditTransitions,
-        detectCreditStates,
         apply,
     };
 }
@@ -65,11 +56,9 @@ it("pulls bounded indexed pages and resets private inventory only on the first p
         block: block(range.toBlock),
         notes: [{ transactionHash: hash }],
     }));
-    const key = new Uint8Array(32).fill(1);
     const result = await refreshWallet(h.runtime, {
         fromBlock: 10n,
         pageSize: 100,
-        detectionKey: key,
         reset: true,
     });
     expect(
@@ -86,7 +75,6 @@ it("pulls bounded indexed pages and resets private inventory only on the first p
     ]);
     expect(result).toMatchObject({ block: block(260n), notes: 3, credits: 6 });
     expect(h.apply.mock.calls.every(([batch]) => batch.block.number === 260n)).toBe(true);
-    expect(key.every((n) => n === 0)).toBe(true);
 });
 it("does not delegate a detector implicitly and propagates caller cancellation", async () => {
     const h = fixture();
@@ -169,8 +157,6 @@ it("defaults to 10000 blocks and accepts an explicit 10000 block page", async ()
         const h = fixture();
         h.getStatus.mockResolvedValue({
             indexedHead: block(10010n),
-            detectionEnabled: true,
-            checkedBits: 8,
         });
         await refreshWallet(h.runtime, {
             fromBlock: 10n,
@@ -185,18 +171,6 @@ it("defaults to 10000 blocks and accepts an explicit 10000 block page", async ()
     }
 });
 
-it("keeps Credit transitions unfiltered while delegating independent Note and Credit-state detection", async () => {
-    const h = fixture();
-    await refreshWallet(h.runtime, {
-        fromBlock: 10n,
-        toBlock: 10n,
-        detectionKey: new Uint8Array(32).fill(7),
-    });
-    expect(h.getCreditTransitions).toHaveBeenCalledTimes(1);
-    expect(h.getCreditTransitions.mock.calls[0]![1]).not.toHaveProperty("detectionKey");
-    expect(h.getNoteUpdates.mock.calls[0]![1]).toHaveProperty("detectionKey");
-    expect(h.detectCreditStates.mock.calls[0]![1]).toHaveProperty("detectionKey");
-});
 it("rejects a Credit page with a different number even when the claimed hash matches", async () => {
     const h = fixture();
     h.getCreditTransitions.mockImplementation(async () => ({

@@ -341,8 +341,7 @@ try {
                     database: { driver: "sqlite", path: join(rpcDir, "protocol.sqlite") },
                     confirmations: 0,
                     pollSeconds: 1,
-                    detectionEnabled: false,
-                    detectionBits: 8,
+
                     snapshotInterval: "0s",
                     deployment: {
                         chainId: "31337",

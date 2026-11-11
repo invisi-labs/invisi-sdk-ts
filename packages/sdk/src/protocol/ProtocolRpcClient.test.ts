@@ -28,8 +28,6 @@ it("checks indexed heads against the supplied provider and rejects a forged bloc
                         protocol: { ...deployment.protocol, fromBlock: 0 },
                     },
                     indexedHead: { number: 1, hash, parentHash: hash, timestamp: 0 },
-                    checkedBits: 8,
-                    detectionEnabled: true,
                 },
             });
         },

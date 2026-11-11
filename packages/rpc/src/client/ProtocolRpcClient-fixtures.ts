@@ -31,8 +31,6 @@ export const status = () => ({
         protocol: { address: deployment.protocol.address, runtimeCodeHash: h(9), fromBlock: 1 },
     },
     indexedHead: wireBlock,
-    checkedBits: 8,
-    detectionEnabled: true,
 });
 
 export function setup(

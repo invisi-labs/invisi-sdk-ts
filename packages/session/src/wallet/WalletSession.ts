@@ -379,10 +379,6 @@ export class WalletSession {
         if (!reader) throw new MissingCapabilityError("chain reader");
         if (!provider) throw new MissingCapabilityError("Protocol RPC");
         if (!this.#options.store) throw new MissingCapabilityError("wallet store");
-        if (options.detectionKey)
-            throw Error(
-                "WalletSession detection keys must remain in the App; inject batch detection instead"
-            );
         const request = { ...options };
         const task = this.#refreshQueue.then(() =>
             prepareWalletRefresh(this.#options, this.scope, request, this.publicHistory)

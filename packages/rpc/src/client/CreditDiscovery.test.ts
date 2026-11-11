@@ -12,7 +12,6 @@ import {
 } from "./ProtocolRpcClient-fixtures";
 
 const range = { fromBlock: 10n, toBlock: 10n };
-const key = new Uint8Array(32).fill(1);
 const delivery = (byte = "ab") => ({
     ciphertext: "0x81" + byte.repeat(80),
     clue: "0x" + "02".repeat(68),
@@ -27,68 +26,6 @@ const event = (name = "CreditCreated") => ({
     transactionHash: h(22),
     logIndex: 4,
     data: { revocationShard: "18446744073709551615", revocationSlot: 65535 },
-});
-it("keeps both role envelopes in a separate Credit candidate model", async () => {
-    const raw = state();
-    const { client, requests } = setup((m) =>
-        m === "invisi_getStatus"
-            ? status()
-            : {
-                  blockHash: h(10),
-                  checkedBits: 8,
-                  candidates: [
-                      { state: raw, fallback: false },
-                      { state: raw, fallback: false },
-                  ],
-              }
-    );
-    const page = await client.detectCreditStates(context, { ...range, detectionKey: key });
-    expect(page.states).toHaveLength(1);
-    expect(page.states[0]?.deliveries).toEqual(raw.deliveries);
-    expect("notes" in page).toBe(false);
-    expect(requests[1]?.method).toBe("invisi_detectCreditStates");
-});
-it.each([
-    { kind: "Transact" },
-    { deliveries: [delivery()] },
-    { deliveries: [delivery(), delivery(), delivery()] },
-    { deliveries: [delivery(), { ciphertext: "0x", clue: "0x" }] },
-    { deliveries: [delivery(), { ...delivery(), clue: "0x12" }] },
-    { commitment: h(1n << 255n) },
-])("rejects malformed Credit states %j", async (patch) => {
-    const { client } = setup((m) =>
-        m === "invisi_getStatus"
-            ? status()
-            : {
-                  blockHash: h(10),
-                  checkedBits: 8,
-                  candidates: [{ state: { ...state(), ...patch }, fallback: true }],
-              }
-    );
-    await expect(
-        client.detectCreditStates(context, { ...range, detectionKey: key })
-    ).rejects.toThrow();
-});
-it("rejects conflicting state envelopes sharing a leaf", async () => {
-    const raw = state();
-    const { client } = setup((m) =>
-        m === "invisi_getStatus"
-            ? status()
-            : {
-                  blockHash: h(10),
-                  checkedBits: 8,
-                  candidates: [
-                      { state: raw, fallback: false },
-                      {
-                          state: { ...raw, deliveries: [delivery("ef"), delivery("cd")] },
-                          fallback: false,
-                      },
-                  ],
-              }
-    );
-    await expect(
-        client.detectCreditStates(context, { ...range, detectionKey: key })
-    ).rejects.toThrow("Conflicting");
 });
 it("does not classify Credit states as Notes from an envelope header", async () => {
     const { client } = setup((m) =>
@@ -116,23 +53,6 @@ it.each(["CreditCancelled", "CreditToppedUp", "Transact"])(
         );
     }
 );
-it("requires explicit enabled detection and correct precision", async () => {
-    const noKey = setup(() => status());
-    await expect(noKey.client.detectCreditStates(context, range)).rejects.toThrow(
-        "Detection key required"
-    );
-    expect(noKey.requests).toHaveLength(0);
-    const disabled = setup(() => ({ ...status(), detectionEnabled: false }));
-    await expect(
-        disabled.client.detectCreditStates(context, { ...range, detectionKey: key })
-    ).rejects.toThrow("disabled");
-    const wrong = setup((m) =>
-        m === "invisi_getStatus" ? status() : { blockHash: h(10), checkedBits: 9, candidates: [] }
-    );
-    await expect(
-        wrong.client.detectNotes(context, { ...range, detectionKey: key })
-    ).rejects.toThrow("precision");
-});
 it("queries Credit consumption independently from Note spent state", async () => {
     const { client, requests } = setup(() => true);
     expect(await client.isCreditConsumed(context, h(1), block)).toBe(true);
@@ -203,4 +123,39 @@ it("returns Credit transaction state records and transitions without Note arrays
     expect(result.states[0]?.deliveries).toHaveLength(2);
     expect(result.transitions).toHaveLength(1);
     expect("notes" in result).toBe(false);
+});
+
+it.each([
+    { kind: "Transact" },
+    { deliveries: [delivery()] },
+    { deliveries: [delivery(), delivery(), delivery()] },
+    { deliveries: [delivery(), { ciphertext: "0x", clue: "0x" }] },
+    { deliveries: [delivery(), { ...delivery(), clue: "0x12" }] },
+    { commitment: h(1n << 255n) },
+])("rejects malformed public transaction Credit states %j", async (patch) => {
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  ...transactionWire(),
+                  states: [{ ...state(), transactionHash: h(123), ...patch }],
+                  transitions: [],
+              }
+    );
+    await expect(client.getTransactionCreditUpdates(context, h(123))).rejects.toThrow();
+});
+it("rejects conflicting public transaction Credit envelopes sharing a leaf", async () => {
+    const raw = { ...state(), transactionHash: h(123) };
+    const { client } = setup((method) =>
+        method === "invisi_getStatus"
+            ? status()
+            : {
+                  ...transactionWire(),
+                  states: [raw, { ...raw, deliveries: [delivery("ef"), delivery("cd")] }],
+                  transitions: [],
+              }
+    );
+    await expect(client.getTransactionCreditUpdates(context, h(123))).rejects.toThrow(
+        "Conflicting"
+    );
 });

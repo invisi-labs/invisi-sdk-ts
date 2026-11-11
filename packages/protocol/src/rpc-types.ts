@@ -20,13 +20,10 @@ export interface Membership {
 /** Indexed service data is untrusted; the wallet verifies canonical facts through ChainReader. */
 export interface ProtocolDataStatus {
     indexedHead: CanonicalBlock | null;
-    detectionEnabled: boolean;
-    checkedBits: number;
 }
 export interface ProtocolUpdateRange {
     fromBlock: bigint;
     toBlock: bigint;
-    detectionKey?: Uint8Array;
     signal?: AbortSignal;
 }
 export interface ProtocolNoteUpdates {
@@ -36,10 +33,6 @@ export interface ProtocolNoteUpdates {
 export interface ProtocolCreditUpdates {
     block: CanonicalBlock;
     transitions: readonly ProtocolCreditTransition[];
-}
-export interface ProtocolCreditCandidates {
-    block: CanonicalBlock;
-    states: readonly IndexedCreditState[];
 }
 export interface ProtocolDataProvider {
     getMembership(
@@ -59,14 +52,6 @@ export interface ProtocolDataProvider {
         context: DeploymentContext,
         range: ProtocolUpdateRange
     ): Promise<ProtocolCreditUpdates>;
-    detectNotes(
-        context: DeploymentContext,
-        range: ProtocolUpdateRange
-    ): Promise<ProtocolNoteUpdates>;
-    detectCreditStates(
-        context: DeploymentContext,
-        range: ProtocolUpdateRange
-    ): Promise<ProtocolCreditCandidates>;
 }
 
 /** Registered public receiving address returned by a trusted indexed RPC read. */

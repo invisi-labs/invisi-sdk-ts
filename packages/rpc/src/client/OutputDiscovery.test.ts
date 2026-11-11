@@ -80,34 +80,6 @@ it.each([true, false, "false"])("validates indexed spent observations %j", async
     else await expect(client.isNoteSpent(context, h(1), block)).rejects.toThrow(/spent/);
 });
 
-it("supports detected encrypted candidates and empty output pages", async () => {
-    const { client, requests } = setup((method) =>
-        method === "invisi_getStatus"
-            ? status()
-            : {
-                  blockHash: h(10),
-                  checkedBits: 8,
-                  candidates: [{ fallback: false, note: encryptedOutput() }],
-                  creditTransitions: [],
-              }
-    );
-    const result = await client.detectNotes(context, {
-        fromBlock: 10n,
-        toBlock: 10n,
-        detectionKey: new Uint8Array(32).fill(1),
-    });
-    expect(result.notes).toHaveLength(1);
-    expect(requests[1]?.method).toBe("invisi_detectNotes");
-    const empty = setup((method) =>
-        method === "invisi_getStatus"
-            ? status()
-            : { blockHash: h(10), notes: null, creditTransitions: null }
-    );
-    expect(
-        (await empty.client.getNoteUpdates(context, { fromBlock: 10n, toBlock: 10n })).notes
-    ).toEqual([]);
-});
-
 it.each([
     { leafIndex: 4 },
     { treeId: "2" },

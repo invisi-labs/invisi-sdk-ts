@@ -122,15 +122,7 @@ functions(sdk.Protocol.prototype, ["forToken", "aggregate"], "Protocol");
 functions(rpc.ProtocolRpcClient, ["getChains"], "ProtocolRpcClient");
 functions(
     rpc.ProtocolRpcClient.prototype,
-    [
-        "getDeployment",
-        "getNote",
-        "getCreditState",
-        "getNoteUpdates",
-        "getCreditTransitions",
-        "detectNotes",
-        "detectCreditStates",
-    ],
+    ["getDeployment", "getNote", "getCreditState", "getNoteUpdates", "getCreditTransitions"],
     "ProtocolRpcClient"
 );
 const preparations = [

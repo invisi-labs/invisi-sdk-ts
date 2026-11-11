@@ -1,6 +1,6 @@
 import { getAddress } from "ethers";
 import type { Address, Hex } from "@invisi-labs/primitives";
-import { deriveClueKey, poseidonHash, TREE_DEPTH } from "@invisi-labs/primitives";
+import { poseidonHash, TREE_DEPTH } from "@invisi-labs/primitives";
 import { MAX_UPDATE_BLOCKS } from "../constants";
 import { defineDeployment, type ProtocolDeployment } from "../deployment/deployment";
 import { getBroadcasters } from "../queries/broadcasters";
@@ -243,20 +243,14 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
                 expected.protocol.runtimeCodeHash.toLowerCase()
         )
             invalid("RPC deployment pins mismatch");
-        if (typeof status.detectionEnabled !== "boolean") invalid("Invalid detection capability");
-        const checkedBits = Number(integer(status.checkedBits, 8));
-        if (checkedBits < 1 || checkedBits > 24) invalid("Invalid detection precision");
         return {
             indexedHead: status.indexedHead,
-            detectionEnabled: status.detectionEnabled as boolean,
-            checkedBits,
         };
     }
     private async updatePage(
         context: DeploymentContext,
         range: ProtocolUpdateRange,
-        method: string,
-        detected = false
+        method: string
     ) {
         this.context(context);
         if (
@@ -265,9 +259,6 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             range.toBlock - range.fromBlock >= BigInt(MAX_UPDATE_BLOCKS)
         )
             invalid(`RPC updates require at most ${MAX_UPDATE_BLOCKS} deployment blocks`);
-        if (detected && range.detectionKey === undefined) invalid("Detection key required");
-        if (!detected && range.detectionKey !== undefined)
-            invalid("Use explicit detection method for a detection key");
         const status = await this.readStatusMetadata(
             context,
             range.signal ? { signal: range.signal } : {}
@@ -289,23 +280,10 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             toBlock: numeric(range.toBlock),
             blockHash: hash(block.hash),
         };
-        let key: string | undefined;
-        if (detected) {
-            if (!status.detectionEnabled) invalid("Delegated detection is disabled");
-            deriveClueKey(range.detectionKey!);
-            key =
-                "0x" +
-                Array.from(range.detectionKey!, (b) => b.toString(16).padStart(2, "0")).join("");
-        }
-        const raw = await this.rpc(method, detected ? [anchor, key] : [anchor], range.signal);
+        const raw = await this.rpc(method, [anchor], range.signal);
         if (method !== "invisi_getCreditTransitions") {
             const result = object(raw);
             if (hash(result.blockHash) !== hash(block.hash)) invalid("RPC update anchor mismatch");
-            if (detected) {
-                const bits = integer(result.checkedBits, 8);
-                if (bits < 1n || bits > 24n || Number(bits) !== status.checkedBits)
-                    invalid("Invalid detection precision");
-            }
         }
         return { block, raw };
     }
@@ -327,33 +305,6 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             list(object(raw).notes),
             range
         );
-        await this.recheck(block);
-        return page;
-    }
-    async detectNotes(context: DeploymentContext, range: ProtocolUpdateRange) {
-        const { block, raw } = await this.updatePage(context, range, "invisi_detectNotes", true);
-        const values = list(object(raw).candidates).map((v) => {
-            const c = object(v);
-            if (typeof c.fallback !== "boolean") invalid("Invalid candidate");
-            return c.note;
-        });
-        const page = await parseNoteCandidates(this.canonical.bind(this), block, values, range);
-        await this.recheck(block);
-        return page;
-    }
-    async detectCreditStates(context: DeploymentContext, range: ProtocolUpdateRange) {
-        const { block, raw } = await this.updatePage(
-            context,
-            range,
-            "invisi_detectCreditStates",
-            true
-        );
-        const values = list(object(raw).candidates).map((v) => {
-            const c = object(v);
-            if (typeof c.fallback !== "boolean") invalid("Invalid candidate");
-            return c.state;
-        });
-        const page = await parseCreditCandidates(this.canonical.bind(this), block, values, range);
         await this.recheck(block);
         return page;
     }

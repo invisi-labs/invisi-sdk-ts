@@ -46,7 +46,6 @@ describe("ProtocolRpcClient", () => {
             },
         },
         { indexedHead: { ...wireBlock, hash: h(3) } },
-        { checkedBits: 25 },
     ])("rejects untrusted status metadata %j", async (patch) => {
         const { client } = setup(() => ({ ...status(), ...patch }));
         await expect(client.getStatus(context)).rejects.toBeInstanceOf(ProtocolRpcError);
@@ -282,3 +281,8 @@ it.each([null, { ...wireBlock, number: 9 }])(
         expect(requests).toHaveLength(1);
     }
 );
+
+it("accepts public-only status without detection metadata", async () => {
+    const { client } = setup(() => status());
+    expect(await client.getStatus(context)).toEqual({ indexedHead: block });
+});

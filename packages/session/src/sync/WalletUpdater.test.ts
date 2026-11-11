@@ -145,17 +145,12 @@ async function harness() {
         ),
         getStatus: async () => ({
             indexedHead: batch.block,
-            detectionEnabled: false,
-            checkedBits: 8,
         }),
         getCreditTransitions: async (_: unknown, range: { toBlock: bigint }) => ({
             block: block(range.toBlock),
             transitions: [],
         }),
-        detectCreditStates: async (_: unknown, range: { toBlock: bigint }) => ({
-            block: block(range.toBlock),
-            states: [],
-        }),
+
         getNoteUpdates: async () => ({
             block: batch.block,
             notes: batch.transactionHashes.map(noteCandidate),
@@ -164,7 +159,7 @@ async function harness() {
     const session = new WalletSession(
         sessionOptions({
             ...options,
-            protocolRpc: { ...protocolRpc, detectNotes: protocolRpc.getNoteUpdates },
+            protocolRpc,
         })
     );
     const updater = new WalletUpdater({
@@ -173,7 +168,7 @@ async function harness() {
         store,
         reader,
         viewing,
-        protocolRpc: { ...protocolRpc, detectNotes: protocolRpc.getNoteUpdates },
+        protocolRpc,
     });
     return {
         session,
@@ -552,8 +547,6 @@ it.each([
             const rpc = {
                 getStatus: async () => ({
                     indexedHead: block(13n),
-                    detectionEnabled: false,
-                    checkedBits: 8,
                 }),
                 getNoteUpdates: async (_context: unknown, range: { toBlock: bigint }) => ({
                     block: block(range.toBlock),
@@ -689,7 +682,6 @@ it("accepts historical membership roots still known by the contract", async () =
 
 it("composes both RPCs and refreshes owned inventory without delegating wallet secrets", async () => {
     const h = await harness();
-    const key = new Uint8Array(32).fill(1);
     const getNoteUpdates = vi.fn(async () => ({
         block: h.batch.block,
         notes: h.batch.transactionHashes.map(noteCandidate),
@@ -698,40 +690,27 @@ it("composes both RPCs and refreshes owned inventory without delegating wallet s
     const protocolRpc = {
         getStatus: async () => ({
             indexedHead: h.batch.block,
-            detectionEnabled: true,
-            checkedBits: 8,
         }),
         getNoteUpdates,
-        detectNotes: getNoteUpdates,
+
         getCreditTransitions: async () => ({ block: h.batch.block, transitions: [] }),
-        detectCreditStates: async () => ({ block: h.batch.block, states: [] }),
+
         getMembership,
     };
     const session = new WalletSession(
         sessionOptions({
             ...h.options,
-            protocolRpc: {
-                ...protocolRpc,
-                detectNotes: protocolRpc.getNoteUpdates,
-                detectCreditStates: async (_: unknown, range: { toBlock: bigint }) => ({
-                    block: block(range.toBlock),
-                    states: [],
-                }),
-            },
+            protocolRpc,
         })
     );
     const result = await refreshSession(session, { fromBlock: 12n });
     expect(result.notes).toBe(1);
     expect((await session.balance(token)).availableKnown).toBe(70n);
     expect(getMembership).toHaveBeenCalledTimes(1);
-    expect(key.every((value) => value === 1)).toBe(true);
     const sent = getNoteUpdates.mock.calls as unknown as Array<
         [unknown, { detectionKey: Uint8Array }]
     >;
     expect(sent[0]![1].detectionKey).toBeUndefined();
-    await expect(session.refresh({ fromBlock: 12n, detectionKey: key })).rejects.toThrow(
-        /remain in the App/
-    );
 });
 
 it("serializes entire multi-page refreshes while a provider request is pending", async () => {
@@ -748,7 +727,7 @@ it("serializes entire multi-page refreshes while a provider request is pending",
     const protocolRpc = {
         getStatus: vi.fn(async () => {
             calls.push("status");
-            return { indexedHead: block(13n), detectionEnabled: false, checkedBits: 8 };
+            return { indexedHead: block(13n) };
         }),
         getCreditTransitions: async (_: unknown, range: { toBlock: bigint }) => ({
             block: block(range.toBlock),
@@ -776,14 +755,7 @@ it("serializes entire multi-page refreshes while a provider request is pending",
     const session = new WalletSession(
         sessionOptions({
             ...h.options,
-            protocolRpc: {
-                ...protocolRpc,
-                detectNotes: protocolRpc.getNoteUpdates,
-                detectCreditStates: async (_: unknown, range: { toBlock: bigint }) => ({
-                    block: block(range.toBlock),
-                    states: [],
-                }),
-            },
+            protocolRpc,
         })
     );
     const first = session.refresh({ fromBlock: 12n, toBlock: 13n, pageSize: 1 });
@@ -894,11 +866,9 @@ async function sharedHarness() {
     vi.spyOn(h.reader, "getBlock").mockImplementation(async (n) => canonical(n));
     const rpc = {
         ...h.protocolRpc,
-        detectNotes: h.protocolRpc.getNoteUpdates,
+
         getStatus: async () => ({
             indexedHead: canonical(head),
-            detectionEnabled: false,
-            checkedBits: 8,
         }),
         getNoteUpdates: vi.fn(async (_: unknown, r: { fromBlock: bigint; toBlock: bigint }) => ({
             block: canonical(r.toBlock),
