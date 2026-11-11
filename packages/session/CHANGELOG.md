@@ -1,5 +1,10 @@
 # @invisi-labs/session
 
+## Unreleased
+
+- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation; keep reference lookup internal.
+
+
 ## 1.2.1
 
 - Share bounded public history across accounts; prioritize recent asset discovery, persist independent scan coverage, and expose recovery and spendability status.

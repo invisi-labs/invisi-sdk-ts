@@ -55,8 +55,11 @@ describe("explicit transactions without a wallet store", () => {
         expect(prepared.preview().inputDetails[0]).toMatchObject({ amount: 100n });
         expect(prepared.preview().funding.amount).toBe(0n);
 
-        expect(prepared.getGasReference().source).toBe("documented-reference");
-        await expect(prepared.estimateGas()).rejects.toThrow(/provider/);
+        expect(prepared.estimateGas()).toMatchObject({
+            source: "benchmark",
+            available: expect.any(Boolean),
+        });
+        expect("getGasReference" in prepared).toBe(false);
         expect(store.readSnapshot).not.toHaveBeenCalled();
         expect(store.transaction).not.toHaveBeenCalled();
         expect((await h.store.readSnapshot(h.scope)).reservations).toEqual({});
@@ -73,12 +76,14 @@ it("authorizes, proves, verifies and exports without any store", async () => {
         outputs: [structuredClone(await testOutput(h, { to: h.bob.getAddress(), amount: 30n }))],
     };
     const prepared = await h.invisi.prepareTransfer(options);
+    const estimate = prepared.estimateGas();
     options.inputs[0]!.note.amount = 999n;
     Object.assign(options.outputs[0]!, { amount: 999n });
     expect(prepared.preview().outputs[0]!.amount).toBe(30n);
     await expect(prepared.prove()).rejects.toThrow(/authoriz/);
     const authorized = await externallyAuthorize(prepared);
     const ready = await authorized.prove();
+    expect(ready.estimateGas()).toEqual(estimate);
     expect(h.prover.verify).toHaveBeenCalledOnce();
     const call = await ready.exportTransaction();
     expect(new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!.name).toBe(

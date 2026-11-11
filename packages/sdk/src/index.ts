@@ -121,8 +121,7 @@ export type {
     TransactionIdentity,
 } from "./transactions/explicit-types";
 
-export { getDocumentedGasReference } from "@invisi-labs/protocol";
-export type { DocumentedGasReference, DocumentedGasShape } from "@invisi-labs/protocol";
+export type { GasEstimate, GasShape } from "@invisi-labs/protocol";
 
 export type { SigningRequest } from "@invisi-labs/primitives";
 

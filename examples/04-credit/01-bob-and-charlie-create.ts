@@ -50,6 +50,7 @@ try {
             availableCredit: 50000n,
             unlimited: false,
         });
+        console.log("Benchmark gas estimate:", prepared.estimateGas());
 
         // 3. Sign the frozen EIP-712 authorization with ethers.
         const signer = new EthersWallet(

@@ -17,7 +17,7 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     acceptFundingSignature,
     acceptWalletSignature,
-    getOperationGasReference,
+    estimateOperationGas,
     fundingSigningRequest,
     operationPreview,
     proveOperation,
@@ -210,18 +210,11 @@ export class Operation {
         return this.#saved.plan.kind;
     }
 
-    async estimateGas(options: { from?: `0x${string}` } = {}) {
-        const provider = this.#runtime.options.provider;
-        if (!provider)
-            throw new MissingCapabilityError("ethers provider for final eth_estimateGas");
-        const call = await this.exportTransaction();
-        return {
-            source: "rpc" as const,
-            gasUnits: await provider.estimateGas({ ...call, ...options }),
-        };
-    }
-    getGasReference() {
-        return getOperationGasReference(this.#saved.plan, this.#runtime.options.protocol);
+    estimateGas() {
+        return estimateOperationGas(
+            this.#saved.plan,
+            this.#saved.broadcasterQuote?.quote.execution
+        );
     }
     /** Final Note outputs, including change. Credit openings have no IPN export. */
     getOutputs(): readonly TransactionOutput[] {

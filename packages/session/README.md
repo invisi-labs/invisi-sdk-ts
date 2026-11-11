@@ -168,3 +168,16 @@ For example, scanning 100–300 and 900–1,000 yields max height 1,000, fully s
 Use `onProgress` for processing/committed page events and directions (`forward`, `backward`, `credit-recovery`); use `session.subscribe` for local wallet commits and re-read the status/funds interfaces. The host owns foreground/background scheduling, cancellation and UI text. Each call has a fixed target snapshot; a host can cancel historical recovery at a committed batch and start a new catch-up without losing completed ranges. If the indexer lags the known network tip, status requests an indexer wait instead of declaring full sync.
 
 The API distinction follows the ideas in [Zcash WalletRead](https://zcash.github.io/librustzcash/rustdoc/latest/zcash_client_backend/data_api/trait.WalletRead.html) and [Android Synchronizer](https://github.com/zcash/zcash-android-wallet-sdk/blob/main/sdk-lib/src/main/java/cash/z/ecc/android/sdk/Synchronizer.kt); the counters here describe Invisi block coverage and Credit recovery.
+
+## Local gas estimation
+
+Call `operation.estimateGas()` immediately after preparation, before signing, proving or approval. This read-only local calculation uses transaction structure and benchmark medians; it needs no RPC or provider and does not export or externalize the operation.
+
+```ts
+const operation = await session.prepareTransfer({ tokenAddress, outputs });
+const estimate = operation.estimateGas();
+if (estimate.available) console.log(estimate.gasUnits, estimate.conditions);
+else console.log(estimate.reason);
+```
+
+Measurement version/hash metadata is provenance only. Unsupported shapes return `available:false` and `reason:"shape-not-covered"` with no gas count. Estimates are approximate, not guaranteed gas limits or monetary fees; the App owns live fee pricing, approval, final simulation and safety margins. Sending through `session.sendTransaction` requires a positive `gasLimit` supplied by the host, preventing implicit ethers estimation.

@@ -15,7 +15,7 @@ import type { ProofBundle, Prover } from "@invisi-labs/prover";
 import { exportBroadcasterIntent } from "../../broadcaster/intent";
 import { resolveQuotedExecution } from "../../broadcaster/execution";
 import { exportBroadcasterSubmission, publicOperationData } from "../../broadcaster/submission";
-import { getOperationGasReference } from "../../gas/gas-estimation";
+import { estimateOperationGas } from "../../gas/gas-estimation";
 import type {
     OperationAggregateMember,
     OperationPlan,
@@ -197,18 +197,11 @@ export class PreparedTransaction {
     get kind() {
         return this.#saved.plan.kind;
     }
-    async estimateGas(options: { from?: `0x${string}` } = {}) {
-        const provider = this.#runtime.options.provider;
-        if (!provider)
-            throw new MissingCapabilityError("ethers provider for final eth_estimateGas");
-        const call = await this.exportTransaction();
-        return {
-            source: "rpc" as const,
-            gasUnits: await provider.estimateGas({ ...call, ...options }),
-        };
-    }
-    getGasReference() {
-        return getOperationGasReference(this.#saved.plan, this.#runtime.options.protocol);
+    estimateGas() {
+        return estimateOperationGas(
+            this.#saved.plan,
+            this.#saved.broadcasterQuote?.quote.execution
+        );
     }
     /** Final Note outputs, including change; Credit outputs are not exported as IPN. */
     getOutputs(): readonly TransactionOutput[] {

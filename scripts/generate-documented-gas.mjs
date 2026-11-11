@@ -50,13 +50,6 @@ const creditIdentity = {
     creditManifestVersion: Number(creditHeader[1]),
     creditFormatVersion: Number(creditHeader[2]),
 };
-const packaged = JSON.parse(readFileSync("packages/prover/circuits/manifest.json", "utf8"));
-const packagedCredit = packaged.manifests.find((m) => m.name === "credit");
-const packagedCreditIdentity = {
-    creditManifestSha256: packagedCredit.sha256,
-    creditManifestVersion: packagedCredit.version,
-    creditFormatVersion: packagedCredit.formatVersion,
-};
 const rows = [];
 for (const [index, source] of sources.entries()) {
     const table = source.text
@@ -191,18 +184,9 @@ writeFileSync(
         {
             formatVersion: 1,
             catalogSha256: sha(JSON.stringify(catalog)),
-            packagedCreditIdentity,
             vectors: catalog.references.map((r) => ({
                 query: r.shape,
-                available:
-                    r.shape.kind === "transact" ||
-                    (!!r.releaseIdentity.creditManifestSha256 &&
-                        r.releaseIdentity.creditManifestSha256 ===
-                            packagedCreditIdentity.creditManifestSha256 &&
-                        r.releaseIdentity.creditManifestVersion ===
-                            packagedCreditIdentity.creditManifestVersion &&
-                        r.releaseIdentity.creditFormatVersion ===
-                            packagedCreditIdentity.creditFormatVersion),
+                available: true,
                 gasUnits: r.gasUnits,
             })),
             unsupported: [

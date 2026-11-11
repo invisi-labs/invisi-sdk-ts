@@ -40,6 +40,7 @@ export * from "./factory/factory";
 export { normalizeFee } from "./fees/fee";
 export type * from "./rpc-types";
 export { CIRCUIT_RELEASE } from "./release-identity";
-export * from "./gas/documented-reference";
+export { estimateGas } from "./gas/estimate";
+export type { GasEstimate, GasShape, DocumentedReleaseIdentity } from "./gas/estimate";
 export * from "./note/aggregate-routes";
 export * from "./deployment";

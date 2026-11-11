@@ -1,5 +1,10 @@
 # @invisi-labs/protocol
 
+## Unreleased
+
+- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation; keep reference lookup internal.
+
+
 ## 1.2.1
 
 - Align internal dependencies with the 1.2.1 workspace release.

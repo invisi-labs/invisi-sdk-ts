@@ -103,9 +103,11 @@ Without a Broadcaster quote, `prove({execution:"aggregate"})` selects the recurs
 
 Protocol RPC APIv1 separates Note and Credit data. Credit indexed states retain two role deliveries per physical leaf. Session discovery combines candidate transaction references internally and verifies canonical Chain RPC receipts, commitments, role decryption, membership and consumption. Detection is explicit, untrusted filtering; observed or indexed history is not a completeness proof. Keep uncertain inputs reserved until canonical settlement or genuine expiry is established.
 
-`prepared.getGasReference()` returns a documented scenario reference, with source conditions and `available:false` when unsupported. Credit references require the full measured Credit manifest SHA256 to match the packaged manifest, in addition to version/format; missing hashes cannot match. `getDocumentedGasReference(shape)` exposes the curated exact reference catalog from protocol-docs sections5.1..5.6. Documented medians do not contain raw receipt fingerprints. Draw measurements cover distinct payers only; same-payer and current aggregate costs are unavailable. No arbitrary shape extrapolation is performed.
+`prepared.estimateGas()` and managed `operation.estimateGas()` synchronously estimate gas from transaction structure and the embedded benchmark table. They work before authorization, proving or ERC20 approval and require no provider. The estimator never exports a transaction, changes its state or performs an RPC simulation.
 
-`await ready.estimateGas({from?})` uses the configured ethers provider on the final transaction and returns `{source:"rpc",gasUnits}`. It requires a ready handle. Applications separately choose current fee prices and transaction budgets.
+Results have `source: "benchmark"`, `available`, and `gasUnits` when supported, plus measurement conditions and provenance. Circuit versions and manifest hashes describe the measurement only and do not reject another release with a matching structure. Unsupported shapes return `{source: "benchmark", available: false, reason: "shape-not-covered"}` without a fabricated gas value. No arbitrary extrapolation or hidden safety padding is applied. Aggregate execution, Shield and unmeasured delivery/layout combinations are not represented by the current table.
+
+The result is an approximate gas count, not a guaranteed transaction gas limit, a live fee or a Broadcaster quote. Applications choose fee prices and safety budgets, manage approval/balances, and may explicitly simulate the final call through their own EVM provider. `session.sendTransaction` requires a positive caller-supplied `gasLimit` so ethers cannot implicitly simulate on the SDK's behalf. There is no public `getGasReference` API.
 
 ## Development
 

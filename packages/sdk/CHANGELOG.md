@@ -1,5 +1,10 @@
 # @invisi-labs/sdk
 
+## Unreleased
+
+- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation; keep reference lookup internal.
+
+
 ## 1.2.1
 
 - Expose explicit native detection and decryption contracts with complete protocol context.

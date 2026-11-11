@@ -101,6 +101,12 @@ it.each(["direct", "aggregate"] as const)(
     "automatically proves and submits the signed %s execution",
     async (execution) => {
         const h = await fixture(execution);
+        if (execution === "aggregate")
+            expect(h.quoted.estimateGas()).toMatchObject({
+                source: "benchmark",
+                available: false,
+                reason: "shape-not-covered",
+            });
         const authorized = await externallyAuthorize(h.quoted);
         await expect(
             authorized.prove({ execution: execution === "direct" ? "aggregate" : "single" })

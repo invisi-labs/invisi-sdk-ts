@@ -218,3 +218,48 @@ it("persists the original update delta across resume and quotes and rejects a ch
     });
     await expect(h.ownerSession.resume(requoted.id)).rejects.toThrow(/adjustment/);
 });
+
+it.each(["create", "update", "draw", "revoke"] as const)(
+    "estimates prepared Credit %s without authorization or proving",
+    async (kind) => {
+        const h = await creditFixture();
+        let operation: Awaited<ReturnType<typeof h.ownerSession.prepareCreateCredit>>;
+        switch (kind) {
+            case "create":
+                operation = await h.ownerSession.prepareCreateCredit({
+                    tokenAddress: h.context.tokenAddress,
+                    spender: h.bob.getAddress(),
+                    expiry: 2000003600n,
+                    availableCredit: 100n,
+                    unlimited: false,
+                });
+                break;
+            case "update":
+                operation = await h.ownerSession.prepareUpdateCredit({
+                    tokenAddress: h.context.tokenAddress,
+                    credit: h.commitment,
+                    singleLimit: 10n,
+                });
+                break;
+            case "draw":
+                operation = await h.spenderSession.prepareDrawCredit({
+                    tokenAddress: h.context.tokenAddress,
+                    credits: [{ credit: h.commitment, amount: 30n }],
+                    recipient: h.wallet.getAddress(),
+                });
+                break;
+            case "revoke":
+                operation = await h.ownerSession.prepareRevokeCredit({
+                    tokenAddress: h.context.tokenAddress,
+                    shard: 1n,
+                    slot: 99n,
+                    caller: h.wallet.ownerAddress,
+                });
+                break;
+        }
+        const estimate = operation.estimateGas();
+        expect(estimate).toMatchObject({ source: "benchmark", available: kind !== "revoke" });
+        expect(operation.status).toBe("prepared");
+        expect(h.prover.prove).not.toHaveBeenCalled();
+    }
+);

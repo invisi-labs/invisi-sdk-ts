@@ -1,26 +1,86 @@
-import { it, expect } from "vitest";
-import { getDocumentedGasReference } from "@invisi-labs/sdk";
+import { it, expect, vi, afterEach } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { testOutput } from "../../../../test-support/test-output";
-it("keeps documented pre-proof references distinct from final RPC estimation", async () => {
-    const h = await fixture(),
-        prepared = await h.session.prepareTransfer({
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+it("estimates a prepared operation locally without proof, approval, export or state writes", async () => {
+    const h = await fixture();
+    const prepared = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
+    });
+    const before = await h.store.readSnapshot(h.scope);
+    const exportCall = vi
+        .spyOn(Object.getPrototypeOf(prepared), "exportTransaction")
+        .mockRejectedValue(Error("must not export"));
+    const chainHead = vi
+        .spyOn(h.reader, "getLatestBlockNumber")
+        .mockRejectedValue(Error("must not query chain"));
+    const write = vi.spyOn(h.store, "transaction").mockRejectedValue(Error("must not write"));
+    const estimate = await prepared.estimateGas();
+    expect(estimate).toMatchObject({
+        source: "benchmark",
+        available: true,
+        gasUnits: expect.any(BigInt),
+    });
+    expect(prepared.status).toBe("prepared");
+    expect("getGasReference" in prepared).toBe(false);
+    expect(exportCall).not.toHaveBeenCalled();
+    expect(chainHead).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    write.mockRestore();
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+});
+
+it("uses the measured mixed path for a C1 withdrawal with a fee", async () => {
+    const h = await fixture();
+    const prepared = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 98n },
+        fee: { recipient: h.bob.ownerAddress, amount: 2n },
+    });
+    expect(prepared.estimateGas()).toMatchObject({
+        source: "benchmark",
+        available: true,
+        gasUnits: 1083512n,
+    });
+});
+it("matches C4 mixed funding without querying approval", async () => {
+    const h = await fixture();
+    const prepared = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: await Promise.all(
+            [1n, 2n, 3n].map((nonce) =>
+                testOutput(h, { to: h.bob.getAddress(), amount: 30n, nonce })
+            )
+        ),
+        funding: { payer: h.wallet.ownerAddress, amount: 40n, authorization: "caller" },
+        withdrawal: { to: h.bob.ownerAddress, amount: 30n },
+        fee: { recipient: h.bob.ownerAddress, amount: 20n },
+    });
+    expect(prepared.estimateGas()).toMatchObject({
+        source: "benchmark",
+        available: true,
+        gasUnits: 1768554n,
+    });
+});
+it.each(["fee", "withdrawal"] as const)(
+    "does not mislabel a C2 %s payout with change as a private-only path",
+    async (kind) => {
+        const h = await fixture();
+        const prepared = await h.session.prepareTransfer({
             tokenAddress: h.context.tokenAddress,
-            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 70n })],
+            ...(kind === "fee"
+                ? { fee: { recipient: h.bob.ownerAddress, amount: 30n } }
+                : { withdrawal: { to: h.bob.ownerAddress, amount: 30n } }),
         });
-    expect(prepared.getGasReference().source).toBe("documented-reference");
-    await expect(prepared.estimateGas()).rejects.toThrow(/provider/);
-});
-it("returns documented revoke medians only for an exact authorization and bitmap scenario", () => {
-    expect(
-        getDocumentedGasReference({
-            kind: "revoke-credit",
-            authorization: "direct",
-            bitmapWord: "empty",
-        })
-    ).toMatchObject({ available: false });
-    expect(getDocumentedGasReference({ kind: "aggregate" })).toMatchObject({ available: false });
-    expect(
-        getDocumentedGasReference({ kind: "draw-credit", creditInputs: 2, distinctPayers: 1 })
-    ).toMatchObject({ available: false });
-});
+        expect(prepared.estimateGas()).toEqual({
+            source: "benchmark",
+            available: false,
+            reason: "shape-not-covered",
+        });
+    }
+);

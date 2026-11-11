@@ -1,17 +1,16 @@
-import { CIRCUIT_RELEASE } from "../release-identity";
 import catalog from "./data/documented-references.json";
 export type DocumentedReleaseIdentity =
     | { creditManifestVersion: number; creditFormatVersion: number; creditManifestSha256?: string }
     | { userManifestVersion: number; userFormatVersion: number };
-export type DocumentedGasShape = Readonly<Record<string, string | number | boolean>>;
-export type DocumentedGasReference =
+export type GasShape = Readonly<Record<string, string | number | boolean>>;
+export type GasEstimate =
     | {
-          source: "documented-reference";
+          source: "benchmark";
           available: false;
-          reason: "shape-not-covered" | "release-not-covered";
+          reason: "shape-not-covered";
       }
     | {
-          source: "documented-reference";
+          source: "benchmark";
           available: true;
           gasUnits: bigint;
           statistic: "median";
@@ -25,29 +24,18 @@ export type DocumentedGasReference =
           releaseIdentity: DocumentedReleaseIdentity;
       };
 /** Exact documented workload lookup. This is neither a transaction gas limit nor an RPC estimate. */
-export function getDocumentedGasReference(query: DocumentedGasShape): DocumentedGasReference {
+function lookupReference(query: GasShape): GasEstimate {
     const row = catalog.references.find((r) => {
-        const shape = r.shape as DocumentedGasShape;
+        const shape = r.shape as GasShape;
         return (
             Object.keys(query).length === Object.keys(shape).length &&
             Object.keys(shape).every((k) => query[k] === shape[k])
         );
     });
-    if (!row)
-        return { source: "documented-reference", available: false, reason: "shape-not-covered" };
-    const identity = row.releaseIdentity as DocumentedReleaseIdentity;
-    if (
-        "creditManifestVersion" in identity &&
-        (identity.creditManifestVersion !== CIRCUIT_RELEASE.credit.version ||
-            identity.creditFormatVersion !== CIRCUIT_RELEASE.credit.formatVersion ||
-            !/^[a-f0-9]{64}$/.test(identity.creditManifestSha256 ?? "") ||
-            !/^[a-f0-9]{64}$/.test(CIRCUIT_RELEASE.credit.manifestSha256) ||
-            identity.creditManifestSha256 !== CIRCUIT_RELEASE.credit.manifestSha256)
-    )
-        return { source: "documented-reference", available: false, reason: "release-not-covered" };
+    if (!row) return { source: "benchmark", available: false, reason: "shape-not-covered" };
     const source = catalog.sources.find((s) => s.path === row.source)!;
     return {
-        source: "documented-reference",
+        source: "benchmark",
         available: true,
         gasUnits: BigInt(row.gasUnits),
         statistic: "median",
@@ -60,4 +48,9 @@ export function getDocumentedGasReference(query: DocumentedGasShape): Documented
         assumptions: catalog.assumptions,
         releaseIdentity: row.releaseIdentity as unknown as DocumentedReleaseIdentity,
     };
+}
+
+/** Estimate the measured workload locally; this neither simulates nor exports a transaction. */
+export function estimateGas(query: GasShape): GasEstimate {
+    return lookupReference(query);
 }

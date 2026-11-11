@@ -17,7 +17,7 @@ import {
     prepareWithErrors,
     validateTransactionInfrastructure,
 } from "@invisi-labs/sdk/session-support";
-import { getAddress, type TransactionRequest, type TransactionResponse } from "ethers";
+import { getAddress, getBigInt, type TransactionRequest, type TransactionResponse } from "ethers";
 import { walletHistory, type HistoryOptions } from "../history/history";
 
 import { MissingCapabilityError } from "@invisi-labs/primitives";
@@ -199,12 +199,15 @@ export class WalletSession {
     ): Promise<TransactionResponse> {
         const signer = this.#options.signer;
         if (!signer) throw new MissingCapabilityError("ethers signer");
+        const overrides = { ...options };
+        // A supplied budget prevents ethers from implicitly simulating the transaction.
+        if (overrides.gasLimit == null || getBigInt(overrides.gasLimit, "gasLimit") <= 0n)
+            throw new Error("transaction gas limit must be supplied by the caller");
         const operation = input instanceof Operation ? input : undefined;
         if (operation && this.#sending.has(operation.id))
             throw new Error("operation is already being sent by this session");
         if (operation) this.#sending.add(operation.id);
-        // Copy options and plain calldata before the first asynchronous provider check.
-        const overrides = { ...options };
+        // Copy plain calldata before the first asynchronous provider check.
         const plain = operation ? undefined : { ...(input as TransactionCall) };
         try {
             await this.ready();

@@ -70,6 +70,7 @@ try {
         tokenAddress,
         outputs: [output],
     });
+    console.log("Benchmark gas estimate:", prepared.estimateGas());
 
     // 3. Authorize and prove the main payment; no transaction has been sent.
     const authorization = await prepared.exportWalletAuthorization();
@@ -97,7 +98,10 @@ try {
     console.log("Source tracking:", tracking.id);
 
     // 5. Only after acceptance, send the original payment with the user's ethers signer.
-    const transaction = await session.sendTransaction(ready);
+    // Final simulation is an explicit App decision, outside the SDK estimator.
+    const call = await ready.exportTransaction();
+    const gasLimit = await provider.estimateGas({ ...call, from: signer.address });
+    const transaction = await session.sendTransaction(ready, { gasLimit });
     console.log("Main transaction:", transaction.hash);
     await transaction.wait(1);
 

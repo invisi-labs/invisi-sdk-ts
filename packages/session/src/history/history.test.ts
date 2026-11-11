@@ -75,7 +75,10 @@ it("connects explicit session signers without enabling infrastructure signer def
         signer: signer as never,
     });
     await expect(
-        session.sendTransaction({ to: h.context.protocolAddress, data: "0x", value: 0n })
+        session.sendTransaction(
+            { to: h.context.protocolAddress, data: "0x", value: 0n },
+            { gasLimit: 100000n }
+        )
     ).rejects.toThrow(/connected ethers signer/);
     expect(() => new Invisi({ signer } as never)).toThrow(/signer/);
 });

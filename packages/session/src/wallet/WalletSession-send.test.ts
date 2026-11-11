@@ -40,7 +40,7 @@ it("exports a managed operation and records its transaction hash without waiting
         funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
     });
     const ready = await prepared.ready();
-    expect(await h.session.sendTransaction(ready)).toBe(h.transaction);
+    expect(await h.session.sendTransaction(ready, { gasLimit: 100000n })).toBe(h.transaction);
     const state = await h.store.readSnapshot(h.scope);
     expect(state.operations[ready.id]!.transactionHash).toBe(h.transaction.hash);
     expect(state.operations[ready.id]!.status).toBe("uncertain");
@@ -64,7 +64,9 @@ it("rejects a missing signer or a foreign operation before sending", async () =>
             funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
         })
     ).ready();
-    await expect(h.session.sendTransaction(ready)).rejects.toThrow(/session/);
+    await expect(h.session.sendTransaction(ready, { gasLimit: 100000n })).rejects.toThrow(
+        /session/
+    );
     expect(h.sendTransaction).not.toHaveBeenCalled();
 });
 
@@ -86,7 +88,7 @@ it("does not retry an ethers send failure and preserves its original error", asy
     const error = new Error("ethers insufficient funds");
     h.sendTransaction.mockRejectedValueOnce(error);
     const call = { to: h.protocol.context.protocolAddress, data: "0x1234" as const, value: 0n };
-    await expect(h.session.sendTransaction(call)).rejects.toBe(error);
+    await expect(h.session.sendTransaction(call, { gasLimit: 100000n })).rejects.toBe(error);
     expect(h.sendTransaction).toHaveBeenCalledOnce();
 });
 it("reports the broadcast hash if tracking fails and keeps the exported operation externalized", async () => {
@@ -101,7 +103,9 @@ it("reports the broadcast hash if tracking fails and keeps the exported operatio
         vi.spyOn(h.store, "transaction").mockRejectedValueOnce(new Error("storage unavailable"));
         return h.transaction;
     });
-    await expect(h.session.sendTransaction(ready)).rejects.toThrow(h.transaction.hash);
+    await expect(h.session.sendTransaction(ready, { gasLimit: 100000n })).rejects.toThrow(
+        h.transaction.hash
+    );
     const state = await h.store.readSnapshot(h.scope);
     expect((state.operations[ready.id]!.payload as { externalized: boolean }).externalized).toBe(
         true
@@ -117,11 +121,14 @@ it("rejects a changed signer chain before handing any call to ethers", async () 
     } as unknown as Signer;
     const session = new WalletSession(sessionOptions({ ...h.options, signer }));
     await expect(
-        session.sendTransaction({
-            to: h.protocol.context.protocolAddress,
-            data: "0x1234",
-            value: 0n,
-        })
+        session.sendTransaction(
+            {
+                to: h.protocol.context.protocolAddress,
+                data: "0x1234",
+                value: 0n,
+            },
+            { gasLimit: 100000n }
+        )
     ).rejects.toThrow(/chain mismatch/);
     expect(h.sendTransaction).not.toHaveBeenCalled();
 });
@@ -134,8 +141,10 @@ it("fences overlapping sends of the same managed handle within a session", async
             funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
         })
     ).ready();
-    const pending = h.session.sendTransaction(ready);
-    await expect(h.session.sendTransaction(ready)).rejects.toThrow(/already being sent/);
+    const pending = h.session.sendTransaction(ready, { gasLimit: 100000n });
+    await expect(h.session.sendTransaction(ready, { gasLimit: 100000n })).rejects.toThrow(
+        /already being sent/
+    );
     expect(await pending).toBe(h.transaction);
     expect(h.sendTransaction).toHaveBeenCalledOnce();
 });
@@ -168,3 +177,18 @@ it.each([false, true])(
         });
     }
 );
+
+it("requires the host gas budget before exporting or mutating an operation", async () => {
+    const h = await setup();
+    const ready = await (
+        await h.session.prepareShield({
+            tokenAddress: h.context.tokenAddress,
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
+            funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
+        })
+    ).ready();
+    const before = await h.store.readSnapshot(h.scope);
+    await expect(h.session.sendTransaction(ready)).rejects.toThrow(/gas limit.*caller/);
+    expect(h.sendTransaction).not.toHaveBeenCalled();
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+});
