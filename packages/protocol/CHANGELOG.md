@@ -1,9 +1,9 @@
 # @invisi-labs/protocol
 
-## Unreleased
+## 1.2.2
 
-- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation; keep reference lookup internal.
-
+- Remove delegated detection request fields from the Protocol RPC contract; detection remains local to the wallet.
+- Estimate transaction gas from version-independent benchmark shapes and keep reference lookup internal.
 
 ## 1.2.1
 

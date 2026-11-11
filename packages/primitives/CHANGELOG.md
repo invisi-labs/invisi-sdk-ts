@@ -1,5 +1,9 @@
 # @invisi-labs/primitives
 
+## 1.2.2
+
+- Require complete public receiving material for Wallet; keep identity-only authorization and decryption bound to explicit owner addresses.
+
 ## 1.2.1
 
 - Pass complete delivery detection/decryption context and distinguish operational errors from unresolved authentication results.

@@ -195,24 +195,36 @@ export function validateWalletRequest(request: WalletRequest): void {
             throw new Error("unsupported wallet method");
     }
 }
-const retainedWallets = new WeakMap<PreparedWalletRequest, Wallet>();
+const retainedWallets = new WeakMap<
+    PreparedWalletRequest,
+    { ownerAddress: WalletHex; viewingPublicKey?: Uint8Array; clueKey?: Uint8Array }
+>();
 export function prepareWalletRequest<M extends WalletMethod>(
-    wallet: Wallet,
+    wallet: Wallet | WalletHex,
     id: string,
     method: M,
     params: WalletParams[M]
 ): PreparedWalletRequest<M> {
-    if (!(wallet instanceof Wallet)) throw new TypeError("public Wallet required");
+    if (!(wallet instanceof Wallet) && typeof wallet !== "string")
+        throw new TypeError("ownerAddress or public Wallet required");
+    const ownerAddress = ReceivingAddress.fromIdentity(
+        typeof wallet === "string" ? wallet : wallet.ownerAddress
+    ).ownerAddress;
     const request = structuredClone({
         version: 1 as const,
         id,
-        ownerAddress: wallet.ownerAddress.toLowerCase() as WalletHex,
+        ownerAddress,
         method,
         params,
     });
     validateWalletRequest(request);
     const prepared = freeze({ request });
-    retainedWallets.set(prepared, wallet);
+    retainedWallets.set(
+        prepared,
+        wallet instanceof Wallet
+            ? { ownerAddress, viewingPublicKey: wallet.viewingPublicKey, clueKey: wallet.clueKey }
+            : { ownerAddress }
+    );
     return prepared;
 }
 /** Validate native output against the retained request before using it in business state. */
@@ -258,7 +270,8 @@ async function acceptResponse(
         if ((await computeOwnerAddress(result.spendingPublicKey)) !== request.ownerAddress)
             throw new Error("wallet public identity mismatch");
         if (
-            wallet.getReceivingAddress().kind === "long" &&
+            wallet.viewingPublicKey &&
+            wallet.clueKey &&
             (walletHex(wallet.viewingPublicKey) !== result.viewingPublicKey ||
                 walletHex(wallet.clueKey) !== result.clueKey)
         )
@@ -298,10 +311,16 @@ async function acceptResponse(
         const typed = request as WalletRequest<"wallet.decryptNote" | "wallet.decryptCredit">;
         const context = walletDecryptionContext(typed);
         const plaintext = walletBytes(result.plaintext);
-        const viewing = authenticatedDecryptor(wallet, {
-            decryptNote: async () => plaintext,
-            decryptCredit: async () => plaintext,
-        });
+        const viewing = authenticatedDecryptor(
+            request.ownerAddress,
+            {
+                decryptNote: async () => plaintext,
+                decryptCredit: async () => plaintext,
+            },
+            wallet.viewingPublicKey && wallet.clueKey
+                ? { viewingPublicKey: wallet.viewingPublicKey, clueKey: wallet.clueKey }
+                : undefined
+        );
         return typed.method === "wallet.decryptNote"
             ? viewing.decryptNote(typed.params.envelope, context)
             : viewing.decryptCredit(typed.params.envelope, context as CreditStateDecryptionContext);

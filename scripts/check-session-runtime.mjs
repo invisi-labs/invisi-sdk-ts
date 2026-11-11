@@ -1,11 +1,21 @@
 /** Exercise built entry points, including CommonJS class identity, without network access. */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
-const { Wallet: EvmWallet } = require(
+const { Wallet: EvmWallet, getBytes } = require(
     require.resolve("ethers", { paths: [resolve("packages/sdk")] })
+);
+const vectors = JSON.parse(
+    readFileSync(
+        new URL(
+            "../packages/primitives/src/wallet/testdata/wallet-note-vectors.json",
+            import.meta.url
+        ),
+        "utf8"
+    )
 );
 const word = (number) => `0x${number.toString(16).padStart(64, "0")}`;
 for (const format of ["js", "cjs"]) {
@@ -14,6 +24,7 @@ for (const format of ["js", "cjs"]) {
         return format === "js" ? import(pathToFileURL(target).href) : require(target);
     };
     const sdk = await load("sdk/dist/index");
+    const primitives = await load("primitives/dist/index");
     const support = await load("sdk/dist/session-support");
     const sourceSdk = await load("sdk/dist/provenance");
     const session = await load("session/dist/index");
@@ -29,7 +40,7 @@ for (const format of ["js", "cjs"]) {
     const chainId = 31337n;
     const protocolAddress = "0x1111111111111111111111111111111111111111";
     const tokenAddress = "0x2222222222222222222222222222222222222222";
-    const ownerAddress = "0x3333333333333333333333333333333333333333";
+    const ownerAddress = `0x${BigInt(vectors.owner.ownerAddress).toString(16).padStart(40, "0")}`;
     const block = { number: 12n, hash: word(12), parentHash: word(11), timestamp: 2000000000n };
     const reader = {
         getChainId: async () => chainId,
@@ -50,7 +61,13 @@ for (const format of ["js", "cjs"]) {
         },
     });
     const invisi = new sdk.Invisi({ chainReader: reader });
-    const wallet = sdk.Wallet.fromAddress(ownerAddress);
+    const wallet = sdk.Wallet.fromAddress(
+        primitives.ReceivingAddress.from({
+            ownerAddress,
+            viewingPublicKey: getBytes(vectors.credit.ownerReceivingKeys.viewingPublicKey),
+            clueKey: getBytes(vectors.credit.ownerReceivingKeys.clueKey),
+        })
+    );
     const store = new memory.MemoryWalletStore();
     const managed = await session.WalletSession.connect({ invisi, wallet, protocol, store });
     const output = await sdk.NoteOutput.create({

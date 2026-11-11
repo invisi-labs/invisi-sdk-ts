@@ -1,9 +1,11 @@
 # @invisi-labs/session
 
-## Unreleased
+## 1.2.2
 
-- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation; keep reference lookup internal.
-
+- Require complete public receiving material for Wallet and bind App decryption to the explicit owner and available receiving keys.
+- Detect public-history candidates locally instead of delegating detection to Protocol RPC.
+- Persist signed broadcaster execution quotes and submit aggregate members through managed operations.
+- Estimate prepared operation gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation.
 
 ## 1.2.1
 

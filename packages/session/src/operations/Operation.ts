@@ -1,6 +1,5 @@
 import { bindBroadcasterOperation } from "@invisi-labs/sdk/session-support";
 import {
-    Wallet,
     prepareWalletRequest,
     acceptWalletResponse,
     type PreparedWalletRequest,
@@ -291,7 +290,7 @@ export class Operation {
         check(!this.#walletRequests.has(id), "wallet request id already exported");
         const request = authorizationRequest(this.#saved.plan);
         const prepared = prepareWalletRequest(
-            Wallet.fromAddress(this.#saved.plan.scope.ownerAddress),
+            this.#saved.plan.scope.ownerAddress,
             id,
             "wallet.authorize",
             {

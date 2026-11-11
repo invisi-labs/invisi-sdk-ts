@@ -21,6 +21,7 @@ import { Invisi, Wallet, NoteOutput, Protocol, ProtocolRpcClient } from "@invisi
 import { WalletSession } from "@invisi-labs/session";
 import { MemoryWalletStore } from "@invisi-labs/session/memory";
 
+// Wallet requires complete 0i receiving material; use ownerAddress directly for identity-only operations.
 const wallet = Wallet.fromAddress(receivingAddress);
 const protocolRpc = new ProtocolRpcClient(protocolRpcUrl); // /v1 service
 const protocol = await Protocol.fromRpc(protocolRpc, provider);
@@ -130,7 +131,7 @@ Artifact synchronization reads the current authenticated manifests and removes r
 
 `Wallet` contains public receiving material only. The App owns key storage, unlocking, decryption and signing. The SDK includes no native wallet transport or App bridge. Authorization can use ethers EIP-712 signing directly.
 
-Inject a `DeliveryDecryptor` with `decryptNote(envelope, context)` and `decryptCredit(envelope, context)`. Each returns authenticated plaintext `Uint8Array`, explicit `null` for a known nonrecipient, or `{ status: "authentication-failed" }` for ambiguous AEAD failure; operational failures reject. Optional native batch `detect` receives full context and clues without exporting detection keys. `authenticatedDecryptor(wallet, decryptor)` validates plaintext context and commitments. Session shares public history across accounts and commits each private batch with its own cursor through `pending.decrypt(decryptor)`. Unresolved candidates remain retryable and make asset completeness unknown. See [shared history APIs](packages/session/README.md#shared-public-history). See [example integration](examples/app-decryptor.ts).
+Inject a `DeliveryDecryptor` with `decryptNote(envelope, context)` and `decryptCredit(envelope, context)`. Each returns authenticated plaintext `Uint8Array`, explicit `null` for a known nonrecipient, or `{ status: "authentication-failed" }` for ambiguous AEAD failure; operational failures reject. Optional native batch `detect` receives full context and clues without exporting detection keys. `authenticatedDecryptor(ownerAddress, decryptor, receivingKeys)` validates plaintext context and commitments. Session shares public history across accounts and commits each private batch with its own cursor through `pending.decrypt(decryptor)`. Unresolved candidates remain retryable and make asset completeness unknown. See [shared history APIs](packages/session/README.md#shared-public-history). See [example integration](examples/app-decryptor.ts).
 
 The optional low-level wallet wire codecs remain transport-neutral validation utilities for application-defined integrations; normal examples and Session refresh do not use their request/response envelopes. Keys never enter SDK transaction configuration. Plaintext Note/Credit openings and proving witnesses may enter JavaScript at explicit boundaries.
 

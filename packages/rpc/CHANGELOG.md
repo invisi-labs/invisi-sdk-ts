@@ -1,5 +1,10 @@
 # @invisi-labs/rpc
 
+## 1.2.2
+
+- Remove delegated detection options and requests; query public candidates for local wallet detection.
+- Add signed broadcaster execution quotes, aggregate-member submission, and execution status handling.
+
 ## 1.2.1
 
 - Align internal dependencies with the 1.2.1 workspace release.

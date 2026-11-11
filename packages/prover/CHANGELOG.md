@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.2.2
+
+- Align internal dependencies with the 1.2.2 workspace release.
+
 ## 1.2.1
 
 - Align internal dependencies with the 1.2.1 workspace release.

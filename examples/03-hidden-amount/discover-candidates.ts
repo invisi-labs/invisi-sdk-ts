@@ -31,7 +31,11 @@ export async function discoverCandidates({
         reference: DisclosureReference;
     })[]
 > {
-    const viewing = authenticatedDecryptor(wallet, decryptor);
+    const viewing = authenticatedDecryptor(
+        wallet.ownerAddress,
+        decryptor,
+        wallet.getReceivingAddress().getReceivingKeys()
+    );
     const rpc = protocolRpc.withProvider(provider);
     const status = await rpc.getStatus(protocol.context);
     if (!status.indexedHead) {

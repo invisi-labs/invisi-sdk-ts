@@ -1,0 +1,55 @@
+{
+  "format": "invisi.npm.release-integrity.v1",
+  "version": "1.2.2",
+  "archives": "github-release",
+  "packages": [
+    {
+      "name": "@invisi-labs/primitives",
+      "version": "1.2.2",
+      "filename": "invisi-labs-primitives-1.2.2.tgz",
+      "integrity": "sha512-yyGx3n8to1916TodJ6sA+8Fz5OsAE3KPRLJxFK+RGe77nSHIBPlFMDtsdKlTl9jaqxEFPfDP61/tPuvu05Ji/g=="
+    },
+    {
+      "name": "@invisi-labs/protocol",
+      "version": "1.2.2",
+      "filename": "invisi-labs-protocol-1.2.2.tgz",
+      "integrity": "sha512-SxsCAg0nlMa+lgLVosXXxVnqRqubdTqy6RLegrdQ8nDsM/3s30yanfibLGzvFwgDbRiVXblL4HZq+OcaMh2etw=="
+    },
+    {
+      "name": "@invisi-labs/prover",
+      "version": "1.2.2",
+      "filename": "invisi-labs-prover-1.2.2.tgz",
+      "integrity": "sha512-5Sncobos6AwlfTQczb4OimtDKtD+roWbhDafaqXXnzGs2Av6cqKPglGf8IZ9/yr7R/yfBJYt0slYT2TK7SvxFA=="
+    },
+    {
+      "name": "@invisi-labs/react",
+      "version": "1.2.2",
+      "filename": "invisi-labs-react-1.2.2.tgz",
+      "integrity": "sha512-2jlMxHQz/WpCVRzRwL51vEE99tOXKY8hVCIZkNGZu4IhtZIYVjWwbpJHcVlWQA9zALYtPy+QmcIith2+HBrQQQ=="
+    },
+    {
+      "name": "@invisi-labs/rpc",
+      "version": "1.2.2",
+      "filename": "invisi-labs-rpc-1.2.2.tgz",
+      "integrity": "sha512-WBFDsAwkuwJkM635XjiBIifssFxR62EXzFZKp0PnfvqxbN1CcDKE2ED9HJBRpNzHNbZf0/QZkxr2BybT/Vag9w=="
+    },
+    {
+      "name": "@invisi-labs/sdk",
+      "version": "1.2.2",
+      "filename": "invisi-labs-sdk-1.2.2.tgz",
+      "integrity": "sha512-2mELpaXUV+psj/gjWx7uuR6CDn6nY/x3m++trh5S+T55P5C4Ijuon3+DLITZjfA3wdogFv6AOAmOrMCPvZW14w=="
+    },
+    {
+      "name": "@invisi-labs/session",
+      "version": "1.2.2",
+      "filename": "invisi-labs-session-1.2.2.tgz",
+      "integrity": "sha512-fs11xBX2uYby97Gnz6/f2+Ij71dHLNC51JEFOkIn8akfY46/IfompIhBbhG2Ba+E6EjRSCbVc9stMgrbeN0p9g=="
+    },
+    {
+      "name": "@invisi-labs/vue",
+      "version": "1.2.2",
+      "filename": "invisi-labs-vue-1.2.2.tgz",
+      "integrity": "sha512-Jh+jg1E+Fek9R0AHKhb3N5xmAFJCdLnyfFcDSek7QGlaOdQ5zjzhmns3UqSo3SbWZP8qGkK1Qh3qtino0j6SOg=="
+    }
+  ]
+}

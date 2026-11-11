@@ -1,9 +1,10 @@
 # @invisi-labs/sdk
 
-## Unreleased
+## 1.2.2
 
-- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation; keep reference lookup internal.
-
+- Require complete public receiving material for Wallet; keep identity-only authorization and decryption bound to explicit owner addresses.
+- Follow signed broadcaster execution quotes and submit aggregate members with their bound execution context.
+- Estimate prepared transaction gas locally from version-independent benchmark shapes without proofs, ERC20 approval or RPC simulation.
 
 ## 1.2.1
 

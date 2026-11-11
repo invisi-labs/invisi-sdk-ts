@@ -3,11 +3,9 @@ import { getBytes, toBeHex } from "ethers";
 import { authenticatedDecryptor, type DeliveryDecryptor } from "./decryptor";
 import { deliveryCodec } from "./delivery-codec";
 import { decryptPrivateTransferNote, decryptCreditState } from "./encryption";
-import { Wallet } from "../wallet/wallet-object";
 import vectors from "../wallet/testdata/wallet-note-vectors.json";
 
 const ownerAddress = toBeHex(BigInt(vectors.owner.ownerAddress), 20) as `0x${string}`;
-const wallet = Wallet.fromAddress(ownerAddress);
 const context = {
     chainId: BigInt(vectors.context.chainId),
     protocolAddress: BigInt(vectors.context.protocolAddress),
@@ -31,7 +29,7 @@ const app: DeliveryDecryptor = {
 };
 
 it("authenticates App Note and Credit plaintext against public vectors", async () => {
-    const viewing = authenticatedDecryptor(wallet, app);
+    const viewing = authenticatedDecryptor(ownerAddress, app);
     expect((await viewing.decryptNote(noteEnvelope, context))?.amount).toBe(70n);
     const credit = await viewing.decryptCredit(creditEnvelope, {
         ...context,
@@ -42,12 +40,12 @@ it("authenticates App Note and Credit plaintext against public vectors", async (
 });
 
 it("skips only explicit nonrecipients and propagates App errors", async () => {
-    const nonrecipient = authenticatedDecryptor(wallet, {
+    const nonrecipient = authenticatedDecryptor(ownerAddress, {
         decryptNote: async () => null,
         decryptCredit: async () => null,
     });
     expect(await nonrecipient.decryptNote(noteEnvelope, context)).toBeNull();
-    const failed = authenticatedDecryptor(wallet, {
+    const failed = authenticatedDecryptor(ownerAddress, {
         ...app,
         decryptNote: async () => {
             throw Error("App wallet locked");
@@ -58,7 +56,10 @@ it("skips only explicit nonrecipients and propagates App errors", async () => {
 
 it("rejects plaintext substituted from another commitment, owner or token", async () => {
     const plaintext = await app.decryptNote(noteEnvelope, { ...context, ownerAddress });
-    const viewing = authenticatedDecryptor(wallet, { ...app, decryptNote: async () => plaintext });
+    const viewing = authenticatedDecryptor(ownerAddress, {
+        ...app,
+        decryptNote: async () => plaintext,
+    });
     await expect(
         viewing.decryptNote(noteEnvelope, {
             ...context,
@@ -68,7 +69,7 @@ it("rejects plaintext substituted from another commitment, owner or token", asyn
     await expect(
         viewing.decryptNote(noteEnvelope, { ...context, tokenAddress: 1n })
     ).rejects.toThrow(/context|commitment/);
-    const other = authenticatedDecryptor(Wallet.fromAddress(toBeHex(1, 20)), {
+    const other = authenticatedDecryptor(toBeHex(1, 20) as `0x${string}`, {
         ...app,
         decryptNote: async () => plaintext,
     });
@@ -78,7 +79,10 @@ it("rejects plaintext substituted from another commitment, owner or token", asyn
 it("rejects wrong envelope kinds before invoking the App", async () => {
     const decryptNote = vi.fn(app.decryptNote);
     await expect(
-        authenticatedDecryptor(wallet, { ...app, decryptNote }).decryptNote(creditEnvelope, context)
+        authenticatedDecryptor(ownerAddress, { ...app, decryptNote }).decryptNote(
+            creditEnvelope,
+            context
+        )
     ).rejects.toThrow(/kind/);
     expect(decryptNote).not.toHaveBeenCalled();
 });
@@ -91,7 +95,7 @@ it("rejects a Credit plaintext delivered under the other role", async () => {
         role: "owner" as const,
     };
     const plaintext = await app.decryptCredit(creditEnvelope, creditContext);
-    const viewing = authenticatedDecryptor(wallet, {
+    const viewing = authenticatedDecryptor(ownerAddress, {
         ...app,
         decryptCredit: async () => plaintext,
     });
@@ -111,7 +115,7 @@ it("passes complete native detection context and rejects mismatched accounts or 
         },
     ];
     const detect = vi.fn(async () => ({ ownerAddress, results: ["candidate" as const] }));
-    const viewing = authenticatedDecryptor(wallet, { ...app, detect });
+    const viewing = authenticatedDecryptor(ownerAddress, { ...app, detect });
     expect(await viewing.detectCandidates(candidates)).toEqual(["candidate"]);
     expect(detect.mock.calls).toHaveLength(1);
     expect(detect).toHaveBeenCalledWith(candidates);
@@ -120,15 +124,16 @@ it("passes complete native detection context and rejects mismatched accounts or 
         { ownerAddress, results: [] },
     ]) {
         await expect(
-            authenticatedDecryptor(wallet, { ...app, detect: async () => result }).detectCandidates(
-                candidates
-            )
+            authenticatedDecryptor(ownerAddress, {
+                ...app,
+                detect: async () => result,
+            }).detectCandidates(candidates)
         ).rejects.toThrow(/wrong account|invalid detection/);
     }
 });
 it("distinguishes ambiguous AEAD authentication from host failures for both delivery roles", async () => {
     const { DeliveryAuthenticationError } = await import("./errors");
-    const ambiguous = authenticatedDecryptor(wallet, {
+    const ambiguous = authenticatedDecryptor(ownerAddress, {
         async decryptNote() {
             return { status: "authentication-failed" };
         },
@@ -159,7 +164,7 @@ it("distinguishes ambiguous AEAD authentication from host failures for both deli
     ).rejects.toBeInstanceOf(DeliveryAuthenticationError);
     for (const reason of ["locked", "cancelled", "session expired", "wrong account"]) {
         await expect(
-            authenticatedDecryptor(wallet, {
+            authenticatedDecryptor(ownerAddress, {
                 ...app,
                 async decryptCredit() {
                     throw Error(reason);
@@ -194,7 +199,7 @@ it("authenticates the spender Credit role with the spender account and full nati
             );
         }
     );
-    const active = authenticatedDecryptor(Wallet.fromAddress(spender), { ...app, decryptCredit });
+    const active = authenticatedDecryptor(spender, { ...app, decryptCredit });
     expect(
         (await active.decryptCredit(vectors.credit.spenderCiphertext as `0x${string}`, request))
             ?.note.spenderWalletIdentity

@@ -19,6 +19,34 @@ describe("wallet request boundary", () => {
     });
 });
 
+it("discovers public material and authorizes with an explicit owner address", async () => {
+    const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
+    const prepared = prepareWalletRequest(local.ownerAddress, "public", "wallet.public", {});
+    const result = await acceptWalletResponse(
+        prepared,
+        (await local.execute(
+            prepared.request
+        )) as import("./wallet-wire").WalletResponse<"wallet.public">
+    );
+    expect(result.viewingPublicKey).toBeDefined();
+    const authorization = prepareWalletRequest(local.ownerAddress, "auth", "wallet.authorize", {
+        operation: "transact",
+        capacity: 1,
+        words: ["31337", "4660"],
+        context: { chainId: "31337", protocolAddress: "4660" },
+    });
+    expect(
+        (
+            await acceptWalletResponse(
+                authorization,
+                (await local.execute(
+                    authorization.request
+                )) as import("./wallet-wire").WalletResponse<"wallet.authorize">
+            )
+        ).ownerAddress
+    ).toBe(local.ownerAddress);
+});
+
 it("verifies native authorization and rejects altered words, digest and owner", async () => {
     const local = await TestWallet.fromPrivateKey("0x" + "01".padStart(64, "0"));
     const wallet = Wallet.fromAddress(local.getAddress());
@@ -195,7 +223,7 @@ it("binds native Credit receiving snapshots to the resolved public Wallet", asyn
 it("throws shared typed errors and validates batch errors before acceptance", async () => {
     const { NativeWalletError, acceptWalletResponses, validateWalletBatch } =
         await import("./wallet-wire");
-    const wallet = Wallet.fromAddress("0x1111111111111111111111111111111111111111");
+    const wallet = "0x1111111111111111111111111111111111111111" as const;
     const prepared = prepareWalletRequest(wallet, "locked", "wallet.public", {});
     const error = {
         version: 1 as const,

@@ -159,7 +159,11 @@ export async function scanAccount(
         lower;
     const reader = localReader(history, options.chainReader!, !!settings.offline);
     const receiving = options.wallet.getReceivingAddress();
-    const active = authenticatedDecryptor(options.wallet, decryptor);
+    const active = authenticatedDecryptor(
+        options.wallet.ownerAddress,
+        decryptor,
+        receiving.getReceivingKeys()
+    );
     const viewing = {
         ...active,
         async detectCandidates(...args: Parameters<typeof active.detectCandidates>) {
@@ -182,7 +186,7 @@ export async function scanAccount(
         reader,
         protocolRpc: publicProvider(options, !!settings.offline),
         viewing,
-        ...(receiving.kind === "long" ? { receivingKeys: receiving.getReceivingKeys() } : {}),
+        receivingKeys: receiving.getReceivingKeys(),
     });
     let notes = 0,
         credits = 0,
@@ -318,8 +322,12 @@ async function replayCredits(
         store,
         reader,
         protocolRpc: options.protocolRpc!,
-        viewing: authenticatedDecryptor(options.wallet, decryptor),
-        ...(receiving.kind === "long" ? { receivingKeys: receiving.getReceivingKeys() } : {}),
+        viewing: authenticatedDecryptor(
+            options.wallet.ownerAddress,
+            decryptor,
+            receiving.getReceivingKeys()
+        ),
+        receivingKeys: receiving.getReceivingKeys(),
     });
     let credits = 0;
     for await (const page of history.pages(start, target, {
@@ -391,8 +399,12 @@ export async function retryUnresolved(
         store: options.store!,
         reader,
         protocolRpc: publicProvider(options, !!settings.offline),
-        viewing: authenticatedDecryptor(options.wallet, decryptor),
-        ...(receiving.kind === "long" ? { receivingKeys: receiving.getReceivingKeys() } : {}),
+        viewing: authenticatedDecryptor(
+            options.wallet.ownerAddress,
+            decryptor,
+            receiving.getReceivingKeys()
+        ),
+        receivingKeys: receiving.getReceivingKeys(),
     });
     const ranges = new Set<bigint>();
     for (const candidate of Object.values(state.unresolvedDeliveries ?? {})) {

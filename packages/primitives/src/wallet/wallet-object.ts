@@ -1,37 +1,37 @@
 import { ReceivingAddress } from "../address/receiving-address";
-import { MissingCapabilityError } from "../errors";
+import { encodeLongAddress } from "../address/address";
+import type { ReceivingKeys } from "../types";
 import { NullifierCapability } from "./capabilities";
 
 /** Public identity and receiving keys. */
 export class WalletAddress {
-    readonly #address: ReceivingAddress;
+    readonly #ownerAddress: `0x${string}`;
+    readonly #receivingKeys: ReceivingKeys;
 
     protected constructor(address: ReceivingAddress) {
-        this.#address = address;
+        this.#receivingKeys = address.getReceivingKeys();
+        this.#ownerAddress = address.ownerAddress;
     }
 
     get ownerAddress(): `0x${string}` {
-        return this.#address.ownerAddress;
+        return this.#ownerAddress;
     }
 
     get viewingPublicKey(): Uint8Array {
-        return this.#address.viewingPublicKey;
+        return this.#receivingKeys.viewingPublicKey.slice();
     }
 
     get clueKey(): Uint8Array {
-        return this.#address.clueKey;
+        return this.#receivingKeys.clueKey.slice();
     }
 
-    /** Complete 0i receiving address. Owner-only wallets must first resolve their receiving keys. */
+    /** Encode the complete public receiving material on demand. */
     getAddress(): string {
-        if (this.#address.kind !== "long") {
-            throw new MissingCapabilityError("resolved receiving keys");
-        }
-        return this.#address.toString();
+        return encodeLongAddress({ ownerAddress: this.#ownerAddress, ...this.#receivingKeys });
     }
 
     getReceivingAddress(): ReceivingAddress {
-        return this.#address;
+        return ReceivingAddress.from({ ownerAddress: this.#ownerAddress, ...this.#receivingKeys });
     }
 
     /** Nullifiers derive from public identity and do not grant spending authority. */
@@ -40,7 +40,7 @@ export class WalletAddress {
     }
 
     toJSON() {
-        return { ownerAddress: this.ownerAddress, address: this.#address.toString() };
+        return { ownerAddress: this.ownerAddress, address: this.getAddress() };
     }
 
     [Symbol.for("nodejs.util.inspect.custom")]() {
@@ -48,14 +48,14 @@ export class WalletAddress {
     }
 }
 
-/** Address-only wallet. Contains no private keys or private capability methods. */
+/** Complete public wallet. Contains no private keys or private capability methods. */
 export class Wallet extends WalletAddress {
     private constructor(address: ReceivingAddress) {
         super(address);
         Object.freeze(this);
     }
 
-    /** Parse a complete 0i address or an EVM owner address without network access. */
+    /** Parse complete 0i receiving material without network access. */
     static fromAddress(address: ReceivingAddress | string): Wallet {
         if (typeof address !== "string" && !(address instanceof ReceivingAddress)) {
             throw new TypeError("expected a validated receiving address");

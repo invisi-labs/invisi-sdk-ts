@@ -25,6 +25,7 @@ Without `--execute`, live scripts exit before reading account configuration, env
 Initialize the public wallet from the App's complete receiving address:
 
 ```ts
+// Wallet requires complete 0i receiving material; use ownerAddress directly for identity-only operations.
 const wallet = Wallet.fromAddress(receivingAddress);
 ```
 
@@ -36,7 +37,7 @@ Authorization examples call `exportWalletAuthorization()`, sign its exact `domai
 
 Decryption is explicitly injected through `DeliveryDecryptor`. Implement the two callbacks in `app-decryptor.ts` using your App's wallet. They receive ciphertext and the complete owner/deployment/token/commitment context, plus the Credit delivery role. Return authenticated delivery bytes, explicit `null` only for a known nonrecipient, or `{ status: "authentication-failed" }` when AEAD failure is ambiguous. Optional native batch detection also receives clues. Throw on locked accounts, expired sessions, cancellation and other operational errors.
 
-`authenticatedDecryptor(wallet, decryptor)` decodes and checks returned plaintext against the requested owner, token, commitment and Credit receiving key. Discovery independently checks canonical receipt evidence. Session uses `await pending.decrypt(decryptor)` to commit each authenticated batch and its account checkpoint atomically; failed batches do not advance the cursor, and earlier commits remain. Ambiguous candidates are retained for `retryUnresolved` and asset completeness remains unknown. See [shared public history](../packages/session/README.md#shared-public-history). No request IDs, response matching, native transport or private keys are needed in SDK configuration.
+`authenticatedDecryptor(ownerAddress, decryptor, receivingKeys)` decodes and checks returned plaintext against the requested owner, token, commitment and Credit receiving key. Discovery independently checks canonical receipt evidence. Session uses `await pending.decrypt(decryptor)` to commit each authenticated batch and its account checkpoint atomically; failed batches do not advance the cursor, and earlier commits remain. Ambiguous candidates are retained for `retryUnresolved` and asset completeness remains unknown. See [shared public history](../packages/session/README.md#shared-public-history). No request IDs, response matching, native transport or private keys are needed in SDK configuration.
 
 `example-io.ts` only formats log output and reads public recovery records; it performs no wallet operation.
 

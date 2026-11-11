@@ -87,7 +87,11 @@ export async function discoverCredits({
         reference: DisclosureReference;
     })[]
 > {
-    const viewing = authenticatedDecryptor(wallet, decryptor);
+    const viewing = authenticatedDecryptor(
+        wallet.ownerAddress,
+        decryptor,
+        wallet.getReceivingAddress().getReceivingKeys()
+    );
     const rpc = protocolRpc.withProvider(provider),
         status = await rpc.getStatus(protocol.context);
     if (!status.indexedHead) {

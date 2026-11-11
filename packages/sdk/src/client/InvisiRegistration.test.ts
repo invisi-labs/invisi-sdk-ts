@@ -87,9 +87,7 @@ describe("Invisi registry composition", () => {
         const request = await prepared.exportRegistrationAuthorization();
         expect(request.primaryType).toBe("RegisterReceivingKeys");
         expect(request.message.deadline).toBe("1300");
-        await expect(
-            invisi.prepareRegistration({ wallet: Wallet.fromAddress(wallet.ownerAddress) })
-        ).rejects.toThrow(/resolved receiving keys/i);
+        expect(() => Wallet.fromAddress(wallet.ownerAddress)).toThrow(/resolved receiving keys/i);
     });
 
     it("rejects absent infrastructure and registry metadata", async () => {

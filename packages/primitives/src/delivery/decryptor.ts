@@ -1,6 +1,7 @@
 import { DeliveryAuthenticationError } from "./errors";
 import { bytesToHex } from "@noble/hashes/utils";
-import type { Wallet } from "../wallet/wallet-object";
+import type { ReceivingKeys } from "../types";
+import { ReceivingAddress } from "../address/receiving-address";
 import { deliveryCodec, validateDeliveryCiphertext } from "./delivery-codec";
 import { noteCommitment, creditCommitment } from "./validation";
 import type { NoteBytes, NoteDecryptionContext, CreditStateDecryptionContext } from "./types";
@@ -47,8 +48,18 @@ function checkedPlaintext(
 }
 
 /** Bind untrusted App plaintext to the requested wallet, deployment, token and commitment. */
-export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryptor) {
-    const ownerAddress = wallet.ownerAddress;
+export function authenticatedDecryptor(
+    owner: `0x${string}`,
+    decryptor: DeliveryDecryptor,
+    expectedKeys?: ReceivingKeys
+) {
+    const ownerAddress = ReceivingAddress.fromIdentity(owner).ownerAddress;
+    const receivingKeys = expectedKeys
+        ? {
+              viewingPublicKey: expectedKeys.viewingPublicKey.slice(),
+              clueKey: expectedKeys.clueKey.slice(),
+          }
+        : undefined;
     return {
         ownerAddress,
         async detectCandidates(candidates: readonly DeliveryDetectionCandidate[]) {
@@ -125,12 +136,15 @@ export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryp
                     state.note.tokenAddress !== context.tokenAddress
                 )
                     throw new Error("decrypted credit context mismatch");
-                if (wallet.getReceivingAddress().kind === "long") {
+                if (receivingKeys) {
                     const keys =
                         context.role === "owner"
                             ? state.ownerReceivingKeys
                             : state.spenderReceivingKeys;
-                    if (bytesToHex(keys.viewingPublicKey) !== bytesToHex(wallet.viewingPublicKey))
+                    if (
+                        bytesToHex(keys.viewingPublicKey) !==
+                        bytesToHex(receivingKeys.viewingPublicKey)
+                    )
                         throw new Error("decrypted credit receiving key mismatch");
                 }
                 await creditCommitment(full, state.note);

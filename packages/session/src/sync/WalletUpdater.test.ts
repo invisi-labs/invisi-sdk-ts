@@ -1,3 +1,4 @@
+import { TestWallet } from "../../../../test-support/test-wallet";
 import {
     testDecryptor,
     applyRefresh,
@@ -21,7 +22,7 @@ import {
     type Membership,
 } from "@invisi-labs/protocol";
 import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
-import { Interface, keccak256 } from "ethers";
+import { Interface, keccak256, getBytes } from "ethers";
 import { expect, it, vi } from "vitest";
 import { MerkleFixture } from "../../../../test-support/merkle-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
@@ -114,7 +115,13 @@ async function harness() {
     });
     const store = new MemoryWalletStore();
     const options = {
-        wallet: Wallet.fromAddress(ReceivingAddress.fromIdentity(identity).toString()),
+        wallet: Wallet.fromAddress(
+            ReceivingAddress.from({
+                ownerAddress: identity,
+                viewingPublicKey: getBytes(vectors.credit.ownerReceivingKeys.viewingPublicKey),
+                clueKey: getBytes(vectors.credit.ownerReceivingKeys.clueKey),
+            })
+        ),
         protocol,
         store,
         chainReader: reader,
@@ -895,7 +902,7 @@ async function sharedHarness() {
         sessionOptions({
             ...options,
             wallet: Wallet.fromAddress(
-                ReceivingAddress.fromIdentity(`0x${"22".repeat(20)}`).toString()
+                (await TestWallet.fromPrivateKey(new Uint8Array(32).fill(2))).getAddress()
             ),
         })
     );

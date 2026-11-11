@@ -1,5 +1,9 @@
 # @invisi-labs/vue
 
+## 1.2.2
+
+- Align managed wallet bindings and internal dependencies with the 1.2.2 workspace release.
+
 ## 1.2.1
 
 - Align internal dependencies with the 1.2.1 workspace release.
