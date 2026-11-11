@@ -538,6 +538,108 @@ it.each([
         expect(successor.receivingKeySource).toEqual({ kind: "draw", commitment: p.commitment });
         expect(state.credits[p.commitment + ":owner"]!.spent).toBe("spent");
         expect(state.credits[ordinary + ":owner"]).toBeUndefined();
+        if (!crossTree) {
+            const protocol = new Protocol({
+                deployment: {
+                    chainId: context.chainId,
+                    protocol: {
+                        address: context.protocolAddress,
+                        runtimeCodeHash: keccak256("0x01") as Hex,
+                        fromBlock: 12n,
+                    },
+                },
+            });
+            const rpc = {
+                getStatus: async () => ({
+                    indexedHead: block(13n),
+                    detectionEnabled: false,
+                    checkedBits: 8,
+                }),
+                getNoteUpdates: async (_context: unknown, range: { toBlock: bigint }) => ({
+                    block: block(range.toBlock),
+                    notes: [],
+                }),
+                getCreditTransitions: async (
+                    _context: unknown,
+                    range: { fromBlock: bigint; toBlock: bigint }
+                ) => ({
+                    block: block(range.toBlock),
+                    transitions: [created, drawn]
+                        .filter(
+                            (r) =>
+                                r.block.number >= range.fromBlock && r.block.number <= range.toBlock
+                        )
+                        .map((r) => ({ transactionHash: r.transactionHash })),
+                }),
+                getMembership: async (
+                    _context: unknown,
+                    input: { leafIndex: number; commitment: Hex },
+                    anchor: CanonicalBlock
+                ) => ({
+                    block: anchor,
+                    treeId: 1n,
+                    leafIndex: input.leafIndex,
+                    leaf: input.commitment,
+                    root: hex(outputTree.getRoot()),
+                    path: outputTree.getProof(input.leafIndex).merklePath,
+                }),
+            };
+            const store = new MemoryWalletStore({ recentRecords: 0 });
+            const session = new WalletSession(
+                sessionOptions({
+                    ...h.options,
+                    protocol,
+                    store,
+                    protocolRpc:
+                        rpc as unknown as import("@invisi-labs/protocol").ProtocolDataProvider,
+                })
+            );
+            const pending = await session.refresh({ fromBlock: 12n, toBlock: 13n, pageSize: 1 });
+            await pending.decrypt(testDecryptor);
+            const replayed = await store.readSnapshot(session.scope);
+            expect(replayed.credits[p.draw.stateCommitment + ":owner"]?.state.note.totalSpent).toBe(
+                30n
+            );
+            expect(replayed.credits[p.draw.stateCommitment + ":owner"]?.spent).toBe("unspent");
+            expect(replayed.creditReplayFrom).toBeUndefined();
+            if (!validChild) {
+                const retryStore = new MemoryWalletStore({ recentRecords: 0 });
+                const retrySession = new WalletSession(
+                    sessionOptions({
+                        ...h.options,
+                        protocol,
+                        store: retryStore,
+                        protocolRpc:
+                            rpc as unknown as import("@invisi-labs/protocol").ProtocolDataProvider,
+                    })
+                );
+                const deferred = {
+                    ...testDecryptor,
+                    async decryptCredit(
+                        envelope: Parameters<typeof testDecryptor.decryptCredit>[0],
+                        at: Parameters<typeof testDecryptor.decryptCredit>[1]
+                    ) {
+                        if (at.outputCommitment === p.commitment && at.role === "owner")
+                            return { status: "authentication-failed" as const };
+                        return testDecryptor.decryptCredit(envelope, at);
+                    },
+                };
+                await (
+                    await retrySession.refresh({ fromBlock: 12n, toBlock: 13n, pageSize: 1 })
+                ).decrypt(deferred);
+                expect(
+                    (await retryStore.readSnapshot(retrySession.scope)).credits[
+                        p.draw.stateCommitment + ":owner"
+                    ]
+                ).toBeUndefined();
+                await retrySession.retryUnresolved(testDecryptor);
+                expect(
+                    (await retryStore.readSnapshot(retrySession.scope)).credits[
+                        p.draw.stateCommitment + ":owner"
+                    ]?.state.note.totalSpent
+                ).toBe(30n);
+            }
+        }
     }
 );
 
@@ -618,7 +720,7 @@ it("composes both RPCs and refreshes owned inventory without delegating wallet s
             },
         })
     );
-    const result = await refreshSession(session, { fromBlock: 12n, detectionKey: key });
+    const result = await refreshSession(session, { fromBlock: 12n });
     expect(result.notes).toBe(1);
     expect((await session.balance(token)).availableKnown).toBe(70n);
     expect(getMembership).toHaveBeenCalledTimes(1);
@@ -626,8 +728,10 @@ it("composes both RPCs and refreshes owned inventory without delegating wallet s
     const sent = getNoteUpdates.mock.calls as unknown as Array<
         [unknown, { detectionKey: Uint8Array }]
     >;
-    expect(sent[0]![1].detectionKey).not.toBe(key);
-    expect(sent[0]![1].detectionKey.every((value) => value === 0)).toBe(true);
+    expect(sent[0]![1].detectionKey).toBeUndefined();
+    await expect(session.refresh({ fromBlock: 12n, detectionKey: key })).rejects.toThrow(
+        /remain in the App/
+    );
 });
 
 it("serializes entire multi-page refreshes while a provider request is pending", async () => {
@@ -691,7 +795,7 @@ it("serializes entire multi-page refreshes while a provider request is pending",
     release();
     const results = await Promise.all([first, second]);
     expect(results.map((result) => result.block.number)).toEqual([13n, 13n]);
-    expect(calls).toEqual(["status", "page:12", "page:13", "status", "page:12", "page:13"]);
+    expect(calls).toEqual(["status", "page:13", "status"]);
     await applyRefresh(results[0]!);
     await expect(applyRefresh(results[1]!)).rejects.toThrow(/wallet changed/);
     expect((await session.balance(token)).availableKnown).toBe(70n);
@@ -706,6 +810,7 @@ it("stages without writes and validates App plaintext before committing", async 
         ...testDecryptor,
         async decryptNote(...args: Parameters<typeof testDecryptor.decryptNote>) {
             const bytes = (await testDecryptor.decryptNote(...args))!;
+            if (!(bytes instanceof Uint8Array)) throw Error("expected plaintext");
             bytes[47] = bytes[47]! ^ 1;
             return bytes;
         },
@@ -761,4 +866,446 @@ it("keeps an entire refresh pending when App decryption fails", async () => {
     expect(before.notes).toEqual({});
     await applyRefresh(pending);
     expect((await h.store.readSnapshot(h.session.scope)).revision).toBe(1);
+});
+
+async function sharedHarness() {
+    const h = await harness();
+    const { PublicHistory, PublicHistoryStore, MemoryAtomicRecords } = await import("../index");
+    const protocol = new Protocol({
+        deployment: {
+            chainId: context.chainId,
+            protocol: {
+                address: context.protocolAddress,
+                runtimeCodeHash: keccak256("0x01") as Hex,
+                fromBlock: 12n,
+            },
+        },
+    });
+    let head = 16n;
+    let forkFrom: bigint | undefined;
+    const canonical = (n: bigint) =>
+        forkFrom !== undefined && n >= forkFrom
+            ? {
+                  ...block(n),
+                  hash: hex(n + 1000n),
+                  parentHash: n === forkFrom ? hex(n - 1n) : hex(n - 1n + 1000n),
+              }
+            : block(n);
+    vi.spyOn(h.reader, "getBlock").mockImplementation(async (n) => canonical(n));
+    const rpc = {
+        ...h.protocolRpc,
+        detectNotes: h.protocolRpc.getNoteUpdates,
+        getStatus: async () => ({
+            indexedHead: canonical(head),
+            detectionEnabled: false,
+            checkedBits: 8,
+        }),
+        getNoteUpdates: vi.fn(async (_: unknown, r: { fromBlock: bigint; toBlock: bigint }) => ({
+            block: canonical(r.toBlock),
+            notes: r.fromBlock <= 12n && r.toBlock >= 12n ? [noteCandidate(hex(101n))] : [],
+        })),
+        getCreditTransitions: async (_: unknown, r: { toBlock: bigint }) => ({
+            block: canonical(r.toBlock),
+            transitions: [],
+        }),
+        getMembership: vi.fn(async (_: unknown, _input: unknown, anchor: CanonicalBlock) => ({
+            ...h.membership,
+            block: anchor,
+        })),
+    };
+    const history = new PublicHistory({
+        protocol,
+        reader: h.reader,
+        protocolRpc: rpc,
+        store: new PublicHistoryStore(new MemoryAtomicRecords(), { persistent: false }),
+    });
+    const options = { ...h.options, protocol, protocolRpc: rpc, publicHistory: history };
+    const a = new WalletSession(sessionOptions(options));
+    const b = new WalletSession(
+        sessionOptions({
+            ...options,
+            wallet: Wallet.fromAddress(
+                ReceivingAddress.fromIdentity(`0x${"22".repeat(20)}`).toString()
+            ),
+        })
+    );
+    return {
+        ...h,
+        a,
+        b,
+        history,
+        rpc,
+        options,
+        head: (value: bigint) => {
+            head = value;
+        },
+        fork: (from: bigint) => {
+            forkFrom = from;
+        },
+    };
+}
+it("shares authenticated public receipts across independent accounts and resumes empty ranges", async () => {
+    const h = await sharedHarness();
+    await h.a.synchronizeHistory({ toBlock: 16n, pageSize: 2 });
+    expect(h.reader.getReceipt).toHaveBeenCalledTimes(1);
+    expect(h.rpc.getMembership).toHaveBeenCalledTimes(1);
+    await h.a.scanHistory(testDecryptor);
+    const detect = vi.fn(
+        async (
+            candidates: readonly import("@invisi-labs/primitives").DeliveryDetectionCandidate[]
+        ) => ({
+            ownerAddress: h.b.scope.ownerAddress,
+            results: candidates.map(() => "not-recipient" as const),
+        })
+    );
+    const decryptNote = vi.fn(async () => {
+        throw Error("must not decrypt rejected candidates");
+    });
+    await h.b.scanHistory({ detect, decryptNote, decryptCredit: decryptNote }, { offline: true });
+    expect(detect.mock.calls[0]![0][0]).toMatchObject({
+        chainId: context.chainId,
+        protocolAddress: BigInt(context.protocolAddress),
+        tokenAddress: BigInt(token),
+        outputCommitment: vectors.note.commitment,
+        clue: `0x${clues.vectors[0]!.clue}`,
+        role: "funds",
+        ownerAddress: h.b.scope.ownerAddress,
+    });
+    expect(decryptNote).not.toHaveBeenCalled();
+    await h.b.scanHistory({ detect, decryptNote, decryptCredit: decryptNote }, { offline: true });
+    expect(detect).toHaveBeenCalledTimes(1);
+    expect(h.reader.getReceipt).toHaveBeenCalledTimes(1);
+    expect(h.rpc.getNoteUpdates).toHaveBeenCalledTimes(3);
+    expect((await h.store.readSnapshot(h.a.scope)).discoveryThrough?.number).toBe(16n);
+    expect((await h.store.readSnapshot(h.b.scope)).notes).toEqual({});
+    const restarted = new WalletSession(sessionOptions({ ...h.options, wallet: h.options.wallet }));
+    await restarted.scanHistory(testDecryptor, { offline: true });
+    expect(h.reader.getReceipt).toHaveBeenCalledTimes(1);
+    h.head(18n);
+    h.spent();
+    await h.history.synchronize({ toBlock: 18n });
+    await h.a.refreshState();
+    expect((await h.a.balance(token)).availableKnown).toBe(0n);
+    expect((await h.store.readSnapshot(h.a.scope)).discoveryThrough?.number).toBe(16n);
+    await h.a.scanHistory(testDecryptor);
+    expect((await h.store.readSnapshot(h.a.scope)).discoveryThrough?.number).toBe(18n);
+});
+it("keeps ambiguous candidates, retries them, and never advances a failed private batch", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ pageSize: 1 });
+    const ambiguous = {
+        async decryptNote() {
+            return { status: "authentication-failed" as const };
+        },
+        decryptCredit: testDecryptor.decryptCredit,
+    };
+    await h.a.scanHistory(ambiguous);
+    expect(Object.keys((await h.store.readSnapshot(h.a.scope)).unresolvedDeliveries!)).toHaveLength(
+        1
+    );
+    expect((await h.a.balance(token)).availableKnown).toBeNull();
+    expect(await h.a.getScanStatus()).toMatchObject({
+        assetCompleteness: "unknown",
+        unresolvedCount: 1,
+    });
+    await h.a.retryUnresolved(testDecryptor);
+    const resolved = await h.store.readSnapshot(h.a.scope);
+    expect(resolved.unresolvedDeliveries).toBeUndefined();
+    expect(resolved.discoveryThrough?.number).toBe(16n);
+    expect((await h.a.balance(token)).availableKnown).toBe(70n);
+    for (const reason of ["locked", "cancelled", "session expired", "wrong account"]) {
+        const isolatedStore = new MemoryWalletStore();
+        const isolated = new WalletSession(sessionOptions({ ...h.options, store: isolatedStore }));
+        await expect(
+            isolated.scanHistory({
+                async decryptNote() {
+                    throw Error(reason);
+                },
+                decryptCredit: testDecryptor.decryptCredit,
+            })
+        ).rejects.toThrow(reason);
+        expect((await isolatedStore.readSnapshot(isolated.scope)).discoveryThrough).toBeUndefined();
+    }
+});
+it("isolates subscriber cancellation while coalescing public downloads", async () => {
+    const h = await sharedHarness();
+    const controller = new AbortController();
+    const a = h.history.synchronize({ signal: controller.signal, pageSize: 1 });
+    const { PublicHistory } = await import("../index");
+    const second = new PublicHistory(h.history.options);
+    const b = second.synchronize({ fromBlock: 12n, toBlock: 16n, pageSize: 1 });
+    controller.abort(Error("A cancelled"));
+    await expect(a).rejects.toThrow("A cancelled");
+    await b;
+    expect(h.reader.getReceipt).toHaveBeenCalledTimes(1);
+    expect(h.rpc.getNoteUpdates).toHaveBeenCalledTimes(5);
+});
+
+it("fences every account after a real fork and preserves in-flight records during rebuild", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ pageSize: 2 });
+    await h.a.scanHistory(testDecryptor);
+    await h.b.scanHistory({
+        async decryptNote() {
+            return null;
+        },
+        async decryptCredit() {
+            return null;
+        },
+    });
+    await h.store.transaction(h.a.scope, (draft) => {
+        draft.operations.pending = {
+            id: "pending",
+            status: "submitted",
+            inputs: [],
+            transactionHash: hex(909n),
+            payload: { externalized: true },
+        };
+    });
+    h.fork(14n);
+    await h.history.synchronize({ fromBlock: 16n, toBlock: 16n, pageSize: 2 });
+    expect((await h.history.snapshot()).generation).toBe(2);
+    expect((await h.a.balance(token)).invalidated).toBe(true);
+    expect((await h.b.balance(token)).invalidated).toBe(true);
+    await expect(h.a.scanHistory(testDecryptor)).rejects.toThrow("rebuild required");
+    await h.a.scanHistory(testDecryptor, { reset: true });
+    expect((await h.a.balance(token)).availableKnown).toBe(70n);
+    expect((await h.store.readSnapshot(h.a.scope)).operations.pending!.status).toBe("reorged");
+    expect((await h.store.readSnapshot(h.a.scope)).discoveryThrough?.hash).toBe(hex(1016n));
+});
+it("records committed progress and retains earlier private batches when a later batch fails", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ pageSize: 1 });
+    const progress = vi.fn();
+    let fail = true;
+    const store = {
+        persistent: false,
+        readSnapshot: h.store.readSnapshot.bind(h.store),
+        transaction: async <T>(
+            scope: import("../storage/state").WalletScope,
+            mutate: (draft: import("../storage/state").WalletState) => T
+        ) =>
+            h.store.transaction(scope, (draft) => {
+                const result = mutate(draft);
+                if (fail && draft.discoveryRanges?.some((range) => range.fromBlock === 14n))
+                    throw Error("disk full");
+                return result;
+            }),
+    };
+    const session = new WalletSession(sessionOptions({ ...h.options, store }));
+    await expect(session.scanHistory(testDecryptor, { onProgress: progress })).rejects.toThrow(
+        "disk full"
+    );
+    expect((await h.store.readSnapshot(session.scope)).discoveryRanges?.[0]?.fromBlock).toBe(15n);
+    expect(
+        progress.mock.calls
+            .filter(([p]) => p.state === "committed")
+            .map(([p]) => p.accountRanges?.[0]?.fromBlock)
+    ).toEqual([16n, 15n]);
+    fail = false;
+    await session.scanHistory(testDecryptor);
+    expect((await h.store.readSnapshot(session.scope)).discoveryThrough?.number).toBe(16n);
+});
+
+it("requires explicit re-download for evicted history and never downloads during offline scan", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ pageSize: 1 });
+    await h.history.pruneBefore(14n);
+    await expect(h.a.scanHistory(testDecryptor, { offline: true })).rejects.toThrow(/unavailable/);
+    expect(h.rpc.getNoteUpdates).toHaveBeenCalledTimes(5);
+    await h.history.synchronize({ fromBlock: 12n, toBlock: 13n, pageSize: 1 });
+    await h.a.scanHistory(testDecryptor, { offline: true });
+    expect((await h.a.getScanStatus()).assetCompleteness).toBe("complete");
+    expect((await h.a.balance(token)).availableKnown).toBeNull();
+    await h.a.refreshState();
+    expect((await h.a.balance(token)).availableKnown).toBe(70n);
+});
+
+it("invalidates known state when the chain forks during a cached account scan", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ pageSize: 1 });
+    await h.a.scanHistory(testDecryptor);
+    h.fork(14n);
+    await expect(h.a.refreshState()).rejects.toThrow(/canonical history changed/);
+    expect(await h.a.getScanStatus()).toMatchObject({
+        invalidated: true,
+        assetCompleteness: "unknown",
+    });
+});
+
+it("scans an arbitrarily long range through a tiny cache without repeatedly downloading it", async () => {
+    const h = await sharedHarness();
+    const { PublicHistory, PublicHistoryStore, MemoryAtomicRecords } = await import("../index");
+    const history = new PublicHistory({
+        ...h.history.options,
+        store: new PublicHistoryStore(new MemoryAtomicRecords(), {
+            persistent: false,
+            retention: { maxPages: 1, maxBytes: 100_000, maxPageBytes: 50_000 },
+        }),
+    });
+    const a = new WalletSession(sessionOptions({ ...h.options, publicHistory: history }));
+    const progress = vi.fn();
+    const pending = await a.refresh({
+        fromBlock: 12n,
+        toBlock: 16n,
+        pageSize: 1,
+        onProgress: progress,
+    });
+    await pending.decrypt(testDecryptor);
+    expect(progress.mock.calls.at(-1)![0]).toMatchObject({
+        state: "committed",
+        publicThrough: { number: 16n },
+        accountThrough: { number: 16n },
+    });
+    expect((await h.store.readSnapshot(a.scope)).discoveryThrough?.number).toBe(16n);
+    expect(h.rpc.getNoteUpdates).toHaveBeenCalledTimes(5);
+    expect((await history.snapshot()).pages).toHaveLength(1);
+});
+
+it("restores archived externalized journals and reservations before rebuilding after a fork", async () => {
+    const h = await sharedHarness();
+    const store = new MemoryWalletStore({ recentRecords: 0 });
+    const session = new WalletSession(sessionOptions({ ...h.options, store }));
+    await h.history.synchronize({ pageSize: 1 });
+    await session.scanHistory(testDecryptor);
+    await store.transaction(session.scope, (draft) => {
+        draft.notes[vectors.note.commitment]!.spent = "spent";
+        draft.operations.archived = {
+            id: "archived",
+            status: "confirmed",
+            inputs: [vectors.note.commitment],
+            confirmedAt: { number: 16n, hash: hex(16n) },
+            transactionHash: hex(1001n),
+            payload: { externalized: true },
+        };
+    });
+    expect((await store.readSnapshot(session.scope)).operations.archived).toBeUndefined();
+    h.fork(14n);
+    await h.history.synchronize({ toBlock: 16n });
+    await session.scanHistory(testDecryptor, { reset: true });
+    const rebuilt = await store.readSnapshot(session.scope);
+    expect(rebuilt.operations.archived?.status).toBe("reorged");
+    expect(rebuilt.reservations[vectors.note.commitment]).toBe("archived");
+    expect((await session.balance(token)).availableKnown).toBe(0n);
+});
+
+it("backfills old history without evicting recent pages or downloading the staged page twice", async () => {
+    const h = await sharedHarness();
+    const { PublicHistory, PublicHistoryStore, MemoryAtomicRecords } = await import("../index");
+    const history = new PublicHistory({
+        ...h.history.options,
+        store: new PublicHistoryStore(new MemoryAtomicRecords(), {
+            persistent: false,
+            retention: { maxPages: 1, maxBytes: 100_000, maxPageBytes: 50_000 },
+        }),
+    });
+    await history.synchronize({ fromBlock: 12n, toBlock: 16n, pageSize: 1 });
+    const a = new WalletSession(sessionOptions({ ...h.options, publicHistory: history }));
+    const pending = await a.refresh({ fromBlock: 12n, toBlock: 16n, pageSize: 1 });
+    expect((await history.snapshot()).pages.map((p) => p.block.number)).toEqual([16n]);
+    await pending.decrypt(testDecryptor);
+    expect((await h.store.readSnapshot(a.scope)).discoveryThrough?.number).toBe(16n);
+    expect(h.rpc.getNoteUpdates).toHaveBeenCalledTimes(9);
+    expect((await history.snapshot()).pages.map((p) => p.block.number)).toEqual([16n]);
+});
+
+it("catches up the public head before descending history and resumes completed coverage", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ fromBlock: 14n, toBlock: 14n, pageSize: 1 });
+    h.rpc.getNoteUpdates.mockClear();
+    h.head(18n);
+    await h.history.synchronize({ pageSize: 1 });
+    expect(h.rpc.getNoteUpdates.mock.calls.map(([, range]) => range.fromBlock)).toEqual([
+        15n,
+        16n,
+        17n,
+        18n,
+        13n,
+        12n,
+    ]);
+    expect((await h.history.snapshot()).through?.number).toBe(18n);
+    h.rpc.getNoteUpdates.mockClear();
+    h.head(19n);
+    await h.history.synchronize({ pageSize: 1 });
+    expect(h.rpc.getNoteUpdates.mock.calls.map(([, range]) => range.fromBlock)).toEqual([19n]);
+});
+it("exposes recent funds before historical recovery without claiming complete history", async () => {
+    const h = await sharedHarness();
+    h.receipt.block = block(16n);
+    vi.mocked(h.reader.getReceipt).mockImplementation(async () => structuredClone(h.receipt));
+    h.rpc.getNoteUpdates.mockImplementation(async (_context, range) => ({
+        block: block(range.toBlock),
+        notes:
+            range.fromBlock <= 16n && range.toBlock >= 16n
+                ? [{ ...noteCandidate(hex(101n)), block: block(16n) }]
+                : [],
+    }));
+    await h.history.synchronize({ pageSize: 1 });
+    const controller = new AbortController();
+    await expect(
+        h.a.scanHistory(testDecryptor, {
+            signal: controller.signal,
+            onProgress: (p) => {
+                if (p.state === "committed") controller.abort(Error("pause recovery"));
+            },
+        })
+    ).rejects.toThrow("pause recovery");
+    expect((await h.a.balance(token)).availableKnown).toBe(70n);
+    expect(await h.a.getFundsStatus(token)).toMatchObject({
+        spendableKnown: 70n,
+        areFundsSpendable: true,
+    });
+    expect(await h.a.getScanStatus()).toMatchObject({
+        maxScannedHeight: 16n,
+        fullyScannedHeight: null,
+        assetCompleteness: "unknown",
+        isSynced: false,
+    });
+    await h.a.scanHistory(testDecryptor);
+    expect(await h.a.getScanStatus()).toMatchObject({
+        maxScannedHeight: 16n,
+        fullyScannedHeight: 16n,
+        isSynced: true,
+    });
+});
+
+it("checks newly found historical notes at the known chain head even while the indexer lags", async () => {
+    const h = await sharedHarness();
+    h.reader.getLatestBlockNumber = async () => 18n;
+    h.spent();
+    await h.history.synchronize({ pageSize: 1 });
+    await h.a.scanHistory(testDecryptor);
+    expect(await h.a.getScanStatus()).toMatchObject({
+        chainHeight: 18n,
+        indexedHeight: 16n,
+        fullyScannedHeight: 16n,
+        isSynced: false,
+        nextAction: "wait-for-indexer",
+    });
+    expect(await h.a.getFundsStatus(token)).toMatchObject({
+        spendableKnown: 0n,
+        areFundsSpendable: false,
+    });
+    expect(
+        vi.mocked(h.reader.isSpent).mock.calls.every(([, , anchor]) => anchor.number === 18n)
+    ).toBe(true);
+});
+
+it("does not clear pending Credit recovery when a caller requests an older snapshot", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize();
+    await h.a.scanHistory(testDecryptor);
+    await h.store.transaction(h.a.scope, (draft) => {
+        draft.creditReplayFrom = 12n;
+        draft.creditReplayThrough = { number: 15n, hash: hex(15n) };
+        draft.creditReplayTarget = { number: 16n, hash: hex(16n) };
+    });
+    await h.a.scanHistory(testDecryptor, { toBlock: 14n });
+    expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBe(12n);
+    await h.store.transaction(h.a.scope, (draft) => {
+        draft.creditReplayThrough = { number: 12n, hash: hex(12n) };
+    });
+    await h.a.scanHistory(testDecryptor, { toBlock: 14n, pageSize: 1 });
+    expect((await h.store.readSnapshot(h.a.scope)).creditReplayTarget?.number).toBe(16n);
+    expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBe(12n);
 });

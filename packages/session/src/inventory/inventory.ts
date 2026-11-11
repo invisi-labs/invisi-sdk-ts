@@ -33,7 +33,11 @@ export interface InventoryOptions {
     scope: WalletScope;
     store: WalletStore;
     reader: ChainReader;
-    viewing: ReturnType<typeof authenticatedDecryptor>;
+    viewing: Pick<
+        ReturnType<typeof authenticatedDecryptor>,
+        "ownerAddress" | "decryptNote" | "decryptCredit"
+    > &
+        Partial<Pick<ReturnType<typeof authenticatedDecryptor>, "detectCandidates">>;
     receivingKeys?: ReceivingKeys;
 }
 

@@ -1,4 +1,4 @@
-import { DeliveryDecryptionError } from "@invisi-labs/primitives";
+import { DeliveryAuthenticationError, validateDeliveryCiphertext } from "@invisi-labs/primitives";
 import type { authenticatedDecryptor } from "@invisi-labs/primitives";
 import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/primitives";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
@@ -285,10 +285,19 @@ export async function decryptCandidates(
     logs: readonly DeliveryEventLog[],
     options: {
         context: DiscoveryContext;
-        viewing: ReturnType<typeof authenticatedDecryptor>;
+        viewing: Pick<
+            ReturnType<typeof authenticatedDecryptor>,
+            "ownerAddress" | "decryptNote" | "decryptCredit"
+        > &
+            Partial<Pick<ReturnType<typeof authenticatedDecryptor>, "detectCandidates">>;
         confirmedThrough: bigint;
+        roles?: readonly DeliveryCandidate["role"][];
     }
-): Promise<{ notes: DiscoveredNote[]; credits: DiscoveredCredit[] }> {
+): Promise<{
+    notes: DiscoveredNote[];
+    credits: DiscoveredCredit[];
+    unresolved?: DeliveryCandidate[];
+}> {
     contextCheck(options.context);
     decodeAddress(ReceivingAddress.fromIdentity(options.viewing.ownerAddress).toString());
     check(
@@ -318,15 +327,47 @@ export async function decryptCandidates(
     }
     const notes: DiscoveredNote[] = [];
     const credits: DiscoveredCredit[] = [];
-    for (const candidate of unique.values()) {
+    const unresolved: DeliveryCandidate[] = [];
+    const list = [...unique.values()].filter(
+        (candidate) => !options.roles || options.roles.includes(candidate.role)
+    );
+    if (!list.length) return { notes, credits };
+    const detection = options.viewing.detectCandidates
+        ? await options.viewing.detectCandidates(
+              list.map((candidate) => ({
+                  chainId: options.context.chainId,
+                  protocolAddress: BigInt(options.context.protocolAddress),
+                  tokenAddress: BigInt(candidate.tokenAddress),
+                  outputCommitment: candidate.commitment,
+                  ownerAddress: options.viewing.ownerAddress,
+                  role: candidate.role,
+                  clue: candidate.delivery.clue,
+                  ciphertext: candidate.delivery.ciphertext,
+              }))
+          )
+        : list.map(() => "candidate" as const);
+    for (const [index, candidate] of list.entries()) {
+        if (detection[index] === "not-recipient") continue;
+        if (detection[index] === "unresolved") {
+            unresolved.push(candidate);
+            continue;
+        }
         const { delivery, role, ...positionData } = candidate;
+        if (role === "funds" && delivery.ciphertext === "0x") continue;
+        try {
+            validateDeliveryCiphertext(delivery.ciphertext, role === "funds" ? "funds" : "credit");
+        } catch {
+            unresolved.push(candidate);
+            continue;
+        }
         const context = {
             chainId: options.context.chainId,
             protocolAddress: BigInt(options.context.protocolAddress),
             tokenAddress: BigInt(candidate.tokenAddress),
             outputCommitment: candidate.commitment,
+            clue: delivery.clue,
         };
-        // Non-recipient ciphertexts and failed authentication are normal scan outcomes.
+        // Authentication ambiguity is retained, never asserted to be a nonrecipient.
         try {
             if (role === "funds") {
                 if (delivery.ciphertext === "0x") continue;
@@ -340,9 +381,12 @@ export async function decryptCandidates(
                 if (state !== null) credits.push({ ...positionData, role, state });
             }
         } catch (error) {
-            if (error instanceof DeliveryDecryptionError) throw error;
-            /* Unrelated or invalid local ciphertext: never add unauthenticated amounts. */
+            if (error instanceof DeliveryAuthenticationError) {
+                unresolved.push(candidate);
+                continue;
+            }
+            throw error;
         }
     }
-    return { notes, credits };
+    return { notes, credits, ...(unresolved.length ? { unresolved } : {}) };
 }

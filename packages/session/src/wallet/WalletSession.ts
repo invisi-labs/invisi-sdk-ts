@@ -1,3 +1,14 @@
+import { scanStatus, fundsStatus } from "../sync/status";
+import { PublicHistory, historyScope, type PublicSyncOptions } from "../public-history/history";
+import { PublicHistoryStore, publicScopeKey } from "../public-history/store";
+import { MemoryAtomicRecords } from "../storage/store";
+import {
+    scanAccount,
+    retryUnresolved,
+    fenceHistory,
+    type AccountScanOptions,
+} from "../public-history/scan";
+import type { DeliveryDecryptor } from "@invisi-labs/primitives";
 import { Wallet } from "@invisi-labs/primitives";
 import { prepareWalletRefresh } from "../sync/WalletRefresh";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -30,6 +41,8 @@ import { walletBalance, type WalletScope } from "../storage/state";
 import { scopeKey } from "../storage/store";
 import { type RefreshOptions } from "../sync/refresh";
 
+const sharedHistory = new WeakMap<object, Map<string, PublicHistory>>();
+
 /** Native ethers transaction options; the exported business call and session chain remain fixed. */
 export type SessionTransactionOptions = Omit<
     TransactionRequest,
@@ -42,6 +55,8 @@ export class WalletSession {
     readonly #listeners = new Set<() => void>();
     readonly #sending = new Set<string>();
     #refreshQueue: Promise<unknown> = Promise.resolve();
+    #scanQueue: Promise<unknown> = Promise.resolve();
+    #history: PublicHistory | undefined;
     readonly scope: WalletScope;
     readonly protocol: Protocol;
 
@@ -73,6 +88,7 @@ export class WalletSession {
             "signer",
             "fundingSigner",
             "coinSelector",
+            "publicHistory",
         ];
         for (const key of Object.keys(configuration)) {
             if (!allowed.includes(key))
@@ -82,11 +98,32 @@ export class WalletSession {
         }
         if (!(configuration.wallet instanceof Wallet))
             throw new TypeError("public Wallet required");
-        const { invisi, ...local } = configuration;
+        const { invisi, publicHistory, ...local } = configuration;
         const options: WalletSessionInfrastructure = configureTransactionInfrastructure({
             ...invisi.getInfrastructure(),
             ...local,
         });
+        let history = publicHistory;
+        const key = publicScopeKey(historyScope(options.protocol));
+        if (history && history.key !== key) throw Error("public history deployment mismatch");
+        if (!history && options.chainReader && options.protocolRpc) {
+            let deployments = sharedHistory.get(invisi);
+            if (!deployments) {
+                deployments = new Map();
+                sharedHistory.set(invisi, deployments);
+            }
+            history = deployments.get(key);
+            if (!history) {
+                history = new PublicHistory({
+                    store: new PublicHistoryStore(new MemoryAtomicRecords(), { persistent: false }),
+                    protocol: options.protocol,
+                    reader: options.chainReader,
+                    protocolRpc: options.protocolRpc,
+                });
+                deployments.set(key, history);
+            }
+        }
+        this.#history = history;
         const store = options.store;
         this.#options = {
             ...options,
@@ -94,7 +131,32 @@ export class WalletSession {
                 ? {
                       store: {
                           persistent: store.persistent,
-                          readSnapshot: (scope) => store.readSnapshot(scope),
+                          readSnapshot: (scope) =>
+                              history
+                                  ? fenceHistory(history, store, scope)
+                                  : store.readSnapshot(scope),
+                          ...(store.restoreReorgedOperations
+                              ? {
+                                    restoreReorgedOperations: (scope: WalletScope, from: bigint) =>
+                                        store.restoreReorgedOperations!(scope, from),
+                                }
+                              : {}),
+                          ...(store.readSummary
+                              ? {
+                                    readSummary: (scope: WalletScope) =>
+                                        history
+                                            ? fenceHistory(history, store, scope, true)
+                                            : store.readSummary!(scope),
+                                }
+                              : {}),
+                          ...(store.readRecords
+                              ? {
+                                    readRecords: (
+                                        scope: WalletScope,
+                                        query: import("../storage/record-wallet").WalletRecordQuery
+                                    ) => store.readRecords!(scope, query),
+                                }
+                              : {}),
                           transaction: async (scope, action) => {
                               const result = await store.transaction(scope, action);
                               if (scopeKey(scope) === scopeKey(this.scope)) {
@@ -204,7 +266,7 @@ export class WalletSession {
         };
     }
 
-    /** Detached history for wallet UI; construction records do not imply chain success. */
+    /** Full detached history; prefer getHistoryPage for bounded UI reads. */
     async getHistory(options: HistoryOptions = {}) {
         await this.ready();
         const tokenAddress = options.tokenAddress
@@ -212,10 +274,92 @@ export class WalletSession {
             : undefined;
         const store = this.#options.store;
         if (!store) throw new MissingCapabilityError("wallet store");
+        if (store.readRecords && store.readSummary) {
+            const state = await store.readSummary(this.scope);
+            state.notes = {};
+            state.operations = {};
+            for (const kind of ["notes", "operations"] as const) {
+                let cursor: string | undefined;
+                do {
+                    const page = await store.readRecords(this.scope, {
+                        kind,
+                        limit: 128,
+                        ...(cursor ? { cursor } : {}),
+                    });
+                    if (page.revision !== state.revision)
+                        throw Error("wallet history changed; retry");
+                    for (const item of page.items) {
+                        (state[kind] as Record<string, unknown>)[item.id] = item.value;
+                        if (item.canonical === "unknown")
+                            state.invalidated =
+                                "Historical record requires canonical reconciliation";
+                    }
+                    cursor = page.nextCursor;
+                } while (cursor);
+            }
+            return walletHistory(state, tokenAddress ? { tokenAddress } : {});
+        }
         return walletHistory(
             await store.readSnapshot(this.scope),
             tokenAddress ? { tokenAddress } : {}
         );
+    }
+
+    async getHistoryPage(options: {
+        direction: "incoming" | "outgoing";
+        limit?: number;
+        cursor?: string;
+        tokenAddress?: Hex;
+    }) {
+        const store = this.#options.store;
+        if (!store?.readRecords || !store.readSummary)
+            throw new MissingCapabilityError("paged wallet store");
+        const summary = await store.readSummary(this.scope);
+        const page = await store.readRecords(this.scope, {
+            kind: options.direction === "incoming" ? "notes" : "operations",
+            ...(options.limit !== undefined ? { limit: options.limit } : {}),
+            ...(options.cursor ? { cursor: options.cursor } : {}),
+        });
+        if (page.revision !== summary.revision)
+            throw Error("wallet history changed; restart pagination");
+        const projection = { ...summary, notes: {}, credits: {}, operations: {}, reservations: {} };
+        const items: {
+            entry:
+                | import("../history/history").IncomingHistoryEntry
+                | import("../history/history").OutgoingHistoryEntry;
+            archived: boolean;
+            canonical: "current" | "unknown";
+        }[] = [];
+        for (const item of page.items) {
+            if (options.direction === "incoming")
+                projection.notes = {
+                    [item.id]: item.value as import("../storage/state").StoredNote,
+                };
+            else
+                projection.operations = {
+                    [item.id]: item.value as import("../storage/state").OperationRecord,
+                };
+            const view = walletHistory(
+                projection,
+                options.tokenAddress
+                    ? { tokenAddress: getAddress(options.tokenAddress) as Hex }
+                    : {}
+            );
+            const entry = options.direction === "incoming" ? view.incoming[0] : view.outgoing[0];
+            if (entry)
+                items.push({
+                    entry,
+                    archived: item.archived,
+                    canonical: summary.invalidated ? "unknown" : item.canonical,
+                });
+        }
+        return {
+            revision: page.revision,
+            checkedThrough: summary.discoveryThrough ?? null,
+            invalidated: !!summary.invalidated,
+            items,
+            ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
+        };
     }
 
     async balance(tokenAddress: `0x${string}`) {
@@ -228,22 +372,111 @@ export class WalletSession {
     }
 
     /** Stage indexed pages; inject App decryption to validate and atomically commit state. */
-    async refresh(options: RefreshOptions) {
+    async refresh(options: RefreshOptions = {}) {
         await this.ready();
         const provider = this.#options.protocolRpc;
         const reader = this.#options.chainReader;
         if (!reader) throw new MissingCapabilityError("chain reader");
         if (!provider) throw new MissingCapabilityError("Protocol RPC");
         if (!this.#options.store) throw new MissingCapabilityError("wallet store");
-        const request = {
-            ...options,
-            ...(options.detectionKey ? { detectionKey: options.detectionKey.slice() } : {}),
-        };
+        if (options.detectionKey)
+            throw Error(
+                "WalletSession detection keys must remain in the App; inject batch detection instead"
+            );
+        const request = { ...options };
         const task = this.#refreshQueue.then(() =>
-            prepareWalletRefresh(this.#options, this.scope, request)
+            prepareWalletRefresh(this.#options, this.scope, request, this.publicHistory)
         );
         this.#refreshQueue = task.catch(() => {});
-        return task;
+        const pending = await task;
+        return {
+            block: pending.block,
+            decrypt: (decryptor: DeliveryDecryptor) =>
+                this.queueScan(() => pending.decrypt(decryptor)),
+        };
+    }
+
+    get publicHistory(): PublicHistory {
+        if (!this.#history) throw new MissingCapabilityError("public history infrastructure");
+        return this.#history;
+    }
+    synchronizeHistory(options: PublicSyncOptions = {}) {
+        return this.publicHistory.synchronize(options);
+    }
+    private queueScan<T>(action: () => Promise<T>): Promise<T> {
+        const result = this.#scanQueue.then(action);
+        this.#scanQueue = result.catch(() => {});
+        return result;
+    }
+    scanHistory(decryptor: DeliveryDecryptor, options: AccountScanOptions = {}) {
+        return this.queueScan(() =>
+            scanAccount(this.publicHistory, this.#options, this.scope, decryptor, options)
+        );
+    }
+    async getScanStatus() {
+        if (!this.#options.store) throw new MissingCapabilityError("wallet store");
+        const store = this.#options.store;
+        const state = await (store.readSummary
+            ? store.readSummary(this.scope)
+            : store.readSnapshot(this.scope));
+        const publicState = await this.publicHistory.snapshot();
+        return scanStatus(state, publicState, this.publicHistory.scope);
+    }
+    async getFundsStatus(tokenAddress: Hex) {
+        const store = this.#options.store;
+        if (!store) throw new MissingCapabilityError("wallet store");
+        const state = await store.readSnapshot(this.scope),
+            history = await this.publicHistory.snapshot();
+        return fundsStatus(
+            state,
+            getAddress(tokenAddress) as Hex,
+            history.knownHead ?? history.indexedHead ?? history.coverage?.at(-1)?.block
+        );
+    }
+    retryUnresolved(
+        decryptor: DeliveryDecryptor,
+        options: Omit<AccountScanOptions, "fromBlock" | "toBlock" | "reset"> = {}
+    ) {
+        return this.queueScan(() =>
+            retryUnresolved(this.publicHistory, this.#options, this.scope, decryptor, options)
+        );
+    }
+    async refreshState(
+        options: {
+            signal?: AbortSignal;
+            onProgress?: import("../public-history/history").HistoryProgressListener;
+        } = {}
+    ) {
+        if (!this.#options.store) throw new MissingCapabilityError("wallet store");
+        const publicState = await this.publicHistory.snapshot();
+        const target =
+            publicState.knownHead ??
+            publicState.indexedHead ??
+            publicState.coverage?.at(-1)?.block ??
+            publicState.through;
+        if (!target) throw Error("synchronize public history before refreshing known state");
+        const result = await this.scanHistory(
+            {
+                async decryptNote() {
+                    throw Error("state refresh must not decrypt");
+                },
+                async decryptCredit() {
+                    throw Error("state refresh must not decrypt");
+                },
+            },
+            { ...options, fromBlock: target.number + 1n, toBlock: target.number }
+        );
+        const state = await this.#options.store!.readSnapshot(this.scope);
+        for (const record of Object.values(state.operations)) {
+            options.signal?.throwIfAborted();
+            if (
+                record.payload &&
+                record.transactionHash &&
+                ["submitted", "uncertain", "reorged"].includes(record.status)
+            )
+                await (await this.resume(record.id)).reconcile(options);
+        }
+        return result;
     }
 
     private preparation(tokenAddress: Hex): TransactionPreparation<Operation> {

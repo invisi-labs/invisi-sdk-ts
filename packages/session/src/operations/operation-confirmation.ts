@@ -306,6 +306,7 @@ export async function confirmOperation(
         }
         observe(draft, spentBlock);
         record.status = "confirmed";
+        record.confirmedAt = { number: spentBlock.number, hash: spentBlock.hash };
         record.transactionHash = hash;
         active.generation++;
         return { status: record.status, saved: structuredClone(active) };

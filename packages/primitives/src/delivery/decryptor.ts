@@ -1,16 +1,31 @@
+import { DeliveryAuthenticationError } from "./errors";
 import { bytesToHex } from "@noble/hashes/utils";
 import type { Wallet } from "../wallet/wallet-object";
 import { deliveryCodec, validateDeliveryCiphertext } from "./delivery-codec";
 import { noteCommitment, creditCommitment } from "./validation";
 import type { NoteBytes, NoteDecryptionContext, CreditStateDecryptionContext } from "./types";
 
+export type DeliveryDecryptionResult = Uint8Array | null | { status: "authentication-failed" };
+export interface DeliveryDetectionCandidate extends NoteDecryptionContext {
+    role: "funds" | "owner" | "spender";
+    clue: `0x${string}`;
+    ciphertext: `0x${string}`;
+}
+export interface DeliveryDetectionBatch {
+    ownerAddress: `0x${string}`;
+    results: readonly ("candidate" | "not-recipient" | "unresolved")[];
+}
 /** App-owned decryption. Only null means nonrecipient; operational failures must reject. */
 export interface DeliveryDecryptor {
-    decryptNote(envelope: NoteBytes, context: NoteDecryptionContext): Promise<Uint8Array | null>;
+    detect?(candidates: readonly DeliveryDetectionCandidate[]): Promise<DeliveryDetectionBatch>;
+    decryptNote(
+        envelope: NoteBytes,
+        context: NoteDecryptionContext
+    ): Promise<DeliveryDecryptionResult>;
     decryptCredit(
         envelope: NoteBytes,
         context: CreditStateDecryptionContext
-    ): Promise<Uint8Array | null>;
+    ): Promise<DeliveryDecryptionResult>;
 }
 
 /** Keeps App failures and invalid plaintext distinct from unrelated local scan candidates. */
@@ -36,6 +51,23 @@ export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryp
     const ownerAddress = wallet.ownerAddress;
     return {
         ownerAddress,
+        async detectCandidates(candidates: readonly DeliveryDetectionCandidate[]) {
+            if (!decryptor.detect) return candidates.map(() => "candidate" as const);
+            const result = await decryptor.detect(structuredClone(candidates));
+            if (
+                !result ||
+                BigInt(result.ownerAddress) !== BigInt(ownerAddress) ||
+                !Array.isArray(result.results) ||
+                result.results.length !== candidates.length ||
+                result.results.some(
+                    (value) => !["candidate", "not-recipient", "unresolved"].includes(value)
+                )
+            )
+                throw new DeliveryDecryptionError(
+                    new Error("invalid detection batch or wrong account")
+                );
+            return [...result.results];
+        },
         async decryptNote(
             envelope: NoteBytes,
             context: Omit<NoteDecryptionContext, "ownerAddress">
@@ -46,6 +78,11 @@ export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryp
                 const full = { ...context, ownerAddress };
                 const plaintext = await decryptor.decryptNote(bytes.slice(), { ...full });
                 if (plaintext === null) return null;
+                if (!(plaintext instanceof Uint8Array)) {
+                    if (plaintext?.status === "authentication-failed")
+                        throw new DeliveryAuthenticationError();
+                    throw new Error("invalid decryption result");
+                }
                 const codec = deliveryCodec(bytes[0]!);
                 if (codec.kind !== "funds") throw new Error("unexpected envelope kind");
                 const note = codec.decode(checkedPlaintext(plaintext, codec), full);
@@ -57,6 +94,7 @@ export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryp
                 await noteCommitment(full, note);
                 return note;
             } catch (cause) {
+                if (cause instanceof DeliveryAuthenticationError) throw cause;
                 throw new DeliveryDecryptionError(cause);
             }
         },
@@ -70,6 +108,11 @@ export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryp
                 const full = { ...context, ownerAddress };
                 const plaintext = await decryptor.decryptCredit(bytes.slice(), { ...full });
                 if (plaintext === null) return null;
+                if (!(plaintext instanceof Uint8Array)) {
+                    if (plaintext?.status === "authentication-failed")
+                        throw new DeliveryAuthenticationError();
+                    throw new Error("invalid decryption result");
+                }
                 const codec = deliveryCodec(bytes[0]!);
                 if (codec.kind !== "credit") throw new Error("unexpected envelope kind");
                 const state = codec.decode(checkedPlaintext(plaintext, codec), full);
@@ -93,6 +136,7 @@ export function authenticatedDecryptor(wallet: Wallet, decryptor: DeliveryDecryp
                 await creditCommitment(full, state.note);
                 return state;
             } catch (cause) {
+                if (cause instanceof DeliveryAuthenticationError) throw cause;
                 throw new DeliveryDecryptionError(cause);
             }
         },

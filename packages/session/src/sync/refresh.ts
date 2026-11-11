@@ -17,14 +17,17 @@ export interface RefreshResult {
 
 export interface RefreshOptions {
     /** Explicit history range; retain the returned block to request the next page later. */
-    fromBlock: bigint;
+    fromBlock?: bigint;
     /** Defaults to the Protocol RPC's indexed head, independently checked against Chain RPC. */
     toBlock?: bigint;
-    /** Explicit permission to delegate detection; never provide a viewing or spending key. */
+    /** Only the low-level refreshWallet helper supports remote detection; WalletSession requires native detection. */
     detectionKey?: Uint8Array;
-    /** Defaults to MAX_UPDATE_BLOCKS (10000 blocks) per service request. Reduce this on high-volume deployments. */
+    /** WalletSession defaults to 100, at most 256; low-level refreshWallet permits MAX_UPDATE_BLOCKS. */
     pageSize?: number;
     signal?: AbortSignal;
+    onProgress?: import("../public-history/history").HistoryProgressListener;
+    refreshState?: boolean;
+    offline?: boolean;
     /** Rebuild private inventory from these pages while retaining uncertain operations. */
     reset?: boolean;
 }
@@ -40,9 +43,10 @@ export async function refreshWallet(
     options: RefreshOptions
 ): Promise<RefreshResult> {
     const { signal } = options;
+    const fromBlock = options.fromBlock ?? runtime.fromBlock;
     try {
         signal?.throwIfAborted();
-        if (typeof options.fromBlock !== "bigint" || options.fromBlock < runtime.fromBlock)
+        if (typeof fromBlock !== "bigint" || fromBlock < runtime.fromBlock)
             throw new Error("refresh range precedes deployment");
         const pageSize = options.pageSize ?? MAX_UPDATE_BLOCKS;
         if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > MAX_UPDATE_BLOCKS)
@@ -54,7 +58,7 @@ export async function refreshWallet(
         const toBlock = options.toBlock ?? status.indexedHead.number;
         if (
             typeof toBlock !== "bigint" ||
-            toBlock < options.fromBlock ||
+            toBlock < fromBlock ||
             toBlock > status.indexedHead.number
         )
             throw new Error("refresh range is outside indexed history");
@@ -64,7 +68,7 @@ export async function refreshWallet(
         let result: RefreshResult | undefined;
         let notes = 0;
         let credits = 0;
-        for (let from = options.fromBlock; from <= toBlock; from += BigInt(pageSize)) {
+        for (let from = fromBlock; from <= toBlock; from += BigInt(pageSize)) {
             signal?.throwIfAborted();
             const end = from + BigInt(pageSize) - 1n;
             const range = {

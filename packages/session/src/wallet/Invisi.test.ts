@@ -199,6 +199,7 @@ it("separates connection permissions from shared runtime infrastructure", () => 
         | "wallet"
         | "protocol"
         | "namespace"
+        | "publicHistory"
         | "signer"
         | "fundingSigner"
         | "invisi"
@@ -257,7 +258,13 @@ it("returns detached infrastructure snapshots without leaking wallet state capab
     expectTypeOf<
         Extract<
             keyof import("@invisi-labs/sdk").InvisiOptions,
-            "store" | "wallet" | "viewing" | "authorization" | "namespace" | "coinSelector"
+            | "store"
+            | "wallet"
+            | "viewing"
+            | "authorization"
+            | "namespace"
+            | "publicHistory"
+            | "coinSelector"
         >
     >().toEqualTypeOf<never>();
 });

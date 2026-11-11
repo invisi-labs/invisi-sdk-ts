@@ -99,3 +99,104 @@ it("rejects a Credit plaintext delivered under the other role", async () => {
         viewing.decryptCredit(creditEnvelope, { ...creditContext, role: "spender" })
     ).rejects.toThrow(/context|commitment|role/);
 });
+
+it("passes complete native detection context and rejects mismatched accounts or result lengths", async () => {
+    const candidates = [
+        {
+            ...context,
+            ownerAddress,
+            role: "funds" as const,
+            clue: "0x1234" as const,
+            ciphertext: noteEnvelope,
+        },
+    ];
+    const detect = vi.fn(async () => ({ ownerAddress, results: ["candidate" as const] }));
+    const viewing = authenticatedDecryptor(wallet, { ...app, detect });
+    expect(await viewing.detectCandidates(candidates)).toEqual(["candidate"]);
+    expect(detect.mock.calls).toHaveLength(1);
+    expect(detect).toHaveBeenCalledWith(candidates);
+    for (const result of [
+        { ownerAddress: toBeHex(1, 20) as `0x${string}`, results: ["candidate" as const] },
+        { ownerAddress, results: [] },
+    ]) {
+        await expect(
+            authenticatedDecryptor(wallet, { ...app, detect: async () => result }).detectCandidates(
+                candidates
+            )
+        ).rejects.toThrow(/wrong account|invalid detection/);
+    }
+});
+it("distinguishes ambiguous AEAD authentication from host failures for both delivery roles", async () => {
+    const { DeliveryAuthenticationError } = await import("./errors");
+    const ambiguous = authenticatedDecryptor(wallet, {
+        async decryptNote() {
+            return { status: "authentication-failed" };
+        },
+        async decryptCredit() {
+            return { status: "authentication-failed" };
+        },
+    });
+    await expect(ambiguous.decryptNote(noteEnvelope, context)).rejects.toBeInstanceOf(
+        DeliveryAuthenticationError
+    );
+    await expect(
+        ambiguous.decryptCredit(creditEnvelope, {
+            ...context,
+            outputCommitment: vectors.credit.commitment as `0x${string}`,
+            role: "owner",
+        })
+    ).rejects.toBeInstanceOf(DeliveryAuthenticationError);
+    const damaged = getBytes(noteEnvelope);
+    damaged[damaged.length - 1] = damaged[damaged.length - 1]! ^ 1;
+    await expect(
+        decryptPrivateTransferNote(key, damaged, { ...context, ownerAddress })
+    ).rejects.toBeInstanceOf(DeliveryAuthenticationError);
+    await expect(
+        decryptPrivateTransferNote(`0x${"02".repeat(32)}`, noteEnvelope, {
+            ...context,
+            ownerAddress,
+        })
+    ).rejects.toBeInstanceOf(DeliveryAuthenticationError);
+    for (const reason of ["locked", "cancelled", "session expired", "wrong account"]) {
+        await expect(
+            authenticatedDecryptor(wallet, {
+                ...app,
+                async decryptCredit() {
+                    throw Error(reason);
+                },
+            }).decryptCredit(creditEnvelope, { ...context, role: "owner" })
+        ).rejects.toThrow(reason);
+    }
+});
+
+it("authenticates the spender Credit role with the spender account and full native context", async () => {
+    const spender = toBeHex(BigInt(vectors.spender.ownerAddress), 20) as `0x${string}`;
+    const request = {
+        ...context,
+        outputCommitment: vectors.credit.commitment as `0x${string}`,
+        role: "spender" as const,
+        clue: "0x1234" as const,
+    };
+    const decryptCredit = vi.fn(
+        async (
+            envelope: import("./types").NoteBytes,
+            full: import("./types").CreditStateDecryptionContext
+        ) => {
+            expect(full).toEqual({ ...request, ownerAddress: spender });
+            const codec = deliveryCodec(getBytes(envelope)[0]!);
+            if (codec.kind !== "credit") throw Error("wrong kind");
+            return codec.encode(
+                await decryptCreditState(
+                    vectors.spender.viewingPrivateKey as `0x${string}`,
+                    envelope,
+                    full
+                )
+            );
+        }
+    );
+    const active = authenticatedDecryptor(Wallet.fromAddress(spender), { ...app, decryptCredit });
+    expect(
+        (await active.decryptCredit(vectors.credit.spenderCiphertext as `0x${string}`, request))
+            ?.note.spenderWalletIdentity
+    ).toBe(spender);
+});

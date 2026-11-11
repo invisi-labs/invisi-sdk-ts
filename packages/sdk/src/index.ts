@@ -160,5 +160,14 @@ export { TransactionOutput } from "./notes/TransactionOutput";
 
 export type { PreparedProvenanceCapability } from "./broadcaster/provenance-preparation";
 
-export { authenticatedDecryptor, DeliveryDecryptionError } from "@invisi-labs/primitives";
-export type { DeliveryDecryptor } from "@invisi-labs/primitives";
+export {
+    authenticatedDecryptor,
+    DeliveryDecryptionError,
+    DeliveryAuthenticationError,
+} from "@invisi-labs/primitives";
+export type {
+    DeliveryDecryptor,
+    DeliveryDecryptionResult,
+    DeliveryDetectionCandidate,
+    DeliveryDetectionBatch,
+} from "@invisi-labs/primitives";

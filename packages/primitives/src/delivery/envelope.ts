@@ -1,3 +1,4 @@
+import { DeliveryAuthenticationError } from "./errors";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { ascii, bytes, concat, encode } from "./binary";
 import { deliveryCodec, validateDeliveryCiphertext } from "./delivery-codec";
@@ -181,16 +182,22 @@ export async function open(
                   secp256k1.getPublicKey(localKey, true),
                   domain
               );
-        const decrypted = await crypto.subtle.decrypt(
-            {
-                name: "AES-GCM",
-                iv: buffer(data.slice(50, 62)),
-                additionalData: buffer(additionalData),
-                tagLength: 128,
-            },
-            aes,
-            buffer(data.slice(62))
-        );
+        const decrypted = await crypto.subtle
+            .decrypt(
+                {
+                    name: "AES-GCM",
+                    iv: buffer(data.slice(50, 62)),
+                    additionalData: buffer(additionalData),
+                    tagLength: 128,
+                },
+                aes,
+                buffer(data.slice(62))
+            )
+            .catch((error: unknown) => {
+                if (error instanceof Error && error.name === "OperationError")
+                    throw new DeliveryAuthenticationError(error);
+                throw error;
+            });
         return new Uint8Array(decrypted);
     } finally {
         localKey.fill(0);

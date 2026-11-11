@@ -9,6 +9,7 @@ import type { WalletStore } from "../storage/state";
 export type * from "@invisi-labs/sdk/session-support";
 export interface WalletSessionOptions {
     invisi: Invisi;
+    publicHistory?: import("../public-history/history").PublicHistory;
     wallet: TransactionInfrastructure["wallet"];
     protocol: TransactionInfrastructure["protocol"];
     namespace?: string;
@@ -18,6 +19,7 @@ export interface WalletSessionOptions {
     coinSelector?: NonNullable<TransactionInfrastructure["coinSelector"]>;
 }
 export interface WalletSessionInfrastructure extends TransactionInfrastructure {
+    publicHistory?: import("../public-history/history").PublicHistory;
     namespace?: string;
     store?: WalletStore;
     signer?: Signer;

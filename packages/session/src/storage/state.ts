@@ -24,6 +24,7 @@ export interface OperationRecord {
     inputs: string[];
     deadline?: bigint;
     transactionHash?: Hex;
+    confirmedAt?: Checkpoint;
     payload?: unknown;
 }
 
@@ -39,11 +40,31 @@ export interface WalletState {
     observedThrough?: Checkpoint;
     /** Completed contiguous RPC discovery ranges; independent of operation reconciliation. */
     discoveryThrough?: Checkpoint;
+    recoveryBoundary?: bigint;
+    discoveryRanges?: import("../public-history/coverage").CoverageRange<Checkpoint>[];
+    creditReplayFrom?: bigint;
+    creditReplayThrough?: Checkpoint;
+    creditReplayTarget?: Checkpoint;
+    creditReplayRevision?: number;
     invalidated?: string;
+    publicHistoryGeneration?: number;
+    unresolvedDeliveryCount?: number;
+    archiveFenceGeneration?: number;
+    /** Authentication ambiguity is retryable and never evidence of an empty account. */
+    unresolvedDeliveries?: Record<
+        string,
+        import("@invisi-labs/sdk/session-support").DeliveryCandidate
+    >;
 }
 
 export interface WalletStore {
     readonly persistent: boolean;
+    restoreReorgedOperations?(scope: WalletScope, fromBlock: bigint): Promise<void>;
+    readSummary?(scope: WalletScope): Promise<WalletState>;
+    readRecords?(
+        scope: WalletScope,
+        query: import("./record-wallet").WalletRecordQuery
+    ): Promise<import("./record-wallet").WalletRecordPage>;
     readSnapshot(scope: WalletScope): Promise<WalletState>;
     /** Pure synchronous mutation; an optimistic persistent adapter may retry it. */
     transaction<T>(scope: WalletScope, action: (draft: WalletState) => T): Promise<T>;
@@ -62,7 +83,7 @@ export interface BalanceSnapshot {
 export function walletBalance(state: WalletState, tokenAddress: Hex): BalanceSnapshot {
     let confirmedKnown = 0n;
     let reserved = 0n;
-    let unknown = !!state.invalidated;
+    let unknown = !!state.invalidated || Object.keys(state.unresolvedDeliveries ?? {}).length > 0;
     const records = Object.values(state.notes).filter(
         (r) => r.note.tokenAddress === BigInt(tokenAddress)
     );

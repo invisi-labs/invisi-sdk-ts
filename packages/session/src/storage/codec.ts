@@ -48,13 +48,17 @@ function decode(node: unknown): unknown {
         return value;
     throw new Error("invalid wallet record node");
 }
+export function serializeRecord(value: unknown): Uint8Array {
+    return new TextEncoder().encode(JSON.stringify(encode(value)));
+}
+export function deserializeRecord(data: Uint8Array): unknown {
+    return decode(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(data)));
+}
 export function serializeState(state: WalletState): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(encode(state)));
+    return serializeRecord(state);
 }
 export function deserializeState(data: Uint8Array): WalletState {
-    const state = decode(
-        JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(data))
-    ) as WalletState;
+    const state = deserializeRecord(data) as WalletState;
     if (state.schemaVersion !== 2) throw Error("Unsupported wallet store schema");
     return state;
 }

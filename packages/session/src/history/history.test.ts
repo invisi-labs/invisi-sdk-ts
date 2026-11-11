@@ -2,7 +2,7 @@ import { refreshSession } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
 import { Invisi } from "@invisi-labs/sdk/session-support";
 import { expect, it, vi } from "vitest";
-import { fixture } from "../../../../test-support/operation-fixture";
+import { canonicalBlock, fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
 import { testOutput } from "../../../../test-support/test-output";
 import { WalletSession } from "../wallet/WalletSession";
@@ -150,6 +150,7 @@ it("restores history and reservations through a newly opened encrypted store", a
 
 it("does not confuse chain observations with successfully scanned history ranges", async () => {
     const h = await fixture();
+    vi.spyOn(h.reader, "getBlock").mockImplementation(async (n) => canonicalBlock(n));
     expect((await h.session.getHistory()).checkedThrough).toBeNull();
     await refreshSession(h.session, { fromBlock: 0n, toBlock: 12n });
     expect((await h.session.getHistory()).checkedThrough?.number).toBe(12n);
@@ -159,8 +160,9 @@ it("does not confuse chain observations with successfully scanned history ranges
     expect((await h.session.getHistory()).checkedThrough?.number).toBe(12n);
 });
 
-it("does not advance discovery over gaps or after a partially failed range", async () => {
+it("recovers only missing coverage without rescanning previously committed ranges", async () => {
     const h = await fixture();
+    vi.spyOn(h.reader, "getBlock").mockImplementation(async (n) => canonicalBlock(n));
     await refreshSession(h.session, { fromBlock: 1n, toBlock: 12n });
     expect((await h.session.getHistory()).checkedThrough).toBeNull();
     vi.spyOn(h.membership, "getCreditTransitions").mockImplementation(async (_, range) => ({
@@ -173,9 +175,11 @@ it("does not advance discovery over gaps or after a partially failed range", asy
         const block = { ...(await h.reader.getBlock(range.toBlock)), number: range.toBlock };
         return { block, notes: [] };
     });
-    await expect(
-        refreshSession(h.session, { fromBlock: 0n, toBlock: 12n, pageSize: 5 })
-    ).rejects.toThrow(/indexer unavailable/);
-    expect(pages).toBe(2);
-    expect((await h.session.getHistory()).checkedThrough).toBeNull();
+    await refreshSession(new WalletSession(sessionOptions(h.options)), {
+        fromBlock: 0n,
+        toBlock: 12n,
+        pageSize: 5,
+    });
+    expect(pages).toBe(1);
+    expect((await h.session.getHistory()).checkedThrough?.number).toBe(12n);
 });

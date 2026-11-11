@@ -134,4 +134,10 @@ export type {
 export { provenanceIntentHash } from "./provenance/intent-hash";
 
 export { authenticatedDecryptor, DeliveryDecryptionError } from "./delivery/decryptor";
-export type { DeliveryDecryptor } from "./delivery/decryptor";
+export type {
+    DeliveryDecryptor,
+    DeliveryDecryptionResult,
+    DeliveryDetectionCandidate,
+    DeliveryDetectionBatch,
+} from "./delivery/decryptor";
+export { DeliveryAuthenticationError } from "./delivery/errors";

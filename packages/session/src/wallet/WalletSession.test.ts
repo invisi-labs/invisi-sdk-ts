@@ -194,6 +194,7 @@ it("keeps derivable session capabilities out of the configuration surface", () =
         | "wallet"
         | "protocol"
         | "namespace"
+        | "publicHistory"
         | "store"
         | "signer"
         | "fundingSigner"

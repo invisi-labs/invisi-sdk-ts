@@ -7,6 +7,8 @@ export interface NoteEncryptionContext extends ProtocolContext {
 }
 
 export interface NoteDecryptionContext extends NoteEncryptionContext {
+    /** Present for discovery; absent for an explicitly supplied standalone envelope. */
+    clue?: `0x${string}`;
     tokenAddress: bigint;
     ownerAddress: `0x${string}`;
 }

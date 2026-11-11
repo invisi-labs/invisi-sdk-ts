@@ -1,8 +1,12 @@
+import { mergeCoverage } from "../public-history/coverage";
+import { certifiedHistoryBatch, certifyHistoryBatch } from "../public-history/authentication";
+import { historyPosition } from "../public-history/store";
 import { NullifierCapability } from "@invisi-labs/primitives";
 import type { CanonicalBlock, ProtocolDataProvider } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     decryptCandidates,
+    extractDeliveryCandidates,
     readProtocolLogs,
     verifyMembership,
 } from "@invisi-labs/sdk/session-support";
@@ -26,6 +30,18 @@ export interface ApplyPageOptions {
     signal?: AbortSignal;
     /** Rebuild private inventory from supplied history after a reorg; preserves uncertain operations. */
     reset?: boolean;
+    refreshState?: boolean;
+    observationBlock?: import("@invisi-labs/protocol").CanonicalBlock;
+    discoveryFrom?: bigint;
+    recoveryBoundary?: bigint;
+    discoveryBlock?: import("../storage/state").Checkpoint;
+    creditOnly?: boolean;
+    queueCreditReplay?: boolean;
+    creditReplayBlock?: import("../storage/state").Checkpoint;
+    creditReplayComplete?: boolean;
+    creditReplayRevision?: number;
+    historyGeneration?: number;
+    beforeCommit?: () => Promise<void>;
 }
 const check: (value: unknown, message: string) => asserts value = (value, message) => {
     if (!value) throw new Error(message);
@@ -46,7 +62,10 @@ export class WalletUpdater extends InventoryProcessor {
     }
 
     applyUpdates(batch: CandidatePage, options: ApplyPageOptions = {}): Promise<RefreshResult> {
-        return this.run(structuredClone(batch), { ...options });
+        const copy = structuredClone(batch);
+        const page = certifiedHistoryBatch(batch);
+        if (page) certifyHistoryBatch(copy, page);
+        return this.run(copy, { ...options });
     }
 
     private async run(batch: CandidatePage, options: ApplyPageOptions): Promise<RefreshResult> {
@@ -65,8 +84,14 @@ export class WalletUpdater extends InventoryProcessor {
             batch.block.number >= protocol.deployment.protocol.fromBlock,
             "update precedes deployment"
         );
-        await protocol.validateDeployment(reader);
+        const cachedPage = certifiedHistoryBatch(batch);
+        if (!cachedPage) await protocol.validateDeployment(reader);
         const base = await store.readSnapshot(scope);
+        if (options.creditReplayRevision !== undefined)
+            check(
+                (base.creditReplayRevision ?? 0) === options.creditReplayRevision,
+                "Credit recovery changed; retry"
+            );
         check(reset || !base.invalidated, "wallet state is invalidated; rebuild required");
         try {
             if (!reset) {
@@ -75,7 +100,7 @@ export class WalletUpdater extends InventoryProcessor {
                     if ((await reader.getBlock(cursor.number)).hash !== cursor.hash)
                         throw new CanonicalConflict("Canonical history changed after a reorg");
                     check(
-                        cursor.number <= batch.block.number,
+                        !!cachedPage || cursor.number <= batch.block.number,
                         "update target precedes wallet checkpoint"
                     );
                 }
@@ -88,8 +113,13 @@ export class WalletUpdater extends InventoryProcessor {
                 block.hash === batch.block.hash && block.number === batch.block.number,
                 "update target block is not canonical"
             );
+            const observation = options.observationBlock ?? block;
+            check(
+                observation.number >= block.number,
+                "spent observation precedes discovery target"
+            );
             const receipts = [];
-            for (const hash of new Set(batch.transactionHashes)) {
+            for (const hash of cachedPage ? [] : new Set(batch.transactionHashes)) {
                 signal?.throwIfAborted();
                 check(/^0x[0-9a-fA-F]{64}$/.test(hash), "invalid candidate transaction hash");
                 const receipt = await reader.getReceipt(hash);
@@ -108,9 +138,9 @@ export class WalletUpdater extends InventoryProcessor {
                     throw new CanonicalConflict("Candidate receipt disagrees with canonical chain");
                 receipts.push(receipt);
             }
-            const logs = receipts.flatMap((receipt) =>
-                readProtocolLogs(receipt, context.protocolAddress)
-            );
+            const logs = cachedPage
+                ? structuredClone(cachedPage.logs)
+                : receipts.flatMap((receipt) => readProtocolLogs(receipt, context.protocolAddress));
             logs.sort((a, b) =>
                 a.blockNumber! < b.blockNumber!
                     ? -1
@@ -149,6 +179,7 @@ export class WalletUpdater extends InventoryProcessor {
                 viewing,
 
                 confirmedThrough: block.number,
+                ...(options.creditOnly ? { roles: ["owner", "spender"] as const } : {}),
             });
             const notes: StoredNote[] = decrypted.notes.map((record) => ({
                 ...record,
@@ -187,6 +218,12 @@ export class WalletUpdater extends InventoryProcessor {
                 );
             for (const record of [...notes, ...credits]) {
                 signal?.throwIfAborted();
+                if (
+                    cachedPage?.verifiedPositions.includes(
+                        historyPosition(record.treeId, record.leafIndex, record.commitment)
+                    )
+                )
+                    continue;
                 const proof = await this.#options.protocolRpc.getMembership(context, record, block);
                 const tokenAddress =
                     "note" in record ? record.note.tokenAddress : record.state.note.tokenAddress;
@@ -230,21 +267,40 @@ export class WalletUpdater extends InventoryProcessor {
                     id,
                     nullifier: await this.creditNullifier(record.state),
                 });
-            const spent = observations.length
-                ? await reader.isSpent(
-                      context,
-                      observations.map((item) => item.nullifier),
-                      block
-                  )
-                : [];
+            const spent =
+                options.refreshState !== false && observations.length
+                    ? await reader.isSpent(
+                          context,
+                          observations.map((item) => item.nullifier),
+                          observation
+                      )
+                    : [];
             check(
-                spent.length === observations.length &&
+                (options.refreshState === false || spent.length === observations.length) &&
                     spent.every((value) => typeof value === "boolean"),
                 "invalid spent-state response"
             );
             signal?.throwIfAborted();
             if ((await reader.getBlock(block.number)).hash !== block.hash)
                 throw new CanonicalConflict("Canonical block changed during update");
+            const revocations = new Map<string, boolean>();
+            if (options.refreshState !== false && reader.getCreditRevocationBitmap) {
+                for (const [id, record] of Object.entries(allCredits)) {
+                    const note = record.state.note;
+                    const bitmap = await reader.getCreditRevocationBitmap(
+                        context,
+                        note.ownerWalletIdentity,
+                        `0x${note.tokenAddress.toString(16).padStart(40, "0")}`,
+                        note.revocationShard,
+                        Number(note.revocationSlot / 256n),
+                        observation
+                    );
+                    revocations.set(id, (bitmap & (1n << (note.revocationSlot % 256n))) !== 0n);
+                }
+            }
+            if ((await reader.getBlock(observation.number)).hash !== observation.hash)
+                throw new CanonicalConflict("spent observation block changed");
+            await options.beforeCommit?.();
             await store.transaction(scope, (draft) => {
                 signal?.throwIfAborted();
                 check(draft.revision === base.revision, "wallet changed during update; retry");
@@ -254,20 +310,132 @@ export class WalletUpdater extends InventoryProcessor {
                     draft.credits = {};
                     delete draft.observedThrough;
                     delete draft.discoveryThrough;
+                    delete draft.discoveryRanges;
+                    delete draft.recoveryBoundary;
+                    delete draft.creditReplayFrom;
+                    delete draft.creditReplayThrough;
+                    delete draft.creditReplayTarget;
+                    draft.creditReplayRevision = (draft.creditReplayRevision ?? 0) + 1;
                     delete draft.invalidated;
+                    delete draft.unresolvedDeliveries;
                 }
                 mergeReceiptRecords(draft, { notes, credits, checkpoint: block });
-                observations.forEach((item, index) => {
-                    const record = draft[item.kind][item.id];
-                    if (record) {
-                        mergeSpentObservation(record, {
-                            spent: spent[index] ? "spent" : "unspent",
-                            checkedThrough: { number: block.number, hash: block.hash },
-                        });
+                if (options.refreshState !== false)
+                    observations.forEach((item, index) => {
+                        const record = draft[item.kind][item.id];
+                        if (record) {
+                            mergeSpentObservation(record, {
+                                spent: spent[index] ? "spent" : "unspent",
+                                checkedThrough: {
+                                    number: observation.number,
+                                    hash: observation.hash,
+                                },
+                            });
+                        }
+                    });
+                for (const [id, revoked] of revocations)
+                    if (
+                        draft.credits[id] &&
+                        (!draft.credits[id]!.checkedThrough ||
+                            draft.credits[id]!.checkedThrough!.number <= block.number)
+                    )
+                        draft.credits[id]!.revoked = revoked;
+                const deliveries = extractDeliveryCandidates(logs, context, block.number);
+                const unresolved = draft.unresolvedDeliveries ?? {};
+                const key = (c: (typeof deliveries)[number]) =>
+                    `${c.transactionHash}:${c.treeId}:${c.leafIndex}:${c.role}`;
+                for (const candidate of deliveries)
+                    if (!options.creditOnly || candidate.role !== "funds")
+                        delete unresolved[key(candidate)];
+                for (const candidate of decrypted.unresolved ?? [])
+                    unresolved[key(candidate)] = structuredClone(candidate);
+                if (Object.keys(unresolved).length) draft.unresolvedDeliveries = unresolved;
+                else delete draft.unresolvedDeliveries;
+                if (options.historyGeneration !== undefined)
+                    draft.publicHistoryGeneration = options.historyGeneration;
+                let replayChanged = false;
+                if (options.queueCreditReplay) {
+                    const fresh = credits.filter(
+                        (record) => !base.credits[record.commitment + ":" + record.role]
+                    );
+                    for (const record of fresh)
+                        if (
+                            draft.creditReplayFrom === undefined ||
+                            record.blockNumber < draft.creditReplayFrom ||
+                            (draft.creditReplayThrough &&
+                                record.blockNumber <= draft.creditReplayThrough.number)
+                        ) {
+                            draft.creditReplayFrom =
+                                draft.creditReplayFrom === undefined ||
+                                record.blockNumber < draft.creditReplayFrom
+                                    ? record.blockNumber
+                                    : draft.creditReplayFrom;
+                            delete draft.creditReplayThrough;
+                            replayChanged = true;
+                        }
+                }
+                if (
+                    draft.creditReplayFrom !== undefined &&
+                    (options.discoveryFrom !== undefined || options.queueCreditReplay)
+                ) {
+                    const previousTarget =
+                        draft.discoveryRanges?.at(-1)?.block ?? draft.discoveryThrough;
+                    const required =
+                        previousTarget && previousTarget.number > block.number
+                            ? previousTarget
+                            : { number: block.number, hash: block.hash };
+                    if (
+                        !draft.creditReplayTarget ||
+                        draft.creditReplayTarget.number < required.number
+                    ) {
+                        draft.creditReplayTarget = { ...required };
+                        replayChanged = true;
                     }
-                });
-                // Candidate processing cannot establish complete or FMD scan coverage.
-                draft.observedThrough = { number: block.number, hash: block.hash };
+                }
+                if (replayChanged)
+                    draft.creditReplayRevision = (draft.creditReplayRevision ?? 0) + 1;
+                if (options.creditReplayBlock)
+                    draft.creditReplayThrough = { ...options.creditReplayBlock };
+                if (
+                    options.creditReplayComplete &&
+                    options.creditReplayBlock &&
+                    (!draft.creditReplayTarget ||
+                        options.creditReplayBlock.number >= draft.creditReplayTarget.number)
+                ) {
+                    delete draft.creditReplayFrom;
+                    delete draft.creditReplayThrough;
+                    delete draft.creditReplayTarget;
+                }
+                if (options.recoveryBoundary !== undefined && draft.recoveryBoundary === undefined)
+                    draft.recoveryBoundary = options.recoveryBoundary;
+                if (options.discoveryFrom !== undefined) {
+                    const checkpoint = options.discoveryBlock ?? {
+                        number: block.number,
+                        hash: block.hash,
+                    };
+                    const ranges =
+                        draft.discoveryRanges ??
+                        (draft.discoveryThrough
+                            ? [
+                                  {
+                                      fromBlock: protocol.deployment.protocol.fromBlock,
+                                      block: draft.discoveryThrough,
+                                  },
+                              ]
+                            : []);
+                    draft.discoveryRanges = mergeCoverage(ranges, {
+                        fromBlock: options.discoveryFrom,
+                        block: checkpoint,
+                    });
+                    const prefix = draft.discoveryRanges.find(
+                        (range) => range.fromBlock === protocol.deployment.protocol.fromBlock
+                    );
+                    if (prefix) draft.discoveryThrough = { ...prefix.block };
+                    else delete draft.discoveryThrough;
+                }
+                // Candidate-only ingestion cannot establish complete scan coverage.
+                if (!draft.observedThrough || draft.observedThrough.number <= observation.number)
+                    draft.observedThrough = { number: observation.number, hash: observation.hash };
             });
             return {
                 block,

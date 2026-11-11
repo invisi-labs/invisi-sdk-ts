@@ -128,3 +128,60 @@ it("runs the identical contract over independent encrypted memory sessions", asy
         )
     ).toEqual({ checks: 10 });
 });
+
+it("keeps public SQLite coverage separate and reusable after reopening the wallet database", async () => {
+    const { SQLitePublicHistoryStore } = await import("./sqlite");
+    const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as {
+        DatabaseSync: new (path: string) => SQLiteConnection & { close(): void };
+    };
+    const dir = await mkdtemp(join(tmpdir(), "invisi-public-"));
+    const path = join(dir, "wallet.sqlite");
+    const publicScope = {
+        chainId: scope.chainId,
+        protocolAddress: scope.protocolAddress,
+        runtimeCodeHash: `0x${"33".repeat(32)}` as const,
+        deploymentBlock: 100n,
+    };
+    const block = {
+        number: 100n,
+        hash: `0x${"44".repeat(32)}` as const,
+        parentHash: `0x${"55".repeat(32)}` as const,
+        timestamp: 100n,
+    };
+    const db = new DatabaseSync(path);
+    try {
+        const codec = await EncryptedWalletCodec.fromBytes(new Uint8Array(32).fill(3));
+        const privateStore = new SQLiteWalletStore(db, codec);
+        await privateStore.transaction(scope, () => {});
+        const shared = new SQLitePublicHistoryStore(db);
+        await shared.append(
+            publicScope,
+            {
+                fromBlock: 100n,
+                block,
+                headers: [block],
+                receipts: [],
+                logs: [],
+                verifiedPositions: [],
+            },
+            1
+        );
+        expect(
+            (db.prepare("SELECT count(*) AS n FROM invisi_wallet_state").get() as { n: number }).n
+        ).toBe(1);
+        expect(
+            (db.prepare("SELECT count(*) AS n FROM invisi_public_history").get() as { n: number }).n
+        ).toBe(2);
+    } finally {
+        db.close();
+    }
+    const reopened = new DatabaseSync(path);
+    try {
+        const shared = new SQLitePublicHistoryStore(reopened);
+        expect((await shared.snapshot(publicScope)).through).toEqual(block);
+        expect((await shared.pageAt(publicScope, 100n))?.receipts).toEqual([]);
+    } finally {
+        reopened.close();
+        await rm(dir, { recursive: true, force: true });
+    }
+});

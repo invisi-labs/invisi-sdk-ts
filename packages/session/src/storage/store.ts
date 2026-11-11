@@ -1,3 +1,4 @@
+import { RecordWalletPersistence, type WalletRecordQuery } from "./record-wallet";
 import { FIELD_MODULUS, normalizeCreditDeliveryState } from "@invisi-labs/primitives";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
@@ -60,6 +61,51 @@ export function validateState(state: WalletState, scope: WalletScope, revision: 
     for (const field of [state.notes, state.credits, state.reservations, state.operations])
         if (!field || typeof field !== "object" || Array.isArray(field))
             throw new Error("invalid wallet state records");
+    if (
+        state.publicHistoryGeneration !== undefined &&
+        (!Number.isSafeInteger(state.publicHistoryGeneration) || state.publicHistoryGeneration < 1)
+    )
+        throw new Error("invalid public history generation");
+    if (state.discoveryRanges) {
+        if (!Array.isArray(state.discoveryRanges) || state.discoveryRanges.length > 4096)
+            throw Error("invalid account scan coverage");
+        let previous = -1n;
+        for (const range of state.discoveryRanges) {
+            if (
+                typeof range.fromBlock !== "bigint" ||
+                range.fromBlock < 0n ||
+                range.fromBlock <= previous ||
+                typeof range.block.number !== "bigint" ||
+                range.block.number < range.fromBlock ||
+                !/^0x[0-9a-fA-F]{64}$/.test(range.block.hash)
+            )
+                throw Error("invalid account scan coverage");
+            previous = range.block.number;
+        }
+    }
+    if (
+        state.unresolvedDeliveryCount !== undefined &&
+        (!Number.isSafeInteger(state.unresolvedDeliveryCount) || state.unresolvedDeliveryCount < 0)
+    )
+        throw Error("invalid unresolved delivery count");
+    if (state.unresolvedDeliveries !== undefined) {
+        if (
+            !state.unresolvedDeliveries ||
+            typeof state.unresolvedDeliveries !== "object" ||
+            Array.isArray(state.unresolvedDeliveries)
+        )
+            throw new Error("invalid unresolved deliveries");
+        for (const candidate of Object.values(state.unresolvedDeliveries)) {
+            if (
+                typeof candidate.blockNumber !== "bigint" ||
+                candidate.blockNumber < 0n ||
+                !["funds", "owner", "spender"].includes(candidate.role) ||
+                !/^0x[0-9a-fA-F]{64}$/.test(candidate.commitment) ||
+                !/^0x[0-9a-fA-F]{64}$/.test(candidate.transactionHash)
+            )
+                throw new Error("invalid unresolved delivery context");
+        }
+    }
     for (const record of Object.values(state.notes)) {
         if (
             typeof record.note.tokenAddress !== "bigint" ||
@@ -129,6 +175,35 @@ export interface AtomicRecordStore {
     read(key: string): Promise<AtomicRecord | undefined>;
     compareAndSwap(key: string, previousRevision: number, next: AtomicRecord): Promise<boolean>;
 }
+export interface RecordWrite {
+    key: string;
+    record?: AtomicRecord;
+}
+export interface RecordRow extends AtomicRecord {
+    key: string;
+}
+export interface PagedAtomicRecordStore extends AtomicRecordStore {
+    count?(prefix: string): Promise<number>;
+    readPage(prefix: string, after: string | undefined, limit: number): Promise<RecordRow[]>;
+    compareAndSwapBatch(
+        key: string,
+        previousRevision: number,
+        next: AtomicRecord,
+        writes: readonly RecordWrite[]
+    ): Promise<boolean>;
+}
+export function pageLimit(limit: number): void {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 256)
+        throw Error("record page limit must be 1..256");
+}
+export function isPagedRecords(records: AtomicRecordStore): records is PagedAtomicRecordStore {
+    return (
+        "readPage" in records &&
+        typeof records.readPage === "function" &&
+        "compareAndSwapBatch" in records &&
+        typeof records.compareAndSwapBatch === "function"
+    );
+}
 export interface WalletRecordCodec {
     encode(value: WalletState, context: { key: string; revision: number }): Promise<Uint8Array>;
     decode(data: Uint8Array, context: { key: string; revision: number }): Promise<WalletState>;
@@ -137,26 +212,33 @@ export class TransactionalWalletStore implements WalletStore {
     readonly persistent: boolean;
     readonly #records: AtomicRecordStore;
     readonly #codec: WalletRecordCodec;
+    readonly #rows: RecordWalletPersistence | undefined;
     constructor(
         records: AtomicRecordStore,
         codec: WalletRecordCodec,
-        options: { persistent: boolean }
+        options: { persistent: boolean; recentRecords?: number }
     ) {
         this.#records = records;
         this.#codec = codec;
         this.persistent = options.persistent;
+        if (isPagedRecords(records))
+            this.#rows = new RecordWalletPersistence(records, codec, options.recentRecords ?? 128);
     }
     async readSnapshot(scope: WalletScope): Promise<WalletState> {
+        if (this.#rows) return (await this.#rows.read(scope)).state;
         const key = scopeKey(scope),
             record = await this.#records.read(key);
         if (!record) return initialState(scope);
         const state = await this.#codec.decode(record.data, { key, revision: record.revision });
+        if ((state as WalletState & { recordLayout?: string }).recordLayout)
+            throw Error("wallet rows require paged atomic adapter capabilities");
         validateState(state, scope, record.revision);
         return state;
     }
     async transaction<T>(scope: WalletScope, action: (draft: WalletState) => T): Promise<T> {
         if (action.constructor.name === "AsyncFunction")
             throw new Error("wallet transaction action must be synchronous");
+        if (this.#rows) return this.#rows.transaction({ ...scope }, action);
         const copied = { ...scope },
             key = scopeKey(copied);
         for (let attempt = 0; attempt < 100; attempt++) {
@@ -182,6 +264,19 @@ export class TransactionalWalletStore implements WalletStore {
         }
         throw new Error("wallet transaction contention limit exceeded");
     }
+    async restoreReorgedOperations(scope: WalletScope, fromBlock: bigint): Promise<void> {
+        await this.#rows?.restoreReorgedOperations(scope, fromBlock);
+    }
+    async readSummary(scope: WalletScope): Promise<WalletState> {
+        return this.#rows ? this.#rows.summary(scope) : this.readSnapshot(scope);
+    }
+    async readRecords(scope: WalletScope, query: WalletRecordQuery) {
+        if (!this.#rows)
+            throw Error(
+                "paged wallet records require readPage and compareAndSwapBatch adapter capabilities"
+            );
+        return this.#rows.readRecords(scope, query);
+    }
     toJSON() {
         return { walletStore: true, persistent: this.persistent };
     }
@@ -190,11 +285,57 @@ export class TransactionalWalletStore implements WalletStore {
     }
 }
 /** Explicitly nonpersistent reference storage; data never leaves this process. */
-export class MemoryAtomicRecords implements AtomicRecordStore {
+export class MemoryAtomicRecords implements PagedAtomicRecordStore {
     readonly #values = new Map<string, AtomicRecord>();
     async read(key: string): Promise<AtomicRecord | undefined> {
         const value = this.#values.get(key);
         return value ? { revision: value.revision, data: Uint8Array.from(value.data) } : undefined;
+    }
+    async count(prefix: string): Promise<number> {
+        let count = 0;
+        for (const key of this.#values.keys()) if (key.startsWith(prefix)) count++;
+        return count;
+    }
+    async readPage(prefix: string, after: string | undefined, limit: number): Promise<RecordRow[]> {
+        pageLimit(limit);
+        return [...this.#values.keys()]
+            .filter((key) => key.startsWith(prefix) && (!after || key > after))
+            .sort()
+            .slice(0, limit)
+            .map((key) => ({
+                ...this.#values.get(key)!,
+                key,
+                data: Uint8Array.from(this.#values.get(key)!.data),
+            }));
+    }
+    async compareAndSwapBatch(
+        key: string,
+        previousRevision: number,
+        next: AtomicRecord,
+        writes: readonly RecordWrite[]
+    ): Promise<boolean> {
+        if ((this.#values.get(key)?.revision ?? 0) !== previousRevision) return false;
+        const root = { revision: next.revision, data: Uint8Array.from(next.data) };
+        const copy = writes.map((write) => ({
+            key: write.key,
+            ...(write.record
+                ? {
+                      record: {
+                          revision: write.record.revision,
+                          data: Uint8Array.from(write.record.data),
+                      },
+                  }
+                : {}),
+        }));
+        for (const write of copy) {
+            if (write.key === key) throw Error("batch cannot replace its guard");
+        }
+        for (const write of copy) {
+            if (write.record) this.#values.set(write.key, write.record);
+            else this.#values.delete(write.key);
+        }
+        this.#values.set(key, root);
+        return true;
     }
     async compareAndSwap(
         key: string,

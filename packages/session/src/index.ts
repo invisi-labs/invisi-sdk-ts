@@ -7,8 +7,11 @@ import { MemoryRecordCodec } from "./storage/codec";
 import { MemoryAtomicRecords, TransactionalWalletStore } from "./storage/store";
 /** Explicit ephemeral state for demos and applications that choose memory-only operation. */
 export class MemoryWalletStore extends TransactionalWalletStore {
-    constructor() {
-        super(new MemoryAtomicRecords(), new MemoryRecordCodec(), { persistent: false });
+    constructor(options: { recentRecords?: number } = {}) {
+        super(new MemoryAtomicRecords(), new MemoryRecordCodec(), {
+            persistent: false,
+            ...options,
+        });
     }
 }
 
@@ -46,3 +49,18 @@ export { EncryptedWalletCodec } from "./storage/encrypted-codec";
 export type { PendingWalletRefresh } from "./sync/WalletRefresh";
 
 export * from "./recovery";
+
+export * from "./public-history/store";
+export * from "./public-history/history";
+export type { AccountScanOptions } from "./public-history/scan";
+
+export type {
+    WalletRecordKind,
+    WalletRecordQuery,
+    WalletRecordItem,
+    WalletRecordPage,
+} from "./storage/record-wallet";
+
+export type { CoverageRange } from "./public-history/coverage";
+
+export type { WalletScanStatus, WalletFundsStatus } from "./sync/status";

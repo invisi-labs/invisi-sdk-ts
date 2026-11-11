@@ -1,3 +1,4 @@
+import { DeliveryAuthenticationError } from "../packages/primitives/src/delivery/errors";
 import { TestWallet } from "./test-wallet";
 import type { DeliveryDecryptor, WalletRequest, WalletResponse } from "@invisi-labs/primitives";
 import type { Operation } from "../packages/session/src/operations/Operation";
@@ -32,14 +33,17 @@ export async function executeWalletRequests(requests: WalletRequest[]): Promise<
                     (request.method === "wallet.decryptNote" ||
                         request.method === "wallet.decryptCredit") &&
                     error instanceof Error &&
-                    error.name === "OperationError";
+                    (error instanceof DeliveryAuthenticationError ||
+                        error.name === "OperationError");
                 return {
                     version: request.version,
                     id: request.id,
                     ownerAddress: request.ownerAddress,
                     method: request.method,
                     error: {
-                        code: nonrecipient ? "WALLET_NOT_RECIPIENT" : "WALLET_EXECUTION_FAILED",
+                        code: nonrecipient
+                            ? "DELIVERY_AUTHENTICATION_FAILED"
+                            : "WALLET_EXECUTION_FAILED",
                     },
                 };
             }
@@ -63,7 +67,7 @@ async function decryptForTest(
     context:
         | import("@invisi-labs/primitives").NoteDecryptionContext
         | import("@invisi-labs/primitives").CreditStateDecryptionContext
-): Promise<Uint8Array | null> {
+): Promise<import("@invisi-labs/primitives").DeliveryDecryptionResult> {
     const { hexlify, getBytes } = await import("ethers");
     try {
         const response = await executeWalletRequest({
@@ -85,7 +89,11 @@ async function decryptForTest(
         if ("error" in response) throw new Error(response.error!.code);
         return getBytes((response.result as { plaintext: string }).plaintext);
     } catch (error) {
-        if (error instanceof Error && error.name === "OperationError") return null;
+        if (
+            error instanceof Error &&
+            (error instanceof DeliveryAuthenticationError || error.name === "OperationError")
+        )
+            return { status: "authentication-failed" };
         throw error;
     }
 }

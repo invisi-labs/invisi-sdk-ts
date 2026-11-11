@@ -1,9 +1,14 @@
 import { fileURLToPath } from "node:url";
 import { JsonRpcProvider, getBytes } from "ethers";
 import { createRequire } from "node:module";
-import { WalletSession, EncryptedWalletCodec } from "@invisi-labs/session";
-import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/session/sqlite";
+import { WalletSession, EncryptedWalletCodec, PublicHistory } from "@invisi-labs/session";
+import {
+    SQLiteWalletStore,
+    SQLitePublicHistoryStore,
+    type SQLiteConnection,
+} from "@invisi-labs/session/sqlite";
 import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
+import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
@@ -43,8 +48,16 @@ try {
     }
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
+    const chainReader = new EthersChainReader(provider);
+    const publicHistory = new PublicHistory({
+        store: new SQLitePublicHistoryStore(database),
+        protocol,
+        reader: chainReader,
+        protocolRpc,
+    });
     const invisi = new Invisi({
         provider,
+        chainReader,
         protocolRpc,
         prover: new NativeProver({ bbBin: settings.bbBin }),
     });
@@ -52,22 +65,29 @@ try {
     const session = await WalletSession.connect({
         invisi,
         store,
+        publicHistory,
         wallet: alice.publicWallet,
         protocol,
         namespace: "alice-local-experiments",
     });
 
-    // 2. Revisit the saved checkpoint to detect reorgs before using inventory.
-    const history = await session.getHistory();
+    // 2. Catch up recent data first, then recover older gaps using persisted account coverage.
     const pending = await session.refresh({
-        fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
+        onProgress: (progress) => console.log("Sync progress:", json(progress)),
     });
-    // A malformed batch or operational error must not advance the persisted checkpoint.
     await pending.decrypt(decryptor);
+    console.log("Scan status:", json(await session.getScanStatus()));
+    console.log("Known funds:", json(await session.getFundsStatus(settings.tokenAddress)));
     console.log("Verified balance:", json(await session.balance(settings.tokenAddress)));
     console.log(
-        "History:",
-        json(await session.getHistory({ tokenAddress: settings.tokenAddress }))
+        "History page:",
+        json(
+            await session.getHistoryPage({
+                direction: "incoming",
+                tokenAddress: settings.tokenAddress,
+                limit: 50,
+            })
+        )
     );
 } finally {
     database.close();
