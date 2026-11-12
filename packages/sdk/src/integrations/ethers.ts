@@ -1,3 +1,8 @@
+import {
+    FinalityUnsupportedError,
+    FinalityInconsistentError,
+    type FinalityTag,
+} from "@invisi-labs/protocol";
 import { ReceivingAddress, type ReceivingKeyLookup } from "@invisi-labs/primitives/address";
 import type {
     CanonicalBlock,
@@ -189,6 +194,40 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
         return BigInt(await this.client.getBlockNumber());
     }
 
+    async getBlockByTag(tag: FinalityTag): Promise<CanonicalBlock | null> {
+        if (!["latest", "safe", "finalized"].includes(tag)) throw new Error("Invalid finality tag");
+        try {
+            const block = await this.client.getBlock(tag);
+            if (!block) return null;
+            if (
+                !Number.isSafeInteger(block.number) ||
+                block.number < 0 ||
+                !Number.isSafeInteger(block.timestamp) ||
+                block.timestamp < 0 ||
+                !block.hash ||
+                !/^0x[0-9a-fA-F]{64}$/.test(block.hash) ||
+                !/^0x[0-9a-fA-F]{64}$/.test(block.parentHash)
+            )
+                throw new FinalityInconsistentError();
+            return {
+                number: BigInt(block.number),
+                hash: word(block.hash),
+                parentHash: word(block.parentHash),
+                timestamp: BigInt(block.timestamp),
+            };
+        } catch (error) {
+            const failure = error as {
+                code?: unknown;
+                error?: { code?: unknown };
+                info?: { error?: { code?: unknown } };
+            };
+            const code = failure?.error?.code ?? failure?.info?.error?.code ?? failure?.code;
+            if (code === -32601 || code === -32602 || code === "UNSUPPORTED_OPERATION")
+                throw new FinalityUnsupportedError();
+            throw error;
+        }
+    }
+
     async getBlock(blockNumber: bigint): Promise<CanonicalBlock> {
         const block = await this.client.getBlock(blockNumber);
         check(
@@ -319,7 +358,8 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
             const receipt = await this.client.getTransactionReceipt(word(hash));
             if (!receipt) return null;
             const block = await this.getBlock(BigInt(receipt.blockNumber));
-            check(block.hash === receipt.blockHash, "receipt block is no longer canonical");
+            if (block.hash !== receipt.blockHash || (receipt.status !== 0 && receipt.status !== 1))
+                throw new FinalityInconsistentError();
             return {
                 block,
                 transactionHash: word(receipt.hash),

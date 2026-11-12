@@ -81,18 +81,34 @@ async function harness() {
         getChainId: async () => current.chainId,
         getCode: async () => "0x01" as Hex,
         getLatestBlockNumber: async () => current.head,
+        getBlockByTag: async (tag: string) => ({
+            ...block,
+            number:
+                tag === "latest"
+                    ? current.head
+                    : current.head < block.number
+                      ? current.head
+                      : block.number,
+            hash: current.blockHash,
+        }),
         getReceipt: async () => current.receipt,
-        getBlock: async () => {
+        getBlock: async (number = block.number) => {
             current.blockReads++;
             return {
                 ...block,
+                number,
                 hash:
                     current.reorgAfterRead && current.blockReads > 1 ? hex(99n) : current.blockHash,
             };
         },
     } satisfies Pick<
         ChainReader,
-        "getChainId" | "getCode" | "getLatestBlockNumber" | "getReceipt" | "getBlock"
+        | "getChainId"
+        | "getCode"
+        | "getLatestBlockNumber"
+        | "getReceipt"
+        | "getBlock"
+        | "getBlockByTag"
     >;
     const protocol = new TokenProtocol(context, {
         expectedRuntimeCodeHash: keccak256("0x01") as Hex,
@@ -148,9 +164,9 @@ describe("canonical disclosure verifier", () => {
         let reads = 0;
         const reader = {
             ...h.reader,
-            getLatestBlockNumber: async () => {
+            getBlockByTag: async () => {
                 if (++reads === 2) h.current.chainId++;
-                return h.current.head;
+                return { ...block, number: h.current.head };
             },
         };
         await expect(
@@ -166,7 +182,7 @@ describe("canonical disclosure verifier", () => {
         const verifier = new wallet.DisclosureVerifier({
             protocol: h.protocol,
             reader: h.reader,
-            confirmations: 2,
+            finality: "finalized",
         });
         const result = await verifier.verify(
             await Disclosure.fromExport(h.disclosure.export()),
@@ -178,7 +194,7 @@ describe("canonical disclosure verifier", () => {
         expect(result.output.commitment).toBe(vectors.note.commitment);
         expect(result.output.transactionHash).toBe(reference.transactionHash);
         expect(result.block.hash).toBe(block.hash);
-        expect(result.confirmations).toBe(2n);
+        expect(result.finality).toBe("finalized");
     });
 
     it.each([
@@ -220,7 +236,9 @@ describe("canonical disclosure verifier", () => {
         ).rejects.toThrow();
         h.current.blockReads = 0;
         h.current.reorgAfterRead = true;
-        await expect(verifier.verify(h.disclosure, reference)).rejects.toThrow(/canonical|reorg/);
+        await expect(verifier.verify(h.disclosure, reference)).rejects.toThrow(
+            /canonical|reorg|inconsistent/
+        );
     });
 
     it("enforces deployment profile, chain identity and requested confirmations", async () => {
@@ -231,13 +249,15 @@ describe("canonical disclosure verifier", () => {
                 reader: h.reader,
             }).verify(h.disclosure, reference)
         ).rejects.toThrow(/profile/);
+        h.current.head = 11n;
         await expect(
             new wallet.DisclosureVerifier({
                 protocol: h.protocol,
                 reader: h.reader,
-                confirmations: 3,
+                finality: "finalized",
             }).verify(h.disclosure, reference)
-        ).rejects.toThrow(/confirm/);
+        ).rejects.toThrow(/finality/);
+        h.current.head = 13n;
         h.current.chainId++;
         await expect(
             new wallet.DisclosureVerifier({ protocol: h.protocol, reader: h.reader }).verify(
@@ -246,4 +266,14 @@ describe("canonical disclosure verifier", () => {
             )
         ).rejects.toThrow(/chain/);
     });
+});
+
+it("requires native finalized capability for explicit disclosure verification", async () => {
+    const h = await harness();
+    await expect(
+        new wallet.DisclosureVerifier({
+            protocol: h.protocol,
+            reader: { ...h.reader, getBlockByTag: undefined },
+        } as any).verify(h.disclosure, reference)
+    ).rejects.toThrow(/finalized.*unsupported/i);
 });

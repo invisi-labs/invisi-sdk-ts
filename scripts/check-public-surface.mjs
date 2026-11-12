@@ -92,6 +92,10 @@ functions(
         "PaymentNote",
         "PreparedTransaction",
         "RegistrationOperation",
+        "readChainFinality",
+        "readTransactionConfirmation",
+        "FinalityUnsupportedError",
+        "FinalityInconsistentError",
     ],
     "sdk"
 );
@@ -99,7 +103,15 @@ functions(session, ["WalletSession", "Operation", "EncryptedWalletCodec"], "sess
 functions(rpc, ["ProtocolRpcClient", "defineDeployment"], "rpc");
 functions(
     protocol,
-    ["registrationTypedData", "registrationDigest", "buildRegistrationCalldata"],
+    [
+        "registrationTypedData",
+        "registrationDigest",
+        "buildRegistrationCalldata",
+        "readChainFinality",
+        "readTransactionConfirmation",
+        "FinalityUnsupportedError",
+        "FinalityInconsistentError",
+    ],
     "protocol"
 );
 assert(!existsSync("packages/primitives/dist/local.js"), "private wallet entry still built");
@@ -146,6 +158,7 @@ for (const [name, entry] of [
     functions(
         entry.prototype,
         [
+            "getConfirmation",
             "exportWalletAuthorization",
             "withWalletSignature",
             "exportFundingAuthorization",

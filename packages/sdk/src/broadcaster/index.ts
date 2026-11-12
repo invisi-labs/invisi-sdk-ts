@@ -14,6 +14,7 @@ export type {
     SignedBroadcasterQuote,
     BroadcasterTrust,
     BroadcasterStatus,
+    BroadcasterConfirmation,
     BroadcasterTransport,
     BroadcasterConfiguration,
 } from "@invisi-labs/rpc/broadcaster";

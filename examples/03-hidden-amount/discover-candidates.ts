@@ -44,7 +44,7 @@ export async function discoverCandidates({
     const verifier = new DisclosureVerifier({
         protocol: protocol.forToken(tokenAddress),
         reader: new EthersChainReader(provider),
-        confirmations: 1,
+        finality: "finalized",
     });
     const candidates: (NoteInput & {
         reference: DisclosureReference;

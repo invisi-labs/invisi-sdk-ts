@@ -49,7 +49,7 @@ try {
     const verifier = new DisclosureVerifier({
         protocol: protocol.forToken(settings.tokenAddress),
         reader: new EthersChainReader(provider),
-        confirmations: 1,
+        finality: "finalized",
     });
     const verified = await verifier.verify(transferred, selected.reference);
     console.log("Disclosure scope:", json(disclosure.getScope()));

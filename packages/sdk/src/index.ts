@@ -170,3 +170,17 @@ export type {
     DeliveryDetectionCandidate,
     DeliveryDetectionBatch,
 } from "@invisi-labs/primitives";
+
+export {
+    readChainFinality,
+    readTransactionConfirmation,
+    FinalityUnsupportedError,
+    FinalityInconsistentError,
+} from "@invisi-labs/protocol";
+export type {
+    FinalityTag,
+    FinalityStatus,
+    FinalityHead,
+    ChainFinality,
+    TransactionConfirmation,
+} from "@invisi-labs/protocol";

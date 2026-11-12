@@ -4,6 +4,9 @@ import type { CanonicalBlock, DeploymentContext } from "../types";
 
 export interface ProtocolRpcReader {
     getBlock(number: bigint): Promise<CanonicalBlock>;
+    getBlockByTag?(
+        tag: import("@invisi-labs/protocol").FinalityTag
+    ): Promise<CanonicalBlock | null>;
     isKnownRoot(
         context: DeploymentContext,
         treeId: bigint,

@@ -149,3 +149,45 @@ it("checks arbitrary registry signature bytes through ERC-1271 and propagates RP
         failure
     );
 });
+
+it("reads native finalized tag without a block-depth fallback", async () => {
+    const client = {
+        getBlock: vi.fn(async () => ({
+            number: 7,
+            hash: `0x${"07".repeat(32)}`,
+            parentHash: `0x${"06".repeat(32)}`,
+            timestamp: 123,
+        })),
+    };
+    const reader = new EthersChainReader(client as any);
+    expect((await reader.getBlockByTag("finalized"))?.number).toBe(7n);
+    expect(client.getBlock).toHaveBeenCalledWith("finalized");
+});
+
+it("reports malformed native tag blocks as inconsistent rather than a temporary outage", async () => {
+    const { readChainFinality } = await import("@invisi-labs/protocol");
+    const reader = new EthersChainReader({
+        getBlock: async () => ({
+            number: -1,
+            timestamp: 123,
+            hash: word(1n),
+            parentHash: word(0n),
+        }),
+    } as any);
+    expect((await readChainFinality(reader)).finalized.status).toBe("inconsistent");
+});
+
+it("reports a receipt reorg as inconsistent native transaction progress", async () => {
+    const { readTransactionConfirmation } = await import("@invisi-labs/protocol");
+    const reader = new EthersChainReader({
+        getTransactionReceipt: async () => ({
+            blockNumber: 7,
+            blockHash: word(8n),
+            hash: word(9n),
+            status: 1,
+            logs: [],
+        }),
+        getBlock: async () => ({ number: 7, hash: word(7n), parentHash: word(6n), timestamp: 123 }),
+    } as any);
+    expect((await readTransactionConfirmation(reader, word(9n))).status).toBe("inconsistent");
+});

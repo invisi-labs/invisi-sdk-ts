@@ -1,3 +1,4 @@
+import { readTransactionConfirmation, type TransactionConfirmation } from "@invisi-labs/protocol";
 import { bindBroadcasterOperation } from "../../broadcaster/operation-bridge";
 import {
     prepareWalletRequest,
@@ -95,6 +96,11 @@ export class PreparedTransaction {
             "prepared",
             { generation: 0, busy: false }
         );
+    }
+    /** Observe canonical inclusion/finality only; this does not verify the intended operation effects. */
+    async getConfirmation(transactionHash: Hex): Promise<TransactionConfirmation> {
+        await this.#runtime.options.protocol.validateDeployment(this.#runtime.reader);
+        return readTransactionConfirmation(this.#runtime.reader, transactionHash);
     }
     broadcasterQuote() {
         return this.#saved.broadcasterQuote

@@ -1,3 +1,4 @@
+import { checkedFinality } from "../validation/finality";
 import { getAddress } from "ethers";
 import type { Address, Hex } from "@invisi-labs/primitives";
 import { poseidonHash, TREE_DEPTH } from "@invisi-labs/primitives";
@@ -217,7 +218,9 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
     async getStatus(context: DeploymentContext, options: { signal?: AbortSignal } = {}) {
         const status = await this.readStatusMetadata(context, options);
         return {
-            ...status,
+            ...(status.finality === undefined
+                ? {}
+                : { finality: await checkedFinality(status.finality, this.reader) }),
             indexedHead:
                 status.indexedHead === null ? null : await this.canonical(status.indexedHead),
         };
@@ -245,6 +248,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             invalid("RPC deployment pins mismatch");
         return {
             indexedHead: status.indexedHead,
+            finality: status.finality,
         };
     }
     private async updatePage(

@@ -100,7 +100,7 @@ export async function discoverCredits({
     const verifier = new DisclosureVerifier({
         protocol: protocol.forToken(tokenAddress),
         reader: new EthersChainReader(provider),
-        confirmations: 1,
+        finality: "finalized",
     });
     const result: (CreditInput & {
         reference: DisclosureReference;

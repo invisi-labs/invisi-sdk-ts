@@ -1,3 +1,4 @@
+import { readChainFinality, type FinalityTag } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import type { Provider } from "ethers";
 import { readProtocolLogs } from "../discovery/receipt-logs";
@@ -17,27 +18,27 @@ export interface DisclosureReference {
 
 export type DisclosureReader = Pick<
     ChainReader,
-    "getChainId" | "getCode" | "getReceipt" | "getBlock" | "getLatestBlockNumber"
+    "getChainId" | "getCode" | "getReceipt" | "getBlock" | "getBlockByTag"
 >;
 
 export interface DisclosureVerifierOptions {
     protocol: TokenProtocol;
     reader: DisclosureReader;
-    /** Minimum confirmations including the inclusion block; defaults to one. */
-    confirmations?: number;
+    /** Native chain finality required for the inclusion block; defaults to finalized. */
+    finality?: FinalityTag;
 }
 
 export interface DisclosureEvidence {
     reference: Readonly<DisclosureReference>;
     block: Readonly<CanonicalBlock>;
-    confirmations: bigint;
+    finality: FinalityTag;
     output: Readonly<DisclosureOutput>;
 }
 
 export interface VerifiedDisclosure {
     result: DisclosureResult;
     block: Readonly<CanonicalBlock>;
-    confirmations: bigint;
+    finality: FinalityTag;
     output: Readonly<DisclosureReference & { commitment: Hex }>;
 }
 
@@ -70,26 +71,23 @@ function reference(value: DisclosureReference): DisclosureReference {
 export class DisclosureVerifier {
     readonly #protocol: TokenProtocol;
     readonly #reader: DisclosureReader;
-    readonly #confirmations: bigint;
+    readonly #finality: FinalityTag;
 
     constructor(
         options:
             | DisclosureVerifierOptions
             | (Omit<DisclosureVerifierOptions, "reader"> & { provider: Provider })
     ) {
-        const confirmations = options.confirmations ?? 1;
-        check(
-            Number.isSafeInteger(confirmations) && confirmations >= 1,
-            "invalid disclosure confirmations"
-        );
+        const finality = options.finality ?? "finalized";
+        check(["latest", "safe", "finalized"].includes(finality), "invalid disclosure finality");
         this.#protocol = options.protocol;
         this.#reader =
             "provider" in options ? new EthersChainReader(options.provider) : options.reader;
-        this.#confirmations = BigInt(confirmations);
+        this.#finality = finality;
         Object.freeze(this);
     }
 
-    private async barrier(block: Readonly<CanonicalBlock>): Promise<bigint> {
+    private async barrier(block: Readonly<CanonicalBlock>): Promise<FinalityTag> {
         await this.#protocol.validateDeployment(this.#reader);
         const canonical = await this.#reader.getBlock(block.number);
         check(
@@ -97,16 +95,22 @@ export class DisclosureVerifier {
                 canonical.hash.toLowerCase() === block.hash.toLowerCase(),
             "disclosure canonical block changed; reorg verification required"
         );
-        const head = await this.#reader.getLatestBlockNumber();
+        const head = (await readChainFinality(this.#reader))[this.#finality];
         check(
-            head >= block.number && head - block.number + 1n >= this.#confirmations,
-            "insufficient disclosure confirmations"
+            head.status === "available" && head.block,
+            `Native ${this.#finality} finality ${head.status}`
+        );
+        check(head.block.number >= block.number, "insufficient disclosure finality");
+        check(
+            (await this.#reader.getBlock(block.number)).hash.toLowerCase() ===
+                block.hash.toLowerCase(),
+            "disclosure canonical block changed during finality verification"
         );
         check(
             (await this.#reader.getChainId()) === this.#protocol.context.chainId,
             "disclosure chain changed during verification"
         );
-        return head - block.number + 1n;
+        return this.#finality;
     }
 
     /** Resolve the exact inserted output and its delivery from a successful canonical receipt. */
@@ -141,11 +145,11 @@ export class DisclosureVerifier {
             "disclosure output has no unique canonical insertion and delivery"
         );
         const candidate = candidates[0]!;
-        const confirmations = await this.barrier(receipt.block);
+        const finality = await this.barrier(receipt.block);
         return Object.freeze({
             reference: Object.freeze(selected),
             block: Object.freeze({ ...receipt.block }),
-            confirmations,
+            finality,
             output: Object.freeze({
                 chainId: context.chainId,
                 protocolAddress: BigInt(context.protocolAddress),
@@ -160,11 +164,11 @@ export class DisclosureVerifier {
     async verify(disclosure: Disclosure, value: DisclosureReference): Promise<VerifiedDisclosure> {
         const evidence = await this.readOutput(value);
         const result = await disclosure.verify(evidence.output);
-        const confirmations = await this.barrier(evidence.block);
+        const finality = await this.barrier(evidence.block);
         return Object.freeze({
             result: Object.freeze(result),
             block: evidence.block,
-            confirmations,
+            finality,
             output: Object.freeze({
                 ...evidence.reference,
                 commitment: evidence.output.outputCommitment,
@@ -173,7 +177,7 @@ export class DisclosureVerifier {
     }
 
     toJSON() {
-        return { disclosureVerifier: true, confirmations: this.#confirmations.toString() };
+        return { disclosureVerifier: true, finality: this.#finality };
     }
 
     [Symbol.for("nodejs.util.inspect.custom")]() {

@@ -19,6 +19,7 @@ export interface Membership {
 }
 /** Indexed service data is untrusted; the wallet verifies canonical facts through ChainReader. */
 export interface ProtocolDataStatus {
+    finality?: import("./finality").ChainFinality;
     indexedHead: CanonicalBlock | null;
 }
 export interface ProtocolUpdateRange {

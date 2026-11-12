@@ -44,3 +44,5 @@ export { estimateGas } from "./gas/estimate";
 export type { GasEstimate, GasShape, DocumentedReleaseIdentity } from "./gas/estimate";
 export * from "./note/aggregate-routes";
 export * from "./deployment";
+
+export * from "./finality";

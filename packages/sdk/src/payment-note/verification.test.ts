@@ -93,19 +93,18 @@ it("rejects missing leaves, altered proofs, tokens and unknown roots", async () 
 });
 it("rejects context, confirmation, deployment and reorganization mismatches", async () => {
     const { h, note, options } = await setup();
-    await expect(note.verify(h.protocol, { ...options, confirmations: 0 })).rejects.toThrow(
-        /confirmations/
-    );
-    await expect(note.verify(h.protocol, { ...options, confirmations: 100 })).rejects.toThrow(
-        /confirmed/
-    );
+    await expect(
+        note.verify(h.protocol, { ...options, finality: "invalid" as any })
+    ).rejects.toThrow(/finality/);
     h.reader.getCode = async () => "0x6001";
     await expect(note.verify(h.protocol, options)).rejects.toThrow(/runtime/);
     h.reader.getCode = async () => "0x6000";
     const block = await h.reader.getBlock(12n);
     let calls = 0;
     h.reader.getBlock = async () => (++calls > 1 ? { ...block, hash: h.leaf } : block);
-    await expect(note.verify(h.protocol, options)).rejects.toThrow(/canonical|reorganized/);
+    await expect(note.verify(h.protocol, options)).rejects.toThrow(
+        /canonical|reorganized|inconsistent/
+    );
 });
 it("exports final prepared outputs and rejects identity-only exports", async () => {
     const { h } = await setup();
@@ -211,7 +210,7 @@ it("checks spendability at the latest chain block while membership uses the conf
     h.reader.isSpent = vi.fn(async () => [false]);
     const verified = await note.verifySpendable(h.protocol, h.options.wallet, {
         ...options,
-        confirmations: 2,
+        finality: "finalized",
     });
     expect(verified.checkedAt.number).toBe(12n);
     expect(verified.spendabilityCheckedAt.number).toBe(20n);
@@ -252,4 +251,25 @@ it("exports EVM Notes with or without envelope lookup, including an explicit zer
         expect(note.ownerAddress).toBe(h.bob.ownerAddress);
         expect(output.deliveryPending).toBe(envelope);
     }
+});
+
+it("requires native finalized capability by default without using confirmation depth", async () => {
+    const { h, note, options } = await setup();
+    delete h.reader.getBlockByTag;
+    await expect(note.verify(h.protocol, options)).rejects.toThrow(/finalized.*unsupported/i);
+});
+
+it("rechecks native finalized progress after membership verification", async () => {
+    const { h, note, options, getNote } = await setup();
+    const anchor = await h.reader.getBlock(12n);
+    let changed = false;
+    h.reader.getBlockByTag = async () => ({ ...anchor, number: changed ? 1n : 12n });
+    h.reader.getBlock = async (number) => ({ ...anchor, number });
+    const original = getNote.getMockImplementation()!;
+    getNote.mockImplementation(async () => {
+        const result = await original();
+        changed = true;
+        return result;
+    });
+    await expect(note.verify(h.protocol, options)).rejects.toThrow(/finality/);
 });

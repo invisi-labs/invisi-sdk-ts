@@ -1,5 +1,12 @@
+import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
-import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import {
+    Invisi,
+    Protocol,
+    ProtocolRpcClient,
+    NoteOutput,
+    readTransactionConfirmation,
+} from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { WalletSession } from "@invisi-labs/session";
 import { MemoryWalletStore } from "@invisi-labs/session/memory";
@@ -100,7 +107,31 @@ try {
     // For aggregate execution the service queues, batches and wraps the member, including single-member fallback.
     const submitted = await client.submit(ready);
     console.log("Broadcast result:", json(submitted));
-    // queued/proving are not chain confirmations. Keep the ID and query client.status(submitted.id).
+    // Inclusion and native finality are separate observations. Keep the relay ID for recovery.
+    if (process.argv.includes("--wait-finalized")) {
+        let status = submitted;
+        const deadline = Date.now() + 120_000;
+        while (Date.now() < deadline) {
+            if (["reverted", "rejected", "expired"].includes(status.state))
+                throw Error(`Submission ${status.state}`);
+            if (status.transactionHash) {
+                const confirmation = await readTransactionConfirmation(
+                    new EthersChainReader(provider),
+                    status.transactionHash as `0x${string}`
+                );
+                if (confirmation.status === "unsupported" || confirmation.status === "inconsistent")
+                    throw Error(`Native finality ${confirmation.status}`);
+                if (confirmation.level === "finalized" && confirmation.status === "available") {
+                    console.log("Finalized transaction:", json(confirmation));
+                    break;
+                }
+            }
+            await new Promise((resolve) => setTimeout(resolve, 3_000));
+            status = await client.status(submitted.id);
+        }
+        if (Date.now() >= deadline)
+            throw Error("Timed out waiting for native finalized confirmation");
+    }
 } finally {
     provider.destroy();
 }

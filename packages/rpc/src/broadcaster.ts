@@ -259,7 +259,13 @@ function checkedMemberProof(data: string, proof: BroadcasterMemberProof): Broadc
         throw Error("member proof public shape mismatch");
     return { ...proof, publicInputs: [...proof.publicInputs] };
 }
+export interface BroadcasterConfirmation {
+    level: "pending" | "included" | "safe" | "finalized";
+    status: import("@invisi-labs/protocol").FinalityStatus;
+    block: { number: string; hash: string; timestamp: number } | null;
+}
 export interface BroadcasterStatus {
+    confirmation?: BroadcasterConfirmation;
     id: string;
     state:
         | "pending"
@@ -296,7 +302,54 @@ function checkedStatus(value: unknown, id?: string): BroadcasterStatus {
             !/^0x[0-9a-fA-F]{64}$/.test(status.transactionHash))
     )
         throw new Error("invalid broadcaster status");
-    return status;
+    if (status.confirmation !== undefined) {
+        const confirmation = status.confirmation;
+        if (
+            !confirmation ||
+            typeof confirmation !== "object" ||
+            !["pending", "included", "safe", "finalized"].includes(confirmation.level) ||
+            !["available", "unsupported", "unavailable", "inconsistent"].includes(
+                confirmation.status
+            ) ||
+            ["queued", "proving", "rejected", "expired"].includes(status.state)
+        )
+            throw new Error("invalid broadcaster confirmation");
+        const block = confirmation.block;
+        if (
+            block !== null &&
+            (!block ||
+                typeof block !== "object" ||
+                typeof block.number !== "string" ||
+                !/^(0|[1-9][0-9]*)$/.test(block.number) ||
+                BigInt(block.number) >= 1n << 64n ||
+                typeof block.hash !== "string" ||
+                !/^0x[0-9a-fA-F]{64}$/.test(block.hash) ||
+                !Number.isSafeInteger(block.timestamp) ||
+                block.timestamp < 0)
+        )
+            throw new Error("invalid broadcaster confirmation block");
+        if (
+            confirmation.level === "pending"
+                ? block !== null
+                : !status.transactionHash ||
+                  (block === null &&
+                      (confirmation.status === "available" ||
+                          confirmation.level === "safe" ||
+                          confirmation.level === "finalized"))
+        )
+            throw new Error("invalid broadcaster confirmation anchor");
+        return {
+            ...status,
+            confirmation: {
+                level: confirmation.level,
+                status: confirmation.status,
+                block: block
+                    ? { number: block.number, hash: block.hash, timestamp: block.timestamp }
+                    : null,
+            },
+        };
+    }
+    return { ...status };
 }
 export type BroadcasterTransport = (
     request: { jsonrpc: "2.0"; id: number; method: string; params: unknown },

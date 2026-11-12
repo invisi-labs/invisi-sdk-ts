@@ -1,3 +1,4 @@
+import { readTransactionConfirmation, type TransactionConfirmation } from "@invisi-labs/protocol";
 import { bindBroadcasterOperation } from "@invisi-labs/sdk/session-support";
 import {
     prepareWalletRequest,
@@ -705,6 +706,16 @@ export class Operation {
             return structuredClone(current);
         });
         return new Operation(this.#runtime, saved, "uncertain");
+    }
+
+    /** Read chain progress independently; reconciliation still owns inventory and reservation changes. */
+    async getConfirmation(): Promise<TransactionConfirmation> {
+        const state = await this.#runtime.store.readSnapshot(this.#runtime.scope);
+        const record = state.operations[this.id];
+        check(record, "operation is unavailable");
+        if (!record.transactionHash) return { level: "pending", status: "available", block: null };
+        await this.#runtime.options.protocol.validateDeployment(this.#runtime.reader);
+        return readTransactionConfirmation(this.#runtime.reader, record.transactionHash);
     }
 
     async reconcile(

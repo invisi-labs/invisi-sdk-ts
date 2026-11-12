@@ -286,3 +286,67 @@ it("accepts public-only status without detection metadata", async () => {
     const { client } = setup(() => status());
     expect(await client.getStatus(context)).toEqual({ indexedHead: block });
 });
+
+it("does not accept an indexer finalized label without primary native capability", async () => {
+    const finality = {
+        latest: { status: "available", block: wireBlock },
+        safe: { status: "available", block: wireBlock },
+        finalized: { status: "available", block: wireBlock },
+    };
+    const { client } = setup(() => ({ ...status(), finality }));
+    expect((await client.getStatus(context)).finality?.finalized).toEqual({
+        status: "unsupported",
+        block: null,
+    });
+});
+
+it.each([
+    {
+        latest: { status: "unknown", block: null },
+        safe: { status: "unsupported", block: null },
+        finalized: { status: "unsupported", block: null },
+    },
+    {
+        latest: { status: "available", block: null },
+        safe: { status: "unsupported", block: null },
+        finalized: { status: "unsupported", block: null },
+    },
+    {
+        latest: { status: "unsupported", block: wireBlock },
+        safe: { status: "unsupported", block: null },
+        finalized: { status: "unsupported", block: null },
+    },
+    {
+        latest: { status: "available", block: wireBlock },
+        safe: { status: "available", block: { ...wireBlock, number: 11 } },
+        finalized: { status: "unsupported", block: null },
+    },
+])("rejects malformed native finality snapshots %j", async (finality) => {
+    const { client } = setup(() => ({ ...status(), finality }));
+    await expect(client.getStatus(context)).rejects.toBeInstanceOf(ProtocolRpcError);
+});
+
+it("keeps the validated service finality snapshot and distinguishes primary lag", async () => {
+    const finality = {
+        latest: { status: "available", block: wireBlock },
+        safe: { status: "available", block: wireBlock },
+        finalized: { status: "available", block: wireBlock },
+    };
+    const { client, reader } = setup(() => ({ ...status(), finality }));
+    const supported = client.withReader({
+        ...reader,
+        getBlockByTag: async () => reader.getBlock(12n),
+    });
+    expect((await supported.getStatus(context)).finality?.finalized).toEqual({
+        status: "available",
+        block,
+    });
+    const lagging = client.withReader({
+        ...reader,
+        getBlockByTag: async () => reader.getBlock(9n),
+    });
+    expect((await lagging.getStatus(context)).finality?.finalized).toEqual({
+        status: "unavailable",
+        block: null,
+    });
+});

@@ -202,3 +202,64 @@ describe("execution-bound broadcaster wire contract", () => {
         ).rejects.toThrow("aggregation unavailable");
     });
 });
+
+it("rejects impossible relay confirmation before a transaction exists", async () => {
+    const relay = client({
+        id: "member",
+        state: "queued",
+        confirmation: {
+            level: "finalized",
+            status: "available",
+            block: { number: "10", hash: ZeroHash, timestamp: 123 },
+        },
+    });
+    await expect(relay.status("member")).rejects.toThrow(/confirmation/);
+});
+
+it.each(["confirmed", "reverted"])(
+    "preserves %s receipt semantics with separate relay confirmation",
+    async (state) => {
+        const confirmation = {
+            level: "finalized",
+            status: "available",
+            block: { number: "10", hash: ZeroHash, timestamp: 123 },
+        };
+        const result = await client({
+            id: "member",
+            state,
+            transactionHash: ZeroHash,
+            confirmation,
+        }).status("member");
+        expect(result.state).toBe(state);
+        expect(result.confirmation).toEqual(confirmation);
+        expect(result.confirmation).not.toBe(confirmation);
+    }
+);
+it.each([
+    { level: "safe", status: "available", block: null },
+    { level: "safe", status: "unavailable", block: null },
+    {
+        level: "pending",
+        status: "available",
+        block: { number: "10", hash: ZeroHash, timestamp: 123 },
+    },
+    {
+        level: "included",
+        status: "available",
+        block: { number: "01", hash: ZeroHash, timestamp: 123 },
+    },
+    {
+        level: "included",
+        status: "available",
+        block: { number: "10", hash: ZeroHash, timestamp: -1 },
+    },
+])("rejects malformed relay confirmation %j", async (confirmation) => {
+    await expect(
+        client({
+            id: "member",
+            state: "confirmed",
+            transactionHash: ZeroHash,
+            confirmation,
+        }).status("member")
+    ).rejects.toThrow(/confirmation/);
+});

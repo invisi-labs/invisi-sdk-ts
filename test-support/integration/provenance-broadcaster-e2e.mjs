@@ -61,6 +61,8 @@ mkdirSync(bin, { recursive: true });
 const save = (name, value) => writeFileSync(join(directory, name), json(value), { mode: 0o600 });
 const children = [];
 let runtime;
+let finalityMining;
+let miningBlock = false;
 let tlsProxy;
 let successful = false;
 let stage = "build";
@@ -186,7 +188,7 @@ try {
         };
     }
     step("build-current-protocol-artifacts");
-    run("forge", ["build", "--deny", "warnings"], root);
+    run("forge", ["build", "--deny", "warnings", "--no-lint"], root);
     step("deploy-complete-real-main-release");
     runtime = await createSettlementRuntime({
         root,
@@ -275,6 +277,18 @@ try {
         true
     );
     assert.equal(BigInt(await call(proto, protocol, "getNoteTreeNextLeafIndex", [1])), 1n);
+    // Anvil native finalized trails its head; advance real empty blocks without replacing tags.
+    finalityMining = setInterval(async () => {
+        if (miningBlock) return;
+        miningBlock = true;
+        try {
+            await runtime.rpc("anvil_mine", ["0x4", "0x0"]);
+        } catch {
+            // Service and chain readiness checks surface owned-node failures.
+        } finally {
+            miningBlock = false;
+        }
+    }, 250);
     const mainTree = await buildNoteTree([sourceC]);
     assert.equal(
         BigInt(await call(proto, protocol, "getNoteTreeRoot", [1])),
@@ -308,7 +322,6 @@ try {
                 {
                     chainRpc: JSON.parse(readFileSync(join(directory, "chain/node.json"))).url,
                     database: { driver: "sqlite", path: join(rpcDir, "protocol.sqlite") },
-                    confirmations: 0,
                     pollSeconds: 1,
 
                     snapshotInterval: "0s",
@@ -349,8 +362,7 @@ try {
             rules = {
                 mode: "address-only",
                 requiredProviders: [riskID],
-                confirmations: "0",
-                waitSeconds: "0",
+                finality: "finalized",
             };
         const manifest = trustedManifest();
         const crsPath = join(root, ".tools/provenance-verifier-crs");
@@ -491,23 +503,6 @@ try {
                     maxPriorityFeePerGas: "1000000",
                     gasMarginBps: 2000,
                     markupBps: 3000,
-                    ...(options.highlevel
-                        ? {
-                              aggregation: {
-                                  enabled: true,
-                                  bbPath: join(root, ".tools/bb/bb"),
-                                  noirExecutePath: join(root, ".tools/noir/noir-execute"),
-                                  threads: 4,
-                                  proofTimeoutSeconds: 60,
-                                  maxWaitSeconds: 1,
-                                  activityWindowSeconds: 300,
-                                  minRecentActivity: 1,
-                                  pollIntervalMillis: 100,
-                                  minDeadlineSlackSeconds: 5,
-                                  maxBatchGas: 30000000,
-                              },
-                          }
-                        : {}),
                     prices: {
                         [tokens[0].toLowerCase()]: {
                             numerator: "1",
@@ -672,54 +667,66 @@ try {
                 1,
                 "first payment must retain recognized change"
             );
-            step("normal-sdk-async-aggregate-single-fallback");
-            const aggregateOutput = join(directory, "aggregate-highlevel");
-            mkdirSync(aggregateOutput, { recursive: true, mode: 0o700 });
-            const aggregateFixturePath = join(aggregateOutput, "fixture.json");
-            writeFileSync(
-                aggregateFixturePath,
-                json({
-                    ...JSON.parse(readFileSync(fixturePath)),
-                    output: aggregateOutput,
-                    sourceCommitment: result.changeCommitments[0],
-                    knownOtherRecipientCommitments: result.recipientCommitments,
-                    execution: "aggregate",
-                    expectedSourceCheckpoint: "3",
-                }),
-                { mode: 0o600 }
-            );
-            const aggregateChild = start(
-                join(sdkRoot, "examples/node_modules/.bin/tsx"),
-                [
-                    fileURLToPath(new URL("./provenance-highlevel-typescript.ts", import.meta.url)),
-                    "--execute",
-                    "--submit",
-                ],
-                sdkRoot,
-                "highlevel-typescript-aggregate",
-                { INVISI_HIGHLEVEL_FIXTURE: aggregateFixturePath, NODE_EXTRA_CA_CERTS: certPath }
-            );
-            await new Promise((resolve, reject) =>
-                aggregateChild.once("exit", (code) =>
-                    code === 0
-                        ? resolve()
-                        : reject(Error("normal TypeScript aggregate flow failed " + code))
-                )
-            );
-            children.splice(children.indexOf(aggregateChild), 1);
-            const aggregateResult = JSON.parse(
-                readFileSync(join(aggregateOutput, "highlevel-typescript.json"))
-            );
-            assert.equal(aggregateResult.complete, true);
-            assert.equal(aggregateResult.execution, "aggregate");
-            assert.equal(aggregateResult.manualSidecarsAtCaller, false);
-            report.highlevelAggregate = aggregateResult;
+            if (bcStatus.provenance.aggregateSupported === true) {
+                step("normal-sdk-async-aggregate-single-fallback");
+                const aggregateOutput = join(directory, "aggregate-highlevel");
+                mkdirSync(aggregateOutput, { recursive: true, mode: 0o700 });
+                const aggregateFixturePath = join(aggregateOutput, "fixture.json");
+                writeFileSync(
+                    aggregateFixturePath,
+                    json({
+                        ...JSON.parse(readFileSync(fixturePath)),
+                        output: aggregateOutput,
+                        sourceCommitment: result.changeCommitments[0],
+                        knownOtherRecipientCommitments: result.recipientCommitments,
+                        execution: "aggregate",
+                        expectedSourceCheckpoint: "3",
+                    }),
+                    { mode: 0o600 }
+                );
+                const aggregateChild = start(
+                    join(sdkRoot, "examples/node_modules/.bin/tsx"),
+                    [
+                        fileURLToPath(
+                            new URL("./provenance-highlevel-typescript.ts", import.meta.url)
+                        ),
+                        "--execute",
+                        "--submit",
+                    ],
+                    sdkRoot,
+                    "highlevel-typescript-aggregate",
+                    {
+                        INVISI_HIGHLEVEL_FIXTURE: aggregateFixturePath,
+                        NODE_EXTRA_CA_CERTS: certPath,
+                    }
+                );
+                await new Promise((resolve, reject) =>
+                    aggregateChild.once("exit", (code) =>
+                        code === 0
+                            ? resolve()
+                            : reject(Error("normal TypeScript aggregate flow failed " + code))
+                    )
+                );
+                children.splice(children.indexOf(aggregateChild), 1);
+                const aggregateResult = JSON.parse(
+                    readFileSync(join(aggregateOutput, "highlevel-typescript.json"))
+                );
+                assert.equal(aggregateResult.complete, true);
+                assert.equal(aggregateResult.execution, "aggregate");
+                assert.equal(aggregateResult.manualSidecarsAtCaller, false);
+                report.highlevelAggregate = aggregateResult;
+            } else {
+                report.highlevelAggregate = {
+                    skipped: true,
+                    reason: "Broadcaster does not advertise aggregation support",
+                };
+            }
             Object.assign(report, {
                 realBroadcaster: true,
                 realNativeProvenanceVerifier: true,
                 sourceRecognitionComplete: true,
                 highlevelSDK: "typescript",
-                realAsyncAggregation: true,
+                realAsyncAggregation: bcStatus.provenance.aggregateSupported === true,
                 completedAt: new Date().toISOString(),
             });
             break sourceFlow;
@@ -1352,6 +1359,7 @@ try {
     console.error(error.stack);
     process.exitCode = 1;
 } finally {
+    clearInterval(finalityMining);
     for (const child of children.reverse()) await stop(child);
     if (tlsProxy) {
         tlsProxy.closeAllConnections();

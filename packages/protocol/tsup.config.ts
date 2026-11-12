@@ -8,6 +8,11 @@ export default defineConfig({
         provenance: "src/provenance/index.ts",
     },
     format: ["esm", "cjs"],
+    // Keep the shared pure codecs/finality helpers within the browser entry budget.
+    esbuildOptions(options) {
+        options.minifySyntax = true;
+        options.minifyIdentifiers = true;
+    },
     dts: true,
     sourcemap: true,
     clean: true,

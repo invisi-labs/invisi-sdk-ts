@@ -1,3 +1,4 @@
+import { readChainFinality, type FinalityTag } from "@invisi-labs/protocol";
 import { protocolConnection } from "../protocol/connections";
 import {
     poseidonHash,
@@ -17,10 +18,10 @@ import type { PaymentNoteData } from "./types";
 /** Supply connections for manually constructed Protocols; fromRpc connections are reused. */
 export type PaymentNoteVerificationOptions = {
     protocolRpc: Pick<ProtocolRpcClient, "withReader">;
-    confirmations?: number;
+    finality?: FinalityTag;
 } & ({ provider: Provider; chainReader?: never } | { chainReader: ChainReader; provider?: never });
 
-export type PaymentNoteVerificationSettings = { confirmations?: number };
+export type PaymentNoteVerificationSettings = { finality?: FinalityTag };
 export function verificationOptions(
     protocol: Protocol,
     options: PaymentNoteVerificationOptions | PaymentNoteVerificationSettings = {}
@@ -72,17 +73,19 @@ export async function verifyPaymentNote(
         getAddress(data.protocolAddress) !== getAddress(protocol.context.protocolAddress)
     )
         throw new Error("Payment note protocol context mismatch");
-    const confirmations = options.confirmations ?? 1;
-    if (!Number.isSafeInteger(confirmations) || confirmations < 1)
-        throw new RangeError("confirmations must be positive");
+    const finality = options.finality ?? "finalized";
+    if (!["latest", "safe", "finalized"].includes(finality))
+        throw new RangeError("Invalid finality tag");
     const reader = options.chainReader ?? new EthersChainReader(options.provider!);
     await protocol.validateDeployment(reader);
     if (wallet && getAddress(wallet.ownerAddress) !== getAddress(data.ownerAddress))
         throw new Error("Payment note owner mismatch");
-    const latest = await reader.getLatestBlockNumber();
-    const number = latest - BigInt(confirmations - 1);
+    const head = (await readChainFinality(reader))[finality];
+    if (head.status !== "available" || !head.block)
+        throw new Error(`Native ${finality} finality ${head.status}`);
+    const number = head.block.number;
     if (number < protocol.deployment.protocol.fromBlock)
-        throw new Error("Insufficient confirmed blocks");
+        throw new Error("Insufficient finalized blocks");
     const rpc = options.protocolRpc.withReader(reader);
     const status = await rpc.getStatus(protocol.context);
     if (!status.indexedHead) throw new Error("Protocol RPC has no indexed blocks");
@@ -154,6 +157,17 @@ export async function verifyPaymentNote(
     }
     if (!sameBlock(checkedAt, await reader.getBlock(checkedAt.number)))
         throw new Error("Payment note verification block reorganized");
+    const finalHead = (await readChainFinality(reader))[finality];
+    if (
+        finalHead.status !== "available" ||
+        !finalHead.block ||
+        finalHead.block.number < checkedAt.number
+    )
+        throw new Error(
+            `Native ${finality} finality changed during verification: ${finalHead.status}`
+        );
+    if (!sameBlock(checkedAt, await reader.getBlock(checkedAt.number)))
+        throw new Error("Payment note finality anchor reorganized");
     return {
         input: {
             note: asNote(data),

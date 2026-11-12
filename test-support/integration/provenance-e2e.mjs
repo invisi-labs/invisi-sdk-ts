@@ -339,7 +339,6 @@ try {
                 {
                     chainRpc: JSON.parse(readFileSync(join(directory, "chain/node.json"))).url,
                     database: { driver: "sqlite", path: join(rpcDir, "protocol.sqlite") },
-                    confirmations: 0,
                     pollSeconds: 1,
 
                     snapshotInterval: "0s",
@@ -380,8 +379,7 @@ try {
             rules = {
                 mode: "address-only",
                 requiredProviders: [riskID],
-                confirmations: "0",
-                waitSeconds: "0",
+                finality: "finalized",
             };
         const manifest = trustedManifest();
         const crsPath = join(root, ".tools/provenance-verifier-crs");

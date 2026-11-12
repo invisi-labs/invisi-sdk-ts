@@ -58,6 +58,7 @@ export async function fixture() {
         getChainId: async () => 31337n,
         getCode: async () => "0x6000",
         getLatestBlockNumber: async () => 12n,
+        getBlockByTag: async () => block,
         getBlock: async () => block,
         isKnownRoot: async () => true,
         isSpent: async (_: unknown, words: readonly Hex[]) => words.map(() => false),

@@ -1,3 +1,4 @@
+import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 /** Owned-chain acceptance: normal SDK preparation with a real local wallet host and genuine provers. */
 import assert from "node:assert/strict";
 import { readFile, open, writeFile } from "node:fs/promises";
@@ -12,6 +13,7 @@ import {
     Wallet as EthersWallet,
 } from "ethers";
 import {
+    readTransactionConfirmation,
     Invisi,
     Protocol,
     ProtocolRpcClient,
@@ -335,6 +337,26 @@ try {
     }
     assert.equal(status.state, "confirmed");
     assert(status.transactionHash);
+    const nativeReader = new EthersChainReader(provider);
+    let nativeConfirmation = await readTransactionConfirmation(
+        nativeReader,
+        status.transactionHash as `0x${string}`
+    );
+    for (let attempt = 0; nativeConfirmation.level !== "finalized" && attempt < 120; attempt++) {
+        assert(
+            !["unsupported", "inconsistent"].includes(nativeConfirmation.status),
+            JSON.stringify(nativeConfirmation, (_, value) =>
+                typeof value === "bigint" ? value.toString() : value
+            )
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        nativeConfirmation = await readTransactionConfirmation(
+            nativeReader,
+            status.transactionHash as `0x${string}`
+        );
+    }
+    assert.equal(nativeConfirmation.level, "finalized");
+    assert.equal(nativeConfirmation.status, "available");
     const receipt = await provider.getTransactionReceipt(status.transactionHash);
     const tx = await provider.getTransaction(status.transactionHash);
     assert(receipt && receipt.status === 1 && tx);
@@ -409,6 +431,7 @@ try {
         walletHostCrypto: "App-owned real local decrypt and ethers EIP-712 signature",
         manualSidecarsAtCaller: false,
         execution: quote.quote.execution,
+        nativeConfirmation,
         preparedInputOpeningJSON: false,
         mainProofs,
         mainVerifications,
@@ -437,7 +460,11 @@ try {
     };
     await writeFile(
         join(config.output, "highlevel-typescript.json"),
-        JSON.stringify(evidence, null, 2),
+        JSON.stringify(
+            evidence,
+            (_, value) => (typeof value === "bigint" ? value.toString() : value),
+            2
+        ),
         { mode: 0o600 }
     );
     console.log("PASS normal TypeScript SDK highlevel flow");
