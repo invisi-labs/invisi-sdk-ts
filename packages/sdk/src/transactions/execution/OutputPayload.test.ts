@@ -39,6 +39,9 @@ it.each(["shield", "transfer"] as const)(
                 : h.invisi.prepareTransfer({ ...common, inputs: h.inputs });
         memo.fill(9);
         const prepared = await pending;
+        const preview = prepared.estimateGas();
+        expect(preview).toMatchObject({ available: true, source: "benchmark" });
+        if (preview.available) expect(preview.gasUnits).toBeGreaterThan(0n);
         const ready =
             kind === "shield"
                 ? await prepared.ready()
@@ -96,6 +99,9 @@ it.each(["shield", "transfer"] as const)(
                 : h.invisi.prepareTransfer({ ...common, inputs: h.inputs });
         payload.fill(0);
         const prepared = await pending;
+        const preview = prepared.estimateGas();
+        expect(preview).toMatchObject({ available: true, source: "benchmark" });
+        if (preview.available) expect(preview.gasUnits).toBeGreaterThan(0n);
         const ready =
             kind === "shield"
                 ? await prepared.ready()

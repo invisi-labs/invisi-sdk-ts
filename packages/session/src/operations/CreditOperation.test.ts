@@ -258,7 +258,7 @@ it.each(["create", "update", "draw", "revoke"] as const)(
                 break;
         }
         const estimate = operation.estimateGas();
-        expect(estimate).toMatchObject({ source: "benchmark", available: kind !== "revoke" });
+        expect(estimate).toMatchObject({ source: "benchmark", available: true });
         expect(operation.status).toBe("prepared");
         expect(h.prover.prove).not.toHaveBeenCalled();
     }

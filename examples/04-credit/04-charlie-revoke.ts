@@ -55,7 +55,7 @@ try {
         slot,
         caller: charlie.address,
     });
-    console.log("Benchmark gas estimate:", prepared.estimateGas());
+    console.log("Local gas estimate:", prepared.estimateGas());
     const ready = await prepared.ready();
     console.log(
         "Unsigned owner-submitted revocation transaction:",

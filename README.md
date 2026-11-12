@@ -106,7 +106,9 @@ Protocol RPC APIv1 separates Note and Credit data. Credit indexed states retain 
 
 `prepared.estimateGas()` and managed `operation.estimateGas()` synchronously estimate gas from transaction structure and the embedded benchmark table. They work before authorization, proving or ERC20 approval and require no provider. The estimator never exports a transaction, changes its state or performs an RPC simulation.
 
-Results have `source: "benchmark"`, `available`, and `gasUnits` when supported, plus measurement conditions and provenance. Circuit versions and manifest hashes describe the measurement only and do not reject another release with a matching structure. Unsupported shapes return `{source: "benchmark", available: false, reason: "shape-not-covered"}` without a fabricated gas value. No arbitrary extrapolation or hidden safety padding is applied. Aggregate execution, Shield and unmeasured delivery/layout combinations are not represented by the current table.
+Valid direct operations return `available: true` and positive `gasUnits`: Shield1–10 outputs, all supported transact input/output combinations including funding and withdrawal, Credit create/update/revoke, and draw1–80. All local previews use `source: "benchmark"`. `statistic: "median"` identifies measured shapes; `statistic: "estimate"` identifies receipt-calibrated estimates. Results include `protocolCommit`, conditions and assumptions. Additional payload, source trees, Permit and funding signatures have explicit model allowances. Illegal shapes throw; recursive aggregate previews remain explicitly unsupported. Single-output public deposits use Shield, not transact.
+
+To refresh measurements, run `node scripts/measure-gas.mjs ../invisi-protocol` against a clean protocol develop checkout. Existing successful reports can be imported with `node scripts/generate-gas-model.mjs <note-report.json> <credit-report.json> <control-report.json>`. The generator rejects mixed revisions and checks held-out shape error before replacing the embedded data.
 
 The result is an approximate gas count, not a guaranteed transaction gas limit, a live fee or a Broadcaster quote. Applications choose fee prices and safety budgets, manage approval/balances, and may explicitly simulate the final call through their own EVM provider. `session.sendTransaction` requires a positive caller-supplied `gasLimit` so ethers cannot implicitly simulate on the SDK's behalf. There is no public `getGasReference` API.
 
@@ -125,7 +127,7 @@ pnpm check:surface
 pnpm check:session
 ```
 
-Artifact synchronization reads the current authenticated manifests and removes retired artifacts. Deterministic protocol/vector and documented-gas generators live in `scripts/` and `packages/protocol/scripts/`. Optional native/WASM integration tests use `BB_BINARY_PATH` and `INVISI_TEST_WASM=1`.
+Artifact synchronization reads the current authenticated manifests and removes retired artifacts. Deterministic protocol/vector and gas-model generators live in `scripts/` and `packages/protocol/scripts/`. Optional native/WASM integration tests use `BB_BINARY_PATH` and `INVISI_TEST_WASM=1`.
 
 ## App wallet boundary
 

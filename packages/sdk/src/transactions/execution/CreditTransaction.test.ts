@@ -69,6 +69,9 @@ it("creates Credit authority without notes, cash, change or funding authorizatio
         outputs: [],
     });
     expect(prepared.preview().creditOutputs).toHaveLength(1);
+    const estimate = prepared.estimateGas();
+    expect(estimate).toMatchObject({ available: true });
+    if (estimate.available) expect(estimate.gasUnits).toBeGreaterThan(0n);
     const ready = await (await externallyAuthorize(prepared)).prove(),
         decoded = iface.parseTransaction(await ready.exportTransaction())!;
     expect(decoded.name).toBe("createCredit");

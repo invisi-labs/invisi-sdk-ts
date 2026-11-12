@@ -1,77 +1,75 @@
 import type { OperationPlan } from "../transactions/operation-types";
 import { estimateGas, type GasShape } from "@invisi-labs/protocol";
 import { operationSources } from "../transactions/preparation/inputs";
-/** A pre-proof documented scenario reference; conditions remain visible in the result. */
+/** Pre-signing preview; the SDK owns both the receipt lookup and fallback model. */
 export function estimateOperationGas(plan: OperationPlan, execution?: "direct" | "aggregate") {
-    let query: GasShape = { kind: plan.kind };
-    const credit = plan.credit;
     if (execution === "aggregate" || plan.statement?.target === "noir-recursive")
         return estimateGas({ kind: "aggregate" });
-    if (credit?.creation)
-        query = { kind: "create-credit", scenario: "first-allocation-empty-tree" };
-    else if (credit?.update)
-        query = { kind: "update-credit", scenario: "after-draw-preserve-usage" };
-    else if (credit?.draw)
+    const credit = plan.credit;
+    let query: GasShape = { kind: plan.kind };
+    const fee =
+        credit?.creation?.feeAmount ??
+        credit?.update?.feeAmount ??
+        credit?.draw?.feeAmount ??
+        credit?.revocation?.feeAmount ??
+        plan.params?.feeAmount ??
+        plan.shieldParams?.feeAmount ??
+        0n;
+    if (credit?.draw) {
         query = {
             kind: "draw-credit",
             capacity: plan.capacity!,
             creditInputs: credit.inputs.length,
             distinctPayers: credit.draw.payers.length,
             sourceTrees: operationSources(plan).length,
-            noteOutputs: 1,
-            creditOutputs: credit.outputs.length,
-            creditCiphertextBytes: 485,
-            noteCiphertextBytes: 160,
-            clueBytes: 68,
-            scenario: "distinct-payers",
         };
-    else if (plan.kind === "transfer")
+    } else if (credit?.revocation) {
+        query = {
+            kind: "revoke-credit",
+            authorization:
+                credit.revocationCaller?.toLowerCase() === credit.revocation.owner.toLowerCase()
+                    ? "direct"
+                    : "unknown",
+        };
+    } else if (plan.kind === "transfer") {
         query = {
             kind: "transact",
             capacity: plan.capacity!,
             noteInputs: plan.inputs.length,
             noteOutputs: plan.outputs.length,
             sourceTrees: operationSources(plan).length,
-            noteCiphertextBytes: 160,
-            clueBytes: 68,
-            scenario: !plan.inputs.length
-                ? "public-funding"
-                : !plan.outputs.length &&
-                    !(plan.funding.amount ?? 0n) &&
-                    !(plan.params?.feeAmount ?? 0n)
-                  ? "withdrawal"
-                  : !(plan.funding.amount ?? 0n) &&
-                      !(plan.params?.withdrawalAmount ?? 0n) &&
-                      !(plan.params?.feeAmount ?? 0n)
-                    ? "private"
-                    : "mixed",
+            deposit: (plan.funding.amount ?? 0n) > 0n,
+            withdrawal: (plan.params?.withdrawalAmount ?? 0n) > 0n,
         };
-    if (credit) {
-        const feeAmount =
-            credit.creation?.feeAmount ??
-            credit.update?.feeAmount ??
-            credit.draw?.feeAmount ??
-            credit.revocation?.feeAmount ??
-            0n;
-        query = {
-            ...query,
-            feeEnabled: feeAmount > 0n,
-            feeMechanism: feeAmount > 0n ? (credit.draw ? "draw-deduction" : "owner-pull") : "none",
-        };
+    } else if (plan.kind === "shield") {
+        query = { kind: "shield", noteOutputs: plan.outputs.length };
     }
-    if (
-        plan.outputs.some(
-            (o) =>
-                (o.delivery.ciphertext.length - 2) / 2 !== 160 ||
-                (o.delivery.clue.length - 2) / 2 !== 68
-        ) ||
-        credit?.outputs.some((o) =>
-            o.deliveries.some(
-                (d) => (d.ciphertext.length - 2) / 2 !== 485 || (d.clue.length - 2) / 2 !== 68
-            )
-        )
-    )
-        return estimateGas({ kind: "unmeasured-delivery-size" });
-    return estimateGas(query);
+    const extraNoteBytes = plan.outputs.reduce(
+        (sum, o) =>
+            sum +
+            Math.max(0, (o.delivery.ciphertext.length - 2) / 2 - 160) +
+            Math.max(0, (o.delivery.clue.length - 2) / 2 - 68),
+        0
+    );
+    const extraCreditBytes =
+        credit?.outputs.reduce(
+            (sum, o) =>
+                sum +
+                o.deliveries.reduce(
+                    (bytes, d) =>
+                        bytes +
+                        Math.max(0, (d.ciphertext.length - 2) / 2 - 485) +
+                        Math.max(0, (d.clue.length - 2) / 2 - 68),
+                    0
+                ),
+            0
+        ) ?? 0;
+    return estimateGas({
+        ...query,
+        feeEnabled: fee > 0n,
+        extraDeliveryBytes: extraNoteBytes + extraCreditBytes,
+        permit: (plan.funding.permit?.deadline ?? 0n) > 0n,
+        fundingSignature: plan.fundingMode === "signature",
+    });
 }
 export type { GasEstimate, GasShape } from "@invisi-labs/protocol";

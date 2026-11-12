@@ -65,7 +65,7 @@ try {
         outputs,
         funding: { payer: alice.address, amount: cashAmount, authorization: "caller" },
     });
-    console.log("Benchmark gas estimate:", prepared.estimateGas());
+    console.log("Local gas estimate:", prepared.estimateGas());
     // No existing notes are spent, so no private spending authorization is needed.
     // Hidden amounts still require a proof; this differs from transparent Shield.
     const ready = await prepared.prove();

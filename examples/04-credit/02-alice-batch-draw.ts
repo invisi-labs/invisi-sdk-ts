@@ -57,7 +57,7 @@ try {
         credits: selected.map((input) => ({ credit: input.commitment, amount: 7n })),
         recipient: alice.receivingAddress,
     });
-    console.log("Benchmark gas estimate:", prepared.estimateGas());
+    console.log("Local gas estimate:", prepared.estimateGas());
 
     // 3. Sign the frozen EIP-712 authorization with ethers.
     const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);

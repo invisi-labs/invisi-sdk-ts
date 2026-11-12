@@ -70,7 +70,7 @@ try {
         tokenAddress,
         outputs: [output],
     });
-    console.log("Benchmark gas estimate:", prepared.estimateGas());
+    console.log("Local gas estimate:", prepared.estimateGas());
 
     // 3. Authorize and prove the main payment; no transaction has been sent.
     const authorization = await prepared.exportWalletAuthorization();

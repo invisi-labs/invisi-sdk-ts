@@ -57,7 +57,8 @@ describe("explicit transactions without a wallet store", () => {
 
         expect(prepared.estimateGas()).toMatchObject({
             source: "benchmark",
-            available: expect.any(Boolean),
+            available: true,
+            gasUnits: expect.any(BigInt),
         });
         expect("getGasReference" in prepared).toBe(false);
         expect(store.readSnapshot).not.toHaveBeenCalled();
