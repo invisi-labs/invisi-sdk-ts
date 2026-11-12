@@ -1,3 +1,4 @@
+import { DecodedRecordCache } from "./decoded-cache";
 import { RecordWalletPersistence, type WalletRecordQuery } from "./record-wallet";
 import { FIELD_MODULUS, normalizeCreditDeliveryState } from "@invisi-labs/primitives";
 import { sha256 } from "@noble/hashes/sha256";
@@ -219,10 +220,14 @@ export class TransactionalWalletStore implements WalletStore {
         options: { persistent: boolean; recentRecords?: number }
     ) {
         this.#records = records;
-        this.#codec = codec;
+        this.#codec = new DecodedRecordCache(codec);
         this.persistent = options.persistent;
         if (isPagedRecords(records))
-            this.#rows = new RecordWalletPersistence(records, codec, options.recentRecords ?? 128);
+            this.#rows = new RecordWalletPersistence(
+                records,
+                this.#codec,
+                options.recentRecords ?? 128
+            );
     }
     async readSnapshot(scope: WalletScope): Promise<WalletState> {
         if (this.#rows) return (await this.#rows.read(scope)).state;

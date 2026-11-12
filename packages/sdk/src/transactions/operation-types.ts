@@ -224,6 +224,7 @@ export interface TransactionInfrastructure {
     transactionTTL?: bigint;
 }
 export interface TransactionRuntime {
+    preparationReads?: import("./preparation/preparation-reads").PreparationReads;
     options: Omit<TransactionInfrastructure, "protocol"> & { protocol: TokenProtocol };
     scope: WalletScope;
     reader: ChainReader;
@@ -239,6 +240,8 @@ export interface OperationAggregateMember extends AggregateMember {
 
 /** Data required while preparing an operation; it does not own persistence or reservations. */
 export interface PreparationRuntime<Result> extends TransactionRuntime {
+    repricing?: boolean;
+    readSummary?(): Promise<Pick<PreparationInventory, "invalidated" | "observedThrough">>;
     readInventory(): Promise<PreparationInventory>;
     complete(plan: OperationPlan): Promise<Result>;
     explicitInputs?: boolean;

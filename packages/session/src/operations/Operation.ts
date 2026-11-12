@@ -255,10 +255,9 @@ export class Operation {
     }
 
     private async signingCurrent(): Promise<void> {
-        await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
-            check(!state.invalidated, "wallet state requires canonical resync");
-            this.current(state.operations[this.id]);
-        });
+        const state = await this.#runtime.store.readSnapshot(this.#runtime.scope);
+        check(!state.invalidated, "wallet requires canonical resync");
+        this.current(state.operations[this.id]);
     }
 
     async exportRevocationAuthorization() {

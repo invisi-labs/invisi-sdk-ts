@@ -1,3 +1,4 @@
+import { mapPreparation } from "./parallel";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress } from "ethers";
 import { InvisiError } from "../../errors";
@@ -68,22 +69,36 @@ export function positiveOutputAmount(payment: NoteOutput, outputIndex?: number):
 /** Shared local preparation checks; private witnesses never enter this object's public records. */
 export class Preparation<Result> {
     readonly #roots = new Map<bigint, Hex>();
+    readonly #rootReads = new Map<bigint, Promise<Membership>>();
+    #inventory: Promise<import("../operation-types").PreparationInventory> | undefined;
+    inventory() {
+        return (this.#inventory ??= this.runtime.readInventory());
+    }
     constructor(readonly runtime: PreparationRuntime<Result>) {}
 
     async frame(requested?: bigint): Promise<PreparationFrame> {
         const { reader, options } = this.runtime;
-        await options.protocol.validateDeployment(reader);
-        const block = await reader.getBlock(await reader.getLatestBlockNumber());
+        const [, block] = await Promise.all([
+            options.protocol.validateDeployment(reader),
+            reader.getLatestBlockNumber().then((number) => reader.getBlock(number)),
+        ]);
         const deadline = requested ?? block.timestamp + (options.transactionTTL ?? 300n);
         if (typeof deadline !== "bigint" || deadline < block.timestamp || deadline >= 1n << 64n) {
             throw new Error("invalid transaction deadline");
         }
-        const state = await this.runtime.readInventory();
+        const state = await (this.runtime.readSummary
+            ? this.runtime.readSummary()
+            : this.inventory());
         if (state.invalidated) {
             throw new Error("wallet requires canonical resync");
         }
         for (const point of [state.observedThrough]) {
-            if (point && (await reader.getBlock(point.number)).hash !== point.hash) {
+            if (
+                point &&
+                (point.number === block.number
+                    ? block.hash
+                    : (await reader.getBlock(point.number)).hash) !== point.hash
+            ) {
                 throw new Error("canonical wallet checkpoint changed; resync required");
             }
         }
@@ -214,6 +229,25 @@ export class Preparation<Result> {
         input: { treeId: bigint; leafIndex: number; commitment: Hex },
         frame: PreparationFrame
     ): Promise<Membership> {
+        const first = this.#rootReads.get(input.treeId);
+        if (first) {
+            await first;
+            return this.readMembership(input, frame);
+        }
+        const pending = this.readMembership(input, frame);
+        this.#rootReads.set(input.treeId, pending);
+        try {
+            return await pending;
+        } catch (error) {
+            this.#rootReads.delete(input.treeId);
+            throw error;
+        }
+    }
+
+    private async readMembership(
+        input: { treeId: bigint; leafIndex: number; commitment: Hex },
+        frame: PreparationFrame
+    ): Promise<Membership> {
         const { options, reader } = this.runtime;
         if (!options.protocolRpc)
             throw new MissingCapabilityError("Protocol RPC membership provider");
@@ -235,7 +269,7 @@ export class Preparation<Result> {
 
     async selectFunds(target: bigint, frame: PreparationFrame, maxInputs = 190) {
         const { scope, options, reader } = this.runtime;
-        const state = await this.runtime.readInventory();
+        const state = await this.inventory();
         if (state.invalidated) {
             throw new Error("wallet requires canonical resync");
         }
@@ -274,7 +308,7 @@ export class Preparation<Result> {
         const inputs: Array<NoteMembership & { commitment: Hex }> = [];
         const sources = new Map<bigint, Hex>();
         const nullifiers: Hex[] = [];
-        for (const input of selected) {
+        const opened = await mapPreparation(selected, async (input) => {
             const note = input.note;
             const c = frame.context;
             if (
@@ -299,22 +333,24 @@ export class Preparation<Result> {
                 throw new Error("source roots do not share a canonical snapshot");
             }
             sources.set(input.treeId, root);
-            inputs.push({
-                note,
-                commitment: input.commitment,
-                treeId: input.treeId,
-                leafIndex: input.leafIndex,
-                path,
-            });
-            nullifiers.push(
-                await nullifier!.compute(
+            return {
+                input: {
+                    note,
+                    commitment: input.commitment,
+                    treeId: input.treeId,
+                    leafIndex: input.leafIndex,
+                    path,
+                },
+                nullifier: await nullifier!.compute(
                     c.chainId,
                     BigInt(c.protocolAddress),
                     input.commitment,
                     input.note.nonce
-                )
-            );
-        }
+                ),
+            };
+        });
+        inputs.push(...opened.map((value) => value.input));
+        nullifiers.push(...opened.map((value) => value.nullifier));
         await this.assertUnspent(nullifiers, frame);
         return {
             inputs,

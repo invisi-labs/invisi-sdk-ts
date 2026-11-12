@@ -56,10 +56,14 @@ export class TokenProtocol {
         if ((options.requireRuntimeProfile ?? true) && !this.expectedRuntimeCodeHash) {
             throw new MissingCapabilityError("trusted deployment profile");
         }
-        if ((await reader.getChainId()) !== this.context.chainId) {
+        const [chainId, code, tokenCode] = await Promise.all([
+            reader.getChainId(),
+            reader.getCode(this.context.protocolAddress),
+            reader.getCode(this.context.tokenAddress),
+        ]);
+        if (chainId !== this.context.chainId) {
             throw new Error("deployment chain mismatch");
         }
-        const code = await reader.getCode(this.context.protocolAddress);
         if (
             !/^0x(?:[0-9a-fA-F]{2})+$/.test(code) ||
             (this.expectedRuntimeCodeHash &&
@@ -67,7 +71,6 @@ export class TokenProtocol {
         ) {
             throw new Error("deployment runtime code profile mismatch");
         }
-        const tokenCode = await reader.getCode(this.context.tokenAddress);
         if (!/^0x(?:[0-9a-fA-F]{2})+$/.test(tokenCode)) {
             throw new Error("token address must have contract code");
         }

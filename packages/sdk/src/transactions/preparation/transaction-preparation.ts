@@ -1,3 +1,5 @@
+import { mapPreparation } from "./parallel";
+import { PreparationReads } from "./preparation-reads";
 import {
     normalizeTransactRequest,
     transactUserPublicInputs,
@@ -29,8 +31,14 @@ export class TransactionPreparation<Result> {
     #intent: import("../../broadcaster/broadcaster-preparation").PreparationIntent | undefined;
     constructor(readonly context: PreparationRuntime<Result>) {
         const complete = context.complete;
+        const reads =
+            context.preparationReads ??
+            new PreparationReads(context.reader, context.options.protocolRpc);
+        const protocolRpc = reads.provider(context.repricing);
         this.context = {
             ...context,
+            reader: reads.reader(context.repricing),
+            options: { ...context.options, ...(protocolRpc ? { protocolRpc } : {}) },
             complete: (plan) => {
                 const intent = this.#intent ? structuredClone(this.#intent) : undefined;
                 if (intent && (intent.kind === "transfer" || intent.kind === "shield")) {
@@ -119,13 +127,12 @@ export class TransactionPreparation<Result> {
             throw new Error("transaction sum exceeds uint135");
         }
         const { context, block, deadline } = frame;
-        const selection = await preparation.selectFunds(
-            total - (funding.funding.amount ?? 0n),
-            frame
-        );
-        const outputs = await Promise.all(
-            payments.map((payment, index) => preparation.output(payment, context, false, index))
-        );
+        const [selection, outputs] = await Promise.all([
+            preparation.selectFunds(total - (funding.funding.amount ?? 0n), frame),
+            mapPreparation(payments, (payment, index) =>
+                preparation.output(payment, context, false, index)
+            ),
+        ]);
         const change = selection.amount + (funding.funding.amount ?? 0n) - total;
         if (change > 0n) {
             outputs.push(await preparation.change(change, context));
@@ -171,15 +178,15 @@ export class TransactionPreparation<Result> {
         const copied = structuredClone(options);
         const preparation = new Preparation(this.runtime(copied.tokenAddress));
         const frame = await preparation.frame(copied.deadline);
-        const funding = await preparation.funding(copied.funding, frame);
         if (copied.outputs.length < 1 || copied.outputs.length > 10) {
             throw new Error("shield requires 1..10 outputs");
         }
-        const outputs = await Promise.all(
-            copied.outputs.map((output, index) =>
+        const [funding, outputs] = await Promise.all([
+            preparation.funding(copied.funding, frame),
+            mapPreparation(copied.outputs, (output, index) =>
                 preparation.output(output, frame.context, false, index)
-            )
-        );
+            ),
+        ]);
         if (
             outputs.reduce((sum, output) => sum + output.amount, 0n) !==
             (funding.funding.amount ?? 0n) - (copied.fee?.amount ?? 0n)

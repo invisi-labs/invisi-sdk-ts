@@ -13,6 +13,7 @@ import { Wallet } from "@invisi-labs/primitives";
 import { prepareWalletRefresh } from "../sync/WalletRefresh";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
+    PreparationReads,
     configureTransactionInfrastructure,
     prepareWithErrors,
     validateTransactionInfrastructure,
@@ -258,6 +259,7 @@ export class WalletSession {
             scope: this.scope,
             store: options.store,
             reader: options.chainReader,
+            preparationReads: new PreparationReads(options.chainReader, options.protocolRpc),
         };
     }
 
@@ -484,6 +486,10 @@ export class WalletSession {
             options: runtime.options,
             scope: runtime.scope,
             reader: runtime.reader,
+            preparationReads: runtime.preparationReads!,
+            ...(runtime.store.readSummary
+                ? { readSummary: () => runtime.store.readSummary!(runtime.scope) }
+                : {}),
             readInventory: () => runtime.store.readSnapshot(runtime.scope),
             complete: (plan) => Operation.prepare(runtime, plan),
         });

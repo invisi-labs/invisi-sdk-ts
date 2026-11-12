@@ -1,3 +1,4 @@
+import { PreparationReads } from "./preparation-reads";
 import { getAddress } from "ethers";
 import { PreparedTransaction } from "../execution/PreparedTransaction";
 import type { CreditInput, NoteInput } from "../explicit-types";
@@ -60,7 +61,9 @@ export function explicitPreparation(
 
     if (inputs.some((input) => input.note.tokenAddress !== BigInt(getAddress(tokenAddress))))
         throw new Error("explicit note token mismatch");
+    const preparationReads = new PreparationReads(options.chainReader!, options.protocolRpc);
     const runtime = {
+        preparationReads,
         options: { ...capabilities, protocol: options.protocol.forToken(tokenAddress) },
         reader: options.chainReader!,
         scope,
@@ -69,15 +72,18 @@ export function explicitPreparation(
         intent: import("../../broadcaster/broadcaster-preparation").PreparationIntent
     ) =>
         import("../../broadcaster/broadcaster-preparation").then(({ prepareIntent }) =>
-            prepareIntent(
-                {
-                    ...runtime,
-                    explicitInputs: true,
-                    ...(data.changeAddress ? { changeAddress: data.changeAddress } : {}),
-                    readInventory: async () => structuredClone(inventory),
-                    complete: async (plan) => plan,
-                },
-                intent
+            preparationReads.reprice((repricing) =>
+                prepareIntent(
+                    {
+                        ...runtime,
+                        repricing,
+                        explicitInputs: true,
+                        ...(data.changeAddress ? { changeAddress: data.changeAddress } : {}),
+                        readInventory: async () => structuredClone(inventory),
+                        complete: async (plan) => plan,
+                    },
+                    intent
+                )
             )
         );
     return new TransactionPreparation<PreparedTransaction>({

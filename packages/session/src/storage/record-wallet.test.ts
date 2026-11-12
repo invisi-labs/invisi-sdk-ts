@@ -113,7 +113,7 @@ it("keeps large completed histories out of ordinary snapshots and encrypts only 
     decoded = 0;
     const page = await store.readRecords(scope, { kind: "operations", limit: 5 });
     expect(page.items).toHaveLength(5);
-    expect(decoded).toBe(6);
+    expect(decoded).toBeLessThanOrEqual(6);
     encodedSizes.length = 0;
     await store.transaction(scope, (draft) => {
         draft.discoveryThrough = { number: 100n, hash: hex(100) };

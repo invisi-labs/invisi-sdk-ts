@@ -80,33 +80,32 @@ export class Protocol {
                           ),
                   }
                 : connection;
-        if ((await reader.getChainId()) !== this.context.chainId)
-            throw new Error("deployment chain mismatch");
-        const code = await reader.getCode(this.context.protocolAddress);
+        const [chainId, code] = await Promise.all([
+            reader.getChainId(),
+            reader.getCode(this.context.protocolAddress),
+        ]);
+        if (chainId !== this.context.chainId) throw new Error("deployment chain mismatch");
         if (
             !/^0x(?:[0-9a-fA-F]{2})+$/.test(code) ||
             (keccak256(code) as Hex) !== this.deployment.protocol.runtimeCodeHash
         )
             throw new Error("protocol runtime code profile mismatch");
-        if (
-            reader.getProtocolVersion &&
-            (await reader.getProtocolVersion(this.context.protocolAddress)) !== 1n
-        )
-            throw new Error("unsupported onchain protocol version");
         const registry = this.deployment.registry;
+        if (registry && !reader.getProtocolAddressRegistry)
+            throw new Error("registry binding reader capability is missing");
+        const [version, binding, registryCode] = await Promise.all([
+            reader.getProtocolVersion?.(this.context.protocolAddress),
+            registry ? reader.getProtocolAddressRegistry!(this.context.protocolAddress) : undefined,
+            registry ? reader.getCode(registry.address) : undefined,
+        ]);
+        if (reader.getProtocolVersion && version !== 1n)
+            throw new Error("unsupported onchain protocol version");
         if (registry) {
-            if (!reader.getProtocolAddressRegistry)
-                throw new Error("registry binding reader capability is missing");
-            if (
-                getAddress(
-                    await reader.getProtocolAddressRegistry(this.context.protocolAddress)
-                ) !== getAddress(registry.address)
-            )
+            if (getAddress(binding!) !== getAddress(registry.address))
                 throw new Error("protocol registry binding mismatch");
-            const registryCode = await reader.getCode(registry.address);
             if (
-                !/^0x(?:[0-9a-fA-F]{2})+$/.test(registryCode) ||
-                keccak256(registryCode) !== registry.runtimeCodeHash
+                !/^0x(?:[0-9a-fA-F]{2})+$/.test(registryCode!) ||
+                keccak256(registryCode!) !== registry.runtimeCodeHash
             )
                 throw new Error("registry runtime code profile mismatch");
         }

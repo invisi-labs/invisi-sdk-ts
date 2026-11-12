@@ -1,3 +1,4 @@
+import { mapPreparation } from "../transactions/preparation/parallel";
 import { NoteOutput } from "../notes/NoteOutput";
 import type {
     CreateCreditParams,
@@ -111,7 +112,7 @@ export class CreditPreparation<Result> {
         role: "owner" | "spender",
         frame: PreparationFrame
     ): Promise<{ input: PreparedCreditInput; nullifier: Hex; source: InputSource }> {
-        const stored = (await this.runtime.readInventory()).credits[commitment + ":" + role];
+        const stored = (await this.#prepare.inventory()).credits[commitment + ":" + role];
         if (!stored || stored.spent !== "unspent" || stored.role !== role) {
             throw new Error(`confirmed unspent ${role} Credit is unavailable`);
         }
@@ -198,22 +199,22 @@ export class CreditPreparation<Result> {
         if (expiry < frame.deadline) throw Error("expiry before request deadline");
         if (!this.runtime.reader.getCreditAllocation)
             throw Error("Credit allocation reader required");
-        const allocation = await this.runtime.reader.getCreditAllocation(
-            frame.context,
-            this.runtime.scope.ownerAddress,
-            frame.context.tokenAddress,
-            frame.block
-        );
-        const spender = await resolveRecipient(
-                options.spender,
-                recipientLookup(this.runtime.options),
-                { field: "spender" }
+        const [allocation, spender, owner] = await Promise.all([
+            this.runtime.reader.getCreditAllocation(
+                frame.context,
+                this.runtime.scope.ownerAddress,
+                frame.context.tokenAddress,
+                frame.block
             ),
-            owner = await resolveRecipient(
+            resolveRecipient(options.spender, recipientLookup(this.runtime.options), {
+                field: "spender",
+            }),
+            resolveRecipient(
                 this.runtime.options.wallet.getReceivingAddress().toString(),
                 recipientLookup(this.runtime.options),
                 { field: "wallet" }
-            );
+            ),
+        ]);
         const output = await this.seal(
             {
                 note: {
@@ -347,12 +348,10 @@ export class CreditPreparation<Result> {
             profile = selectCreditDrawCircuit(options.credits.length);
         if (new Set(options.credits.map((c) => c.credit)).size !== options.credits.length)
             throw Error("duplicate Credit input");
-        const members = await Promise.all(
-            options.credits.map(async (value) => ({
-                ...(await this.input(value.credit, "spender", frame)),
-                value,
-            }))
-        );
+        const members = await mapPreparation(options.credits, async (value) => ({
+            ...(await this.input(value.credit, "spender", frame)),
+            value,
+        }));
         members.sort((a, b) => {
             const x = a.input.state.note,
                 y = b.input.state.note;

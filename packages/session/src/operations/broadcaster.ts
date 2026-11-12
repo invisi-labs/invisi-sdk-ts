@@ -14,10 +14,18 @@ export async function quoteManagedOperation(
     const { prepareIntent, prepareBroadcasterPlan } =
         await import("@invisi-labs/sdk/session-support");
 
-    const reprepare = (intent: import("@invisi-labs/sdk/session-support").PreparationIntent) =>
+    const build = (
+        intent: import("@invisi-labs/sdk/session-support").PreparationIntent,
+        repricing: boolean
+    ) =>
         prepareIntent(
             {
                 options: runtime.options,
+                ...(runtime.preparationReads ? { preparationReads: runtime.preparationReads } : {}),
+                repricing,
+                ...(runtime.store.readSummary
+                    ? { readSummary: () => runtime.store.readSummary!(runtime.scope) }
+                    : {}),
                 scope: runtime.scope,
                 reader: runtime.reader,
                 readInventory: async () => {
@@ -30,6 +38,10 @@ export async function quoteManagedOperation(
             },
             intent
         );
+    const reprepare = (intent: import("@invisi-labs/sdk/session-support").PreparationIntent) =>
+        runtime.preparationReads
+            ? runtime.preparationReads.reprice((reuse) => build(intent, reuse))
+            : build(intent, false);
     const selected = await prepareBroadcasterPlan(snapshot.plan, reprepare, client, options);
     const saved = await runtime.store.transaction(runtime.scope, (state) => {
         const record = state.operations[snapshot.plan.id];

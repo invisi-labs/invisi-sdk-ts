@@ -116,7 +116,7 @@ export async function acceptWalletSignature(plan: OperationPlan, signature: stri
 /** The remote round trip may outlive the nonce or deadline selected during preparation. */
 export async function fundingSigningRequest(
     saved: SavedOperation,
-    runtime: Pick<TransactionRuntime, "reader" | "options">
+    runtime: Pick<TransactionRuntime, "reader" | "options" | "preparationReads">
 ) {
     const plan = saved.plan;
     if (plan.fundingMode !== "signature") {
@@ -125,8 +125,12 @@ export async function fundingSigningRequest(
     if (plan.kind !== "shield" && !saved.proof) {
         throw new Error("proof must precede funding authorization");
     }
-    await runtime.options.protocol.validateDeployment(runtime.reader);
-    const block = await runtime.reader.getBlock(await runtime.reader.getLatestBlockNumber());
+    const [, block] = await Promise.all([
+        runtime.options.protocol.validateDeployment(
+            runtime.preparationReads?.reader() ?? runtime.reader
+        ),
+        runtime.reader.getLatestBlockNumber().then((number) => runtime.reader.getBlock(number)),
+    ]);
     if (block.timestamp > plan.deadline || block.timestamp > (plan.funding.deadline ?? 0n)) {
         throw new Error("funding authorization expired");
     }
@@ -147,7 +151,7 @@ export async function fundingSigningRequest(
 export async function acceptFundingSignature(
     saved: SavedOperation,
     signature: string,
-    runtime: Pick<TransactionRuntime, "reader" | "options">
+    runtime: Pick<TransactionRuntime, "reader" | "options" | "preparationReads">
 ) {
     if (!/^0x(?:[a-fA-F0-9]{2})+$/.test(signature)) {
         throw new Error("invalid EVM funding signature");
