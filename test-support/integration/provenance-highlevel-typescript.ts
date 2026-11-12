@@ -1,7 +1,7 @@
 import { EthersChainReader } from "@invisi-labs/sdk/ethers";
 /** Owned-chain acceptance: normal SDK preparation with a real local wallet host and genuine provers. */
 import assert from "node:assert/strict";
-import { readFile, open, writeFile } from "node:fs/promises";
+import { readFile, open, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import {
     AbiCoder,
@@ -68,6 +68,31 @@ globalThis.fetch = async (url, options) => {
             "provenance_evaluateTransaction",
             "SDK must leave Source preflight submission to the Broadcaster"
         );
+        if (request.method === "broadcaster_submitTransaction" && config.submitBarrier) {
+            await writeFile(
+                join(config.submitBarrier.directory, `${config.submitBarrier.member}.ready`),
+                "ready",
+                { mode: 0o600 }
+            );
+            let peersReady = false;
+            for (let attempt = 0; attempt < 2400; attempt++) {
+                try {
+                    await Promise.all(
+                        config.submitBarrier.members.map((member: string) =>
+                            access(join(config.submitBarrier.directory, `${member}.ready`))
+                        )
+                    );
+                    peersReady = true;
+                    break;
+                } catch {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                }
+            }
+            assert(
+                peersReady,
+                "both SDK members must finish Source preparation before simultaneous submission"
+            );
+        }
         events.push(`rpc:${request.method}`);
         publicRequests.push({
             method: request.method,
@@ -212,6 +237,14 @@ try {
         amount: BigInt(config.recipientAmount),
         recipient: { type: "invisi", address: recipientHost.getAddress() },
     });
+    const ownedOutput = config.selfOutputAmount
+        ? await NoteOutput.create({
+              ...protocol.context,
+              tokenAddress: config.tokenAddress,
+              amount: BigInt(config.selfOutputAmount),
+              recipient: { type: "invisi", address: host.getAddress() },
+          })
+        : undefined;
     const latest = await provider.getBlock("latest");
     assert(latest);
     const prepared = await invisi.prepareTransfer({
@@ -220,7 +253,7 @@ try {
         tokenAddress: config.tokenAddress,
         deadline: BigInt(latest.timestamp) + 600n,
         inputs: [input],
-        outputs: [output],
+        outputs: ownedOutput ? [output, ownedOutput] : [output],
     });
     const relay = new BroadcasterClient({
         endpoint: config.broadcaster.endpoint,
@@ -332,7 +365,7 @@ try {
             !["reverted", "uncertain", "rejected", "expired"].includes(status.state),
             JSON.stringify(status)
         );
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
         status = await relay.status(accepted.id);
     }
     assert.equal(status.state, "confirmed");
@@ -357,6 +390,16 @@ try {
     }
     assert.equal(nativeConfirmation.level, "finalized");
     assert.equal(nativeConfirmation.status, "available");
+    for (let attempt = 0; status.confirmation?.level !== "finalized" && attempt < 120; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        status = await relay.status(accepted.id);
+    }
+    assert.equal(
+        status.confirmation?.level,
+        "finalized",
+        "Broadcaster follows native finality after receipt"
+    );
+    assert.equal(status.confirmation?.status, "available");
     const receipt = await provider.getTransactionReceipt(status.transactionHash);
     const tx = await provider.getTransaction(status.transactionHash);
     assert(receipt && receipt.status === 1 && tx);
@@ -365,23 +408,55 @@ try {
     } else {
         const aggregate = abi.parseTransaction({ data: tx.data });
         assert(aggregate && aggregate.fragment.inputs[1]?.baseType === "array");
-        assert.equal(aggregate.args[1].length, 1, "single-member server fallback expected");
+        assert.equal(aggregate.args[1].length, config.expectedBatchSize ?? 1);
+        const memberIndex = aggregate.args[1].findIndex(
+            (request: any) =>
+                abi
+                    .encodeFunctionData(single, [ready.exportProof().proofHex, request])
+                    .toLowerCase() === transaction.data.toLowerCase()
+        );
+        assert(memberIndex >= 0, "own member occurs in actual outer transaction");
+        assert.equal(
+            aggregate.args[1].filter(
+                (request: any) =>
+                    abi
+                        .encodeFunctionData(single, [ready.exportProof().proofHex, request])
+                        .toLowerCase() === transaction.data.toLowerCase()
+            ).length,
+            1,
+            "own member occurs exactly once"
+        );
         assert.equal(
             abi
-                .encodeFunctionData(single, [ready.exportProof().proofHex, aggregate.args[1][0]])
+                .encodeFunctionData(single, [
+                    ready.exportProof().proofHex,
+                    aggregate.args[1][memberIndex],
+                ])
                 .toLowerCase(),
             transaction.data.toLowerCase()
         );
     }
     assert.equal(tx.to?.toLowerCase(), config.scope.protocolAddress);
     assert.equal((await provider.getBlock(receipt.blockNumber))?.hash, receipt.blockHash);
+    const operationIndex =
+        quote.quote.execution === "aggregate"
+            ? abi
+                  .parseTransaction({ data: tx.data })!
+                  .args[1].findIndex(
+                      (request: any) =>
+                          abi
+                              .encodeFunctionData(single, [ready.exportProof().proofHex, request])
+                              .toLowerCase() === transaction.data.toLowerCase()
+                  )
+                  .toString()
+            : "0";
     let operation: Record<string, unknown> = {};
     for (let attempt = 0; attempt < 180; attempt++) {
         try {
             operation = await client.getOperationRecognition({
                 txHash: tx.hash,
                 blockHash: receipt.blockHash,
-                operationIndex: "0",
+                operationIndex,
             });
         } catch (error) {
             if (!(error instanceof Error) || error.message !== "Provenance HTTP 404") throw error;
@@ -394,7 +469,11 @@ try {
     }
     assert.equal(operation.recognitionState, "recognized");
     const recognition = operation.recognition as Record<string, unknown>;
-    assert.equal(recognition.checkpointSequence, config.expectedSourceCheckpoint ?? "2");
+    if (config.minimumSourceCheckpoint)
+        assert(
+            BigInt(String(recognition.checkpointSequence)) >= BigInt(config.minimumSourceCheckpoint)
+        );
+    else assert.equal(recognition.checkpointSequence, config.expectedSourceCheckpoint ?? "2");
     assert(
         !publicRequests.some((request) =>
             ["provenance_getMembership", "provenance_getNoteRecognition"].includes(request.method)
@@ -442,6 +521,8 @@ try {
         walletAuthorizations,
         recognition: operation,
         transactionHash: tx.hash,
+        operationIndex,
+        ownedOutputCommitments: ownedOutput ? [ownedOutput.commitment] : [],
         calldataHash: keccak256(tx.data),
         sourceCheckpoint: recognition.checkpointSequence,
         outputCommitments: ready.getOutputs().map((item) => item.commitment),
@@ -451,7 +532,7 @@ try {
             .map((item) => item.commitment),
         recipientCommitments: ready
             .getOutputs()
-            .filter((item) => !item.change)
+            .filter((item) => !item.change && item.commitment !== ownedOutput?.commitment)
             .map((item) => item.commitment),
         quoteBeforeAuthorizationAndMainProof: true,
         publicRequests,

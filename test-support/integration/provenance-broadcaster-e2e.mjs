@@ -217,7 +217,7 @@ try {
         fromBlock,
         chainId: "31337",
     });
-    const amount = 100000000000000000n,
+    const amount = options.highlevel ? 1000000000000000000n : 100000000000000000n,
         wallet = await fixtureWallet(1),
         sourceNote = {
             ownerAddress: wallet.ownerAddress,
@@ -510,6 +510,23 @@ try {
                             validUntil: new Date(Date.now() + 3600000).toISOString(),
                         },
                     },
+                    ...(options.highlevel
+                        ? {
+                              aggregation: {
+                                  enabled: true,
+                                  bbPath: join(root, ".tools/bb/bb"),
+                                  noirExecutePath: join(root, ".tools/noir/noir-execute"),
+                                  threads: 4,
+                                  maxWaitSeconds: 5,
+                                  proofTimeoutSeconds: 60,
+                                  activityWindowSeconds: 300,
+                                  minRecentActivity: 1,
+                                  pollIntervalMillis: 100,
+                                  minDeadlineSlackSeconds: 5,
+                                  maxBatchGas: 30000000,
+                              },
+                          }
+                        : {}),
                     provenance: {
                         enabled: true,
                         endpoint: serviceURL,
@@ -632,7 +649,8 @@ try {
                 tokenAddress: tokens[0].toLowerCase(),
                 sourceCommitment: shieldRequest.params.noteCommitments[0],
                 maxFeeAmount: (amount / 2n).toString(),
-                recipientAmount: (amount / 10n).toString(),
+                recipientAmount: (amount / 100n).toString(),
+                selfOutputAmount: (amount / 4n).toString(),
             });
             const sdkRoot = join(repoRoot, "invisi-sdk-ts");
             const child = start(
@@ -667,7 +685,12 @@ try {
                 1,
                 "first payment must retain recognized change"
             );
-            if (bcStatus.provenance.aggregateSupported === true) {
+            assert.equal(
+                bcStatus.provenance.aggregateSupported,
+                true,
+                "native aggregation must be enabled"
+            );
+            {
                 step("normal-sdk-async-aggregate-single-fallback");
                 const aggregateOutput = join(directory, "aggregate-highlevel");
                 mkdirSync(aggregateOutput, { recursive: true, mode: 0o700 });
@@ -680,6 +703,7 @@ try {
                         sourceCommitment: result.changeCommitments[0],
                         knownOtherRecipientCommitments: result.recipientCommitments,
                         execution: "aggregate",
+                        selfOutputAmount: undefined,
                         expectedSourceCheckpoint: "3",
                     }),
                     { mode: 0o600 }
@@ -715,11 +739,85 @@ try {
                 assert.equal(aggregateResult.execution, "aggregate");
                 assert.equal(aggregateResult.manualSidecarsAtCaller, false);
                 report.highlevelAggregate = aggregateResult;
-            } else {
-                report.highlevelAggregate = {
-                    skipped: true,
-                    reason: "Broadcaster does not advertise aggregation support",
-                };
+                step("normal-sdk-two-member-native-aggregate");
+                const batchRoot = join(directory, "aggregate-two-member");
+                mkdirSync(batchRoot, { recursive: true, mode: 0o700 });
+                const sourceCommitments = [
+                    aggregateResult.changeCommitments[0],
+                    result.ownedOutputCommitments[0],
+                ];
+                assert(sourceCommitments.every(Boolean));
+                const members = ["alice-a", "alice-b"];
+                const batchChildren = members.map((member, index) => {
+                    const output = join(batchRoot, member);
+                    mkdirSync(output, { recursive: true, mode: 0o700 });
+                    const fixture = join(output, "fixture.json");
+                    writeFileSync(
+                        fixture,
+                        json({
+                            ...JSON.parse(readFileSync(fixturePath)),
+                            output,
+                            selfOutputAmount: undefined,
+                            sourceCommitment: sourceCommitments[index],
+                            knownOtherRecipientCommitments: [
+                                ...result.recipientCommitments,
+                                ...aggregateResult.recipientCommitments,
+                            ],
+                            execution: "aggregate",
+                            expectedBatchSize: 2,
+                            minimumSourceCheckpoint: "4",
+                            submitBarrier: { directory: batchRoot, member, members },
+                        }),
+                        { mode: 0o600 }
+                    );
+                    return start(
+                        join(sdkRoot, "examples/node_modules/.bin/tsx"),
+                        [
+                            fileURLToPath(
+                                new URL("./provenance-highlevel-typescript.ts", import.meta.url)
+                            ),
+                            "--execute",
+                            "--submit",
+                        ],
+                        sdkRoot,
+                        `highlevel-batch-${member}`,
+                        { INVISI_HIGHLEVEL_FIXTURE: fixture, NODE_EXTRA_CA_CERTS: certPath }
+                    );
+                });
+                await Promise.all(
+                    batchChildren.map(
+                        (child) =>
+                            new Promise((resolve, reject) =>
+                                child.once("exit", (code) =>
+                                    code === 0
+                                        ? resolve()
+                                        : reject(Error("two-member SDK flow failed " + code))
+                                )
+                            )
+                    )
+                );
+                batchChildren.forEach((child) => children.splice(children.indexOf(child), 1));
+                const batchResults = members.map((member) =>
+                    JSON.parse(readFileSync(join(batchRoot, member, "highlevel-typescript.json")))
+                );
+                assert(
+                    batchResults.every(
+                        (member) =>
+                            member.complete &&
+                            member.execution === "aggregate" &&
+                            member.manualSidecarsAtCaller === false
+                    )
+                );
+                assert.equal(
+                    batchResults[0].transactionHash,
+                    batchResults[1].transactionHash,
+                    "both independently proven members share exactly one real outer transaction"
+                );
+                assert.deepEqual(batchResults.map((member) => member.operationIndex).sort(), [
+                    "0",
+                    "1",
+                ]);
+                report.highlevelAggregateBatch = batchResults;
             }
             Object.assign(report, {
                 realBroadcaster: true,
