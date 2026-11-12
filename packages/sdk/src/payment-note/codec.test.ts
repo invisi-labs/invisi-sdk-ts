@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { FIELD_MODULUS, computeNoteIdentity, computeNoteCommitment } from "@invisi-labs/primitives";
 import { encodePaymentNote, decodePaymentNote } from "./codec";
 import { PaymentNote } from "./PaymentNote";
+import parity from "./testdata/payment-notes.json";
 const address = "0x1111111111111111111111111111111111111111" as const;
 const hex = (n: bigint) => `0x${n.toString(16).padStart(64, "0")}` as const;
 const data = {
@@ -50,4 +51,14 @@ it("validates commitment preimages before exposing a PaymentNote", async () => {
     await expect(PaymentNote.from(encodePaymentNote({ ...original, amount: 71n }))).rejects.toThrow(
         /commitment/
     );
+});
+
+it("matches the shared Go and Rust portable Note vectors byte for byte", async () => {
+    for (const vector of parity) {
+        const note = await PaymentNote.from(vector.encoded);
+        expect(note.ipn, vector.name).toBe(vector.encoded);
+        expect(encodePaymentNote(decodePaymentNote(vector.encoded)), vector.name).toBe(
+            vector.encoded
+        );
+    }
 });
