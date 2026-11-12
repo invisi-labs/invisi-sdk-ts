@@ -1,3 +1,4 @@
+import type { PreparationCapture } from "./preparation-capture";
 import { mergeCoverage } from "../public-history/coverage";
 import { certifiedHistoryBatch, certifyHistoryBatch } from "../public-history/authentication";
 import { historyPosition } from "../public-history/store";
@@ -50,9 +51,17 @@ const position = (treeId: bigint, leafIndex: number) => `${treeId}:${leafIndex}`
 
 /** Authenticates indexed candidates before updating private wallet state. */
 export class WalletUpdater extends InventoryProcessor {
-    readonly #options: InventoryOptions & { protocolRpc: ProtocolDataProvider };
+    readonly #options: InventoryOptions & {
+        protocolRpc: ProtocolDataProvider;
+        preparationCapture?: PreparationCapture;
+    };
 
-    constructor(options: InventoryOptions & { protocolRpc: ProtocolDataProvider }) {
+    constructor(
+        options: InventoryOptions & {
+            protocolRpc: ProtocolDataProvider;
+            preparationCapture?: PreparationCapture;
+        }
+    ) {
         super(options);
         this.#options = { ...options };
         check(
@@ -237,6 +246,7 @@ export class WalletUpdater extends InventoryProcessor {
                     record,
                     proof
                 );
+                this.#options.preparationCapture?.rememberMembership(record, proof);
             }
             const allNotes = {
                 ...base.notes,

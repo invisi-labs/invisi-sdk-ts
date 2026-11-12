@@ -1,3 +1,7 @@
+import {
+    createPreparationCapture,
+    registerPreparationHistoryCapture,
+} from "../sync/preparation-capture";
 import { highestGap } from "./coverage";
 import type { ChainReader, CanonicalBlock, ProtocolDataProvider } from "@invisi-labs/protocol";
 import type { Protocol } from "@invisi-labs/rpc";
@@ -79,6 +83,7 @@ const coordinators = new WeakMap<PublicHistoryStore, Map<string, Coordinator>>()
 export class PublicHistory {
     readonly scope: PublicHistoryScope;
     readonly key: string;
+    readonly #preparationCapture = createPreparationCapture();
     #coordinator: Coordinator;
     constructor(
         readonly options: {
@@ -88,6 +93,7 @@ export class PublicHistory {
             protocolRpc: ProtocolDataProvider;
         }
     ) {
+        registerPreparationHistoryCapture(this, this.#preparationCapture);
         this.scope = Object.freeze(historyScope(options.protocol));
         this.key = publicScopeKey(this.scope);
         let scopes = coordinators.get(options.store);
@@ -227,6 +233,7 @@ export class PublicHistory {
                 : indexed.number;
         const known = height > indexed.number ? await reader.getBlock(height) : indexed;
         await this.options.store.noteHead(this.scope, indexed, known);
+        if (this.#preparationCapture) this.#preparationCapture.anchor = structuredClone(known);
     }
     private async synchronizeResume(
         settings: Omit<PublicSyncOptions, "signal" | "onProgress">
@@ -234,7 +241,9 @@ export class PublicHistory {
         const size = settings.pageSize ?? 100;
         if (!Number.isInteger(size) || size < 1 || size > 256)
             throw Error("public page size must be 1..256");
-        await this.options.protocol.validateDeployment(this.options.reader);
+        await this.options.protocol.validateDeployment(
+            this.#preparationCapture?.reader(this.options.reader) ?? this.options.reader
+        );
         const before = await this.reconcile();
         const status = await this.options.protocolRpc.getStatus(this.options.protocol.context);
         await this.observeHead(status);
@@ -274,7 +283,8 @@ export class PublicHistory {
         settings: Omit<PublicSyncOptions, "signal" | "onProgress">,
         capture?: (page: PublicHistoryPage, generation: number) => void
     ) {
-        const { protocol, reader, protocolRpc, store } = this.options;
+        const { protocol, protocolRpc, store } = this.options;
+        const reader = this.#preparationCapture?.reader(this.options.reader) ?? this.options.reader;
         const size = settings.pageSize ?? 100;
         if (!Number.isSafeInteger(size) || size < 1 || size > 256)
             throw Error("public page size must be 1..256");
@@ -394,6 +404,7 @@ export class PublicHistory {
                     candidate,
                     proof
                 );
+                this.#preparationCapture?.rememberMembership(candidate, proof);
                 verifiedPositions.add(key);
             }
             if ((await reader.getBlock(end)).hash !== block.hash)

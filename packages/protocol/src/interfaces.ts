@@ -23,6 +23,12 @@ export interface CanonicalReceipt {
     status?: "success" | "reverted";
 }
 export interface ChainReader {
+    getTokenBalanceAllowance?(
+        context: DeploymentContext,
+        owner: Address,
+        token: Address,
+        block: CanonicalBlock
+    ): Promise<{ balance: bigint; allowance: bigint }>;
     getCreditAllocation?(
         context: DeploymentContext,
         owner: Address,

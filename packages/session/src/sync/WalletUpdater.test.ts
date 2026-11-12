@@ -1286,3 +1286,18 @@ it("does not clear pending Credit recovery when a caller requests an older snaps
     expect((await h.store.readSnapshot(h.a.scope)).creditReplayTarget?.number).toBe(16n);
     expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBe(12n);
 });
+
+it("retains normal-sync authenticated memberships without querying their paths or spent state twice", async () => {
+    const h = await sharedHarness();
+    h.reader.getFundingNonce = async () => 0n;
+    const code = vi.spyOn(h.reader, "getCode");
+    await h.a.synchronizeHistory({ toBlock: 16n, pageSize: 2 });
+    expect(h.rpc.getMembership).toHaveBeenCalledTimes(1);
+    const codeReads = code.mock.calls.length;
+    await h.a.scanHistory(testDecryptor);
+    expect(h.rpc.getMembership).toHaveBeenCalledTimes(1);
+    expect(h.reader.isSpent).toHaveBeenCalledTimes(1);
+    // Deployment code authenticated during this canonical public sync is reused privately.
+    expect(code.mock.calls.slice(codeReads).map(([address]) => address)).toEqual([token]);
+    expect((await h.store.readSnapshot(h.a.scope)).preparationSnapshot).toBeDefined();
+});

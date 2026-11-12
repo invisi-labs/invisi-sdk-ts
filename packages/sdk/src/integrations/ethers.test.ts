@@ -191,3 +191,28 @@ it("reports a receipt reorg as inconsistent native transaction progress", async 
     } as any);
     expect((await readTransactionConfirmation(reader, word(9n))).status).toBe("inconsistent");
 });
+
+it("reads token balance and protocol allowance together at the canonical submission block", async () => {
+    const abi = new Interface([
+        "function balanceOf(address) view returns(uint256)",
+        "function allowance(address,address) view returns(uint256)",
+    ]);
+    const call = vi.fn(async (request: { data: string; blockTag: bigint }) =>
+        request.data.startsWith(abi.getFunction("balanceOf")!.selector)
+            ? abi.encodeFunctionResult("balanceOf", [100n])
+            : abi.encodeFunctionResult("allowance", [40n])
+    );
+    const reader = new EthersChainReader(provider({ getBlock: async () => block, call }));
+    expect(await reader.getTokenBalanceAllowance(context, address, token, block)).toEqual({
+        balance: 100n,
+        allowance: 40n,
+    });
+    const allowance = call.mock.calls.find(([request]) =>
+        request.data.startsWith(abi.getFunction("allowance")!.selector)
+    )![0];
+    expect(abi.decodeFunctionData("allowance", allowance.data).slice()).toEqual([
+        address,
+        context.protocolAddress,
+    ]);
+    expect(call.mock.calls.every(([request]) => request.blockTag === block.number)).toBe(true);
+});

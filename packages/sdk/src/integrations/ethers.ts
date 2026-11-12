@@ -263,6 +263,30 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
         );
     }
 
+    async getTokenBalanceAllowance(
+        context: DeploymentContext,
+        owner: Address,
+        token: Address,
+        block: CanonicalBlock
+    ) {
+        const abi = [
+            "function balanceOf(address) view returns(uint256)",
+            "function allowance(address,address) view returns(uint256)",
+        ];
+        const [balance, allowance] = await Promise.all([
+            this.read(context, token, abi, "balanceOf", [getAddress(owner)], block),
+            this.read(
+                context,
+                token,
+                abi,
+                "allowance",
+                [getAddress(owner), getAddress(context.protocolAddress)],
+                block
+            ),
+        ]);
+        return { balance: number(balance), allowance: number(allowance) };
+    }
+
     async getFundingNonce(context: DeploymentContext, payer: Address, block: CanonicalBlock) {
         return number(
             await this.read(

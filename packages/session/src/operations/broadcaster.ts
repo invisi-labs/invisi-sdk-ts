@@ -23,6 +23,9 @@ export async function quoteManagedOperation(
                 options: runtime.options,
                 ...(runtime.preparationReads ? { preparationReads: runtime.preparationReads } : {}),
                 repricing,
+                ...(snapshot.plan.submissionValidation
+                    ? { preparationTime: BigInt(Math.floor(Date.now() / 1000)) }
+                    : {}),
                 ...(runtime.store.readSummary
                     ? { readSummary: () => runtime.store.readSummary!(runtime.scope) }
                     : {}),
@@ -34,7 +37,12 @@ export async function quoteManagedOperation(
                         if (owner === snapshot.plan.id) delete state.reservations[key];
                     return state;
                 },
-                complete: async (plan) => plan,
+                complete: async (plan) => ({
+                    ...plan,
+                    ...(snapshot.plan.submissionValidation
+                        ? { submissionValidation: "required" as const }
+                        : {}),
+                }),
             },
             intent
         );

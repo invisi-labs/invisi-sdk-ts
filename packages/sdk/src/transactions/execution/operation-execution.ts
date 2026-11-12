@@ -84,7 +84,13 @@ export async function signOperationFunding(
         throw new Error("funding signer is not the payer");
     const typed = await fundingTypedData(saved);
     const signature = await signer.signTypedData(structuredClone(typed));
-    return verifyFundingSignature(typed, payer, signature, verifier);
+    return verifyFundingSignature(
+        typed,
+        payer,
+        signature,
+        verifier,
+        saved.plan.submissionValidation === "required"
+    );
 }
 
 /** Export only typed commitments, never private note openings or authorization witnesses. */
@@ -125,23 +131,25 @@ export async function fundingSigningRequest(
     if (plan.kind !== "shield" && !saved.proof) {
         throw new Error("proof must precede funding authorization");
     }
+    if (plan.submissionValidation) return createSigningRequest(await fundingTypedData(saved));
+    const signingReader = runtime.reader;
     const [, block] = await Promise.all([
         runtime.options.protocol.validateDeployment(
             runtime.preparationReads?.reader() ?? runtime.reader
         ),
-        runtime.reader.getLatestBlockNumber().then((number) => runtime.reader.getBlock(number)),
+        signingReader.getLatestBlockNumber().then((number) => signingReader.getBlock(number)),
     ]);
     if (block.timestamp > plan.deadline || block.timestamp > (plan.funding.deadline ?? 0n)) {
         throw new Error("funding authorization expired");
     }
     if (
-        (await runtime.reader.getFundingNonce(plan.context, plan.funding.payer!, block)) !==
+        (await signingReader.getFundingNonce(plan.context, plan.funding.payer!, block)) !==
         plan.funding.sigNonce
     ) {
         throw new Error("funding nonce changed; prepare again");
     }
     const request = createSigningRequest(await fundingTypedData(saved));
-    if ((await runtime.reader.getBlock(block.number)).hash !== block.hash) {
+    if ((await signingReader.getBlock(block.number)).hash !== block.hash) {
         throw new Error("canonical funding block changed");
     }
     return request;
@@ -161,7 +169,8 @@ export async function acceptFundingSignature(
         request,
         saved.plan.funding.payer!,
         signature,
-        runtime.options.fundingVerifier
+        runtime.options.fundingVerifier,
+        saved.plan.submissionValidation === "required"
     );
 }
 
@@ -169,7 +178,8 @@ async function verifyFundingSignature(
     request: FundingTypedData,
     payer: `0x${string}`,
     signature: string,
-    verifier?: FundingAuthorizationVerifier
+    verifier?: FundingAuthorizationVerifier,
+    localEOA = false
 ) {
     if (!/^0x(?:[a-fA-F0-9]{2})+$/.test(signature)) {
         throw new Error("invalid EVM funding signature");
@@ -189,13 +199,15 @@ async function verifyFundingSignature(
     } catch {
         validEOA = false;
     }
-    const valid = verifier
-        ? await verifier.verifyTypedData({
-              ...structuredClone(request),
-              address: payer,
-              signature: signature as `0x${string}`,
-          })
-        : validEOA;
+    const valid =
+        (localEOA && validEOA) ||
+        (verifier
+            ? await verifier.verifyTypedData({
+                  ...structuredClone(request),
+                  address: payer,
+                  signature: signature as `0x${string}`,
+              })
+            : validEOA);
     if (valid !== true) {
         throw new Error("invalid EVM funding signature");
     }

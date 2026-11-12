@@ -9,17 +9,22 @@ export async function revocationSigningRequest(
 ) {
     const params = plan.credit?.revocation;
     if (!params) throw Error("operation is not a public Credit revocation");
+    if (plan.submissionValidation)
+        return createSigningRequest(
+            encodeRevokeCreditTypedData({ ...plan.context, now: plan.preparedAt.timestamp }, params)
+        );
+    const signingReader = runtime.reader;
     const [, block] = await Promise.all([
         runtime.options.protocol.validateDeployment(
             runtime.preparationReads?.reader() ?? runtime.reader
         ),
-        runtime.reader.getLatestBlockNumber().then((number) => runtime.reader.getBlock(number)),
+        signingReader.getLatestBlockNumber().then((number) => signingReader.getBlock(number)),
     ]);
     if (block.timestamp > params.deadline) throw Error("revocation authorization expired");
     const request = createSigningRequest(
         encodeRevokeCreditTypedData({ ...plan.context, now: block.timestamp }, params)
     );
-    if ((await runtime.reader.getBlock(block.number)).hash !== block.hash)
+    if ((await signingReader.getBlock(block.number)).hash !== block.hash)
         throw Error("canonical revocation block changed");
     return request;
 }

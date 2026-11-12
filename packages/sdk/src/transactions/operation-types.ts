@@ -170,6 +170,7 @@ export interface CreditPlan {
 }
 export interface OperationPlan {
     intent?: import("../broadcaster/broadcaster-preparation").PreparationIntent;
+    submissionValidation?: "required";
     version: 1;
     id: string;
     kind:
@@ -241,6 +242,7 @@ export interface OperationAggregateMember extends AggregateMember {
 /** Data required while preparing an operation; it does not own persistence or reservations. */
 export interface PreparationRuntime<Result> extends TransactionRuntime {
     repricing?: boolean;
+    preparationTime?: bigint;
     readSummary?(): Promise<Pick<PreparationInventory, "invalidated" | "observedThrough">>;
     readInventory(): Promise<PreparationInventory>;
     complete(plan: OperationPlan): Promise<Result>;

@@ -87,7 +87,7 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
     const credit = plan.credit;
     if (credit?.inputs.some((i) => now > i.state.note.expiry)) return true;
     if (credit?.draw) {
-        const prepared = creditPeriods(plan.preparedAt.timestamp),
+        const prepared = creditPeriods(plan.context.now ?? plan.preparedAt.timestamp),
             current = creditPeriods(now);
         if (
             prepared.currentDay !== current.currentDay ||

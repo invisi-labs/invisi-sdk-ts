@@ -14,6 +14,10 @@ import { prepareWalletRefresh } from "../sync/WalletRefresh";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     PreparationReads,
+    MissingPreparationSnapshotData,
+    preparationDeployment,
+    snapshotInfrastructure,
+    type PreparationSnapshot,
     configureTransactionInfrastructure,
     prepareWithErrors,
     validateTransactionInfrastructure,
@@ -71,12 +75,41 @@ export class WalletSession {
 
     private ready(): Promise<void> {
         if (!this.#validation) {
-            this.#validation = validateTransactionInfrastructure(this.#options).catch((error) => {
+            this.#validation = this.validateInfrastructure().catch((error) => {
                 this.#validation = undefined;
                 throw error;
             });
         }
         return this.#validation;
+    }
+
+    private async cachedPreparation(): Promise<PreparationSnapshot | undefined> {
+        const store = this.#options.store;
+        if (!store || !this.#history) return undefined;
+        const state = await fenceHistory(this.publicHistory, store, this.scope, true);
+        if (state.invalidated) return undefined;
+        const snapshot = state.preparationSnapshot;
+        if (!snapshot) return undefined;
+        if (
+            snapshot.version !== 1 ||
+            snapshot.deployment !== preparationDeployment(this.protocol.deployment)
+        )
+            throw Error("preparation snapshot deployment mismatch; refresh online");
+        if (
+            snapshot.generation !== state.publicHistoryGeneration ||
+            snapshot.observation?.number !== state.observedThrough?.number ||
+            snapshot.observation?.hash !== state.observedThrough?.hash
+        )
+            return undefined;
+        return snapshot;
+    }
+    private async validateInfrastructure() {
+        const snapshot = await this.cachedPreparation();
+        if (snapshot) {
+            await this.protocol.validateDeployment(
+                snapshotInfrastructure(snapshot, this.#options.chainReader!).reader
+            );
+        } else await validateTransactionInfrastructure(this.#options);
     }
 
     constructor(configuration: WalletSessionOptions) {
@@ -222,6 +255,7 @@ export class WalletSession {
                 if (!state.operations[operation.id])
                     throw new Error("operation does not belong to this wallet session");
             }
+            if (operation) await operation.validateSubmission();
             const call = operation ? await operation.exportTransaction() : plain!;
             const transaction = await signer.sendTransaction({
                 ...overrides,
@@ -480,54 +514,96 @@ export class WalletSession {
         return result;
     }
 
-    private preparation(tokenAddress: Hex): TransactionPreparation<Operation> {
+    private async preparation(
+        tokenAddress: Hex,
+        fresh = false
+    ): Promise<TransactionPreparation<Operation>> {
         const runtime = this.runtime(tokenAddress);
+        const snapshot = fresh ? undefined : await this.cachedPreparation();
+        const cached = snapshot
+            ? snapshotInfrastructure(snapshot, runtime.reader, runtime.options.protocolRpc)
+            : undefined;
+        if (cached) {
+            runtime.preparationReads = new PreparationReads(cached.reader, cached.rpc);
+        }
         return new TransactionPreparation({
             options: runtime.options,
             scope: runtime.scope,
             reader: runtime.reader,
             preparationReads: runtime.preparationReads!,
+            ...(cached ? { preparationTime: BigInt(Math.floor(Date.now() / 1000)) } : {}),
             ...(runtime.store.readSummary
                 ? { readSummary: () => runtime.store.readSummary!(runtime.scope) }
                 : {}),
             readInventory: () => runtime.store.readSnapshot(runtime.scope),
-            complete: (plan) => Operation.prepare(runtime, plan),
+            complete: (plan) =>
+                Operation.prepare(runtime, {
+                    ...plan,
+                    ...(cached ? { submissionValidation: "required" as const } : {}),
+                }),
         });
+    }
+    async #prepareUsingSnapshot(
+        tokenAddress: Hex,
+        work: (preparation: TransactionPreparation<Operation>) => Promise<Operation>
+    ): Promise<Operation> {
+        try {
+            return await work(await this.preparation(tokenAddress));
+        } catch (error) {
+            let cause: unknown = error;
+            for (let depth = 0; depth < 8 && cause instanceof Error; depth++, cause = cause.cause) {
+                if (cause instanceof MissingPreparationSnapshotData)
+                    return work(await this.preparation(tokenAddress, true));
+            }
+            throw error;
+        }
     }
     async prepareTransfer(options: TransferPreparation): Promise<Operation> {
         return prepareWithErrors("prepareTransfer", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareTransfer(options);
+            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
+                preparation.prepareTransfer(options)
+            );
         });
     }
     async prepareShield(options: ShieldPreparation): Promise<Operation> {
         return prepareWithErrors("prepareShield", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareShield(options);
+            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
+                preparation.prepareShield(options)
+            );
         });
     }
     async prepareCreateCredit(options: CreateCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareCreateCredit", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareCreateCredit(options);
+            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
+                preparation.prepareCreateCredit(options)
+            );
         });
     }
     async prepareDrawCredit(options: DrawCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareDrawCredit", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareDrawCredit(options);
+            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
+                preparation.prepareDrawCredit(options)
+            );
         });
     }
     async prepareUpdateCredit(options: UpdateCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareUpdateCredit", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareUpdateCredit(options);
+            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
+                preparation.prepareUpdateCredit(options)
+            );
         });
     }
     async prepareRevokeCredit(options: RevokeCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareRevokeCredit", async () => {
             await this.ready();
-            return this.preparation(options.tokenAddress).prepareRevokeCredit(options);
+            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
+                preparation.prepareRevokeCredit(options)
+            );
         });
     }
     async resume(operationId: string): Promise<Operation> {

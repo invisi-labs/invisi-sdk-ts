@@ -13,7 +13,7 @@ const reusable = new Set([
     "getMembership",
 ]);
 class RefreshPreparationSnapshot extends Error {}
-function readKey(method: string, args: readonly unknown[]): string {
+export function preparationReadKey(method: string, args: readonly unknown[]): string {
     if (method === "getMembership") {
         const input = args[1] as {
             treeId: bigint;
@@ -96,7 +96,7 @@ export class PreparationReads {
                     // Both framing and the final canonical-block fence remain actual chain reads.
                     if (name === "getBlock" || name === "getChainId") return fn.apply(object, args);
                     if (!reusable.has(name)) return fn.apply(object, args);
-                    const key = readKey(name, args),
+                    const key = preparationReadKey(name, args),
                         entry = memo.#values.get(key);
                     if (entry && performance.now() - entry.at < ttl)
                         return structuredClone(await entry.value);

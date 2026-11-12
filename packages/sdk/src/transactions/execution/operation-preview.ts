@@ -18,6 +18,7 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
         id: p.id,
         kind: p.kind,
         status,
+        submissionValidation: p.submissionValidation,
         context: { ...p.context },
         inputs: inputFacts(p).length,
         inputDetails: [

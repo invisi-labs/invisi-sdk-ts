@@ -1,3 +1,4 @@
+import { validateOperationSubmission } from "./submission-validation";
 import { readTransactionConfirmation, type TransactionConfirmation } from "@invisi-labs/protocol";
 import { bindBroadcasterOperation } from "@invisi-labs/sdk/session-support";
 import {
@@ -36,8 +37,6 @@ import {
     publicOperationData,
     resolveQuotedExecution,
     inputFacts,
-    operationExpired,
-    operationSources,
     publicProof,
     requiresAuthorization,
     sameStatement,
@@ -499,35 +498,13 @@ export class Operation {
     }
 
     private async validateExport(signal?: AbortSignal): Promise<void> {
-        signal?.throwIfAborted();
-        const { reader, options: runtimeOptions } = this.#runtime;
-        await runtimeOptions.protocol.validateDeployment(reader);
-        const head = await reader.getBlock(await reader.getLatestBlockNumber());
-        const plan = this.#saved.plan;
-        check(!operationExpired(plan, head.timestamp), "operation has expired");
-        if (plan.fundingMode === "signature") {
-            check(head.timestamp <= (plan.funding.deadline ?? 0n), "funding authorization expired");
-            check(
-                (await reader.getFundingNonce(plan.context, plan.funding.payer!, head)) ===
-                    plan.funding.sigNonce,
-                "funding nonce changed; prepare again"
-            );
-        }
-        for (const source of operationSources(plan)) {
-            check(
-                await reader.isKnownRoot(plan.context, source.treeId, source.merkleRoot, head),
-                "source root is no longer accepted; prepare again"
-            );
-        }
-        const nullifiers = inputFacts(plan).map((input) => input.nullifier);
-        if (nullifiers.length) {
-            const spent = await reader.isSpent(plan.context, nullifiers, head);
-            check(
-                spent.length === nullifiers.length && spent.every((value) => value === false),
-                "input spent or invalid spent response"
-            );
-        }
-        signal?.throwIfAborted();
+        await validateOperationSubmission(this.#runtime, this.#saved, signal);
+    }
+
+    /** Required immediately before a host submits an offline-built call through its own signer. */
+    async validateSubmission(options: { signal?: AbortSignal } = {}): Promise<void> {
+        await this.signingCurrent();
+        await this.validateExport(options.signal);
     }
 
     async exportTransaction(options: { signal?: AbortSignal } = {}): Promise<TransactionCall> {
@@ -535,7 +512,7 @@ export class Operation {
             this.#saved.plan.statement?.target !== "noir-recursive",
             "recursive operations must be exported as aggregate members"
         );
-        await this.validateExport(options.signal);
+        if (!this.#saved.plan.submissionValidation) await this.validateExport(options.signal);
         const result = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             options.signal?.throwIfAborted();
             const record = state.operations[this.id];

@@ -310,6 +310,8 @@ export class RecordWalletPersistence {
                       );
                   });
         const valid =
+            bytesToHex(serializeRecord(state.preparationSnapshot)) ===
+                bytesToHex(serializeRecord(decoded.preparationSnapshot)) &&
             fields.every((field) => decoded[field] === state[field]) &&
             sameRanges &&
             points.every(

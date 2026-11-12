@@ -45,6 +45,7 @@ async function creditFixture(
             spenderReceivingKeys: h.bob.getReceivingAddress().getReceivingKeys(),
         },
         commitment = await computeCreditCommitment(state.note);
+    h.reader.getCreditAllocation = async () => ({ shard: 1n, slot: 100 });
     await h.tree.insert(BigInt(commitment));
     for (const [wallet, role] of [
         [h.wallet, "owner"],

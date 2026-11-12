@@ -22,7 +22,7 @@ const balance = await session.balance(tokenAddress);
 
 Memory storage is explicitly ephemeral. Persistent hosts import `@invisi-labs/session/indexeddb` or `@invisi-labs/session/sqlite` and supply an `EncryptedWalletCodec` with their own encryption key and database connection. Adapters do not choose keys or open an application database implicitly.
 
-`new WalletSession(...)` constructs a lazy handle. Its asynchronous methods validate the configured chain and pinned deployment before reading or modifying wallet state. `WalletSession.connect(...)` validates immediately. Both accept shared infrastructure through `invisi`; the session alone receives store, namespace, signer, fundingSigner and coinSelector capabilities.
+`new WalletSession(...)` constructs a lazy handle. Its asynchronous methods validate the configured deployment, using an authenticated preparation snapshot when available and live infrastructure otherwise. `WalletSession.connect(...)` performs the same validation immediately; a retained snapshot permits offline reopening. Both accept shared infrastructure through `invisi`; the session alone receives store, namespace, signer, fundingSigner and coinSelector capabilities.
 
 `Operation` owns persisted lifecycle and recovery. `PreparedTransaction` remains in `@invisi-labs/sdk` for callers that supply notes explicitly and own their state. Either can export calldata for an external ethers signer. Session sending is a thin delegation to its optional ethers signer.
 
@@ -183,3 +183,25 @@ else console.log(estimate.reason);
 Measurement version/hash metadata is provenance only. Unsupported shapes return `available:false` and `reason:"shape-not-covered"` with no gas count. Estimates are approximate, not guaranteed gas limits or monetary fees; the App owns live fee pricing, approval, final simulation and safety margins. Sending through `session.sendTransaction` requires a positive `gasLimit` supplied by the host, preventing implicit ethers estimation.
 
 Preparation and signing performance: read-only signing freshness checks no longer commit a wallet revision. Store instances keep a bounded decoded-record LRU (512 entries, 8 MiB of ciphertext-weighted data), keyed by storage key, revision and SHA-256 of the ciphertext. Backend revision/integrity checks and CAS writes remain authoritative; modified or failed ciphertext is never accepted from an older cache entry. Every returned state is independently cloned. The cache is never persisted. Scope a store instance to its unlocked wallet lifetime and discard it on lock/logout; keep host lifecycle/permission guards in place. Optional short-lived public-read reuse during quotation is automatic and does not change the preparation API.
+
+
+### Cached and offline preparation
+
+Online `refresh().decrypt(...)`, `scanHistory(...)` and `refreshState()` retain a canonically verified preparation snapshot with encrypted wallet metadata. It includes known unspent Note/Credit authentication paths, pinned roots, deployment/token code, observed consumption/revocation state, the account funding nonce and Credit allocation. Capture is fenced against concurrent inventory changes and public-history generations. Normal sync authentication paths and exact-anchor consumption/revocation reads are reused rather than fetched again. Later refreshes retain immutable paths only while their roots remain accepted at the new canonical anchor; expired roots trigger fresh authenticated paths. Transient public capture is bounded and never added to public-history storage; encrypted snapshots contain only the account’s selected unspent inventory. Offline scans do not create fresh observations. Existing call signatures stay unchanged; there is no separate preparation synchronization API.
+
+`prepareTransfer`, `prepareShield` and all four Credit preparations automatically reuse retained facts. With complete input data and full receiving addresses (or already resolved outputs), preparation, EOA authorization, local proving and calldata export work without network reads. Proof artifacts/CRS must already be available. Retain or configure the trusted deployment profile before reopening offline; `Protocol.fromRpc(...)` itself remains an online lookup. A missing cached fact automatically falls back to live preparation, so first-use tokens remain usable online. Unknown tokens, uncached external funding nonces, short-address lookups and contract-wallet authorization may still require online data. An explicit external `funding.sigNonce` can freeze the nonce supplied by the host.
+
+`operation.preview().submissionValidation === "required"` means the message was built from historical facts. The default deadline uses the later of the local construction time and cached block time, while `preparedAt` retains the genuine canonical anchor. Credit draw periods use construction time and are rechecked before sending. A changed history generation or observation cannot silently reuse an older snapshot.
+
+`operation.exportTransaction()` can export this cached message offline; it does not certify that it can execute now. `session.sendTransaction(operation)` and Broadcaster submission automatically run the live gate. A host sending exported calldata directly with ethers must call `await operation.validateSubmission()` immediately before sending. The gate checks current deployment, expiry/period, funding nonce and signature, accepted roots, input consumption, Credit revocation/allocation, and token balance/allowance, then fences canonical blocks. Custom `ChainReader` implementations need `getTokenBalanceAllowance` for cached operations that debit public tokens; `EthersChainReader` supplies it. An ERC20 Permit may establish allowance during execution; balance is still checked. A rejected root or changed frozen statement may require new authorization and proof.
+
+```ts
+await (await session.refresh()).decrypt(decryptor); // Online: retains verified preparation facts.
+const operation = await session.prepareTransfer({ tokenAddress, outputs }); // Local when covered.
+const request = await operation.exportWalletAuthorization();
+const signature = await signer.signTypedData(request.domain, request.types, request.message);
+const ready = await (await operation.withWalletSignature(signature)).prove();
+const call = await ready.exportTransaction(); // May run offline.
+// Once online: send the operation to enforce live checks, or validate before a direct ethers send.
+await session.sendTransaction(ready, { gasLimit });
+```

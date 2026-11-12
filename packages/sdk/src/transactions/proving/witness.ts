@@ -37,7 +37,7 @@ export async function witnessFor(
             });
         if (credit.draw) {
             return builder.drawCredit({
-                timestamp: plan.preparedAt.timestamp,
+                timestamp: plan.context.now ?? plan.preparedAt.timestamp,
                 params: credit.draw,
                 deliveries: credit.deliveries,
                 inputs: credit.inputs,

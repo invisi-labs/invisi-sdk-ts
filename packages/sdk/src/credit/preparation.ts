@@ -75,7 +75,7 @@ export class CreditPreparation<Result> {
     }
 
     private expiry(value: bigint, frame: PreparationFrame): bigint {
-        if (typeof value !== "bigint" || value <= frame.block.timestamp || value >= 1n << 64n) {
+        if (typeof value !== "bigint" || value <= frame.timestamp || value >= 1n << 64n) {
             throw new Error("Credit expiry must be a future uint64 timestamp");
         }
         return value;
@@ -392,7 +392,7 @@ export class CreditPreparation<Result> {
             )
                 throw Error("Credit source root mismatch");
             sources.set(member.source.treeId, member.source.merkleRoot);
-            const next = await deriveCreditState(n, amount, frame.block.timestamp);
+            const next = await deriveCreditState(n, amount, frame.timestamp);
             outputs.push(
                 await this.seal(
                     {

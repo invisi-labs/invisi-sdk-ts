@@ -76,7 +76,7 @@ try {
         recipient: { type: "invisi", address: bob.receivingAddress },
     });
 
-    // 3. Selection and change use verified inventory; arbitrary spending needs native approval.
+    // 3. The completed refresh retained preparation paths; selection and change reuse local facts.
     const operation = await session.prepareTransfer({
         tokenAddress: settings.tokenAddress,
         outputs: [output],
@@ -100,6 +100,8 @@ try {
     const authorized = await operation.withWalletSignature(signature);
     const ready = await authorized.prove();
     console.log("Persisted operation:", ready.id);
+    // Export may run offline. Before an ethers send, call ready.validateSubmission();
+    // session.sendTransaction(ready) runs that live gate automatically.
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
     console.log(
         "Retain the operation ID and use recovery after host submission; do not create a replacement payment."

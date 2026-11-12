@@ -29,6 +29,7 @@ export interface OperationRecord {
 }
 
 export interface WalletState {
+    preparationSnapshot?: import("@invisi-labs/sdk/session-support").PreparationSnapshot;
     schemaVersion: 2;
     scope: WalletScope;
     revision: number;

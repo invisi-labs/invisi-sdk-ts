@@ -1,3 +1,9 @@
+import {
+    createPreparationCapture,
+    preparationHistoryCapture,
+    type PreparationCapture,
+} from "../sync/preparation-capture";
+import { retainPreparationSnapshot } from "../sync/preparation-snapshot";
 import { priorityPages, accountCoverage, firstScanRange } from "./scan-order";
 import { authenticatedDecryptor, type DeliveryDecryptor } from "@invisi-labs/primitives";
 import type { ChainReader, CanonicalBlock } from "@invisi-labs/protocol";
@@ -157,7 +163,9 @@ export async function scanAccount(
             !!settings.reset
         )?.fromBlock ??
         lower;
-    const reader = localReader(history, options.chainReader!, !!settings.offline);
+    const capture = settings.offline ? undefined : createPreparationCapture();
+    const normalReader = localReader(history, options.chainReader!, !!settings.offline);
+    const reader = capture?.reader(normalReader) ?? normalReader;
     const receiving = options.wallet.getReceivingAddress();
     const active = authenticatedDecryptor(
         options.wallet.ownerAddress,
@@ -185,6 +193,7 @@ export async function scanAccount(
         store,
         reader,
         protocolRpc: publicProvider(options, !!settings.offline),
+        ...(capture ? { preparationCapture: capture } : {}),
         viewing,
         receivingKeys: receiving.getReceivingKeys(),
     });
@@ -283,8 +292,35 @@ export async function scanAccount(
         });
     }
     if (!settings.offline && lower <= target) {
-        const replay = await replayCredits(history, options, scope, decryptor, target, settings);
+        const replay = await replayCredits(
+            history,
+            { ...options, chainReader: reader },
+            scope,
+            decryptor,
+            target,
+            settings,
+            capture
+        );
         credits += replay;
+    }
+    if (!settings.offline && settings.refreshState !== false) {
+        const current = await store.readSnapshot(scope);
+        const preparationBlock =
+            current.observedThrough && current.observedThrough.number > block.number
+                ? await options.chainReader.getBlock(current.observedThrough.number)
+                : block;
+        await retainPreparationSnapshot(
+            options,
+            scope,
+            preparationBlock,
+            settings.signal,
+            capture,
+            preparationHistoryCapture(history),
+            async () => {
+                if ((await history.snapshot()).generation !== publicState.generation)
+                    throw Error("public history generation changed during preparation retention");
+            }
+        );
     }
     return { block, notes, credits, balances: walletBalances(await store.readSnapshot(scope)) };
 }
@@ -296,7 +332,8 @@ async function replayCredits(
     scope: WalletScope,
     decryptor: DeliveryDecryptor,
     target: bigint,
-    settings: AccountScanOptions
+    settings: AccountScanOptions,
+    capture?: PreparationCapture
 ): Promise<number> {
     const store = options.store!,
         state = await store.readSnapshot(scope);
@@ -322,6 +359,7 @@ async function replayCredits(
         store,
         reader,
         protocolRpc: options.protocolRpc!,
+        ...(capture ? { preparationCapture: capture } : {}),
         viewing: authenticatedDecryptor(
             options.wallet.ownerAddress,
             decryptor,

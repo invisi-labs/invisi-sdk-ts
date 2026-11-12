@@ -29,6 +29,7 @@ import type { NoteRecord } from "../records";
 import { selectNotes, type SelectableNote } from "./selection";
 
 export interface PreparationFrame {
+    timestamp: bigint;
     context: TransactionContext;
     block: CanonicalBlock;
     deadline: bigint;
@@ -82,8 +83,12 @@ export class Preparation<Result> {
             options.protocol.validateDeployment(reader),
             reader.getLatestBlockNumber().then((number) => reader.getBlock(number)),
         ]);
-        const deadline = requested ?? block.timestamp + (options.transactionTTL ?? 300n);
-        if (typeof deadline !== "bigint" || deadline < block.timestamp || deadline >= 1n << 64n) {
+        const timestamp =
+            this.runtime.preparationTime && this.runtime.preparationTime > block.timestamp
+                ? this.runtime.preparationTime
+                : block.timestamp;
+        const deadline = requested ?? timestamp + (options.transactionTTL ?? 300n);
+        if (typeof deadline !== "bigint" || deadline < timestamp || deadline >= 1n << 64n) {
             throw new Error("invalid transaction deadline");
         }
         const state = await (this.runtime.readSummary
@@ -103,10 +108,11 @@ export class Preparation<Result> {
             }
         }
         return {
+            timestamp,
             context: {
                 ...options.protocol.context,
-                now: block.timestamp,
-                timestamp: block.timestamp,
+                now: timestamp,
+                timestamp,
             },
             block,
             deadline,
@@ -153,7 +159,7 @@ export class Preparation<Result> {
             deadline: mode === "caller" ? 0n : (source.deadline ?? frame.deadline),
             ...(source.permit ? { permit: structuredClone(source.permit) } : {}),
         });
-        if (mode === "signature" && funding.deadline < frame.block.timestamp) {
+        if (mode === "signature" && funding.deadline < frame.timestamp) {
             throw new Error("funding authorization deadline has expired");
         }
         return { funding, fundingMode: mode };
