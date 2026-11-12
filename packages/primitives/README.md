@@ -2,4 +2,4 @@
 
 Invisi Protocol pure cryptographic primitives.
 
-Install with `npm install @invisi-labs/primitives@1.2.0`. API documentation and runnable examples are in the [SDK repository](https://github.com/invisi-lab/invisi-sdk-ts).
+Install with `npm install @invisi-labs/primitives@1.2.3`. API documentation and runnable examples are in the [SDK repository](https://github.com/invisi-lab/invisi-sdk-ts).

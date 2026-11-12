@@ -1,0 +1,55 @@
+{
+  "format": "invisi.npm.release-integrity.v1",
+  "version": "1.2.3",
+  "archives": "github-release",
+  "packages": [
+    {
+      "name": "@invisi-labs/primitives",
+      "version": "1.2.3",
+      "filename": "invisi-labs-primitives-1.2.3.tgz",
+      "integrity": "sha512-ApXSrO5UC5inXeK0ATg4nhMbwqGBALq3t/oev81hAZwWvgrstSKG3m3AX5fgMcwrYZPJgRd/J9kklmW0eg+PWQ=="
+    },
+    {
+      "name": "@invisi-labs/protocol",
+      "version": "1.2.3",
+      "filename": "invisi-labs-protocol-1.2.3.tgz",
+      "integrity": "sha512-X+426B1FF5Ned9dxKMYmc/Kud2Rhcq4kWdRYahBCTreXK/nJEuV0aaARYlCH8UohcNX8oa25ZoSgsEE0OHQAOA=="
+    },
+    {
+      "name": "@invisi-labs/prover",
+      "version": "1.2.3",
+      "filename": "invisi-labs-prover-1.2.3.tgz",
+      "integrity": "sha512-U4RQkT5bCQqINFP90ubMNe02uIGPzgtRvnnG4cQSQhfQ/Q00AfvVrcmSlYuDIIQKx7t3KsAyI2CCH+P7MlJfCw=="
+    },
+    {
+      "name": "@invisi-labs/react",
+      "version": "1.2.3",
+      "filename": "invisi-labs-react-1.2.3.tgz",
+      "integrity": "sha512-JlPB/ot790Uw/2afoZwyyAXxISPr0nvjuFFp8SKZP5eyM+QYr9NBwzt8FOpkybbrmQTaTTiAF+XkANS4CsdReQ=="
+    },
+    {
+      "name": "@invisi-labs/rpc",
+      "version": "1.2.3",
+      "filename": "invisi-labs-rpc-1.2.3.tgz",
+      "integrity": "sha512-x8WhSdMBO+baOS55fWP6TwcUOgGsm15LZHxPDpD0t3smnip8RAOwMKrq88vyLwhI0THVzIo1heFaUSi9sP50DA=="
+    },
+    {
+      "name": "@invisi-labs/sdk",
+      "version": "1.2.3",
+      "filename": "invisi-labs-sdk-1.2.3.tgz",
+      "integrity": "sha512-TumATSa/vf0jJYm5NV4h1WRVwroJyFIfKTaDnXnC7EqC2G/Jpn2JlfNgjU5LfOH/ognLryjRmq2wdIX3SUyi9A=="
+    },
+    {
+      "name": "@invisi-labs/session",
+      "version": "1.2.3",
+      "filename": "invisi-labs-session-1.2.3.tgz",
+      "integrity": "sha512-iBAjC1uRETvi+K91DOxKPOlDeYmSrUBwWsSyWwnoOFji6PZ0HtB+BpG6nKRkRdwb33phNUJgK2sBG7AM8t6vCg=="
+    },
+    {
+      "name": "@invisi-labs/vue",
+      "version": "1.2.3",
+      "filename": "invisi-labs-vue-1.2.3.tgz",
+      "integrity": "sha512-OG3OpJlggHenS3u054vHp8Lb49Q5bYUllb9ixFAVLFHYoztZKQgJFyBxPVfyPAg0tjUQXYNVmwueKT8u9iBrEg=="
+    }
+  ]
+}

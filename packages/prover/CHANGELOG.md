@@ -1,5 +1,10 @@
 # @invisi-labs/prover
 
+## 1.2.3
+
+- Align the fixed package group with native-chain finality, offline transaction preparation, preparation-read reuse and shared portable Note interoperability checks.
+
+
 ## 1.2.2
 
 - Align internal dependencies with the 1.2.2 workspace release.

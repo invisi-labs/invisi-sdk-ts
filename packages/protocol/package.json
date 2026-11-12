@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/protocol",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Pure Invisi public ABIs, types, strict codecs, statements, signatures, capacities and gas references",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -1,5 +1,10 @@
 # @invisi-labs/session
 
+## 1.2.3
+
+- Align the fixed package group with native-chain finality, offline transaction preparation, preparation-read reuse and shared portable Note interoperability checks.
+
+
 ## 1.2.2
 
 - Require complete public receiving material for Wallet and bind App decryption to the explicit owner and available receiving keys.
