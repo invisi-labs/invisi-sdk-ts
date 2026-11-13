@@ -54,8 +54,9 @@ async function scheduledOpaqueFixture() {
     const session = new WalletSession(sessionOptions({ ...h.options, prover: prover() }));
     const base = quoteClient(h.context);
     const calls: { method: string; body: any }[] = [];
-    const service = { lose: false };
+    const service = { lose: false, relayOffline: false };
     const client = new BroadcasterClient({ ...base.configuration }, async (request) => {
+        if (service.relayOffline) throw Error("Relay offline");
         const body = (request.params as any[])[0];
         calls.push({ method: request.method, body: structuredClone(body) });
         if (
@@ -100,7 +101,7 @@ async function scheduledOpaqueFixture() {
 it("never creates a remote job just to cancel a never-submitted managed schedule", async () => {
     const h = await scheduledOpaqueFixture();
     const before = h.calls.length;
-    await expect(h.ready.cancelBroadcaster(h.client)).rejects.toThrow(/has not been submitted/);
+    await expect(h.client.cancel(h.ready)).rejects.toThrow(/has not been submitted/);
     expect(h.calls).toHaveLength(before);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(h.ready.id);
     expect(h.calls.some((call) => call.method === "broadcaster_submitTransaction")).toBe(false);
@@ -112,14 +113,12 @@ it("requires explicit frozen-payload recovery before cancelling an ID-less attem
     const recovered = await h.session.resume(h.ready.id);
     expect(recovered.broadcasterScheduleHandle()?.id).toBeUndefined();
     const callsBeforeCancel = h.calls.length;
-    await expect(recovered.cancelBroadcaster(h.client)).rejects.toThrow(
-        /original frozen submission/
-    );
+    await expect(h.client.cancel(recovered)).rejects.toThrow(/original frozen submission/);
     expect(h.calls).toHaveLength(callsBeforeCancel);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(h.ready.id);
     await h.client.submit(recovered);
-    const cancelled = await recovered.cancelBroadcaster(h.client);
-    expect(cancelled.status).toBe("failed");
+    const cancelled = await h.client.cancel(recovered);
+    expect(cancelled.state).toBe("cancelled");
     const requests = h.calls.filter((call) => call.method === "broadcaster_submitTransaction");
     expect(requests).toHaveLength(2);
     expect(requests[0]!.body).toEqual(requests[1]!.body);
@@ -190,4 +189,40 @@ it("uses the saved opaque ID after a committed acknowledgement loses its local r
     );
     expect(h.calls.at(-1)!.method).toBe("broadcaster_getTransactionStatus");
     expect(h.calls.at(-1)!.body.id).toBe(recovered.id);
+});
+
+it("reconciles an acknowledged cancellation through the client while the relay is offline", async () => {
+    const h = await scheduledOpaqueFixture();
+    await h.client.submit(h.ready);
+    const getBlock = h.reader.getBlock;
+    h.reader.getBlock = async () => {
+        throw Error("Canonical chain unavailable");
+    };
+    await expect(h.client.cancel(h.ready)).rejects.toThrow("Canonical chain unavailable");
+    const uncertain = await h.store.readSnapshot(h.scope);
+    expect((uncertain.operations[h.ready.id]!.payload as any).broadcasterCancelled).toBe(true);
+    expect(uncertain.reservations[h.leaf]).toBe(h.ready.id);
+    expect(h.calls.filter((call) => call.method === "broadcaster_cancelTransaction")).toHaveLength(
+        1
+    );
+    h.reader.getBlock = getBlock;
+    h.service.relayOffline = true;
+    const recovered = await h.session.resume(h.ready.id);
+    const cancelled = await h.client.cancel(recovered);
+    expect(cancelled).toMatchObject({ id: "merchant-job-123", state: "cancelled" });
+    expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBeUndefined();
+    expect(h.calls.filter((call) => call.method === "broadcaster_cancelTransaction")).toHaveLength(
+        1
+    );
+    expect(await h.client.cancel(recovered)).toEqual(cancelled);
+});
+
+it("keeps a cancellation reservation when an input was consumed before canonical reconciliation", async () => {
+    const h = await scheduledOpaqueFixture();
+    await h.client.submit(h.ready);
+    h.reader.isSpent = async (_, words) => words.map(() => true);
+    await expect(h.client.cancel(h.ready)).rejects.toThrow(/consumed/);
+    const snapshot = await h.store.readSnapshot(h.scope);
+    expect((snapshot.operations[h.ready.id]!.payload as any).broadcasterCancelled).toBe(true);
+    expect(snapshot.reservations[h.leaf]).toBe(h.ready.id);
 });

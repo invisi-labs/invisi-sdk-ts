@@ -27,7 +27,12 @@ import {
     verifyBroadcasterQuote,
     type BroadcasterStatus,
 } from "@invisi-labs/rpc/broadcaster";
-import { quoteOperation, submitOperation, type BroadcasterTransaction } from "./operation-bridge";
+import {
+    quoteOperation,
+    submitOperation,
+    cancelOperation,
+    type BroadcasterTransaction,
+} from "./operation-bridge";
 import type { BroadcasterQuoteOptions } from "./broadcaster-preparation";
 export type { BroadcasterTransaction } from "./operation-bridge";
 /** Application-level quote and submission conveniences over the public RPC client. */
@@ -37,6 +42,9 @@ export class BroadcasterClient extends RpcBroadcasterClient {
         options: BroadcasterQuoteOptions
     ): Promise<T> {
         return quoteOperation(this, transaction, options);
+    }
+    cancel(transaction: BroadcasterTransaction): Promise<BroadcasterStatus> {
+        return cancelOperation(this, transaction);
     }
     async recoverScheduled(
         handle: BroadcasterScheduleHandle,

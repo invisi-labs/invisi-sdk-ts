@@ -290,6 +290,28 @@ it("accepts an explicit ERC1271 public revocation verifier without calling a pro
     expect(h.prover.prove).not.toHaveBeenCalled();
 });
 
+async function broadcasterCreditPreparations(h: Awaited<ReturnType<typeof creditSetup>>) {
+    return [
+        await h.invisi.prepareCreateCredit({
+            ...h.identity,
+            spender: h.bob.getAddress(),
+            expiry: 2000003600n,
+        }),
+        await h.invisi.prepareUpdateCredit({
+            ...h.identity,
+            creditInputs: [h.input],
+            credit: h.commitment,
+        }),
+        await h.invisi.prepareDrawCredit({
+            ...h.identity,
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
+            creditInputs: [{ ...h.input, role: "spender" }],
+            credits: [{ credit: h.commitment, amount: 30n }],
+            recipient: h.wallet.getAddress(),
+        }),
+        await h.invisi.prepareRevokeCredit({ ...h.identity, shard: 1n, slot: 0n }),
+    ];
+}
 it("freezes paid broadcaster fees for all Credit operations before authorization", async () => {
     const h = await creditSetup();
     const {
@@ -339,26 +361,7 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
             });
         }
     );
-    const prepared = [
-        await h.invisi.prepareCreateCredit({
-            ...h.identity,
-            spender: h.bob.getAddress(),
-            expiry: 2000003600n,
-        }),
-        await h.invisi.prepareUpdateCredit({
-            ...h.identity,
-            creditInputs: [h.input],
-            credit: h.commitment,
-        }),
-        await h.invisi.prepareDrawCredit({
-            ...h.identity,
-            wallet: Wallet.fromAddress(h.bob.getAddress()),
-            creditInputs: [{ ...h.input, role: "spender" }],
-            credits: [{ credit: h.commitment, amount: 30n }],
-            recipient: h.wallet.getAddress(),
-        }),
-        await h.invisi.prepareRevokeCredit({ ...h.identity, shard: 1n, slot: 0n }),
-    ];
+    const prepared = await broadcasterCreditPreparations(h);
     for (const original of prepared) {
         const quoted = await client.quote(original, { maxFeeAmount: 3n });
         expect(quoted.preview().feeAmount).toBe(3n);
@@ -484,4 +487,48 @@ it("encodes Credit mode flags as canonical Noir fields while keeping state boole
     }
     expect(index).toBe(3);
     expect(draw.preview().creditOutputs![0]!.unlimited).toBe(true);
+});
+
+it("schedules, submits and cancels all four detached Credit operations through one client", async () => {
+    const h = await creditSetup();
+    const { BroadcasterClient } = await import("../../broadcaster");
+    const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+    const base = quoteClient(h.context, () => 3n);
+    let window: { publishAfter: string; executeBefore: string };
+    const client = new BroadcasterClient(base.configuration, async (request) => {
+        const payload = (request.params as any[])[0];
+        const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
+        if (request.method === "broadcaster_submitTransaction") {
+            window = {
+                publishAfter: payload.quote.schedule.publishAfter,
+                executeBefore: payload.quote.schedule.executeBefore,
+            };
+            return result({ id: "opaque-credit-job", state: "scheduled", ...window });
+        }
+        if (request.method === "broadcaster_cancelTransaction")
+            return result({ id: payload.id, state: "cancelled", ...window });
+        return base.transport(request);
+    });
+    for (const prepared of await broadcasterCreditPreparations(h)) {
+        const handles: import("../../broadcaster").BroadcasterScheduleHandle[] = [];
+        const quoted = await client.quote(prepared, {
+            maxFeeAmount: 3n,
+            schedule: { publishAfter: BigInt(Math.floor(Date.now() / 1000) + 60) },
+            persistSchedule: async (handle) => {
+                handles.push(handle);
+            },
+        });
+        const signer = new EvmWallet(
+            `0x${(quoted.kind === "draw-credit" ? "02" : "01").repeat(32)}`
+        );
+        let ready;
+        if (quoted.kind === "revoke-credit") {
+            const auth = await quoted.exportRevocationAuthorization();
+            const signature = await signer.signTypedData(auth.domain, auth.types, auth.message);
+            ready = await quoted.withRevocationSignature(signature as `0x${string}`);
+        } else ready = await (await externallyAuthorize(quoted, signer)).prove();
+        expect((await client.submit(ready)).state).toBe("scheduled");
+        expect(handles.at(-1)?.id).toBe("opaque-credit-job");
+        expect((await client.cancel(ready)).state).toBe("cancelled");
+    }
 });

@@ -80,6 +80,7 @@ export class Operation {
         bindBroadcasterOperation(this, {
             quote: (client, options) => this.#quoteForBroadcaster(client, options),
             submit: (client) => this.#submitViaBroadcaster(client),
+            cancel: (client) => this.#cancelViaBroadcaster(client),
             provenanceContext: () =>
                 this.#runtime.store.transaction(this.#runtime.scope, (state) => {
                     const context = this.current(state.operations[this.id]).plan.context;
@@ -653,18 +654,35 @@ export class Operation {
         });
     }
 
-    /** Acknowledged relay cancellation is followed by independent canonical input reconciliation. */
-    async cancelBroadcaster(
+    async #cancelViaBroadcaster(
         client: import("@invisi-labs/sdk").BroadcasterClient
-    ): Promise<Operation> {
-        const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
-            structuredClone(this.current(state.operations[this.id]))
-        );
+    ): Promise<import("@invisi-labs/sdk").BroadcasterStatus> {
+        const snapshot = await this.#runtime.store.readSnapshot(this.#runtime.scope);
+        check(!snapshot.invalidated, "wallet requires canonical resync");
+        const record = snapshot.operations[this.id];
+        check(record, "Operation is unavailable");
+        const retained = record.payload as SavedOperation;
+        const binding = retained.broadcasterBinding;
+        const handle = binding?.scheduleHandle;
+        check(handle, "Operation has no scheduled cancellation capability");
         check(
-            saved.broadcasterBinding?.scheduleHandle,
-            "Operation has no scheduled cancellation capability"
+            JSON.stringify(binding!.configuration) === JSON.stringify(client.configuration),
+            "Broadcaster differs from the scheduled registration"
         );
-        if (!saved.broadcasterBinding.scheduleHandle.id) {
+        // A completed cancellation is an observation, so repeating it needs no network or new worker claim.
+        if (
+            retained.broadcasterCancelled &&
+            ["failed", "expired"].includes(record.status) &&
+            !record.transactionHash &&
+            !retained.claim &&
+            handle.id &&
+            handle.id === this.#saved.broadcasterBinding?.scheduleHandle?.id
+        )
+            return structuredClone(
+                retained.broadcasterCancellation ?? { id: handle.id, state: "cancelled" }
+            );
+        const saved = structuredClone(this.current(record));
+        if (!handle.id) {
             check(
                 saved.broadcasterAttempted,
                 "Scheduled operation has not been submitted; abandon it locally instead"
@@ -673,13 +691,16 @@ export class Operation {
                 "Missing broadcaster ID; recover by retrying the original frozen submission before cancellation"
             );
         }
-        const handle = saved.broadcasterBinding!.scheduleHandle!;
-        const result = await client.cancelScheduled(handle, {
-            chainId: saved.plan.context.chainId,
-            protocol: saved.plan.context.protocolAddress,
-        });
+        const status = saved.broadcasterCancelled
+            ? structuredClone(
+                  saved.broadcasterCancellation ?? { id: handle.id, state: "cancelled" as const }
+              )
+            : await client.cancelScheduled(handle, {
+                  chainId: saved.plan.context.chainId,
+                  protocol: saved.plan.context.protocolAddress,
+              });
         check(
-            result.state === "cancelled" && !result.transactionHash,
+            status.state === "cancelled" && !status.transactionHash,
             "Broadcaster cancellation not confirmed"
         );
         await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
@@ -689,8 +710,10 @@ export class Operation {
                 "Operation already tracked on chain"
             );
             current.broadcasterCancelled = true;
+            current.broadcasterCancellation = structuredClone(status);
         });
-        return this.reconcile();
+        await this.reconcile();
+        return status;
     }
 
     async abandon(): Promise<Operation> {

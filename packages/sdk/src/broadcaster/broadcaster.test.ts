@@ -453,5 +453,6 @@ it("rejects unregistered operation objects before transport access", async () =>
     const unknown = { id: "unregistered", status: "prepared" };
     expect(() => client.quote(unknown, { maxFeeAmount: 1n })).toThrow(/does not support/);
     expect(() => client.submit(unknown)).toThrow(/does not support/);
+    expect(() => client.cancel(unknown)).toThrow(/does not support/);
     expect(transport).not.toHaveBeenCalled();
 });

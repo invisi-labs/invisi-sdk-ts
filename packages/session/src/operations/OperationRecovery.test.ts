@@ -178,11 +178,11 @@ it("keeps scheduled reservations on cancellation uncertainty and releases after 
         };
     });
     const recovered = await session.resume(prepared.id);
-    await expect(recovered.cancelBroadcaster(client)).rejects.toThrow("Cancellation unavailable");
+    await expect(client.cancel(recovered)).rejects.toThrow("Cancellation unavailable");
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(prepared.id);
     unavailable = false;
-    const cancelled = await recovered.cancelBroadcaster(client);
-    expect(cancelled.status).toBe("failed");
+    const cancelled = await client.cancel(recovered);
+    expect(cancelled.state).toBe("cancelled");
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBeUndefined();
     expect((await h.store.readSnapshot(h.scope)).observedThrough!.number).toBe(12n);
 });

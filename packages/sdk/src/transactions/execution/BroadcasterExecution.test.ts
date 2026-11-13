@@ -17,10 +17,12 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
     const h = await setup();
     const signer = new EvmWallet(`0x${"03".repeat(32)}`);
     const calls: { method: string; body: any }[] = [];
+    let scheduledTimes: { publishAfter: string; executeBefore: string } | undefined;
     const service = {
         lose: false,
         missing: false,
         failAcknowledgement: false,
+        cancellationUncertain: false,
         state: "queued" as BroadcasterStatus["state"],
     };
     const client = new BroadcasterClient(
@@ -36,6 +38,11 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
             if (request.method === "broadcaster_estimateQuote")
                 return result({ feeRecipient: signer.address, feeAmount: "10", maxGas: "2000000" });
             if (request.method === "broadcaster_getQuote") {
+                if (body.schedule)
+                    scheduledTimes = {
+                        publishAfter: body.schedule.publishAfter,
+                        executeBefore: body.schedule.executeBefore,
+                    };
                 const params = decodeBroadcasterIntent(body.data).request.params;
                 const quote = {
                     execution,
@@ -88,6 +95,12 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
                     state: execution === "aggregate" ? service.state : "submitted",
                 });
             }
+            if (request.method === "broadcaster_cancelTransaction")
+                return result({
+                    id: body.id,
+                    state: service.cancellationUncertain ? "pending" : "cancelled",
+                    ...scheduledTimes,
+                });
             if (request.method === "broadcaster_getTransactionStatus") {
                 if (service.missing)
                     return {
@@ -309,4 +322,22 @@ it("rejects corrupted persisted cancellation capabilities before any replay netw
         ).rejects.toThrow(/cancellation capability/);
         expect(h.calls).toHaveLength(before);
     }
+});
+
+it("cancels a detached scheduled transaction through the client without a wallet inventory", async () => {
+    const h = await fixture("direct", true);
+    const ready = await (await externallyAuthorize(h.quoted)).prove();
+    const before = h.calls.length;
+    await expect(h.client.cancel(ready)).rejects.toThrow(/has not been submitted/);
+    expect(h.calls).toHaveLength(before);
+    await h.client.submit(ready);
+    h.service.cancellationUncertain = true;
+    await expect(h.client.cancel(ready)).rejects.toThrow(/not confirmed/);
+    h.service.cancellationUncertain = false;
+    const status = await h.client.cancel(ready);
+    expect(status).toMatchObject({ id: "merchant-job-opaque-001", state: "cancelled" });
+    const acknowledgedCalls = h.calls.length;
+    expect(await h.client.cancel(ready)).toEqual(status);
+    expect(h.calls).toHaveLength(acknowledgedCalls);
+    await expect(h.client.submit(ready)).rejects.toThrow(/cancellation already acknowledged/);
 });

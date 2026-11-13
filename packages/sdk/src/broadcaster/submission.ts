@@ -1,4 +1,4 @@
-import { buildTransactCalldata } from "@invisi-labs/protocol";
+import { buildTransactCalldata, encodeCreditProof } from "@invisi-labs/protocol";
 import { decodeBroadcasterIntent, type BroadcasterMemberProof } from "@invisi-labs/rpc/broadcaster";
 import type { SavedOperation } from "../transactions/operation-types";
 import { sameStatement } from "../transactions/proving/proof-integrity";
@@ -13,7 +13,10 @@ export function publicOperationData(saved: SavedOperation): string {
         if (saved.proof) {
             sameStatement(saved.proof, statement(plan));
             const decoded = decodeBroadcasterIntent(saved.call.data);
-            if (decoded.proof.toLowerCase() !== saved.proof.proofHex.toLowerCase())
+            const expectedProof = decoded.credit
+                ? encodeCreditProof(saved.proof.proofHex)
+                : saved.proof.proofHex;
+            if (decoded.proof.toLowerCase() !== expectedProof.toLowerCase())
                 throw Error("Prepared call proof bytes changed");
         }
         return saved.call.data;

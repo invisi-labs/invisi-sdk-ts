@@ -11,6 +11,7 @@ export interface BroadcasterTransaction {
 interface Hooks<T extends BroadcasterTransaction> {
     quote(client: BroadcasterClient, options: BroadcasterQuoteOptions): Promise<T>;
     submit(client: BroadcasterClient): Promise<BroadcasterStatus>;
+    cancel(client: BroadcasterClient): Promise<BroadcasterStatus>;
     provenanceContext(): Promise<Scope>;
     readProvenance(): Promise<ProvenanceProof | undefined>;
     proveProvenance(
@@ -43,6 +44,15 @@ export function submitOperation(
     const hooks = bindings.get(target);
     if (!hooks) throw Error("Operation does not support broadcaster submission");
     return hooks.submit(client);
+}
+
+export function cancelOperation(
+    client: BroadcasterClient,
+    target: BroadcasterTransaction
+): Promise<BroadcasterStatus> {
+    const hooks = bindings.get(target);
+    if (!hooks) throw Error("Operation does not support broadcaster cancellation");
+    return hooks.cancel(client);
 }
 
 export function proveOperationProvenance(

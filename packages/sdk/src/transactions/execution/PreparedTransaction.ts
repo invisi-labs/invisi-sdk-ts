@@ -73,6 +73,7 @@ export class PreparedTransaction {
         bindBroadcasterOperation(this, {
             quote: (client, options) => this.#quoteForBroadcaster(client, options),
             submit: (client) => this.#submitViaBroadcaster(client),
+            cancel: (client) => this.#cancelViaBroadcaster(client),
             provenanceContext: async () => {
                 this.current();
                 return {
@@ -172,6 +173,7 @@ export class PreparedTransaction {
     }
     async #submitViaBroadcaster(client: import("../../broadcaster/index").BroadcasterClient) {
         this.current();
+        check(!this.#saved.broadcasterCancelled, "Broadcaster cancellation already acknowledged");
         check(this.status === "ready", "transaction is not ready");
         const { validateBroadcastEnvelope, validatePreparedBroadcast } =
             await import("../../broadcaster/provenance-preparation");
@@ -225,6 +227,39 @@ export class PreparedTransaction {
         }
         this.#saved.broadcasterSubmissionId = result.id;
         return result;
+    }
+    async #cancelViaBroadcaster(
+        client: import("../../broadcaster/index").BroadcasterClient
+    ): Promise<import("../../broadcaster").BroadcasterStatus> {
+        this.current();
+        const binding = this.#saved.broadcasterBinding;
+        const handle = binding?.scheduleHandle;
+        check(handle, "Transaction has no scheduled cancellation capability");
+        check(
+            JSON.stringify(binding!.configuration) === JSON.stringify(client.configuration),
+            "Broadcaster differs from the scheduled registration"
+        );
+        if (!handle.id) {
+            check(this.#saved.broadcasterAttempted, "Scheduled transaction has not been submitted");
+            throw Error(
+                "Missing broadcaster ID; recover the original frozen submission before cancellation"
+            );
+        }
+        if (this.#saved.broadcasterCancelled)
+            return structuredClone(
+                this.#saved.broadcasterCancellation ?? { id: handle.id, state: "cancelled" }
+            );
+        const status = await client.cancelScheduled(handle, {
+            chainId: this.#saved.plan.context.chainId,
+            protocol: this.#saved.plan.context.protocolAddress,
+        });
+        check(
+            status.state === "cancelled" && !status.transactionHash,
+            "Broadcaster cancellation not confirmed"
+        );
+        this.#saved.broadcasterCancelled = true;
+        this.#saved.broadcasterCancellation = structuredClone(status);
+        return status;
     }
     get id() {
         return this.#saved.plan.id;

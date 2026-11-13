@@ -100,9 +100,11 @@ functions(
     "sdk"
 );
 functions(session, ["WalletSession", "Operation", "EncryptedWalletCodec"], "session");
-assert.equal(typeof sdk.BroadcasterClient.prototype.quote, "function");
+for (const method of ["quote", "submit", "cancel"])
+    assert.equal(typeof sdk.BroadcasterClient.prototype[method], "function");
 for (const target of [sdk.PreparedTransaction, session.Operation])
-    assert.equal("withBroadcaster" in target.prototype, false, "quotation belongs to the client");
+    for (const method of ["withBroadcaster", "submitBroadcaster", "cancelBroadcaster"])
+        assert.equal(method in target.prototype, false, "relay execution belongs to the client");
 functions(rpc, ["ProtocolRpcClient", "defineDeployment"], "rpc");
 functions(
     protocol,

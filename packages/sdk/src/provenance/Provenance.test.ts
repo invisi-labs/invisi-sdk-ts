@@ -222,6 +222,7 @@ it("requires local proving capability only for proof generation", async () => {
         readProvenance: async () => undefined,
         quote: async () => ready,
         submit: async () => ({ id: "service-id", state: "pending" }),
+        cancel: async () => ({ id: "service-id", state: "cancelled" }),
         proveProvenance: async () => {
             throw Error("unexpected proving");
         },

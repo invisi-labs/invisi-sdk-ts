@@ -99,13 +99,12 @@ try {
     };
     console.log("Recovered relay status:", json(await client.recoverScheduled(handle, context)));
     // Uncertain cancellation keeps reservations; acknowledgement is followed by canonical input checks.
-    const cancelled = await recovered.cancelBroadcaster(client);
+    const cancelled = await client.cancel(recovered);
     console.log(
         "Cancellation:",
         json({
-            operationId: cancelled.id,
-            operationStatus: cancelled.status,
-            relay: await client.recoverScheduled(handle, context),
+            operationId,
+            relay: cancelled,
         })
     );
 } finally {

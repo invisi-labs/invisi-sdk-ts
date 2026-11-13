@@ -1,7 +1,7 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
 import { it, expect } from "vitest";
-import { Interface, Wallet as EvmWallet } from "ethers";
+import { AbiCoder, Interface, Wallet as EvmWallet } from "ethers";
 import {
     computeCreditCommitment,
     normalizeCreditPolicy,
@@ -262,5 +262,107 @@ it.each(["create", "update", "draw", "revoke"] as const)(
         expect(estimate).toMatchObject({ source: "benchmark", available: true });
         expect(operation.status).toBe("prepared");
         expect(h.prover.prove).not.toHaveBeenCalled();
+    }
+);
+
+it("compares Credit calldata against the encoded proof envelope and rejects raw or altered proofs", async () => {
+    const h = await creditFixture();
+    const operation = await h.ownerSession.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+    });
+    const ready = await (await authorizeOperation(operation)).prove();
+    const snapshot = await h.store.readSnapshot(h.scope);
+    const saved = snapshot.operations[ready.id]!.payload as SavedOperation;
+    const { publicOperationData } = await import("@invisi-labs/sdk/session-support");
+    const { encodeCreditProof } = await import("@invisi-labs/protocol");
+    const original = publicOperationData(saved);
+    const decoded = iface.parseTransaction({ data: original })!;
+    expect(decoded.args[0]).toBe(encodeCreditProof(saved.proof!.proofHex));
+    for (const changed of [
+        saved.proof!.proofHex,
+        encodeCreditProof("0xbeef"),
+        AbiCoder.defaultAbiCoder().encode(["uint8", "bytes"], [1, saved.proof!.proofHex]),
+    ]) {
+        const copy = structuredClone(saved);
+        copy.call!.data = iface.encodeFunctionData(decoded.fragment, [
+            changed,
+            ...Array.from(decoded.args).slice(1),
+        ]) as `0x${string}`;
+        expect(() => publicOperationData(copy)).toThrow(/proof bytes changed/);
+    }
+});
+
+it.each(["create", "update", "draw", "revoke"] as const)(
+    "schedules and cancels managed Credit %s through the client with durable acknowledgement",
+    async (kind) => {
+        const h = await creditFixture();
+        const { BroadcasterClient } = await import("@invisi-labs/sdk");
+        const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+        const base = quoteClient(h.context, () => 3n);
+        let window: { publishAfter: string; executeBefore: string } | undefined;
+        const client = new BroadcasterClient(base.configuration, async (request) => {
+            const payload = (request.params as any[])[0];
+            const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
+            if (request.method === "broadcaster_submitTransaction") {
+                window = {
+                    publishAfter: payload.quote.schedule.publishAfter,
+                    executeBefore: payload.quote.schedule.executeBefore,
+                };
+                return result({ id: `managed-credit-${kind}`, state: "scheduled", ...window });
+            }
+            if (request.method === "broadcaster_cancelTransaction")
+                return result({ id: payload.id, state: "cancelled", ...window });
+            return base.transport(request);
+        });
+        const tokenAddress = h.context.tokenAddress;
+        const prepared =
+            kind === "create"
+                ? await h.ownerSession.prepareCreateCredit({
+                      tokenAddress,
+                      spender: h.bob.getAddress(),
+                      expiry: 2000003600n,
+                  })
+                : kind === "update"
+                  ? await h.ownerSession.prepareUpdateCredit({
+                        tokenAddress,
+                        credit: h.commitment,
+                        singleLimit: 10n,
+                    })
+                  : kind === "draw"
+                    ? await h.spenderSession.prepareDrawCredit({
+                          tokenAddress,
+                          credits: [{ credit: h.commitment, amount: 30n }],
+                          recipient: h.wallet.getAddress(),
+                      })
+                    : await h.ownerSession.prepareRevokeCredit({
+                          tokenAddress,
+                          shard: 1n,
+                          slot: 0n,
+                      });
+        const quoted = await client.quote(prepared, {
+            maxFeeAmount: 3n,
+            schedule: { publishAfter: BigInt(Math.floor(Date.now() / 1000) + 60) },
+        });
+        let ready: typeof quoted;
+        if (kind === "revoke") {
+            const authorization = await quoted.exportRevocationAuthorization();
+            const signer = new EvmWallet(`0x${"01".repeat(32)}`);
+            const signature = await signer.signTypedData(
+                authorization.domain,
+                authorization.types,
+                authorization.message
+            );
+            ready = await quoted.withRevocationSignature(signature as `0x${string}`);
+        } else ready = await (await authorizeOperation(quoted)).prove();
+        expect((await client.submit(ready)).state).toBe("scheduled");
+        expect((await client.cancel(ready)).state).toBe("cancelled");
+        const scope = kind === "draw" ? { ...h.scope, ownerAddress: h.bob.ownerAddress } : h.scope;
+        const snapshot = await h.store.readSnapshot(scope);
+        expect(Object.values(snapshot.reservations)).not.toContain(ready.id);
+        expect(
+            (snapshot.operations[ready.id]!.payload as SavedOperation).broadcasterCancellation?.id
+        ).toBe(`managed-credit-${kind}`);
     }
 );

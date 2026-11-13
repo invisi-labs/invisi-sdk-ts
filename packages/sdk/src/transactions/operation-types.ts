@@ -201,6 +201,7 @@ export interface SavedOperation {
     broadcasterSubmissionId?: string;
     broadcasterAttempted?: boolean;
     broadcasterCancelled?: boolean;
+    broadcasterCancellation?: import("@invisi-labs/rpc/broadcaster").BroadcasterStatus;
     broadcasterRequest?: {
         data: string;
         memberProof?: import("@invisi-labs/rpc/broadcaster").BroadcasterMemberProof;

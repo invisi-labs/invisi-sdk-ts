@@ -336,6 +336,10 @@ export async function reconcileOperation(
     const expired = operationExpired(plan, block.timestamp);
     // Funding grants can be renewed and an unknown root can reappear. Neither revokes the wallet proof.
     const impossible = spent.some((value) => value);
+    check(
+        !(saved.broadcasterCancelled && !record.transactionHash && impossible),
+        "Cancelled input was consumed; reconcile its transaction before releasing reservations"
+    );
     signal?.throwIfAborted();
     await barrier(runtime, state, block);
     return store.transaction(scope, (draft) => {
