@@ -344,14 +344,22 @@ export class PublicHistory {
                 protocolRpc.getCreditTransitions(protocol.context, range),
             ]);
             const headers: CanonicalBlock[] = [];
-            for (let n = cursor; n <= end; n++) {
-                const header = await reader.getBlock(n);
-                if (
-                    header.number !== n ||
-                    (headers.length && header.parentHash !== headers.at(-1)!.hash)
-                )
-                    throw Error("noncanonical public history headers");
-                headers.push(header);
+            for (let start = cursor; start <= end; start += 8n) {
+                const count = Number(end - start + 1n < 8n ? end - start + 1n : 8n);
+                const batch = await Promise.all(
+                    Array.from({ length: count }, (_, index) =>
+                        reader.getBlock(start + BigInt(index))
+                    )
+                );
+                for (let index = 0; index < batch.length; index++) {
+                    const header = batch[index]!;
+                    if (
+                        header.number !== start + BigInt(index) ||
+                        (headers.length && header.parentHash !== headers.at(-1)!.hash)
+                    )
+                        throw Error("noncanonical public history headers");
+                    headers.push(header);
+                }
             }
             const block = headers.at(-1)!;
             if (
