@@ -4,6 +4,7 @@ import type { BroadcasterConfiguration, SignedBroadcasterQuote } from "./broadca
 type ReadService = (method: string, params: unknown, signal?: AbortSignal) => Promise<unknown>;
 type Context = { chainId: bigint; protocol: string };
 interface ServiceStatus {
+    scheduling?: import("./broadcaster").BroadcasterSchedulingCapabilities;
     apiVersion: string;
     protocolVersion: string;
     chainId: string;
@@ -90,4 +91,32 @@ export async function submissionRequirements(
     )
         throw Error("Broadcaster provenance requirement changed; obtain a new quote");
     return { provenanceRequired: required };
+}
+
+export async function schedulingCapabilities(
+    read: ReadService,
+    configuration: Readonly<BroadcasterConfiguration>,
+    context: Context
+) {
+    const status = checkedServiceStatus(
+        await read("broadcaster_getStatus", undefined),
+        configuration,
+        context
+    );
+    const value = status.scheduling;
+    if (
+        !value ||
+        typeof value.enabled !== "boolean" ||
+        [
+            value.maxDelaySeconds,
+            value.defaultExecutionWindowSeconds,
+            value.maxExecutionWindowSeconds,
+            value.minDeadlineSlackSeconds,
+        ].some(
+            (v) => typeof v !== "string" || !/^(0|[1-9][0-9]*)$/.test(v) || BigInt(v) >= 1n << 64n
+        ) ||
+        BigInt(value.defaultExecutionWindowSeconds) > BigInt(value.maxExecutionWindowSeconds)
+    )
+        throw Error("Invalid Broadcaster scheduling capabilities");
+    return { ...value };
 }

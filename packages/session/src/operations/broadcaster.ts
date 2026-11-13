@@ -50,7 +50,13 @@ export async function quoteManagedOperation(
         runtime.preparationReads
             ? runtime.preparationReads.reprice((reuse) => build(intent, reuse))
             : build(intent, false);
-    const selected = await prepareBroadcasterPlan(snapshot.plan, reprepare, client, options);
+    // The store transaction below commits the quote and cancellation secret before the managed handle can submit.
+    const selected = await prepareBroadcasterPlan(snapshot.plan, reprepare, client, {
+        ...options,
+        ...(options.schedule && !options.persistSchedule
+            ? { persistSchedule: async () => {} }
+            : {}),
+    });
     const saved = await runtime.store.transaction(runtime.scope, (state) => {
         const record = state.operations[snapshot.plan.id];
         const old = record?.payload as SavedOperation;

@@ -126,3 +126,63 @@ it("rejects recovered operation context outside the selected session scope", asy
     });
     await expect(h.session.resume(operation.id)).rejects.toThrow(/scope|deployment|context/);
 });
+
+it("keeps scheduled reservations on cancellation uncertainty and releases after acknowledgement plus canonical checks", async () => {
+    const { BroadcasterClient } = await import("@invisi-labs/sdk");
+    const h = await fixture();
+    const session = new WalletSession(sessionOptions({ ...h.options, prover: prover() }));
+    const prepared = await session.prepareTransfer({
+        tokenAddress: "0x2222222222222222222222222222222222222222",
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
+    });
+    let unavailable = true;
+    const client = new BroadcasterClient(
+        {
+            endpoint: "https://schedule.test",
+            quoteSigner: signer.address,
+            feeRecipient: signer.address,
+        },
+        async (request) => {
+            if (unavailable) throw Error("Cancellation unavailable");
+            const body = (request.params as { id: string }[])[0]!;
+            return {
+                jsonrpc: "2.0",
+                id: request.id,
+                result: {
+                    id: body.id,
+                    state: "cancelled",
+                    publishAfter: "2000000100",
+                    executeBefore: "2000000400",
+                },
+            };
+        }
+    );
+    await h.store.transaction(h.scope, (state) => {
+        const saved = state.operations[prepared.id]!
+            .payload as import("./operation-types").SavedOperation;
+        saved.externalized = true;
+        saved.broadcasterAttempted = true;
+        saved.broadcasterBinding = {
+            configuration: { ...client.configuration },
+            intentHash: "0x" + "44".repeat(32),
+            scheduleHandle: {
+                endpoint: client.configuration.endpoint,
+                chainId: saved.plan.context.chainId.toString(),
+                protocol: saved.plan.context.protocolAddress,
+                id: "job",
+                cancelToken: "0x" + "55".repeat(32),
+                publishAfter: "2000000100",
+                executeBefore: "2000000400",
+            },
+        };
+    });
+    const recovered = await session.resume(prepared.id);
+    await expect(recovered.cancelBroadcaster(client)).rejects.toThrow("Cancellation unavailable");
+    expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(prepared.id);
+    unavailable = false;
+    const cancelled = await recovered.cancelBroadcaster(client);
+    expect(cancelled.status).toBe("failed");
+    expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBeUndefined();
+    expect((await h.store.readSnapshot(h.scope)).observedThrough!.number).toBe(12n);
+});

@@ -6,6 +6,7 @@ import {
     broadcasterRequestHash,
     broadcasterQuoteDomain,
     broadcasterQuoteTypes,
+    scheduledBroadcasterQuoteTypes,
     verifyBroadcasterQuote,
     type BroadcasterMemberProof,
     type SignedBroadcasterQuote,
@@ -262,4 +263,82 @@ it.each([
             confirmation,
         }).status("member")
     ).rejects.toThrow(/confirmation/);
+});
+
+it("binds scheduled timestamps and cancellation hash, and rejects downgrade to an ordinary quote", async () => {
+    const base = await signed();
+    const schedule = {
+        publishAfter: "2000000100",
+        executeBefore: "2000000400",
+        cancelTokenHash: "0x" + "55".repeat(32),
+    };
+    const quote = { ...base.quote, schedule };
+    const signature = await signer.signTypedData(
+        broadcasterQuoteDomain(trust),
+        scheduledBroadcasterQuoteTypes,
+        { ...quote, ...schedule }
+    );
+    expect(verifyBroadcasterQuote({ ...base, quote, signature }, trust, data())).toEqual(quote);
+    for (const mutation of [
+        { publishAfter: "2000000101" },
+        { executeBefore: "2000000401" },
+        { cancelTokenHash: "0x" + "66".repeat(32) },
+    ]) {
+        expect(() =>
+            verifyBroadcasterQuote(
+                { ...base, signature, quote: { ...quote, schedule: { ...schedule, ...mutation } } },
+                trust,
+                data()
+            )
+        ).toThrow("signature");
+    }
+    expect(() => verifyBroadcasterQuote({ ...base, signature }, trust, data())).toThrow(
+        "signature"
+    );
+    await expect(client({ ...base, quote, signature }).getQuote(data(), trust)).rejects.toThrow(
+        "schedule mismatch"
+    );
+});
+
+it.each([
+    { publishAfter: "0", executeBefore: "2", cancelTokenHash: "0x" + "55".repeat(32) },
+    {
+        publishAfter: "9007199254740992",
+        executeBefore: "9007199254740993",
+        cancelTokenHash: "0x" + "55".repeat(32),
+    },
+    {
+        publishAfter: "1",
+        executeBefore: "9007199254740992",
+        cancelTokenHash: "0x" + "55".repeat(32),
+    },
+    { publishAfter: "1", executeBefore: "2", cancelTokenHash: "0x" + "AA".repeat(32) },
+    { publishAfter: 1, executeBefore: "2", cancelTokenHash: "0x" + "55".repeat(32) },
+])("rejects noncanonical scheduled wire values before transport: %j", async (schedule) => {
+    await expect(
+        client(undefined).estimateQuote({ data: data(), schedule: schedule as any })
+    ).rejects.toThrow("invalid broadcaster schedule");
+});
+
+it.each([
+    { publishAfter: "0", executeBefore: "2" },
+    { publishAfter: "1", executeBefore: "9007199254740992" },
+])("rejects noncanonical scheduled status timestamps: %j", async (schedule) => {
+    await expect(
+        client({ id: "job", state: "scheduled", ...schedule }).status("job")
+    ).rejects.toThrow("schedule status");
+});
+
+it("accepts the maximum canonical safe scheduling second", async () => {
+    const estimate = { feeRecipient: signer.address, feeAmount: "2", maxGas: "1000000" };
+    await expect(
+        client(estimate).estimateQuote({
+            data: data(),
+            schedule: {
+                publishAfter: "9007199254740990",
+                executeBefore: "9007199254740991",
+                cancelTokenHash: "0x" + "55".repeat(32),
+            },
+        })
+    ).resolves.toEqual(estimate);
 });

@@ -5,6 +5,8 @@ import {
     broadcasterRequestHash,
     broadcasterQuoteDomain,
     broadcasterQuoteTypes,
+    scheduledBroadcasterQuoteTypes,
+    type BroadcasterSchedule,
     decodeBroadcasterIntent,
 } from "@invisi-labs/sdk";
 export function quoteClient(
@@ -31,9 +33,31 @@ export function quoteClient(
                     feeAmount: String(amount()),
                     maxGas: "2000000",
                 });
-            const { data } = (request.params as unknown[])[0] as { data: string };
+            if (request.method === "broadcaster_getStatus")
+                return result({
+                    apiVersion: "v1",
+                    protocolVersion: "1",
+                    chainId: context.chainId.toString(),
+                    protocol: context.protocolAddress,
+                    sender: signer.address,
+                    feeRecipient: signer.address,
+                    submissionHalted: false,
+                    provenance: { enabled: false },
+                    scheduling: {
+                        enabled: true,
+                        maxDelaySeconds: "604800",
+                        defaultExecutionWindowSeconds: "300",
+                        maxExecutionWindowSeconds: "3600",
+                        minDeadlineSlackSeconds: "120",
+                    },
+                });
+            const { data, schedule } = (request.params as unknown[])[0] as {
+                data: string;
+                schedule?: BroadcasterSchedule;
+            };
             const params = decodeBroadcasterIntent(data).request.params;
             const quote = {
+                ...(schedule ? { schedule } : {}),
                 token: params.token,
                 feeRecipient: params.feeRecipient,
                 feeAmount: String(params.feeAmount),
@@ -46,8 +70,8 @@ export function quoteClient(
                 quote,
                 signature: await signer.signTypedData(
                     broadcasterQuoteDomain(trust),
-                    broadcasterQuoteTypes,
-                    quote
+                    schedule ? scheduledBroadcasterQuoteTypes : broadcasterQuoteTypes,
+                    schedule ? { ...quote, ...schedule } : quote
                 ),
             });
         }

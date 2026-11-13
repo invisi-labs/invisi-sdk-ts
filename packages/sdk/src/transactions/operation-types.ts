@@ -196,9 +196,11 @@ export interface SavedOperation {
     broadcasterBinding?: {
         configuration: import("../broadcaster/index").BroadcasterConfiguration;
         intentHash: string;
+        scheduleHandle?: import("../broadcaster/index").BroadcasterScheduleHandle;
     };
     broadcasterSubmissionId?: string;
     broadcasterAttempted?: boolean;
+    broadcasterCancelled?: boolean;
     broadcasterRequest?: {
         data: string;
         memberProof?: import("@invisi-labs/rpc/broadcaster").BroadcasterMemberProof;

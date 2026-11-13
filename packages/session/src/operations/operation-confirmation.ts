@@ -352,7 +352,7 @@ export async function reconcileOperation(
                 "wallet advanced or changed during reconciliation; retry"
             );
         }
-        if (expired || impossible) {
+        if (expired || impossible || (next.broadcasterCancelled && !active.transactionHash)) {
             active.status = expired ? "expired" : "failed";
             facts.forEach((fact, i) => {
                 const input = draft[fact.kind][fact.key];
