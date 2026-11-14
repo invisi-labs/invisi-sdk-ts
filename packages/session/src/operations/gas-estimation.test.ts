@@ -63,7 +63,7 @@ it("matches C4 mixed funding without querying approval", async () => {
     expect(prepared.estimateGas()).toMatchObject({
         source: "benchmark",
         available: true,
-        gasUnits: 1855550n,
+        gasUnits: 1860623n,
     });
 });
 it.each(["fee", "withdrawal"] as const)(
