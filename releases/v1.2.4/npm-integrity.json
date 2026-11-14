@@ -1,0 +1,55 @@
+{
+  "format": "invisi.npm.release-integrity.v1",
+  "version": "1.2.4",
+  "archives": "github-release",
+  "packages": [
+    {
+      "name": "@invisi-labs/primitives",
+      "version": "1.2.4",
+      "filename": "invisi-labs-primitives-1.2.4.tgz",
+      "integrity": "sha512-ww2m4lFgT0d9bZotNhIDZeSiMxBIDrQA1d8OokAE0xp9kW72u8ksG10zF8JDfFDntyqnk/GcRX75brA3dhoYiQ=="
+    },
+    {
+      "name": "@invisi-labs/protocol",
+      "version": "1.2.4",
+      "filename": "invisi-labs-protocol-1.2.4.tgz",
+      "integrity": "sha512-lLByUzHlxpk6QAPtkVpLgtc4OEMpwlD24kyTom6dOCD4qbZfzfyYYXAWQrC9FdmSdAJI67N7OZCyusRAAfM4ww=="
+    },
+    {
+      "name": "@invisi-labs/prover",
+      "version": "1.2.4",
+      "filename": "invisi-labs-prover-1.2.4.tgz",
+      "integrity": "sha512-RZn7j0zDGk/AXIf384XezViS5s+XKlnKcMdfve3u2EdKyeR2893a6ZaWVClXUphbpJ2QUdcFesLBolSr6dzqBw=="
+    },
+    {
+      "name": "@invisi-labs/react",
+      "version": "1.2.4",
+      "filename": "invisi-labs-react-1.2.4.tgz",
+      "integrity": "sha512-x4uXTysaezntVeEnV4OFEAq50xatFBMNS0QsNk8fkwLbQwmBnUo6XkeQ6L5/wE5+F0D7Wlz+okJWLd4q8Rthww=="
+    },
+    {
+      "name": "@invisi-labs/rpc",
+      "version": "1.2.4",
+      "filename": "invisi-labs-rpc-1.2.4.tgz",
+      "integrity": "sha512-B0YUfzFw9Bg0LHgRcRR9htVn/LPHbjO9fNWJmSsYwDS4u8sbV5MkzrgV8TBkLI/2mhnxo1Ks8DSJrPm8r8g/cg=="
+    },
+    {
+      "name": "@invisi-labs/sdk",
+      "version": "1.2.4",
+      "filename": "invisi-labs-sdk-1.2.4.tgz",
+      "integrity": "sha512-exLt9P4MmMUCtlMAaY2y4TQt0Ea25z6jlfvVi4Emw/Oq92AxvVsYK0dtYjjhC+LYcSofkrPgNlFmz42+ibpvog=="
+    },
+    {
+      "name": "@invisi-labs/session",
+      "version": "1.2.4",
+      "filename": "invisi-labs-session-1.2.4.tgz",
+      "integrity": "sha512-o94k+knoYgOFdIBR2UbuP1Gp8gB9b3AjT8f+9Aqa8mUkMcKZDUs4capZ6lBLTyOGleWzYJu7CCor0VXTVBHe/Q=="
+    },
+    {
+      "name": "@invisi-labs/vue",
+      "version": "1.2.4",
+      "filename": "invisi-labs-vue-1.2.4.tgz",
+      "integrity": "sha512-k/gQOFmU0wmQqSBSAmW5A+VEATZ0bi+8EMR17SSDm2tIwXY3dMXAdTJIVwkUK1/YaSfXzZHTY0tC7qlDob6FGQ=="
+    }
+  ]
+}

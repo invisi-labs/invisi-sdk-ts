@@ -1,5 +1,9 @@
 # @invisi-labs/react
 
+## 1.2.4
+
+- Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.
+
 ## 1.2.3
 
 - Align the fixed package group with native-chain finality, offline transaction preparation, preparation-read reuse and shared portable Note interoperability checks.
