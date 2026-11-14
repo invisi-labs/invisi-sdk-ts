@@ -53,3 +53,21 @@ Block numbers, tree IDs and timestamps normalize to bigint. ABI uint64/uint256 e
 `ProtocolDeployment`/`ContractDeployment` are defined in this package. Deployment records contain chain ID, Protocol and optional receiving/broadcaster registries with address, runtime hash and start block. `getReceivingAddress` and `getBroadcasters` preserve independent registry validation. SDK/Protocol consumers must not maintain a second deployment catalog.
 
 The synchronized server uses index format 3 and snapshot format 2; existing operators must follow its explicit backup/fresh-reindex/rollback guide. This client does not migrate server databases or wallet stores.
+
+### Trusted Protocol RPC chain reader
+
+The opt-in `@invisi-labs/rpc/trusted-provider` entry exports `TrustedProvider`, which implements `ChainReader` using only `invisi_readChainState`. It trusts the selected publisher for chain facts and does not independently authenticate Ethereum. Construct the client with explicit deployment pins (discovered pins alone are insufficient):
+
+```ts
+import { ProtocolRpcClient } from "@invisi-labs/rpc";
+import { TrustedProvider } from "@invisi-labs/rpc/trusted-provider";
+const client = new ProtocolRpcClient({ url: "https://rpc.example/v1", deployment });
+const chainReader = new TrustedProvider(client, {
+    chainId: deployment.chainId,
+    protocolAddress: deployment.protocol.address,
+});
+const rpc = client.withReader(chainReader);
+// Supply { chainReader, protocolRpc: rpc } to Invisi; no ethers provider is needed.
+```
+
+Each response must match the complete deployment and `v1`/`1` version pins. Headers are bound to their encoded hash and requested number; receipts to their transaction and canonical header; signed transactions to their computed hash. The reader supports latest/safe/finalized blocks, code, restricted contract calls, funding nonces, roots, nullifier state and token balance/allowance reads. It exposes no chain transaction submission or generic Ethereum RPC transport. The service allowlist determines which contract calls are available.

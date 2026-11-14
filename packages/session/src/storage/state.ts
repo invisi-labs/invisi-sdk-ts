@@ -15,7 +15,10 @@ export type {
     SpentState,
     WalletScope,
 } from "@invisi-labs/sdk/session-support";
-export interface StoredNote extends NoteRecord {}
+export interface StoredNote extends NoteRecord {
+    /** Membership authenticated at an observation block; creation provenance is not yet known. */
+    origin?: "membership-import";
+}
 export interface StoredCredit extends CreditRecord {}
 
 export interface OperationRecord {

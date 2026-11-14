@@ -69,6 +69,27 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         return client;
     }
 
+    /** @internal Restricted trusted chain transport; explicit publisher pins are mandatory. */
+    trustedChainState(
+        context: DeploymentContext
+    ): (request: unknown) => Promise<Record<string, unknown>> {
+        if (!this.#explicitDeployment)
+            throw Error("trusted provider requires explicit deployment pins");
+        this.context(context);
+        return async (request) => {
+            const result = object(await this.rpc("invisi_readChainState", [request]));
+            if (result.apiVersion !== "v1" || result.protocolVersion !== "1")
+                throw Error("trusted chain state version mismatch");
+            const snapshot = (value: unknown) =>
+                JSON.stringify(value, (_, item) =>
+                    typeof item === "bigint" ? item.toString() : item
+                );
+            if (snapshot(defineDeployment(result.deployment)) !== snapshot(this.deployment))
+                throw Error("trusted chain state deployment mismatch");
+            return result;
+        };
+    }
+
     private get reader(): ProtocolRpcReader {
         if (!this.#options.reader)
             throw new Error("Chain reader required to verify Protocol RPC data");

@@ -22,7 +22,7 @@ export type PreparationIntent =
     | { kind: "draw-credit"; options: DrawCreditPreparation }
     | { kind: "update-credit"; options: UpdateCreditPreparation }
     | { kind: "revoke-credit"; options: RevokeCreditPreparation };
-export type BroadcasterFeeSource = "public-funding" | "private-inputs";
+export type BroadcasterFeeSource = "public-funding" | "private-inputs" | "payout";
 export interface BroadcasterQuoteOptions {
     maxFeeAmount: bigint;
     schedule?: { publishAfter: bigint; executeBefore?: bigint };
@@ -177,6 +177,61 @@ export async function prepareBroadcasterPlan(
             previousAmount = amount;
         }
         throw new Error("broadcaster fee did not stabilize within the preparation limit");
+    }
+    if (options.feeSource === "payout") {
+        if (
+            intent.kind !== "transfer" ||
+            plan.kind !== "transfer" ||
+            !plan.inputs.length ||
+            plan.outputs.length ||
+            plan.params?.noteCommitments.length ||
+            (plan.funding.amount ?? 0n) !== 0n ||
+            !intent.options.withdrawal ||
+            BigInt(intent.options.withdrawal.to) === 0n ||
+            options.fundingPermit
+        )
+            throw Error("payout fee requires a pure unfunded withdrawal");
+        const gross = plan.inputs.reduce((sum, input) => sum + input.note.amount, 0n);
+        if (gross !== plan.params!.withdrawalAmount + (plan.params!.feeAmount ?? 0n))
+            throw Error("payout requires the full selected note sum");
+        let current = plan,
+            previous = 0n;
+        for (let i = 0; i < attempts; i++) {
+            const quoted = await estimate(exportBroadcasterIntent(current).data);
+            const minimum = BigInt(quoted.feeAmount),
+                amount = minimum > previous ? minimum : previous;
+            const recipient = getAddress(quoted.feeRecipient) as `0x${string}`;
+            if (amount <= 0n || amount > maxFee || amount >= 1n << 128n || BigInt(recipient) === 0n)
+                throw Error("broadcaster fee exceeds user limit or is invalid");
+            if (amount >= gross) throw Error("payout fee leaves no positive withdrawal");
+            const request = structuredClone(intent);
+            request.options.commitments = plan.inputs.map((input) => input.commitment);
+            request.options.withdrawal = { ...intent.options.withdrawal, amount: gross - amount };
+            request.options.fee = { recipient, amount };
+            current = await reprepare(request);
+            if (
+                current.outputs.length ||
+                current.inputs.length !== plan.inputs.length ||
+                current.inputs.some(
+                    (input, i) => input.commitment !== plan.inputs[i]!.commitment
+                ) ||
+                (current.funding.amount ?? 0n) !== 0n
+            )
+                throw Error("payout repricing changed selected inputs or authorization");
+            const required = await estimate(exportBroadcasterIntent(current).data);
+            if (
+                getAddress(required.feeRecipient) !== recipient ||
+                BigInt(required.feeAmount) <= 0n ||
+                BigInt(required.feeAmount) > maxFee
+            )
+                throw Error("broadcaster fee exceeds user limit or recipient changed");
+            if (amount >= BigInt(required.feeAmount)) {
+                current.intent = structuredClone(intent);
+                return finalize(current);
+            }
+            previous = amount;
+        }
+        throw Error("broadcaster fee did not stabilize within the preparation limit");
     }
     const funding = "funding" in intent.options ? intent.options.funding : undefined;
     let source = options.feeSource ?? (funding ? "public-funding" : "private-inputs");

@@ -220,6 +220,8 @@ it("requires explicit application pins after discovery and reader cloning", asyn
 
 it("rejects zero commitments before calling the trusted RPC", async () => {
     const { client, requests } = setup(() => null);
-    await expect(client.getNoteFromTrustedRpc(context, h(0), "finalized")).rejects.toThrow(/nonzero/i);
+    await expect(client.getNoteFromTrustedRpc(context, h(0), "finalized")).rejects.toThrow(
+        /nonzero/i
+    );
     expect(requests).toHaveLength(0);
 });

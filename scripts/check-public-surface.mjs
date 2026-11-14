@@ -9,7 +9,7 @@ const entries = {
     "primitives": [".", "./address", "./note", "./credit"],
     "sdk": [".", "./ethers", "./session-support", "./note", "./credit", "./provenance"],
     "prover": [".", "./native", "./wasm", "./aggregate", "./provenance", "./provenance-witness"],
-    "rpc": [".", "./provenance", "./broadcaster"],
+    "rpc": [".", "./provenance", "./broadcaster", "./trusted-provider"],
     "react": ["."],
     "session": [".", "./sqlite", "./indexeddb", "./memory"],
 };
@@ -64,6 +64,7 @@ const sdk = await import(resolve("packages/sdk/dist/index.js"));
 const session = await import(resolve("packages/session/dist/index.js"));
 const protocol = await import(resolve("packages/protocol/dist/index.js"));
 const rpc = await import(resolve("packages/rpc/dist/index.js"));
+const trusted = await import(resolve("packages/rpc/dist/trusted-provider.js"));
 function functions(api, names, label) {
     for (const name of names)
         assert.equal(typeof api[name], "function", `${label}.${name} missing`);
@@ -106,6 +107,8 @@ for (const target of [sdk.PreparedTransaction, session.Operation])
     for (const method of ["withBroadcaster", "submitBroadcaster", "cancelBroadcaster"])
         assert.equal(method in target.prototype, false, "relay execution belongs to the client");
 functions(rpc, ["ProtocolRpcClient", "defineDeployment"], "rpc");
+functions(trusted, ["TrustedProvider"], "rpc/trusted-provider");
+assert.equal("TrustedProvider" in rpc, false, "trusted provider must remain opt-in");
 functions(
     protocol,
     [

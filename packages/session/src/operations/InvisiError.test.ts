@@ -26,7 +26,7 @@ describe("public preparation errors", () => {
             Object.getOwnPropertyNames(WalletSession.prototype)
                 .filter((name) => name.startsWith("prepare"))
                 .sort()
-        ).toEqual([...methods].sort());
+        ).toEqual([...methods, "prepareCollection"].sort());
     });
     it.each([...methods, registration])(
         "normalizes synchronous input failures in Invisi.%s",
@@ -41,12 +41,17 @@ describe("public preparation errors", () => {
             });
         }
     );
-    it.each(methods)("normalizes synchronous failures in WalletSession.%s", async (method) => {
-        const h = await fixture();
-        const error = await h.session[method](undefined as never).catch((error: unknown) => error);
-        expect(error).toBeInstanceOf(InvisiError);
-        expect(error).toMatchObject({ code: "PREPARATION_FAILED", operation: method });
-    });
+    it.each([...methods, "prepareCollection"] as const)(
+        "normalizes synchronous failures in WalletSession.%s",
+        async (method) => {
+            const h = await fixture();
+            const error = await h.session[method](undefined as never).catch(
+                (error: unknown) => error
+            );
+            expect(error).toBeInstanceOf(InvisiError);
+            expect(error).toMatchObject({ code: "PREPARATION_FAILED", operation: method });
+        }
+    );
     it("normalizes the low-level SDK registry entry too", async () => {
         const registry = new AddressRegistry({
             chainId: 97n,

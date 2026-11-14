@@ -205,3 +205,23 @@ const call = await ready.exportTransaction(); // May run offline.
 // Once online: send the operation to enforce live checks, or validate before a direct ethers send.
 await session.sendTransaction(ready, { gasLimit });
 ```
+
+### Explicit note collection
+
+`await session.importNotes(inputs)` accepts the SDK's `NoteInput[]` openings. Import validates owner/deployment, amount, recomputed commitment, authenticated membership and current nullifiers, then commits with a revision fence. Reimport preserves spent state and operation reservations. It updates the known-state observation without advancing discovery coverage; imported notes do not establish that all wallet funds were discovered.
+
+```ts
+await session.importNotes([{ note, commitment, treeId, leafIndex }]);
+const collection = await session.prepareCollection({
+    tokenAddress,
+    recipient,
+    commitments: [commitment],
+    // deadline: optional Unix seconds as bigint
+});
+const quoted = await broadcaster.quote(collection, {
+    feeSource: "payout",
+    maxFeeAmount: 1000n,
+});
+```
+
+`CollectionPreparation` is exported from `@invisi-labs/session`. Collection reserves exactly the selected available notes and withdraws their entire sum, with no funding or private outputs. Payout fees are available only for a pure unfunded full withdrawal. Quotation deducts the fee from that frozen gross sum, requires a positive net withdrawal and owner authorization, and honors the caller's maximum fee. Requoting replaces the fee immutably; it never deducts it twice or adds notes. Authorize and prove the quoted operation through the normal operation lifecycle.

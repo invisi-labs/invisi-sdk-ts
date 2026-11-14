@@ -1,3 +1,5 @@
+import { importSessionNotes } from "./collection";
+import type { NoteInput } from "@invisi-labs/sdk";
 import { scanStatus, fundsStatus } from "../sync/status";
 import { PublicHistory, historyScope, type PublicSyncOptions } from "../public-history/history";
 import { PublicHistoryStore, publicScopeKey } from "../public-history/store";
@@ -558,6 +560,53 @@ export class WalletSession {
             throw error;
         }
     }
+    /** Import known openings without claiming account discovery coverage. */
+    async importNotes(inputs: readonly NoteInput[]): Promise<void> {
+        const copied = structuredClone(inputs);
+        return this.queueScan(async () => {
+            await this.ready();
+            if (!this.#options.store || !this.#options.chainReader || !this.#options.protocolRpc)
+                throw new MissingCapabilityError("note import infrastructure");
+            await importSessionNotes(
+                this.#options,
+                this.scope,
+                copied,
+                async () => (await this.publicHistory.snapshot()).generation
+            );
+        });
+    }
+    /** Freeze exactly the selected available notes into a full withdrawal. */
+    async prepareCollection(options: CollectionPreparation): Promise<Operation> {
+        return prepareWithErrors("prepareCollection", async () => {
+            const request = structuredClone(options);
+            if (BigInt(getAddress(request.recipient)) === 0n || request.commitments.length === 0)
+                throw Error("collection requires a recipient and selected notes");
+            if (!this.#options.store) throw new MissingCapabilityError("wallet store");
+            const state = await this.#options.store.readSnapshot(this.scope),
+                seen = new Set<string>();
+            let amount = 0n;
+            for (const key of request.commitments) {
+                const record = state.notes[key];
+                if (
+                    seen.has(key) ||
+                    !record ||
+                    record.spent !== "unspent" ||
+                    state.reservations[key] ||
+                    record.note.tokenAddress !== BigInt(getAddress(request.tokenAddress))
+                )
+                    throw Error("collection note unavailable or duplicate");
+                seen.add(key);
+                amount += record.note.amount;
+            }
+            return this.prepareTransfer({
+                tokenAddress: request.tokenAddress,
+                commitments: request.commitments,
+                outputs: [],
+                withdrawal: { to: request.recipient, amount },
+                ...(request.deadline === undefined ? {} : { deadline: request.deadline }),
+            });
+        });
+    }
     async prepareTransfer(options: TransferPreparation): Promise<Operation> {
         return prepareWithErrors("prepareTransfer", async () => {
             await this.ready();
@@ -625,4 +674,11 @@ export class WalletSession {
     [Symbol.for("nodejs.util.inspect.custom")]() {
         return this.toJSON();
     }
+}
+
+export interface CollectionPreparation {
+    tokenAddress: Hex;
+    recipient: Hex;
+    commitments: readonly Hex[];
+    deadline?: bigint;
 }

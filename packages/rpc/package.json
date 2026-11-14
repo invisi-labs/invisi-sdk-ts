@@ -21,6 +21,11 @@
       "types": "./dist/broadcaster.d.ts",
       "import": "./dist/broadcaster.js",
       "require": "./dist/broadcaster.cjs"
+    },
+    "./trusted-provider": {
+      "types": "./dist/trusted-provider.d.ts",
+      "import": "./dist/trusted-provider.js",
+      "require": "./dist/trusted-provider.cjs"
     }
   },
   "scripts": {

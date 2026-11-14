@@ -115,7 +115,8 @@ export function mergeReceiptRecords(state: WalletState, batch: ReceiptRecords): 
             atPosition.some(
                 (existing) =>
                     existing.commitment !== record.commitment ||
-                    existing.blockHash !== record.blockHash
+                    (existing.blockHash !== record.blockHash &&
+                        !("note" in existing && existing.origin === "membership-import"))
             )
         ) {
             throw new Error("canonical position conflict requires resync");
@@ -125,6 +126,12 @@ export function mergeReceiptRecords(state: WalletState, batch: ReceiptRecords): 
             if (previous) {
                 if (canonical(previous.note) !== canonical(record.note)) {
                     throw new Error("canonical note preimage conflict");
+                }
+                if (previous.origin === "membership-import") {
+                    previous.blockNumber = record.blockNumber;
+                    previous.blockHash = record.blockHash;
+                    if (record.transactionHash) previous.transactionHash = record.transactionHash;
+                    delete previous.origin;
                 }
                 mergeSpentObservation(previous, record);
                 continue;
