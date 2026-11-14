@@ -14,3 +14,10 @@ export * from "./bindings/client/Protocol";
 export * from "./bindings/client/TokenProtocol";
 export * from "./bindings/registry/AddressRegistry";
 export * from "./bindings/registry/RegistrationOperation";
+
+export type {
+    TrustedNoteFinality,
+    TrustedNotePendingReason,
+    TrustedNoteMembership,
+    TrustedNoteLookup,
+} from "./validation/note-confirmation";

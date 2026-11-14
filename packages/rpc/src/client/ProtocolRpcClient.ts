@@ -1,3 +1,8 @@
+import {
+    parseTrustedNote,
+    type TrustedNoteFinality,
+    type TrustedNoteLookup,
+} from "../validation/note-confirmation";
 import { checkedFinality } from "../validation/finality";
 import { getAddress } from "ethers";
 import type { Address, Hex } from "@invisi-labs/primitives";
@@ -44,20 +49,24 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
     readonly #options: ProtocolRpcClientOptions;
     #deployment: Readonly<ProtocolDeployment> | undefined;
     #nextId = 1;
+    #explicitDeployment: boolean;
     constructor(connection: string | ProtocolRpcClientOptions) {
         const options = typeof connection === "string" ? { url: connection } : connection;
         endpoint(options);
         this.#deployment =
             options.deployment === undefined ? undefined : defineDeployment(options.deployment);
         this.#options = { ...options };
+        this.#explicitDeployment = options.deployment !== undefined;
     }
     /** Create an independent client that verifies indexed data against the selected chain. */
     withReader(reader: ProtocolRpcReader): ProtocolRpcClient {
-        return new ProtocolRpcClient({
+        const client = new ProtocolRpcClient({
             ...this.#options,
             ...(this.#deployment ? { deployment: this.#deployment } : {}),
             reader,
         });
+        client.#explicitDeployment = this.#explicitDeployment;
+        return client;
     }
 
     private get reader(): ProtocolRpcReader {
@@ -563,6 +572,27 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         const bitmap = integer(result.bitmap, 256);
         await this.recheck(block);
         return { block: anchor, bitmap };
+    }
+
+    /** Trust the selected RPC for receipt/canonicality/finality; locally verify pins and proof. */
+    async getNoteFromTrustedRpc(
+        context: DeploymentContext,
+        commitment: Hex,
+        finality: TrustedNoteFinality
+    ): Promise<TrustedNoteLookup> {
+        if (!this.#explicitDeployment)
+            invalid("Explicit application deployment pins required for trusted note lookup");
+        this.context(context);
+        if (finality !== "safe" && finality !== "finalized")
+            invalid("Invalid trusted note finality");
+        const leaf = fieldHash(commitment);
+        if (BigInt(leaf) === 0n) invalid("Nonzero commitment required");
+        return parseTrustedNote(
+            await this.rpc("invisi_getNote", [leaf, { finality }]),
+            this.deployment,
+            leaf,
+            finality
+        );
     }
 
     /** Locate a Note by commitment, then independently authenticate its membership. */

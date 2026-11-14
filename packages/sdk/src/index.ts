@@ -97,6 +97,10 @@ export type {
     ProtocolRpcClientOptions,
     ProtocolRpcConnectionOptions,
     ProtocolRpcReader,
+    TrustedNoteFinality,
+    TrustedNotePendingReason,
+    TrustedNoteMembership,
+    TrustedNoteLookup,
     RegisteredReceivingAddress,
 } from "@invisi-labs/rpc";
 export { AddressRegistry } from "./protocol/AddressRegistry";

@@ -192,3 +192,14 @@ Scheduled status adds `scheduled`, `preparing`, and `cancelled`, with decimal-st
 Run the owned-chain native-proof scheduling acceptance with `node test-support/integration/provenance-broadcaster-e2e.mjs --highlevel=typescript --schedule=both`. It proves and cancels one request, recovers its saved scoped capability, then proves a distinct request from the still-unspent input and verifies delayed inclusion plus normal Source recognition. This explicit mode skips the unrelated aggregate batching scenarios; the default suite remains unchanged.
 
 Use `--highlevel=typescript --schedule=aggregate` for the separate native recursive-member / native outer scheduling scenario. It verifies deferred queue entry, aggregate transaction member matching, finalized inclusion and ordinary Source recognition.
+
+`ProtocolRpcClient.getNoteFromTrustedRpc(context, commitment, "safe" | "finalized")`
+uses the `invisi_getNote` confirmation selector with explicit constructor
+`deployment` pins and no chain reader. Discovery through `getDeployment` alone does
+not authorize trusted confirmation, including on clients cloned with `withReader`. Its distinct `TrustedNoteLookup` result is either `pending` (an explicit
+reason with no partial output/proof) or `confirmed`. The client validates deployment
+pins, response bindings, block consistency, head coverage and the Merkle proof.
+Canonicality, successful receipt authentication and native finality remain claims
+trusted to the selected RPC publisher. A pending result is not proof of no payment.
+The existing `getNote(context, commitment, block)` continues to authenticate through
+an independent chain reader.
