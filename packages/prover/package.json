@@ -71,5 +71,6 @@
     "type": "git",
     "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
     "directory": "packages/prover"
-  }
+  },
+  "license": "Apache-2.0"
 }

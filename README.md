@@ -203,3 +203,7 @@ Canonicality, successful receipt authentication and native finality remain claim
 trusted to the selected RPC publisher. A pending result is not proof of no payment.
 The existing `getNote(context, commitment, block)` continues to authenticate through
 an independent chain reader.
+
+## Contributing
+
+Open a focused GitHub issue or pull request describing the problem, scope, and validation. Run `pnpm test` and `pnpm lint` (plus the relevant package/release checks) for your change. Never include private keys, credentials, or private witnesses in issues, pull requests, logs, or fixtures.

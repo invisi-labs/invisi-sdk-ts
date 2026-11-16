@@ -71,3 +71,7 @@ const rpc = client.withReader(chainReader);
 ```
 
 Each response must match the complete deployment and `v1`/`1` version pins. Headers are bound to their encoded hash and requested number; receipts to their transaction and canonical header; signed transactions to their computed hash. The reader supports latest/safe/finalized blocks, code, restricted contract calls, funding nonces, roots, nullifier state and token balance/allowance reads. It exposes no chain transaction submission or generic Ethereum RPC transport. The service allowlist determines which contract calls are available.
+
+## Contributing
+
+See the [contribution guidelines](../../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.

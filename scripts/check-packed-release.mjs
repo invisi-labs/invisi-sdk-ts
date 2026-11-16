@@ -18,6 +18,17 @@ const packages = archives.map((name) => {
     const files = new Set(
         execFileSync("tar", ["-tf", archive], { encoding: "utf8" }).trim().split("\n")
     );
+    assert.equal(manifest.license, "Apache-2.0", `${manifest.name}: license metadata`);
+    const license = readFileSync(new URL("../LICENSE", import.meta.url), "utf8");
+    assert(
+        license.includes("END OF TERMS AND CONDITIONS") && license.length > 10000,
+        "Root LICENSE must contain the complete Apache-2.0 terms"
+    );
+    assert.equal(
+        execFileSync("tar", ["-xOf", archive, "package/LICENSE"], { encoding: "utf8" }),
+        license,
+        `${manifest.name}: packaged LICENSE must contain the complete terms`
+    );
     const entries = [];
     for (const [subpath, target] of Object.entries(manifest.exports)) {
         const conditions = typeof target === "string" ? { import: target } : target;

@@ -66,5 +66,6 @@
     "type": "git",
     "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
     "directory": "packages/sdk"
-  }
+  },
+  "license": "Apache-2.0"
 }

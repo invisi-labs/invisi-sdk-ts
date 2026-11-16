@@ -118,3 +118,7 @@ Example03 requires `STORE_ENCRYPTION_KEY_HEX`, a dedicated 32-byte storage key r
 Examples01/02 use ephemeral inventory; Example03 demonstrates encrypted persistent operation recovery. None serializes a `ready` object or stores openings in public history.
 
 Gas estimation: the Note funding, four Credit and Broadcaster examples call `prepared.estimateGas()` before authorization or proving. This local receipt-calibrated preview does not check approval or chain state. All valid direct shapes return positive `gasUnits`; `source` is always `benchmark`; `statistic` distinguishes measured medians from calibrated estimates, and `protocolCommit` identifies calibration. Recursive aggregate previews remain unsupported. Example 07-02 demonstrates optional final RPC simulation performed directly by the App provider, then passes its gas budget to `session.sendTransaction`. Current fee prices, safety margins and approval remain host decisions.
+
+## Contributing
+
+See the [contribution guidelines](../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.

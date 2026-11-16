@@ -225,3 +225,7 @@ const quoted = await broadcaster.quote(collection, {
 ```
 
 `CollectionPreparation` is exported from `@invisi-labs/session`. Collection reserves exactly the selected available notes and withdraws their entire sum, with no funding or private outputs. Payout fees are available only for a pure unfunded full withdrawal. Quotation deducts the fee from that frozen gross sum, requires a positive net withdrawal and owner authorization, and honors the caller's maximum fee. Requoting replaces the fee immutably; it never deducts it twice or adds notes. Authorize and prove the quoted operation through the normal operation lifecycle.
+
+## Contributing
+
+See the [contribution guidelines](../../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.

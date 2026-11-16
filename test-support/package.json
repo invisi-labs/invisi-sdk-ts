@@ -16,5 +16,6 @@
   "scripts": {
     "integration:provenance": "node integration/provenance-e2e.mjs",
     "integration:broadcaster": "node integration/provenance-broadcaster-e2e.mjs"
-  }
+  },
+  "license": "Apache-2.0"
 }
