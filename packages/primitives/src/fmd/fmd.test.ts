@@ -102,3 +102,19 @@ it("uses the supplied WebCrypto entropy and fails if secure randomness is absent
         vi.unstubAllGlobals();
     }
 });
+
+it("does not bind public-key precomputation to mutable caller buffers", () => {
+    const vector = rust.vectors[0]!;
+    const key = bytes(vector.clueKey);
+    const seed = bytes(vector.seedHex);
+    expect(hex(createClueFromSeed(key, seed))).toBe(vector.clue);
+    key.fill(0);
+    expect(() => createClueFromSeed(key, seed)).toThrow();
+    key.set(bytes(vector.clueKey));
+    for (const entry of rust.vectors.slice(1, 12)) {
+        expect(hex(createClueFromSeed(bytes(entry.clueKey), bytes(entry.seedHex)))).toBe(
+            entry.clue
+        );
+    }
+    expect(hex(createClueFromSeed(key, seed))).toBe(vector.clue);
+});

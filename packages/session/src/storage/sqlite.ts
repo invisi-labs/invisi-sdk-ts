@@ -10,6 +10,7 @@ import {
 } from "../index";
 export interface SQLiteStatement {
     get(...params: unknown[]): unknown;
+    all?(...params: unknown[]): unknown[];
     run(...params: unknown[]): { changes: number | bigint };
 }
 /** Compatible with node:sqlite DatabaseSync and synchronous SQLite drivers. The caller owns its lifetime. */
@@ -56,9 +57,24 @@ export class SQLiteAtomicRecords implements PagedAtomicRecordStore {
     }
     async readPage(prefix: string, after: string | undefined, limit: number): Promise<RecordRow[]> {
         pageLimit(limit);
+        const statement = this.#db.prepare(
+            `SELECT scope_key,revision,data FROM ${this.#table} WHERE scope_key >= ? AND scope_key < ? AND scope_key > ? ORDER BY scope_key LIMIT ?`
+        );
+        if (statement.all) {
+            return (
+                statement.all(prefix, prefix + "\uffff", after ?? "", limit) as {
+                    scope_key: string;
+                    revision: number;
+                    data: Uint8Array;
+                }[]
+            ).map((row) => ({
+                key: row.scope_key,
+                revision: row.revision,
+                data: Uint8Array.from(row.data),
+            }));
+        }
         const rows: RecordRow[] = [];
         let cursor = after ?? "";
-        // Drivers need only get/run; keyset iteration never fetches an unbounded result set.
         for (let i = 0; i < limit; i++) {
             const row = this.#db
                 .prepare(

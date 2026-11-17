@@ -1,5 +1,9 @@
 # @invisi-labs/primitives
 
+## Unreleased
+
+- Reduce Decaf377 FMD clue-generation work with a fixed-field inverse square root, shared scalar multiplication and a bounded cache of public clue-key precomputations. Preserve canonical encodings, deterministic cross-language clue bytes and fresh per-clue randomness.
+
 ## 1.2.4
 
 - Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.

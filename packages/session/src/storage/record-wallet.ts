@@ -240,10 +240,9 @@ export class RecordWalletPersistence {
             if ((await this.records.read(scopeKey(scope)))?.revision === root.revision) {
                 for (const kind of WALLET_RECORD_KINDS) {
                     const expected = root.activeIntegrity?.[kind],
+                        activePrefix = prefix(scope, kind),
                         actual = integrity(
-                            [...rows.values()].filter((row) =>
-                                row.key.startsWith(prefix(scope, kind))
-                            )
+                            [...rows.values()].filter((row) => row.key.startsWith(activePrefix))
                         );
                     if (
                         !expected ||
@@ -456,14 +455,19 @@ export class RecordWalletPersistence {
             validateState(active, scope, draft.revision);
             const activeRows = new Map([...loaded.rows.values()].map((row) => [row.key, row]));
             const archiveCounts = { ...loaded.root.archiveCounts };
+            const prefixes = WALLET_RECORD_KINDS.map((kind) => ({
+                kind,
+                active: prefix(scope, kind),
+                archive: prefix(scope, kind, true),
+            }));
             for (const write of writes.values()) {
-                for (const kind of WALLET_RECORD_KINDS) {
-                    if (write.key.startsWith(prefix(scope, kind))) {
+                for (const { kind, active, archive } of prefixes) {
+                    if (write.key.startsWith(active)) {
                         if (write.record)
                             activeRows.set(write.key, { key: write.key, ...write.record });
                         else activeRows.delete(write.key);
                     }
-                    if (write.key.startsWith(prefix(scope, kind, true))) {
+                    if (write.key.startsWith(archive)) {
                         const exists = !!(await this.records.read(write.key));
                         archiveCounts[kind] =
                             (archiveCounts[kind] ?? 0) +
@@ -475,11 +479,9 @@ export class RecordWalletPersistence {
                 key = scopeKey(scope);
             root.archiveCounts = archiveCounts;
             root.activeIntegrity = {};
-            for (const kind of WALLET_RECORD_KINDS)
+            for (const { kind, active } of prefixes)
                 root.activeIntegrity[kind] = integrity(
-                    [...activeRows.values()].filter((row) =>
-                        row.key.startsWith(prefix(scope, kind))
-                    )
+                    [...activeRows.values()].filter((row) => row.key.startsWith(active))
                 );
             const data = await this.encodeChecked(root, key);
             if (

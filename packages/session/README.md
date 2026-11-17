@@ -229,3 +229,11 @@ const quoted = await broadcaster.quote(collection, {
 ## Contributing
 
 See the [contribution guidelines](../../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.
+
+## Preview storage performance
+
+SQLite adapters may implement `SQLiteStatement.all` in addition to `get` and `run`. Page reads then use one bounded, ordered query with a keyset cursor; get-only drivers retain the existing fallback. Row authentication, root revision fences and input reservation checks remain enabled.
+
+Managed broadcaster quotation retains one detached inventory for its fee iterations. Each preparation receives an independent copy, and the final transaction still checks the current operation generation, invalidation state and selected inputs. Inventory is not shared across separate quotes.
+
+Run `node test-support/performance/measure-wallet-storage.cjs BASELINE_ROOT CANDIDATE_ROOT OUTPUT_JSON` after building both SDK checkouts to compare encrypted, real SQLite storage with 128 synthetic retained operations. The [recorded Node measurements](../../test-support/performance/wallet-storage-node-20261117.json) show snapshot median 8.8 to 5.8 ms and transaction median 18.5 to 13.6 ms. These are desktop storage measurements, not App end-to-end or Hermes latency claims.
