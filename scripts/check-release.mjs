@@ -56,6 +56,7 @@ function main() {
         "Release packages must match the fixed version group"
     );
     validateRelease(tag, packages);
+    execFileSync("python3", [resolve(root, "scripts/release-notes.py"), tag], { stdio: "pipe" });
 
     const packedDirectory = process.argv[3];
     if (packedDirectory) {

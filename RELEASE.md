@@ -28,3 +28,10 @@ Publishing requires a separate authorization. These preparation steps do not cre
 Public circuit JSON and VK resources are published independently by Core. The SDK pins one immutable resource index and loads only required files, verifying size and hash before use. Publish that exact resource set before publishing SDKs; validate a cold-cache load. Native binaries and upstream WASM/CRS remain separate from the circuit snapshot.
 
 `releases/v1.2.5/npm-integrity.json` records the immutable canonical tarball SHA-512 values. Existing versions are skipped only after both registry metadata and downloaded archive bytes match that list, and the fresh build matches every runtime, declaration and resource file. Frozen CommonJS sourcemap build-directory fields and JSON property ordering are reported separately; other sourcemap or metadata changes fail verification. New publication requires the built archive itself to match the canonical SHA-512. A version already accepted for npm processing is never automatically published again while its public metadata is absent. GitHub release assets retain the canonical tarballs and integrity list.
+
+Release notes use the local versioned CHANGELOG as the only maintained source.
+`scripts/release-notes.py vMAJOR.MINOR.PATCH --output NOTES.md` renders the complete
+current entry (all public package entries for TypeScript) into the GitHub Release
+body. Missing, duplicate, empty or link-only entries fail validation before
+publication. Historical entries are retained locally; a release body includes only
+its matching version. Release retries update the same body from the same source.

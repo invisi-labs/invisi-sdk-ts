@@ -35,3 +35,7 @@ examples/*.sqlite*
 # Circuit binaries are published by Core and provisioned into external caches.
 /packages/prover/circuits/
 /packages/prover/provenance/
+
+# Local Python bytecode
+__pycache__/
+*.pyc

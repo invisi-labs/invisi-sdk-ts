@@ -37,6 +37,9 @@ jobs:
       - name: Verify tiny trusted Provenance metadata
         run: python3 scripts/sync-provenance.py --check-package packages/prover/src/resources
 
+      - name: Test versioned release notes
+        run: python3 scripts/test_release_notes.py
+
       - name: Check source formatting
         run: pnpm format:check
 

@@ -8,7 +8,7 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: read
+  contents: write
   id-token: write # OIDC for npm Trusted Publishing
 
 jobs:
@@ -49,6 +49,11 @@ jobs:
       - name: Test release validation
         run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs scripts/release-archive.test.mjs
 
+      - name: Validate complete versioned release notes
+        run: |
+          python3 scripts/test_release_notes.py
+          python3 scripts/release-notes.py "$GITHUB_REF_NAME" --output "$RUNNER_TEMP/release-notes.md"
+
       - name: Validate release versions and dependencies
         run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
 
@@ -82,3 +87,16 @@ jobs:
           for package in primitives protocol prover rpc sdk session ipp react vue; do
             node scripts/publish-release.mjs "$RUNNER_TEMP/release-packages/invisi-labs-$package-${GITHUB_REF_NAME#v}.tgz"
           done
+
+      - name: Publish full GitHub release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false \
+              --title "TypeScript SDK $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "TypeScript SDK $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" \
+              "$RUNNER_TEMP"/release-packages/*.tgz
+          fi
