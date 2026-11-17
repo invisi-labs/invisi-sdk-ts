@@ -1,0 +1,91 @@
+{
+  "recordedAt": "2026-11-17T09:37:00.673485+00:00",
+  "baselineSdk": "1.2.4",
+  "sourceBaseline": "1f19b1f",
+  "environment": "iPhone 17 iOS simulator development Hermes; same Mac host as Node and Rust comparisons",
+  "fmdPaired": {
+    "cold": {
+      "baselineMs": 961.2254590988159,
+      "candidateMs": 461.7487497329712,
+      "identical": true
+    },
+    "baselineWarm": {
+      "minMs": 658.2606658935547,
+      "medianMs": 659.8578114509583,
+      "maxMs": 663.9761247634888,
+      "samples": 4
+    },
+    "optimizedWarm": {
+      "minMs": 125.34879112243652,
+      "medianMs": 126.95679187774658,
+      "maxMs": 130.03287506103516,
+      "samples": 4
+    },
+    "byteIdentical": true
+  },
+  "fullPreview": {
+    "NoteOutput.create": {
+      "baseline": {
+        "minMs": 779.25,
+        "medianMs": 1075.085,
+        "maxMs": 1370.92,
+        "samples": 2
+      },
+      "optimized": {
+        "minMs": 207.11,
+        "medianMs": 213.95,
+        "maxMs": 787.69,
+        "samples": 3
+      }
+    },
+    "WalletSession.prepareTransfer": {
+      "baseline": {
+        "minMs": 1257.17,
+        "medianMs": 1292.62,
+        "maxMs": 1328.07,
+        "samples": 2
+      },
+      "optimized": {
+        "minMs": 490.23,
+        "medianMs": 493.97,
+        "maxMs": 663.36,
+        "samples": 3
+      }
+    },
+    "SDK.BroadcasterClient.quote": {
+      "baseline": {
+        "minMs": 4136.63,
+        "medianMs": 4271.755,
+        "maxMs": 4406.88,
+        "samples": 2
+      },
+      "optimized": {
+        "minMs": 2473.16,
+        "medianMs": 2637.79,
+        "maxMs": 2719.12,
+        "samples": 3
+      }
+    }
+  },
+  "optimizedMeasuredStagesIncludingDiscoveryAndEstimate": {
+    "coldMs": 5228.32,
+    "warm": {
+      "minMs": 3672.94,
+      "medianMs": 3800.165,
+      "maxMs": 3927.39,
+      "samples": 2
+    }
+  },
+  "sourceSha256": {
+    "packages/primitives/src/fmd/fmd.ts": "e940ca7cb85e6e22e93b280fb8330c5a199e7648250417d17a3907a5dd753b3f",
+    "packages/primitives/src/fmd/decaf377.ts": "fcae22948e2e4786673e7ecd3644dc07c063eab0785790f107b95caa4968d28e"
+  },
+  "boundaries": [
+    "FMD baseline and optimized variants are browser bundles built from the baseline and candidate source with identical esbuild options and tested in the same Hermes runtime, with identical public key/seed pairs. The first sample includes each bundle's cold precomputation.",
+    "Complete preview uses the original App SDK/session 1.2.4 with Metro resolving only @invisi-labs/primitives exports to the local candidate build. It uses the same synthetic Note, 16-level path and live broadcaster as the baseline demo.",
+    "All chain readers and wallet inventory are fixtures. No real wallet data, private signing key, proof generation or transaction submission is used.",
+    "Complete-quote timings already include HTTP and repricing. Network conditions and connection reuse differ between runs; these are development simulator observations, not a device release guarantee.",
+    "Measured stage sums exclude fixture setup, the second status lookup in the fixture, cleanup and App integration overhead. They are not a UI end-to-end measurement.",
+    "Pure TypeScript performance is improved but has not reached the measured Node/V8 complete-quote timing. No npm publication or production App dependency change has been performed."
+  ]
+}

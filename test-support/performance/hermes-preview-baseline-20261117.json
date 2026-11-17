@@ -1,0 +1,86 @@
+{
+  "recordedAt": "2026-11-17T08:20:03.101Z",
+  "engine": "Hermes",
+  "runs": [
+    {
+      "timings": {
+        "poseidon.path16": 28.39,
+        "NoteOutput.create": 1370.92,
+        "WalletSession.prepareTransfer": 1328.07,
+        "exportBroadcasterIntent": 42.45,
+        "live.getStatus": 1372.51,
+        "live.estimateQuote": 292.27,
+        "live.broadcaster_estimateQuote": 224.42,
+        "live.broadcaster_getQuote": 495.96,
+        "SDK.BroadcasterClient.quote": 4406.88
+      },
+      "calls": {
+        "chainId": 4,
+        "code": 3,
+        "blockNumber": 1,
+        "block": 6,
+        "membership": 1,
+        "knownRoot": 1,
+        "spent": 1
+      },
+      "inputs": 1,
+      "outputAmounts": [
+        "1000000000000000000",
+        "9100000000000000000"
+      ],
+      "intentBytes": 1924,
+      "estimate": {
+        "feeAmount": "122222035000000000",
+        "feeRecipient": "0xE906b56E38A8Fc58bDC35aE0b7503D9Cc919c70C",
+        "maxGas": "1880339"
+      },
+      "signedQuote": {
+        "feeAmount": "130507455000000000",
+        "execution": "direct"
+      }
+    },
+    {
+      "timings": {
+        "poseidon.path16": 27.38,
+        "NoteOutput.create": 779.25,
+        "WalletSession.prepareTransfer": 1257.17,
+        "exportBroadcasterIntent": 38.03,
+        "live.getStatus": 216.09,
+        "live.estimateQuote": 216.96,
+        "live.broadcaster_estimateQuote": 205.37,
+        "live.broadcaster_getQuote": 492.97,
+        "SDK.BroadcasterClient.quote": 4136.63
+      },
+      "calls": {
+        "chainId": 4,
+        "code": 3,
+        "blockNumber": 1,
+        "block": 6,
+        "membership": 1,
+        "knownRoot": 1,
+        "spent": 1
+      },
+      "inputs": 1,
+      "outputAmounts": [
+        "1000000000000000000",
+        "9100000000000000000"
+      ],
+      "intentBytes": 1924,
+      "estimate": {
+        "feeAmount": "122222035000000000",
+        "feeRecipient": "0xE906b56E38A8Fc58bDC35aE0b7503D9Cc919c70C",
+        "maxGas": "1880339"
+      },
+      "signedQuote": {
+        "feeAmount": "130507455000000000",
+        "execution": "direct"
+      }
+    }
+  ],
+  "environment": "iPhone 17 iOS simulator, Hermes, SDK 1.2.4; synthetic in-memory wallet, fixture chain reader, live broadcaster, no transaction submitted",
+  "limitations": [
+    "Includes the complete SDK BroadcasterClient.quote with repricing. This extends the earlier offline-only Hermes run.",
+    "Excludes App SQLite encryption, real inventory and global background synchronization. Timings are simulator development observations, not release-device guarantees.",
+    "getStatus is called separately and is not included in SDK.BroadcasterClient.quote."
+  ]
+}

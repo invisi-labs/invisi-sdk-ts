@@ -7,9 +7,10 @@
  * secret erasure. This new composition has not received an independent audit.
  */
 import { blake2b } from "@noble/hashes/blake2b";
-import { concatBytes, utf8ToBytes } from "@noble/hashes/utils";
+import { bytesToHex, concatBytes, utf8ToBytes } from "@noble/hashes/utils";
 import {
     FR,
+    type DecafPoint,
     decodePoint,
     encodePoint,
     generator,
@@ -49,33 +50,46 @@ const hashBit = (p: Uint8Array, shared: Uint8Array, q: Uint8Array) =>
 export function deriveClueKey(detectionKey: Uint8Array): Uint8Array {
     return encodePoint(multiply(generator, detectionScalar(detectionKey)));
 }
-/** Reject malformed, noncanonical, or identity clue keys. */
-export function validateClueKey(clueKey: Uint8Array): void {
+const clueKeys = new Map<string, { root: DecafPoint; offsets?: bigint[] }>();
+function expandedClueKey(clueKey: Uint8Array) {
     requireBytes(clueKey, 32, "Clue key");
-    if (isIdentity(decodePoint(clueKey))) throw new Error("Clue key must not be the identity");
+    const key = bytesToHex(clueKey);
+    let expanded = clueKeys.get(key);
+    if (expanded) clueKeys.delete(key);
+    else {
+        const root = decodePoint(clueKey);
+        if (isIdentity(root)) throw new Error("Clue key must not be the identity");
+        root._setWindowSize(4);
+        expanded = { root };
+    }
+    clueKeys.set(key, expanded);
+    if (clueKeys.size > 8) clueKeys.delete(clueKeys.keys().next().value!);
+    return expanded;
+}
+export function validateClueKey(clueKey: Uint8Array): void {
+    expandedClueKey(clueKey);
 }
 /** Create a fixed 24-bit clue using a fresh WebCrypto random seed. */
 export function createClue(clueKey: Uint8Array): Uint8Array {
     validateClueKey(clueKey);
     return createClueFromSeed(clueKey, secureRandomBytes(32));
 }
-/**
- * Deterministic interoperability/backend entry point. Seed must be independently
- * generated with a CSPRNG for every production clue; never reuse a fixed seed.
- */
+/** Production callers must supply a fresh cryptographically random seed for each clue. */
 export function createClueFromSeed(clueKey: Uint8Array, seed32: Uint8Array): Uint8Array {
-    validateClueKey(clueKey);
+    const expanded = expandedClueKey(clueKey);
     requireBytes(seed32, 32, "Clue seed");
-    const root = decodePoint(clueKey);
+    const offsets = (expanded.offsets ??= Array.from({ length: PRECISION }, (_, i) =>
+        childOffset(clueKey, i)
+    ));
     const r = hashScalar("rdv", clueKey, seed32);
     const z = hashScalar("zdv", clueKey, seed32);
     if (r === 0n) throw new Error("Degenerate clue seed");
     const p = encodePoint(multiply(generator, r));
     const q = encodePoint(multiply(generator, z));
     const ciphertext = new Uint8Array(3);
+    const rootShared = multiply(expanded.root, r);
     for (let i = 0; i < PRECISION; i++) {
-        const child = root.add(multiply(generator, childOffset(clueKey, i)));
-        const shared = encodePoint(multiply(child, r));
+        const shared = encodePoint(rootShared.add(multiply(generator, (offsets[i]! * r) % FR)));
         ciphertext[i >> 3] = ciphertext[i >> 3]! | ((hashBit(p, shared, q) ^ 1) << (i & 7));
     }
     const m = hashScalar("sca", p, Uint8Array.of(PRECISION), ciphertext);

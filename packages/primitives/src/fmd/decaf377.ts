@@ -57,7 +57,35 @@ export function inverseScalar(scalar: bigint): bigint {
     return Field(FR).inv(scalar);
 }
 
-/** Canonical Decaf decoding, including the low-bit sign convention. */
+const sqrtOddOrder = (FQ - 1n) >> 47n;
+const sqrtRootOfUnity = field.pow(11n, sqrtOddOrder);
+
+export function inverseSquareRoot(denominator: bigint): bigint {
+    if (denominator <= 0n || denominator >= FQ)
+        throw new Error("Invalid Decaf377 square root input");
+    let root = field.pow(denominator, (sqrtOddOrder - 1n) >> 1n);
+    let residue = f(root * root * denominator);
+    let unity = sqrtRootOfUnity;
+    let order = 47;
+    while (residue !== 1n) {
+        let index = 0;
+        let power = residue;
+        while (power !== 1n && index < order) {
+            power = f(power * power);
+            index++;
+        }
+        if (index >= order) throw new Error("Invalid Decaf377 square root");
+        let adjustment = unity;
+        for (let i = 0; i < order - index - 1; i++) adjustment = f(adjustment * adjustment);
+        root = f(root * adjustment);
+        unity = f(adjustment * adjustment);
+        residue = f(residue * unity);
+        order = index;
+    }
+    if (f(root * root * denominator) !== 1n) throw new Error("Invalid Decaf377 square root");
+    return root;
+}
+
 export function decodePoint(bytes: Uint8Array): DecafPoint {
     if (!(bytes instanceof Uint8Array) || bytes.length !== 32)
         throw new Error("Invalid Decaf377 encoding length");
@@ -68,12 +96,10 @@ export function decodePoint(bytes: Uint8Array): DecafPoint {
     const u1 = f(1n - ss);
     const u2 = f(u1 * u1 - 4n * 3021n * ss);
     const denominator = f(u2 * u1 * u1);
-    // This is the square branch of Rust sqrt_ratio_zeta(1, denominator).
-    // Decompression rejects the nonsquare branch; root sign is fixed below.
     if (denominator === 0n) throw new Error("Invalid Decaf377 encoding");
     let v: bigint;
     try {
-        v = field.sqrt(field.inv(denominator));
+        v = inverseSquareRoot(denominator);
     } catch {
         throw new Error("Invalid Decaf377 encoding");
     }
@@ -89,7 +115,7 @@ export function encodePoint(point: DecafPoint): Uint8Array {
     const aMinusD = -3022n;
     const u1 = f((x + t) * (x - t));
     const denominator = f(u1 * aMinusD * x * x);
-    const v = field.sqrt(field.inv(denominator));
+    const v = inverseSquareRoot(denominator);
     const u2 = abs(f(v * u1));
     const u3 = f(u2 * z - t);
     return writeLE(abs(f(aMinusD * v * u3 * x)));
