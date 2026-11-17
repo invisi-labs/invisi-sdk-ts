@@ -1,7 +1,7 @@
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Interface, type ParamType } from "ethers";
 
-const protocolInterface = new Interface(invisiProtocolAbi);
+const protocolInterface = new Interface(invisiCoreAbi);
 
 /** Decode only canonical protocol receipt bytes before routing events to token wallets. */
 export function decodeProtocolEvent(log: { data: string; topics: readonly string[] }) {

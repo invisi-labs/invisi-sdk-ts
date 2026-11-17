@@ -37,7 +37,7 @@ profile(
     "compares genuine C20 preparation with an uncached reader and a reopened offline wallet",
     async () => {
         const directory = resolve(process.env.INVISI_NATIVE_PREPARATION_PROFILE!);
-        const root = resolve(process.cwd(), "../../../invisi-protocol");
+        const root = resolve(process.cwd(), "../../../invisi-core");
         const rpcRoot = resolve(root, "../invisi-protocol-rpc");
         const bbBin = join(root, ".tools/bb/bb"),
             crsPath = resolve(process.env.HOME!, ".bb-crs");
@@ -139,7 +139,7 @@ profile(
                 readFileSync(join(directory, "chain/deployment.json"), "utf8")
             );
             const deployed = deploymentData.deployments.find(
-                (d: { name: string }) => d.name === "InvisiProtocol"
+                (d: { name: string }) => d.name === "InvisiCore"
             );
             const fromBlock = Number(BigInt(deployed.receipt.blockNumber));
             const deployment = {

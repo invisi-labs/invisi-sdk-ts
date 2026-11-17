@@ -1,12 +1,12 @@
 import type { CanonicalReceipt } from "@invisi-labs/protocol";
-import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi, type Hex } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import { expect, it } from "vitest";
 import { readProtocolLogs } from "../index";
 
 const address = `0x${"11".repeat(20)}` as Hex;
 const word = `0x${"01".repeat(32)}` as Hex;
-const abi = new Interface(invisiProtocolAbi);
+const abi = new Interface(invisiCoreAbi);
 function insertion(logIndex = 2): CanonicalReceipt["logs"][number] {
     const encoded = abi.encodeEventLog("CommitmentsInserted", [1n, 0, [word]]);
     return {

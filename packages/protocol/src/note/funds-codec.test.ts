@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { Interface } from "ethers";
 import * as api from "../index";
-import { invisiProtocolAbi } from "../contracts";
+import { invisiCoreAbi } from "../contracts";
 import raw from "../protocol-vectors.json";
 const revive = (v: any): any =>
     Array.isArray(v)
@@ -99,7 +99,7 @@ it("encodes atomic Note aggregates for current dedicated and mixed route counts"
         }));
         const call = api.buildTransactAggregateCalldata({ context, proof: "0x1234", requests });
         expect(
-            new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!.args[1]
+            new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!.args[1]
         ).toHaveLength(count);
         expect(api.aggregatePublicInputs(context, requests)).toHaveLength(
             count * (1 + f.publicInputs.length)

@@ -19,9 +19,7 @@ if ((await provider.getNetwork()).chainId !== 31337n)
 const mode = process.argv[2] ?? "--deploy";
 if (!["--deploy", "--record", "--check"].includes(mode))
     throw new Error("Use --deploy, --check or maintainer --record");
-const protocolRoot = resolve(
-    process.env.INVISI_PROTOCOL_DIR ?? resolve(root, "../invisi-protocol")
-);
+const protocolRoot = resolve(process.env.INVISI_PROTOCOL_DIR ?? resolve(root, "../invisi-core"));
 const account = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const output = resolve(
     process.env.INVISI_DEPLOYMENT_CATALOG ?? resolve(protocolRoot, "deployment/deployment.json")

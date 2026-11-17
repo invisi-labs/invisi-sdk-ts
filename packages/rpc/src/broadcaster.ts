@@ -1,6 +1,6 @@
 import { provenanceIntentHash } from "@invisi-labs/primitives";
 import type { ProofSidecar } from "@invisi-labs/protocol/provenance";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { AbiCoder, getAddress, Interface, keccak256, verifyTypedData } from "ethers";
 
 export const broadcasterQuoteTypes = {
@@ -99,7 +99,7 @@ const supportedMethods = [
     "updateCredit",
     "revokeCredit",
 ];
-const intentAbi = invisiProtocolAbi.filter(
+const intentAbi = invisiCoreAbi.filter(
     (item) =>
         item.type === "function" &&
         supportedMethods.includes(item.name) &&

@@ -2,7 +2,7 @@ import { Interface } from "ethers";
 
 import { buildTransactCalldata, EMPTY_FUNDING } from "@invisi-labs/protocol";
 import { expect, it } from "vitest";
-import { invisiProtocolAbi } from "../contracts/index";
+import { invisiCoreAbi } from "../contracts/index";
 it("encodes a single source in the canonical two-argument direct request", () => {
     const context = {
         chainId: 31337n,
@@ -27,7 +27,7 @@ it("encodes a single source in the canonical two-argument direct request", () =>
         },
     ];
     const data = buildTransactCalldata({ context, proof: "0x1234", params, deliveries }).data;
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: data })!;
+    const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: data })!;
     expect(decoded.args).toHaveLength(2);
     const request = decoded.args[1];
     expect({

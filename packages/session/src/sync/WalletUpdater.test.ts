@@ -21,7 +21,7 @@ import {
     type ChainReader,
     type Membership,
 } from "@invisi-labs/protocol";
-import { invisiProtocolAbi, type Hex } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi, type Hex } from "@invisi-labs/protocol/contracts";
 import { Interface, keccak256, getBytes } from "ethers";
 import { expect, it, vi } from "vitest";
 import { MerkleFixture } from "../../../../test-support/merkle-fixture";
@@ -61,7 +61,7 @@ function noteCandidate(transactionHash: Hex) {
 async function harness() {
     const tree = await MerkleFixture.create();
     await tree.insert(BigInt(vectors.note.commitment));
-    const abi = new Interface(invisiProtocolAbi);
+    const abi = new Interface(invisiCoreAbi);
     const event = (name: string, values: unknown[], logIndex: number) => ({
         ...abi.encodeEventLog(name, values),
         address: context.protocolAddress,
@@ -368,7 +368,7 @@ it.each([
             30n
         );
         await outputTree.insert(BigInt(ordinary));
-        const abi = new Interface(invisiProtocolAbi),
+        const abi = new Interface(invisiCoreAbi),
             clue = `0x${clues.vectors[0]!.clue}`;
         const event = (
             name: string,

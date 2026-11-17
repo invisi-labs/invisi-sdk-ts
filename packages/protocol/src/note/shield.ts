@@ -2,7 +2,7 @@ import { computeNoteCommitment } from "@invisi-labs/primitives";
 import { AbiCoder, getAddress, Interface, keccak256, ParamType } from "ethers";
 import type { Address, Hex } from "../contracts/index";
 import {
-    invisiProtocolAbi,
+    invisiCoreAbi,
     type Delivery,
     type ShieldOutput,
     type ShieldParams,
@@ -96,7 +96,7 @@ export async function buildShieldCalldata(p: BuildShieldCalldataParams) {
     const f = await validateShieldRequest(p);
     validateFundingSubmission(f, p.caller, p.context.now);
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("shield", [
+        data: new Interface(invisiCoreAbi).encodeFunctionData("shield", [
             { ...p.params, ...normalizeFee(p.params) },
             p.outputs,
             p.deliveries,

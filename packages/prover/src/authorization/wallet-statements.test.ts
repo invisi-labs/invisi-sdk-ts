@@ -10,7 +10,7 @@ import {
     transactUserPublicInputs,
 } from "@invisi-labs/protocol";
 import { expect, it } from "vitest";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 const word = (n: bigint) => toBeHex(n, 32) as Hex;
 const context = {
     chainId: 31337n,
@@ -100,7 +100,7 @@ it("encodes authenticated delivery tuples and rejects incomplete delivery values
         params,
         deliveries: [delivery],
     });
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: data })!;
+    const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: data })!;
     expect(decoded.name).toBe("transact");
     const request = decoded.args![1] as { deliveries: readonly unknown[] };
     expect(

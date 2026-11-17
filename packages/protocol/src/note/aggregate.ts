@@ -1,7 +1,7 @@
 import { selectAggregateRoute } from "./aggregate-routes";
 import { AbiCoder, Interface, keccak256, ParamType } from "ethers";
 import type { Address, Hex } from "../contracts/index";
-import { invisiProtocolAbi, type TransactRequest } from "../contracts/index";
+import { invisiCoreAbi, type TransactRequest } from "../contracts/index";
 import {
     dense,
     fundingFields,
@@ -57,7 +57,7 @@ export function buildTransactAggregateCalldata(p: BuildTransactAggregateCalldata
     }
     return {
         data: new Interface(
-            invisiProtocolAbi.filter(
+            invisiCoreAbi.filter(
                 (item) =>
                     item.type === "function" &&
                     item.name === "transact" &&

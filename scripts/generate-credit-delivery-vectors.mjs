@@ -5,7 +5,7 @@ import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const sdk = resolve(import.meta.dirname, "..");
-const protocol = resolve(process.argv[2] ?? join(sdk, "../invisi-protocol"));
+const protocol = resolve(process.argv[2] ?? join(sdk, "../invisi-core"));
 const source = join(protocol, "scripts/create-credit-client.mjs");
 const { encryptCreditNote, creditCommitment } = await import(pathToFileURL(source).href);
 const file = join(sdk, "packages/primitives/src/wallet/testdata/wallet-note-vectors.json");

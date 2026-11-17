@@ -16,8 +16,8 @@ import type { RegistryReader } from "@invisi-labs/rpc";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import {
     invisiAddressRegistryAbi,
-    invisiFactoryAbi,
-    invisiProtocolAbi,
+    invisiCoreFactoryAbi,
+    invisiCoreAbi,
 } from "@invisi-labs/protocol/contracts";
 import {
     Contract,
@@ -118,7 +118,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
 
     async getProtocolAddressRegistry(address: Address): Promise<Address> {
         return getAddress(
-            await new Contract(getAddress(address), invisiProtocolAbi, this.client).getFunction(
+            await new Contract(getAddress(address), invisiCoreAbi, this.client).getFunction(
                 "addressRegistry"
             )()
         );
@@ -126,7 +126,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
 
     async getProtocolVersion(address: Address): Promise<bigint> {
         return BigInt(
-            await new Contract(getAddress(address), invisiProtocolAbi, this.client).getFunction(
+            await new Contract(getAddress(address), invisiCoreAbi, this.client).getFunction(
                 "VERSION"
             )()
         );
@@ -138,21 +138,21 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
 
     async getFactoryInstanceAddress(factory: Address, salt: Hex): Promise<Address> {
         return getAddress(
-            await new Contract(factory, invisiFactoryAbi, this.client).getFunction(
+            await new Contract(factory, invisiCoreFactoryAbi, this.client).getFunction(
                 "getInstanceAddress"
             )(salt)
         );
     }
     async isFactoryInstance(factory: Address, instance: Address): Promise<boolean> {
         return boolean(
-            await new Contract(factory, invisiFactoryAbi, this.client).getFunction("isInstance")(
-                instance
-            )
+            await new Contract(factory, invisiCoreFactoryAbi, this.client).getFunction(
+                "isInstance"
+            )(instance)
         );
     }
     async getInstanceFactory(instance: Address): Promise<Address> {
         return getAddress(
-            await new Contract(instance, invisiProtocolAbi, this.client).getFunction("factory")()
+            await new Contract(instance, invisiCoreAbi, this.client).getFunction("factory")()
         );
     }
     async getCreditAllocation(
@@ -164,7 +164,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
         const result = (await this.read(
             context,
             context.protocolAddress,
-            invisiProtocolAbi,
+            invisiCoreAbi,
             "creditAllocation",
             [owner, token],
             block
@@ -183,7 +183,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
             (await this.read(
                 context,
                 context.protocolAddress,
-                invisiProtocolAbi,
+                invisiCoreAbi,
                 "creditRevocationBitmap",
                 [owner, token, shard, wordIndex],
                 block
@@ -292,7 +292,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
             await this.read(
                 context,
                 context.protocolAddress,
-                invisiProtocolAbi,
+                invisiCoreAbi,
                 "nonces",
                 [getAddress(payer)],
                 block
@@ -323,7 +323,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
             await this.read(
                 context,
                 context.protocolAddress,
-                invisiProtocolAbi,
+                invisiCoreAbi,
                 "rootHistory",
                 [number(treeId), word(root)],
                 block
@@ -343,7 +343,7 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
                             this.read(
                                 context,
                                 context.protocolAddress,
-                                invisiProtocolAbi,
+                                invisiCoreAbi,
                                 "isNullifierSpent",
                                 [nf],
                                 block

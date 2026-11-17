@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-const root = resolve(process.argv[2] ?? "../invisi-protocol");
+const root = resolve(process.argv[2] ?? "../invisi-core");
 const { walletAuthorizationTypedData, walletAuthorizationDigest } = await import(
     pathToFileURL(resolve(root, "scripts/wallet-authorization.mjs")).href
 );

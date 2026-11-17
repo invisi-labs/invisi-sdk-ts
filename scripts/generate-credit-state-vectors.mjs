@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-const root = resolve(process.argv[2] ?? "../invisi-protocol");
+const root = resolve(process.argv[2] ?? "../invisi-core");
 const from = (p) => import(pathToFileURL(resolve(root, p)).href);
 const { creditCommitment } = await from("scripts/create-credit-client.mjs");
 const { deriveCreditState, deriveCreditUpdate } = await from("scripts/credit-lifecycle-client.mjs");

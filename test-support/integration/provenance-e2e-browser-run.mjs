@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { root, json } from "../../../invisi-protocol/scripts/provenance-build.mjs";
+import { root, json } from "../../../invisi-core/scripts/provenance-build.mjs";
 import { browserScenario } from "./provenance-e2e-browser.mjs";
 // Recheck retained owned services without rebuilding the chain or replacing HTTP data.
 const args = process.argv.slice(2),

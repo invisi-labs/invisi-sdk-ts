@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 const sdk = resolve(import.meta.dirname, ".."),
-    protocol = resolve(process.argv[2] ?? join(sdk, "../invisi-protocol"));
+    protocol = resolve(process.argv[2] ?? join(sdk, "../invisi-core"));
 assert.equal(
     execFileSync("git", ["branch", "--show-current"], { cwd: protocol, encoding: "utf8" }).trim(),
     "develop"

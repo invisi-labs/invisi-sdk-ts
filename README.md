@@ -14,6 +14,10 @@ A capability SDK for ordinary private Notes and deferred Credit grants. Workspac
 | `@invisi-labs/session` | Inventory, selection, reservations, synchronization, history and operation recovery. |
 | `@invisi-labs/react`, `@invisi-labs/vue` | Thin operation lifecycle bindings. |
 
+## Core contract bindings
+
+Contract bindings follow the current `invisi-core` compiler artifacts: `InvisiCore` / `IInvisiCore` and `InvisiCoreFactory` / `IInvisiCoreFactory`. Update direct binding imports and generated tuple type names accordingly. Generic Protocol objects, package names, `protocolAddress` / `protocol_address`, deployment catalog records, EIP-712 domains and wire encodings retain their existing meanings.
+
 ## Ordinary Notes
 
 ```ts
@@ -108,7 +112,7 @@ Protocol RPC APIv1 separates Note and Credit data. Credit indexed states retain 
 
 Valid direct operations return `available: true` and positive `gasUnits`: Shield1–10 outputs, all supported transact input/output combinations including funding and withdrawal, Credit create/update/revoke, and draw1–80. All local previews use `source: "benchmark"`. `statistic: "median"` identifies measured shapes; `statistic: "estimate"` identifies receipt-calibrated estimates. Results include `protocolCommit`, conditions and assumptions. Additional payload, source trees, Permit and funding signatures have explicit model allowances. Illegal shapes throw; recursive aggregate previews remain explicitly unsupported. Single-output public deposits use Shield, not transact.
 
-To refresh measurements, run `node scripts/measure-gas.mjs ../invisi-protocol` against a clean protocol develop checkout. Existing successful reports can be imported with `node scripts/generate-gas-model.mjs <note-report.json> <credit-report.json> <control-report.json>`. The generator rejects mixed revisions and checks held-out shape error before replacing the embedded data.
+To refresh measurements, run `node scripts/measure-gas.mjs ../invisi-core` against a clean protocol develop checkout. Existing successful reports can be imported with `node scripts/generate-gas-model.mjs <note-report.json> <credit-report.json> <control-report.json>`. The generator rejects mixed revisions and checks held-out shape error before replacing the embedded data.
 
 The result is an approximate gas count, not a guaranteed transaction gas limit, a live fee or a Broadcaster quote. Applications choose fee prices and safety budgets, manage approval/balances, and may explicitly simulate the final call through their own EVM provider. `session.sendTransaction` requires a positive caller-supplied `gasLimit` so ethers cannot implicitly simulate on the SDK's behalf. There is no public `getGasReference` API.
 
@@ -118,7 +122,7 @@ Use Node20+ and pnpm9+:
 
 ```sh
 pnpm install
-pnpm sync:protocol ../invisi-protocol
+pnpm sync:protocol ../invisi-core
 pnpm build
 pnpm test
 pnpm lint
@@ -167,7 +171,7 @@ node test-support/integration/provenance-e2e.mjs --sdk
 node test-support/integration/provenance-broadcaster-e2e.mjs --highlevel=typescript
 ```
 
-Add `--browser`, `--reorg` or `--replicas` for the existing optional scenarios. These runners use `invisi-protocol` public fixtures and retain its existing `.tools` run directories; protocol unit tests do not load or build SDK checkouts.
+Add `--browser`, `--reorg` or `--replicas` for the existing optional scenarios. These runners use `invisi-core` public fixtures and retain its existing `.tools` run directories; protocol unit tests do not load or build SDK checkouts.
 
 ## Native chain finality
 

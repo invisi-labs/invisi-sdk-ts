@@ -8,7 +8,7 @@ import {
     deliveryCodec,
     walletAuthorizationTypedData,
 } from "../../packages/primitives/dist/index.js";
-import { deriveWallet } from "../../../invisi-protocol/scripts/wallet-client.mjs";
+import { deriveWallet } from "../../../invisi-core/scripts/wallet-client.mjs";
 
 export class OwnedWalletHost {
     #signing;

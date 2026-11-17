@@ -2,9 +2,9 @@ import type { Address } from "@invisi-labs/protocol/contracts";
 import { Interface, type Result } from "ethers";
 
 import { buildTransactCalldata, type TransactionCall } from "@invisi-labs/protocol";
-import { invisiProtocolAbi, type TransactRequest } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi, type TransactRequest } from "@invisi-labs/protocol/contracts";
 import type { SavedOperation } from "../operation-types";
-const aggregateAbi = invisiProtocolAbi.filter(
+const aggregateAbi = invisiCoreAbi.filter(
     (item) =>
         item.type === "function" &&
         item.name === "transact" &&

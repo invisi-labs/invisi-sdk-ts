@@ -125,8 +125,8 @@ export async function receiptLog(
     index: number,
     hash: Hex
 ) {
-    const { invisiProtocolAbi } = await import("@invisi-labs/protocol/contracts"),
-        event = invisiProtocolAbi.find((item) => item.type === "event" && item.name === name)!;
+    const { invisiCoreAbi } = await import("@invisi-labs/protocol/contracts"),
+        event = invisiCoreAbi.find((item) => item.type === "event" && item.name === name)!;
     if (event.type !== "event") throw new Error("missing event");
     return {
         address: context.protocolAddress,

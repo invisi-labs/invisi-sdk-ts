@@ -4,11 +4,18 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { format, resolveConfig } from "prettier";
+async function writeTypeScript(path, source) {
+    writeFileSync(
+        path,
+        await format(source, { ...(await resolveConfig(path)), parser: "typescript" })
+    );
+}
 const sdk = resolve(fileURLToPath(new URL("..", import.meta.url))),
-    source = resolve(process.argv[2] ?? join(sdk, "../invisi-protocol"));
+    source = resolve(process.argv[2] ?? join(sdk, "../invisi-core"));
 const contracts = [
-    ["InvisiProtocol", "invisiProtocolAbi"],
-    ["InvisiFactory", "invisiFactoryAbi"],
+    ["InvisiCore", "invisiCoreAbi"],
+    ["InvisiCoreFactory", "invisiCoreFactoryAbi"],
     ["VerifierRouter", "verifierRouterAbi"],
     ["CreditVerifierRouter", "creditVerifierRouterAbi"],
     ["InvisiAddressRegistry", "invisiAddressRegistryAbi"],
@@ -26,16 +33,16 @@ const hashes = {};
 for (const { name, variable, abi } of rows) {
     const text = JSON.stringify(abi, null, 2);
     hashes[name] = createHash("sha256").update(text).digest("hex");
-    writeFileSync(
+    await writeTypeScript(
         join(sdk, "packages/protocol/src/contracts/abis", name + ".ts"),
-        "// AUTO-GENERATED from invisi-protocol build artifacts. Run pnpm sync:abis.\nexport const " +
+        "// AUTO-GENERATED from invisi-core build artifacts. Run pnpm sync:abis.\nexport const " +
             variable +
             " = " +
             text +
             " as const\n"
     );
 }
-writeFileSync(
+await writeTypeScript(
     join(sdk, "packages/protocol/src/contracts/protocol-artifacts.ts"),
     "// AUTO-GENERATED ABI identities, independent of deployment addresses.\nexport const protocolAbiSha256 = " +
         JSON.stringify(hashes, null, 2) +

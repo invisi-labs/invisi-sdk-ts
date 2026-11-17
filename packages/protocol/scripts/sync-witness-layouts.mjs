@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
-const root = resolve(process.argv[2] ?? "../invisi-protocol");
+const root = resolve(process.argv[2] ?? "../invisi-core");
 const json = (path) => JSON.parse(readFileSync(resolve(root, path), "utf8"));
 const sha = (data) => createHash("sha256").update(data).digest("hex");
 const layouts = {};

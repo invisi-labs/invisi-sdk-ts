@@ -5,7 +5,7 @@ import {
     walletAuthorizationTypedData,
 } from "@invisi-labs/primitives";
 import {
-    invisiProtocolAbi,
+    invisiCoreAbi,
     type Hex,
     type CreateCreditParams,
     type Delivery,
@@ -132,7 +132,7 @@ export interface BuildCreateCreditCalldataParams {
 export function buildCreateCreditCalldata(p: BuildCreateCreditCalldataParams) {
     const r = validateCreateCreditRequest(p.context, p.params, p.deliveries);
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("createCredit", [
+        data: new Interface(invisiCoreAbi).encodeFunctionData("createCredit", [
             encodeCreditProof(p.proof),
             { ...p.params, ...normalizeFee(p.params) },
             p.deliveries,

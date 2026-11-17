@@ -1,5 +1,5 @@
 import { Wallet } from "@invisi-labs/primitives";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import type { Prover } from "@invisi-labs/sdk";
 import { Invisi } from "@invisi-labs/sdk/session-support";
 import { sha256 } from "@noble/hashes/sha256";
@@ -81,7 +81,7 @@ for (const managed of [false, true]) {
             );
             const ready = await prepared.withFundingSignature(signature);
             const call = await ready.exportTransaction();
-            const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+            const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
             expect(decoded.name).toBe("shield");
             expect(decoded.args[3].signature).toBe(signature);
             expect(decoded.args[3].payer).toBe(payer.address);
@@ -101,7 +101,7 @@ for (const managed of [false, true]) {
                 Signature.from(signature).compactSerialized
             );
             const call = await ready.exportTransaction();
-            const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+            const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
             expect(decoded.args[3].signature).toBe(signature);
         });
 
@@ -263,7 +263,7 @@ it("accepts arbitrary ERC-1271 bytes only through the configured verifier", asyn
     valid = true;
     const ready = await prepared.withFundingSignature("0x1234");
     const call = await ready.exportTransaction();
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+    const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
     expect(decoded.args[3].signature).toBe("0x1234");
 });
 

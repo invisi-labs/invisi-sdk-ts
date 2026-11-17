@@ -8,13 +8,13 @@ import {
     normalizeCreditUsage,
     type CreditDeliveryState,
 } from "@invisi-labs/primitives";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import type { SavedOperation } from "@invisi-labs/sdk/session-support";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
 import { backend } from "../../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
 import { WalletSession } from "../wallet/WalletSession";
-const iface = new Interface(invisiProtocolAbi);
+const iface = new Interface(invisiCoreAbi);
 async function creditFixture(
     changes: Partial<
         Pick<

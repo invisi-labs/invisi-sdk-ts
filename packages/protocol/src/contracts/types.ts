@@ -1,10 +1,10 @@
-import type { invisiProtocolAbi } from "./abis/InvisiProtocol";
-import type { invisiFactoryAbi } from "./abis/InvisiFactory";
+import type { invisiCoreAbi } from "./abis/InvisiCore";
+import type { invisiCoreFactoryAbi } from "./abis/InvisiCoreFactory";
 import type { verifierRouterAbi } from "./abis/VerifierRouter";
 import type { creditVerifierRouterAbi } from "./abis/CreditVerifierRouter";
 import type { invisiAddressRegistryAbi } from "./abis/InvisiAddressRegistry";
-export type InvisiProtocolAbi = typeof invisiProtocolAbi;
-export type InvisiFactoryAbi = typeof invisiFactoryAbi;
+export type InvisiCoreAbi = typeof invisiCoreAbi;
+export type InvisiCoreFactoryAbi = typeof invisiCoreFactoryAbi;
 export type VerifierRouterAbi = typeof verifierRouterAbi;
 export type CreditVerifierRouterAbi = typeof creditVerifierRouterAbi;
 export type InvisiAddressRegistryAbi = typeof invisiAddressRegistryAbi;

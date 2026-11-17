@@ -6,9 +6,9 @@ import {
     createCreateCreditFixture,
     testWallet,
     fixtureTree,
-} from "../../../invisi-protocol/scripts/create-credit-fixtures.mjs";
-import { drawFixture } from "../../../invisi-protocol/scripts/credit-lifecycle-fixtures.mjs";
-import { proveCreditNative } from "../../../invisi-protocol/scripts/credit-proof-pipeline.mjs";
+} from "../../../invisi-core/scripts/create-credit-fixtures.mjs";
+import { drawFixture } from "../../../invisi-core/scripts/credit-lifecycle-fixtures.mjs";
+import { proveCreditNative } from "../../../invisi-core/scripts/credit-proof-pipeline.mjs";
 
 export async function creditScenario({
     runtime,

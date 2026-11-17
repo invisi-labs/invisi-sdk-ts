@@ -1,5 +1,5 @@
 import { Wallet } from "@invisi-labs/primitives";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import type { Prover } from "@invisi-labs/prover";
 import { Wallet as EvmWallet, Interface } from "ethers";
 import { describe, expect, it, vi } from "vitest";
@@ -87,7 +87,7 @@ it("authorizes, proves, verifies and exports without any store", async () => {
     expect(ready.estimateGas()).toEqual(estimate);
     expect(h.prover.verify).toHaveBeenCalledOnce();
     const call = await ready.exportTransaction();
-    expect(new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!.name).toBe(
+    expect(new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!.name).toBe(
         "transact"
     );
     call.data = "0x00";

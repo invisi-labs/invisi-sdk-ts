@@ -77,9 +77,9 @@ it("builds ready sweep calldata through the public-wallet operation without auth
     const ready = await operation.prove();
     expect(ready.status).toBe("ready");
     const { Interface } = await import("ethers");
-    const { invisiProtocolAbi } = await import("@invisi-labs/protocol/contracts");
+    const { invisiCoreAbi } = await import("@invisi-labs/protocol/contracts");
     const call = await ready.exportTransaction();
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+    const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
     expect(decoded.name).toBe("transact");
     expect(ready.preview().withdrawalAmount).toBe(100n);
     expect(BigInt(ready.preview().withdrawalAddress!)).toBe(BigInt(h.wallet.ownerAddress));

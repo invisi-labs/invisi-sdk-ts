@@ -1,5 +1,5 @@
 /** Independent formatting vectors from the current protocol helpers and built ABI.
- * Usage: node packages/protocol/scripts/generate-protocol-vectors.mjs /path/to/invisi-protocol
+ * Usage: node packages/protocol/scripts/generate-protocol-vectors.mjs /path/to/invisi-core
  * Dummy proof bytes test encoding only. Published deterministic wallet witnesses test Noir separately.
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -141,9 +141,7 @@ fixtures.transact1.memberRequestHash = u.aggregateMemberRequestHash(context, {
 const proof = "0x1234",
     framed = AbiCoder.defaultAbiCoder().encode(["uint8", "bytes"], [0, proof]);
 const iface = new Interface(
-        JSON.parse(
-            readFileSync(resolve(root, "contracts/out/InvisiProtocol.sol/InvisiProtocol.json"))
-        ).abi
+        JSON.parse(readFileSync(resolve(root, "contracts/out/InvisiCore.sol/InvisiCore.json"))).abi
     ),
     direct = iface.fragments.find(
         (f) => f.type === "function" && f.name === "transact" && f.inputs[1].type === "tuple"

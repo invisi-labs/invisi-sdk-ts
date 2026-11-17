@@ -1,5 +1,5 @@
 import { Wallet, fundsV1 } from "@invisi-labs/primitives";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import { expect, it } from "vitest";
 import { testOutput } from "../../../../../test-support/test-output";
@@ -47,7 +47,7 @@ it.each(["shield", "transfer"] as const)(
                 ? await prepared.ready()
                 : await (await externallyAuthorize(prepared)).prove();
         const call = await ready.exportTransaction();
-        const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+        const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
         const commitment =
             kind === "shield"
                 ? decoded.args[0].noteCommitments[0]
@@ -107,7 +107,7 @@ it.each(["shield", "transfer"] as const)(
                 ? await prepared.ready()
                 : await (await externallyAuthorize(prepared)).prove();
         const call = await ready.exportTransaction();
-        const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+        const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
         const delivery = kind === "shield" ? decoded.args[2][0] : decoded.args[1].deliveries[0];
         const outputCommitment =
             kind === "shield"

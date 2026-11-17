@@ -13,17 +13,17 @@ import { createServer } from "node:net";
 import { createServer as createHTTPSServer } from "node:https";
 import { createPublicKey } from "node:crypto";
 import { AbiCoder, Wallet, ZeroAddress, ZeroHash, keccak256, verifyTypedData } from "ethers";
-import { root, json, sha } from "../../../invisi-protocol/scripts/provenance-build.mjs";
-import { createSettlementRuntime } from "../../../invisi-protocol/scripts/settlement-fixtures/runtime.mjs";
+import { root, json, sha } from "../../../invisi-core/scripts/provenance-build.mjs";
+import { createSettlementRuntime } from "../../../invisi-core/scripts/settlement-fixtures/runtime.mjs";
 import {
     prepareSettlementShield,
     settlementDirectRequest,
-} from "../../../invisi-protocol/scripts/settlement-fixtures/client.mjs";
-import { fixtureWallet } from "../../../invisi-protocol/scripts/fixture-utils.mjs";
-import { createTransactSlotsFixture } from "../../../invisi-protocol/scripts/transact-slots-fixtures.mjs";
-import { noteCommitment } from "../../../invisi-protocol/scripts/private-transfer-client.mjs";
-import { buildNoteTree } from "../../../invisi-protocol/scripts/note-tree-fixtures.mjs";
-import { proveUserNative } from "../../../invisi-protocol/scripts/transact-user-pipeline.mjs";
+} from "../../../invisi-core/scripts/settlement-fixtures/client.mjs";
+import { fixtureWallet } from "../../../invisi-core/scripts/fixture-utils.mjs";
+import { createTransactSlotsFixture } from "../../../invisi-core/scripts/transact-slots-fixtures.mjs";
+import { noteCommitment } from "../../../invisi-core/scripts/private-transfer-client.mjs";
+import { buildNoteTree } from "../../../invisi-core/scripts/note-tree-fixtures.mjs";
+import { proveUserNative } from "../../../invisi-core/scripts/transact-user-pipeline.mjs";
 import {
     buildWitness,
     scopeHash,
@@ -31,11 +31,8 @@ import {
     RecognizedTree,
     operationDigest,
     verifyRootCertificate,
-} from "../../../invisi-protocol/scripts/provenance-client.mjs";
-import {
-    proveWitness,
-    trustedManifest,
-} from "../../../invisi-protocol/scripts/provenance-proof.mjs";
+} from "../../../invisi-core/scripts/provenance-client.mjs";
+import { proveWitness, trustedManifest } from "../../../invisi-core/scripts/provenance-proof.mjs";
 import {
     assertTracking,
     preflightTracking,
@@ -214,7 +211,7 @@ try {
         settlementBlockUnix: context.timestamp.toString(),
     };
     const deployment = JSON.parse(readFileSync(join(directory, "chain/deployment.json"))),
-        protocolDeployment = deployment.deployments.find((d) => d.name === "InvisiProtocol"),
+        protocolDeployment = deployment.deployments.find((d) => d.name === "InvisiCore"),
         codeHash = keccak256(await runtime.rpc("eth_getCode", [protocol, "latest"])),
         fromBlock = Number(BigInt(protocolDeployment.receipt.blockNumber));
     save("runtime.json", {
@@ -375,7 +372,7 @@ try {
         const crsPath = join(root, ".tools/provenance-verifier-crs");
         assert(
             existsSync(join(crsPath, "pins.json")),
-            "preprovisioned CRS missing: run node ../invisi-protocol/scripts/provenance-crs.mjs"
+            "preprovisioned CRS missing: run node ../invisi-core/scripts/provenance-crs.mjs"
         );
         const pins = JSON.parse(readFileSync(join(crsPath, "pins.json"))).files;
         Object.assign(cfg, {

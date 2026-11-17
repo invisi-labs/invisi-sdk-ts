@@ -1,4 +1,4 @@
-import { invisiAddressRegistryAbi, invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiAddressRegistryAbi, invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Interface, Wallet, type Provider } from "ethers";
 import { expect, it, vi } from "vitest";
 import {
@@ -22,7 +22,7 @@ const typedData = {
 };
 
 it("pins nonce domains to exact canonical blocks through ethers contracts", async () => {
-    const protocol = new Interface(invisiProtocolAbi),
+    const protocol = new Interface(invisiCoreAbi),
         registry = new Interface(invisiAddressRegistryAbi);
     const call = vi.fn(async (request: { data: string; blockTag: bigint }) =>
         request.data.startsWith(protocol.getFunction("nonces")!.selector)
@@ -106,7 +106,7 @@ it("resolves a canonical EVM owner using padded registry ABI words", async () =>
 });
 
 it("reads Protocol VERSION through ethers", async () => {
-    const abi = new Interface(invisiProtocolAbi);
+    const abi = new Interface(invisiCoreAbi);
     const call = vi.fn(async (_request: { to: string; data: string }) =>
         abi.encodeFunctionResult("VERSION", [1n])
     );
@@ -119,7 +119,7 @@ it("reads Protocol VERSION through ethers", async () => {
 });
 
 it("reads the immutable Protocol registry binding through ethers", async () => {
-    const abi = new Interface(invisiProtocolAbi);
+    const abi = new Interface(invisiCoreAbi);
     const call = vi.fn(async () => abi.encodeFunctionResult("addressRegistry", [token]));
     const reader = new EthersChainReader(provider({ call }));
     expect(await reader.getProtocolAddressRegistry(address)).toBe(token);

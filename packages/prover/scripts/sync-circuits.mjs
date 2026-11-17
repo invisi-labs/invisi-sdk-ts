@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, renameSync, readdirSync
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const root = resolve(process.argv[2] ?? join(packageRoot, "../../../invisi-protocol"));
+const root = resolve(process.argv[2] ?? join(packageRoot, "../../../invisi-core"));
 const FIELD_MODULUS =
     21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const field = (value) => {

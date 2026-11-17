@@ -1,5 +1,5 @@
 import { Wallet } from "@invisi-labs/primitives";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Wallet as EvmWallet, Interface, getAddress } from "ethers";
 import { expect, it, vi } from "vitest";
 import { testOutput } from "../../../../../test-support/test-output";
@@ -21,7 +21,7 @@ it("binds an immediate public fee and withdrawal while conserving private change
     expect(prepared.preview().withdrawalAmount).toBe(20n);
     const ready = await (await externallyAuthorize(prepared)).prove();
     const call = await ready.exportTransaction();
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: call.data })!;
+    const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: call.data })!;
     expect(decoded.args[1].params.feeAmount).toBe(10n);
     expect(BigInt(decoded.args[1].params.feeRecipient)).toBe(BigInt(h.bob.ownerAddress));
 });
@@ -68,7 +68,7 @@ it("exports a non-sendable frozen public intent before authorization for a firm 
     });
     const intent = await prepared.exportBroadcasterIntent();
     expect(intent.sendable).toBe(false);
-    const decoded = new Interface(invisiProtocolAbi).parseTransaction({ data: intent.data })!;
+    const decoded = new Interface(invisiCoreAbi).parseTransaction({ data: intent.data })!;
     expect(decoded.args[0]).toBe("0x");
     expect(decoded.args[1].params.feeAmount).toBe(10n);
     expect(intent).not.toHaveProperty("witness");

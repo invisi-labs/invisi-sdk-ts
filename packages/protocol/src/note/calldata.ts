@@ -1,6 +1,6 @@
 import { Interface } from "ethers";
 import type { Address, Hex } from "../contracts/index";
-import { invisiProtocolAbi, type Delivery, type TransactRequest } from "../contracts/index";
+import { invisiCoreAbi, type Delivery, type TransactRequest } from "../contracts/index";
 import {
     validateFundingSubmission,
     type FundingInput,
@@ -35,7 +35,7 @@ export function buildTransactCalldata(p: BuildTransactCalldataParams) {
         deliveries: p.deliveries,
         funding: r.funding,
     };
-    const abi = invisiProtocolAbi.filter(
+    const abi = invisiCoreAbi.filter(
         (item) =>
             item.type === "function" &&
             item.name === "transact" &&

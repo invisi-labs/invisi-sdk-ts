@@ -2,7 +2,7 @@ import { normalizeFee } from "../fees/fee";
 import { Interface, getAddress } from "ethers";
 import { creditPeriods, walletAuthorizationTypedData } from "@invisi-labs/primitives";
 import {
-    invisiProtocolAbi,
+    invisiCoreAbi,
     type Hex,
     type CreditDrawParams,
     type UpdateCreditParams,
@@ -305,7 +305,7 @@ export interface BuildCreditDrawCalldataParams {
 export function buildCreditDrawCalldata(p: BuildCreditDrawCalldataParams) {
     const r = validateCreditDrawRequest(p.context, p.params, p.deliveries);
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("creditDraw", [
+        data: new Interface(invisiCoreAbi).encodeFunctionData("creditDraw", [
             encodeCreditProof(p.proof),
             { ...p.params, ...normalizeFee(p.params) },
             p.deliveries,
@@ -327,7 +327,7 @@ export interface BuildUpdateCreditCalldataParams {
 export function buildUpdateCreditCalldata(p: BuildUpdateCreditCalldataParams) {
     const r = validateUpdateCreditRequest(p.context, p.params, p.deliveries);
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("updateCredit", [
+        data: new Interface(invisiCoreAbi).encodeFunctionData("updateCredit", [
             encodeCreditProof(p.proof),
             { ...p.params, ...normalizeFee(p.params) },
             p.deliveries,
@@ -387,7 +387,7 @@ export function buildRevokeCreditCalldata(p: BuildRevokeCreditCalldataParams) {
     if (p.signature === "0x" && (!p.caller || getAddress(p.caller) !== getAddress(p.params.owner)))
         throw Error("direct revocation requires owner caller");
     return {
-        data: new Interface(invisiProtocolAbi).encodeFunctionData("revokeCredit", [
+        data: new Interface(invisiCoreAbi).encodeFunctionData("revokeCredit", [
             p.params.token,
             p.params.owner,
             p.params.shard,

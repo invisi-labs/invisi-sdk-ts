@@ -1,6 +1,6 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import { expect, it, vi } from "vitest";
 import { fixture } from "../../../../test-support/operation-fixture";
@@ -29,9 +29,7 @@ it("authorizes exactly the frozen statement, verifies the local proof, and retur
     const tx = await ready.exportTransaction();
     expect(tx.to).toBe(h.protocol.context.protocolAddress);
     expect(tx.value).toBe(0n);
-    expect(new Interface(invisiProtocolAbi).parseTransaction({ data: tx.data })!.name).toBe(
-        "transact"
-    );
+    expect(new Interface(invisiCoreAbi).parseTransaction({ data: tx.data })!.name).toBe("transact");
     tx.data = "0x00";
     expect((await ready.exportTransaction()).data).not.toBe("0x00");
     await expect(ready.abandon()).rejects.toThrow(/external|reconcil/);
@@ -157,7 +155,7 @@ it("requires one explicit caller-funded shield encoding and never broadcasts an 
     expect(ready).not.toHaveProperty("submit");
     expect((await ready.exportTransaction()).to).toBe(h.protocol.context.protocolAddress);
     expect(
-        new Interface(invisiProtocolAbi).parseTransaction({
+        new Interface(invisiCoreAbi).parseTransaction({
             data: (await ready.exportTransaction()).data,
         })!.name
     ).toBe("shield");

@@ -7,9 +7,9 @@ import {
 } from "@invisi-labs/primitives";
 import { Interface, Wallet as EvmWallet } from "ethers";
 import { it, expect, vi } from "vitest";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
-const iface = new Interface(invisiProtocolAbi);
+const iface = new Interface(invisiCoreAbi);
 async function creditSetup(
     policy: Partial<
         import("@invisi-labs/primitives").CreditPolicy &

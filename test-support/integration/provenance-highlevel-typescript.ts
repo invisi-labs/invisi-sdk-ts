@@ -24,7 +24,7 @@ import {
     type BroadcasterScheduleHandle,
 } from "../../packages/sdk/dist/index.js";
 import { ProvenanceClient, authenticateManifest } from "../../packages/sdk/dist/provenance.js";
-import { invisiProtocolAbi } from "../../packages/protocol/dist/contracts.js";
+import { invisiCoreAbi } from "../../packages/protocol/dist/contracts.js";
 import { NativeProver } from "../../packages/prover/dist/native.js";
 import { LocalProvenanceProver } from "../../packages/prover/dist/provenance.js";
 import { OwnedWalletHost } from "./provenance-highlevel-wallet-host.mjs";
@@ -294,7 +294,7 @@ try {
     assert(quote && quote.provenanceRequired === true);
     assert.equal(quote.quote.execution, config.execution ?? "direct");
     const intent = await quoted.exportBroadcasterIntent();
-    const abi = new Interface(invisiProtocolAbi);
+    const abi = new Interface(invisiCoreAbi);
     const before = abi.parseTransaction({ data: intent.data });
     assert(before && before.name === "transact");
     assert.equal(before.args[0], "0x", "quotation does not require main proof bytes");

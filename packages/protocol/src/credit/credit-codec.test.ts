@@ -1,7 +1,7 @@
 import { it, expect, describe } from "vitest";
 import { Interface, TypedDataEncoder } from "ethers";
 import * as api from "../index";
-import { invisiProtocolAbi } from "../contracts";
+import { invisiCoreAbi } from "../contracts";
 import raw from "../protocol-vectors.json";
 const revive = (v: any): any =>
     Array.isArray(v)
@@ -14,7 +14,7 @@ const revive = (v: any): any =>
             ? BigInt(v)
             : v;
 const { context, fixtures } = revive(raw),
-    iface = new Interface(invisiProtocolAbi);
+    iface = new Interface(invisiCoreAbi);
 describe("deferred Credit independent protocol vectors", () => {
     it("binds create and update exactly without any cash funding", () => {
         for (const [key, words, typed, build] of [

@@ -4,7 +4,7 @@ import { Interface, keccak256 } from "ethers";
 import { Disclosure, ViewingCapability } from "@invisi-labs/primitives";
 import { TokenProtocol } from "@invisi-labs/rpc";
 import { type CanonicalReceipt, type ChainReader } from "@invisi-labs/protocol";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { describe, expect, it } from "vitest";
 import clues from "../../../primitives/src/fmd/testdata/fmd-rust-vectors.json";
 import vectors from "../../../primitives/src/wallet/testdata/wallet-note-vectors.json";
@@ -20,7 +20,7 @@ const reference = { transactionHash: hex(101n), treeId: 1n, leafIndex: 0, role: 
 const block = { number: 12n, hash: hex(12n), parentHash: hex(11n), timestamp: 1000n };
 
 function log(name: string, args: Record<string, unknown>, logIndex: number) {
-    const event = invisiProtocolAbi.find((entry) => entry.type === "event" && entry.name === name)!;
+    const event = invisiCoreAbi.find((entry) => entry.type === "event" && entry.name === name)!;
     if (event.type !== "event") throw new Error("missing event");
     const inputs = event.inputs.filter((input) => !input.indexed);
     return {

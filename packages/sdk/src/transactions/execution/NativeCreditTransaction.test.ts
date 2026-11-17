@@ -6,7 +6,7 @@ import {
     type CreditDeliveryState,
 } from "@invisi-labs/primitives";
 import { Wallet as EvmWallet, Interface } from "ethers";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
 const real = process.env.BB_BINARY_PATH || process.env.INVISI_TEST_WASM === "1" ? it : it.skip;
 real(
@@ -107,7 +107,7 @@ real(
                 ),
                 ready = await (await externallyAuthorize(prepared, signer)).prove(prover);
             expect(ready.exportProof().proofHex.length).toBeGreaterThan(1000);
-            const decoded = new Interface(invisiProtocolAbi).parseTransaction(
+            const decoded = new Interface(invisiCoreAbi).parseTransaction(
                 await ready.exportTransaction()
             )!;
             expect(decoded.args[1].feeAmount).toBe(3n);

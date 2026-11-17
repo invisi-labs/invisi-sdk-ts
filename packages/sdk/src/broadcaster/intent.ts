@@ -1,6 +1,6 @@
 import { normalizeFunding } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
 import type { OperationPlan } from "../transactions/operation-types";
 import { statement } from "../transactions/signing/statement";
@@ -59,7 +59,7 @@ export function exportBroadcasterIntent(plan: OperationPlan) {
             "0x",
         ];
     } else throw new Error("unsupported broadcaster operation");
-    const abi = invisiProtocolAbi.filter(
+    const abi = invisiCoreAbi.filter(
         (item) =>
             item.type === "function" &&
             item.name === method &&

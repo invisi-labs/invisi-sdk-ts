@@ -1,364 +1,364 @@
-// AUTO-GENERATED from invisi-protocol build artifacts. Run pnpm sync:abis.
+// AUTO-GENERATED from invisi-core build artifacts. Run pnpm sync:abis.
 export const invisiAddressRegistryAbi = [
-  {
-    "type": "constructor",
-    "inputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "eip712Domain",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "fields",
-        "type": "bytes1",
-        "internalType": "bytes1"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "verifyingContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "salt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "extensions",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "isRegistered",
-    "inputs": [
-      {
-        "name": "walletIdentity",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "nonceOf",
-    "inputs": [
-      {
-        "name": "walletIdentity",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "receivingKeysOf",
-    "inputs": [
-      {
-        "name": "walletIdentity",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "keys",
-        "type": "tuple",
-        "internalType": "struct IAddressRegistry.ReceivingKeys",
-        "components": [
-          {
-            "name": "viewingPublicKey",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "clueKey",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          }
-        ]
-      },
-      {
-        "name": "nonce",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registerKeys",
-    "inputs": [
-      {
-        "name": "registration",
-        "type": "tuple",
-        "internalType": "struct IAddressRegistry.Registration",
-        "components": [
-          {
-            "name": "walletIdentity",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "keys",
-            "type": "tuple",
-            "internalType": "struct IAddressRegistry.ReceivingKeys",
-            "components": [
-              {
+    {
+        "type": "constructor",
+        "inputs": [],
+        "stateMutability": "nonpayable",
+    },
+    {
+        "type": "function",
+        "name": "CHAIN_ID",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "eip712Domain",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "fields",
+                "type": "bytes1",
+                "internalType": "bytes1",
+            },
+            {
+                "name": "name",
+                "type": "string",
+                "internalType": "string",
+            },
+            {
+                "name": "version",
+                "type": "string",
+                "internalType": "string",
+            },
+            {
+                "name": "chainId",
+                "type": "uint256",
+                "internalType": "uint256",
+            },
+            {
+                "name": "verifyingContract",
+                "type": "address",
+                "internalType": "address",
+            },
+            {
+                "name": "salt",
+                "type": "bytes32",
+                "internalType": "bytes32",
+            },
+            {
+                "name": "extensions",
+                "type": "uint256[]",
+                "internalType": "uint256[]",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "isRegistered",
+        "inputs": [
+            {
+                "name": "walletIdentity",
+                "type": "bytes32",
+                "internalType": "bytes32",
+            },
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bool",
+                "internalType": "bool",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "nonceOf",
+        "inputs": [
+            {
+                "name": "walletIdentity",
+                "type": "bytes32",
+                "internalType": "bytes32",
+            },
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint64",
+                "internalType": "uint64",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "receivingKeysOf",
+        "inputs": [
+            {
+                "name": "walletIdentity",
+                "type": "bytes32",
+                "internalType": "bytes32",
+            },
+        ],
+        "outputs": [
+            {
+                "name": "keys",
+                "type": "tuple",
+                "internalType": "struct IAddressRegistry.ReceivingKeys",
+                "components": [
+                    {
+                        "name": "viewingPublicKey",
+                        "type": "bytes",
+                        "internalType": "bytes",
+                    },
+                    {
+                        "name": "clueKey",
+                        "type": "bytes32",
+                        "internalType": "bytes32",
+                    },
+                ],
+            },
+            {
+                "name": "nonce",
+                "type": "uint64",
+                "internalType": "uint64",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "registerKeys",
+        "inputs": [
+            {
+                "name": "registration",
+                "type": "tuple",
+                "internalType": "struct IAddressRegistry.Registration",
+                "components": [
+                    {
+                        "name": "walletIdentity",
+                        "type": "bytes32",
+                        "internalType": "bytes32",
+                    },
+                    {
+                        "name": "keys",
+                        "type": "tuple",
+                        "internalType": "struct IAddressRegistry.ReceivingKeys",
+                        "components": [
+                            {
+                                "name": "viewingPublicKey",
+                                "type": "bytes",
+                                "internalType": "bytes",
+                            },
+                            {
+                                "name": "clueKey",
+                                "type": "bytes32",
+                                "internalType": "bytes32",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "nonce",
+                        "type": "uint64",
+                        "internalType": "uint64",
+                    },
+                    {
+                        "name": "deadline",
+                        "type": "uint64",
+                        "internalType": "uint64",
+                    },
+                ],
+            },
+            {
+                "name": "signature",
+                "type": "bytes",
+                "internalType": "bytes",
+            },
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable",
+    },
+    {
+        "type": "function",
+        "name": "supportsInterface",
+        "inputs": [
+            {
+                "name": "interfaceId",
+                "type": "bytes4",
+                "internalType": "bytes4",
+            },
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bool",
+                "internalType": "bool",
+            },
+        ],
+        "stateMutability": "pure",
+    },
+    {
+        "type": "function",
+        "name": "updateKeys",
+        "inputs": [
+            {
+                "name": "registration",
+                "type": "tuple",
+                "internalType": "struct IAddressRegistry.Registration",
+                "components": [
+                    {
+                        "name": "walletIdentity",
+                        "type": "bytes32",
+                        "internalType": "bytes32",
+                    },
+                    {
+                        "name": "keys",
+                        "type": "tuple",
+                        "internalType": "struct IAddressRegistry.ReceivingKeys",
+                        "components": [
+                            {
+                                "name": "viewingPublicKey",
+                                "type": "bytes",
+                                "internalType": "bytes",
+                            },
+                            {
+                                "name": "clueKey",
+                                "type": "bytes32",
+                                "internalType": "bytes32",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "nonce",
+                        "type": "uint64",
+                        "internalType": "uint64",
+                    },
+                    {
+                        "name": "deadline",
+                        "type": "uint64",
+                        "internalType": "uint64",
+                    },
+                ],
+            },
+            {
+                "name": "signature",
+                "type": "bytes",
+                "internalType": "bytes",
+            },
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable",
+    },
+    {
+        "type": "event",
+        "name": "EIP712DomainChanged",
+        "inputs": [],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "ReceivingKeysSet",
+        "inputs": [
+            {
+                "name": "walletIdentity",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32",
+            },
+            {
                 "name": "viewingPublicKey",
                 "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
+                "indexed": false,
+                "internalType": "bytes",
+            },
+            {
                 "name": "clueKey",
                 "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "nonce",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "deadline",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "supportsInterface",
-    "inputs": [
-      {
-        "name": "interfaceId",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
-    "name": "updateKeys",
-    "inputs": [
-      {
-        "name": "registration",
-        "type": "tuple",
-        "internalType": "struct IAddressRegistry.Registration",
-        "components": [
-          {
-            "name": "walletIdentity",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "keys",
-            "type": "tuple",
-            "internalType": "struct IAddressRegistry.ReceivingKeys",
-            "components": [
-              {
-                "name": "viewingPublicKey",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "clueKey",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "nonce",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "deadline",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "EIP712DomainChanged",
-    "inputs": [],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ReceivingKeysSet",
-    "inputs": [
-      {
-        "name": "walletIdentity",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "viewingPublicKey",
-        "type": "bytes",
-        "indexed": false,
-        "internalType": "bytes"
-      },
-      {
-        "name": "clueKey",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "nextNonce",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "error",
-    "name": "AlreadyRegistered",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ChainIdMismatch",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidNonce",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidReceivingKeys",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidRegistrationSignature",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidShortString",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidWalletIdentity",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NonceExhausted",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotRegistered",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ReentrancyGuardReentrantCall",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "RegistrationExpired",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "StringTooLong",
-    "inputs": [
-      {
-        "name": "str",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
-  }
-] as const
+                "indexed": false,
+                "internalType": "bytes32",
+            },
+            {
+                "name": "nextNonce",
+                "type": "uint64",
+                "indexed": false,
+                "internalType": "uint64",
+            },
+        ],
+        "anonymous": false,
+    },
+    {
+        "type": "error",
+        "name": "AlreadyRegistered",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "ChainIdMismatch",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "InvalidNonce",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "InvalidReceivingKeys",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "InvalidRegistrationSignature",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "InvalidShortString",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "InvalidWalletIdentity",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "NonceExhausted",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "NotRegistered",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "ReentrancyGuardReentrantCall",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "RegistrationExpired",
+        "inputs": [],
+    },
+    {
+        "type": "error",
+        "name": "StringTooLong",
+        "inputs": [
+            {
+                "name": "str",
+                "type": "string",
+                "internalType": "string",
+            },
+        ],
+    },
+] as const;

@@ -7,9 +7,9 @@ import type {
     DeploymentContext,
     FinalityTag,
 } from "@invisi-labs/protocol";
-import { invisiProtocolAbi } from "@invisi-labs/protocol/contracts";
+import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { ProtocolRpcClient } from "./ProtocolRpcClient";
-const abi = /* @__PURE__ */ new Interface(invisiProtocolAbi);
+const abi = /* @__PURE__ */ new Interface(invisiCoreAbi);
 function check(value: unknown, message: string): asserts value {
     if (!value) throw Error(message);
 }

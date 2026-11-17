@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { Interface } from "ethers";
-import { invisiProtocolAbi } from "./InvisiProtocol";
-const iface = new Interface(invisiProtocolAbi);
+import { invisiCoreAbi } from "./InvisiCore";
+const iface = new Interface(invisiCoreAbi);
 it("exposes current Credit operations and public revocation queries", () => {
     for (const name of [
         "createCredit",
