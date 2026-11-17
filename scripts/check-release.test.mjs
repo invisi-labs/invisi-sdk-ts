@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { validateRelease } from "./check-release.mjs";
 
 function manifests() {
@@ -60,4 +61,28 @@ test("rejects empty, duplicate or private release package lists", () => {
     assert.throws(() => validateRelease("v1.1.0", [...packages, packages[0]]), /duplicate/);
     packages[0].private = true;
     assert.throws(() => validateRelease("v1.1.0", packages), /private/);
+});
+
+test("tag publication covers every public package and orders required dependencies first", () => {
+    const root = new URL("../", import.meta.url);
+    const workflow = readFileSync(new URL(".github/workflows/release.yml", root), "utf8");
+    const match = /for package in ([a-z ]+); do\s*node scripts\/publish-release/.exec(workflow);
+    assert(match, "Missing tagged-release package publication loop");
+    const order = match[1].trim().split(/\s+/);
+    const names = readdirSync(new URL("packages", root)).filter((name) =>
+        existsSync(new URL(`packages/${name}/package.json`, root))
+    );
+    assert.deepEqual([...order].sort(), [...names].sort());
+    for (const name of names) {
+        const manifest = JSON.parse(
+            readFileSync(new URL(`packages/${name}/package.json`, root), "utf8")
+        );
+        for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+            if (dependency.startsWith("@invisi-labs/"))
+                assert(
+                    order.indexOf(dependency.slice(13)) < order.indexOf(name),
+                    `${name}: dependency must publish first`
+                );
+        }
+    }
 });

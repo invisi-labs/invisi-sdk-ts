@@ -2,6 +2,28 @@
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { resolve } from "node:path";
+// IPP HTTP/types must remain usable without wallet state or a proving dependency graph.
+const ipp = await build({
+    entryPoints: ["packages/ipp/src/index.ts"],
+    bundle: true,
+    platform: "browser",
+    format: "esm",
+    write: false,
+    metafile: true,
+    logLevel: "silent",
+});
+assert(
+    !Object.keys(ipp.metafile.inputs).some((path) =>
+        /packages\/(?:prover|session)\/|packages\/sdk\/src\/(?:transactions|notes|client)\/|@aztec|@noir|node:/.test(
+            path
+        )
+    ),
+    "lightweight IPP entry acquired transaction, wallet-state or proving dependencies"
+);
+console.log(
+    `IPP browser entry PASS: ${ipp.outputFiles[0].contents.length} bytes; no wallet/prover dependencies`
+);
+
 const result = await build({
     stdin: {
         contents:

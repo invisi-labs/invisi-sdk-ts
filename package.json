@@ -19,7 +19,8 @@
     "format:check": "prettier --check \"{packages,examples,scripts,test-support}/**/*.{ts,tsx,js,mjs,cjs}\"",
     "deploy:local": "node scripts/deploy-local.mjs",
     "check:session": "node scripts/check-session-boundary.mjs",
-    "check:boundaries": "node scripts/check-module-boundaries.mjs"
+    "check:boundaries": "node scripts/check-module-boundaries.mjs",
+    "check:ipp": "node scripts/check-ipp-package.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

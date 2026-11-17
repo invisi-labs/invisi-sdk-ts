@@ -10,7 +10,8 @@
       "@invisi-labs/rpc",
       "@invisi-labs/sdk",
       "@invisi-labs/session",
-      "@invisi-labs/vue"
+      "@invisi-labs/vue",
+      "@invisi-labs/ipp"
     ]
   ],
   "linked": [],

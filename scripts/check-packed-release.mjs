@@ -54,7 +54,12 @@ validateRelease(
     packages.map((entry) => entry.manifest),
     { packed: true }
 );
-assert.equal(packages.length, 8, "The fixed release must contain all eight public packages");
+const expected = JSON.parse(readFileSync(".changeset/config.json", "utf8")).fixed.flat().sort();
+assert.deepEqual(
+    packages.map(({ manifest }) => manifest.name).sort(),
+    expected,
+    "The fixed release must contain every public package exactly once"
+);
 const consumer = mkdtempSync(join(tmpdir(), "invisi-packed-release-"));
 const require = createRequire(import.meta.url);
 const version = (name, location) =>

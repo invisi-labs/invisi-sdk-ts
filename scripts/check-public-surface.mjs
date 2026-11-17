@@ -8,6 +8,7 @@ const entries = {
     "protocol": [".", "./contracts", "./note", "./credit", "./provenance"],
     "primitives": [".", "./address", "./note", "./credit"],
     "sdk": [".", "./ethers", "./session-support", "./note", "./credit", "./provenance"],
+    "ipp": [".", "./invisi"],
     "prover": [".", "./native", "./wasm", "./aggregate", "./provenance", "./provenance-witness"],
     "rpc": [".", "./provenance", "./broadcaster", "./trusted-provider"],
     "react": ["."],

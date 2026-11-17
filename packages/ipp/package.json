@@ -1,0 +1,55 @@
+{
+  "name": "@invisi-labs/ipp",
+  "version": "1.2.4",
+  "description": "IPP payment sessions, authenticated HTTP interactions and optional Invisi transaction preparation",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./invisi": {
+      "types": "./dist/invisi.d.ts",
+      "import": "./dist/invisi.js",
+      "require": "./dist/invisi.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@invisi-labs/primitives": "workspace:*"
+  },
+  "peerDependencies": {
+    "@invisi-labs/sdk": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@invisi-labs/sdk": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@invisi-labs/sdk": "workspace:*",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "@types/node": "^20.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
+    "directory": "packages/ipp"
+  },
+  "license": "Apache-2.0"
+}

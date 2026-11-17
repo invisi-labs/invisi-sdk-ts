@@ -103,6 +103,8 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
+    /** Explicit grant correlation key; canonical nonzero field, preserved without derivation. */
+    creditSharedKey?: bigint;
     fee?: { recipient: Address; amount: bigint };
     payload?: Uint8Array;
     singleLimit?: bigint;

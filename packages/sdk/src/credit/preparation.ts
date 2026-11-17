@@ -177,6 +177,13 @@ export class CreditPreparation<Result> {
     }
 
     async create(options: CreateCreditPreparation): Promise<Result> {
+        if (
+            options.creditSharedKey !== undefined &&
+            (typeof options.creditSharedKey !== "bigint" ||
+                options.creditSharedKey <= 0n ||
+                options.creditSharedKey >= FIELD_MODULUS)
+        )
+            throw Error("Credit shared key must be a canonical nonzero field");
         for (const key of Object.keys(options))
             if (
                 ![
@@ -185,6 +192,7 @@ export class CreditPreparation<Result> {
                     "singleLimit",
                     "dailyLimit",
                     "monthlyLimit",
+                    "creditSharedKey",
                     "availableCredit",
                     "unlimited",
                     "tokenAddress",
@@ -232,7 +240,7 @@ export class CreditPreparation<Result> {
                     payload: copyApplicationPayload(options.payload),
                     expiry,
                     nonce: generateNonce(),
-                    creditSharedKey: generateCreditSharedKey(),
+                    creditSharedKey: options.creditSharedKey ?? generateCreditSharedKey(),
                 },
                 ownerReceivingKeys: owner.getReceivingKeys(),
                 spenderReceivingKeys: spender.getReceivingKeys(),

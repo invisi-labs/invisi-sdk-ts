@@ -8,6 +8,7 @@ export const allowedDependencies = {
     protocol: ["primitives"],
     prover: ["primitives", "protocol"],
     rpc: ["primitives", "protocol"],
+    ipp: ["primitives", "sdk"],
     sdk: ["primitives", "protocol", "prover", "rpc"],
     session: ["primitives", "protocol", "sdk", "rpc"],
     react: ["sdk", "session"],
@@ -43,12 +44,28 @@ export function checkModuleBoundaries() {
             if (["primitives", "protocol"].includes(owner))
                 assert(!/@aztec|@noir/.test(name), `${owner} contains proving runtime ${name}`);
         }
+        if (owner === "ipp") {
+            assert(
+                !manifest.dependencies?.["@invisi-labs/sdk"],
+                "IPP core must not require the SDK"
+            );
+            assert(
+                manifest.peerDependenciesMeta?.["@invisi-labs/sdk"]?.optional,
+                "IPP SDK peer must be optional"
+            );
+        }
         for (const path of sources(`packages/${owner}/src`)) {
             const source = readFileSync(path, "utf8");
             for (const match of source.matchAll(
                 /(?:from\s*|import\s*\()["']@invisi-labs\/([a-z-]+)(?:\/[^"']*)?["']/g
-            ))
+            )) {
                 validateDependency(owner, match[1], path);
+                if (owner === "ipp" && match[1] === "sdk")
+                    assert(
+                        path.endsWith("/methods/invisi/prepare.ts"),
+                        `${path}: SDK imports belong only to the invisi adapter`
+                    );
+            }
             assert(!/@invisi-labs\/core(?:\/|["'])/.test(source), `${path}: retired package name`);
             if (["primitives", "protocol", "prover"].includes(owner))
                 assert(
@@ -65,5 +82,5 @@ export function checkModuleBoundaries() {
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     checkModuleBoundaries();
-    console.log("Six-module dependency boundaries PASS");
+    console.log("Package dependency boundaries PASS");
 }
