@@ -1,5 +1,6 @@
 import { inputFacts } from "@invisi-labs/sdk/session-support";
 import type { OperationRuntime, SavedOperation } from "./operation-types";
+import type { WalletState } from "../storage/state";
 function check(ok: unknown, message: string): asserts ok {
     if (!ok) {
         throw new Error(message);
@@ -14,6 +15,14 @@ export async function quoteManagedOperation(
     const { prepareIntent, prepareBroadcasterPlan } =
         await import("@invisi-labs/sdk/session-support");
 
+    let inventory: Promise<WalletState> | undefined;
+    const readInventory = async () => {
+        const state = await (inventory ??= runtime.store.readSnapshot(runtime.scope));
+        const copy = structuredClone(state);
+        for (const [key, owner] of Object.entries(copy.reservations))
+            if (owner === snapshot.plan.id) delete copy.reservations[key];
+        return copy;
+    };
     const build = (
         intent: import("@invisi-labs/sdk/session-support").PreparationIntent,
         repricing: boolean
@@ -31,12 +40,7 @@ export async function quoteManagedOperation(
                     : {}),
                 scope: runtime.scope,
                 reader: runtime.reader,
-                readInventory: async () => {
-                    const state = await runtime.store.readSnapshot(runtime.scope);
-                    for (const [key, owner] of Object.entries(state.reservations))
-                        if (owner === snapshot.plan.id) delete state.reservations[key];
-                    return state;
-                },
+                readInventory,
                 complete: async (plan) => ({
                     ...plan,
                     ...(snapshot.plan.submissionValidation
@@ -50,7 +54,6 @@ export async function quoteManagedOperation(
         runtime.preparationReads
             ? runtime.preparationReads.reprice((reuse) => build(intent, reuse))
             : build(intent, false);
-    // The store transaction below commits the quote and cancellation secret before the managed handle can submit.
     const selected = await prepareBroadcasterPlan(snapshot.plan, reprepare, client, {
         ...options,
         ...(options.schedule && !options.persistSchedule
