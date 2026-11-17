@@ -1,3 +1,5 @@
+import { browserResources } from "./resources/browser";
+import type { ResourceOptions } from "./resources/loader";
 import { hexlify, sha256 } from "ethers";
 import { Noir } from "@noir-lang/noir_js";
 import type { CompiledCircuit } from "@noir-lang/noir_js";
@@ -13,7 +15,8 @@ export interface ProvenanceAssets {
 }
 export interface LocalProvenanceOptions {
     trustedManifestSha256: string;
-    loadAssets: (capacity: number) => Promise<ProvenanceAssets>;
+    loadAssets?: (capacity: number) => Promise<ProvenanceAssets>;
+    resources?: ResourceOptions;
     threads?: number;
     wasmPath?: string;
     crsPath?: string;
@@ -46,7 +49,24 @@ export class LocalProvenanceProver implements OfflineProver {
         this.options.signal?.throwIfAborted();
         if (request.identity.sha256 !== this.options.trustedManifestSha256)
             throw new Error("Provenance manifest mismatch");
-        const assets = await this.options.loadAssets(request.capacity),
+        const loadAssets =
+            this.options.loadAssets ??
+            (async (capacity: number): Promise<ProvenanceAssets> => {
+                const loader = browserResources(this.options.resources);
+                const manifest = await loader.load("provenance/manifest.json", this.options.signal);
+                authenticateManifest(manifest, this.options.trustedManifestSha256);
+                const raw = JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(manifest));
+                const entry = raw.circuits.find(
+                    (entry: { capacity: number }) => entry.capacity === capacity
+                );
+                if (!entry) throw new Error("Unsupported provenance capacity");
+                const [artifact, verificationKey] = await Promise.all([
+                    loader.load(`provenance/${entry.artifact}`, this.options.signal),
+                    loader.load(`provenance/${entry.vk}`, this.options.signal),
+                ]);
+                return { manifest, artifact, verificationKey };
+            });
+        const assets = await loadAssets(request.capacity),
             identity = authenticateManifest(assets.manifest, this.options.trustedManifestSha256),
             entry = identity.manifest.circuits.find((e) => e.capacity === request.capacity);
         if (
@@ -119,3 +139,5 @@ export class LocalProvenanceProver implements OfflineProver {
         }
     }
 }
+
+export type { ResourceOptions, ResourceCache } from "./resources/loader";

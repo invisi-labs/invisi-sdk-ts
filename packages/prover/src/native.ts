@@ -1,8 +1,8 @@
 import type { ProvenanceProvider } from "./provenance-witness";
 export { checkBBAvailable, proveWithBB, verifyWithBB } from "./backends/backend-bb";
 export type { NativeOptions } from "./backends/backend-bb";
-export { proveWithWasm, verifyWithWasm } from "./backends/backend-wasm";
-export type { WasmOptions } from "./backends/backend-wasm";
+export { proveWithWasm, verifyWithWasm } from "./backends/backend-wasm-node";
+export type { WasmOptions } from "./backends/backend-wasm-node";
 export type {
     CircuitMetadata,
     CircuitName,
@@ -16,6 +16,8 @@ export {
     getCircuitPath,
     getVerificationKeyPath,
     loadCircuit,
+    loadCircuitAsync,
+    loadVerificationKeyAsync,
     loadVerificationKey,
 } from "./circuits/circuits";
 export {
@@ -76,3 +78,7 @@ export class NativeProver extends BackendProver implements ProvenanceProvider {
         });
     }
 }
+
+export type { NodeResourceOptions } from "./resources/node";
+export type { ResourceCache } from "./resources/loader";
+export { PROVER_ASSET_INDEX_SHA256 } from "./resources/pin";

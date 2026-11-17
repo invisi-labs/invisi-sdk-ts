@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve, sep } from "node:path";
+import { nodeResources } from "../resources/node";
+import { PROVENANCE_MANIFEST_TEXT } from "../resources/provenance-manifest";
 import { authenticateManifest, witnessJSON, type OfflineProver } from "../provenance-witness";
 import {
     PROVENANCE_MANIFEST_SHA256,
@@ -15,12 +15,6 @@ import type { CompiledCircuit } from "../circuits/circuit-types";
 import { generateWitness } from "../witness/witness";
 import { runBB, assertBBVersion, type NativeOptions } from "./backend-bb";
 
-const moduleDirectory =
-    typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
-const packaged = join(moduleDirectory, "..", "provenance");
-const defaultAssets = existsSync(join(packaged, "manifest.json"))
-    ? packaged
-    : join(moduleDirectory, "..", "..", "provenance");
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 export interface NativeProvenanceAssetsOptions extends NativeOptions {
@@ -29,17 +23,22 @@ export interface NativeProvenanceAssetsOptions extends NativeOptions {
 
 /** Shares the native BB process configuration; this boundary never sends witness to a service. */
 export class NativeProvenanceBackend implements OfflineProver {
-    readonly #root: string;
+    readonly #root: string | undefined;
     constructor(private readonly options: NativeProvenanceAssetsOptions) {
-        this.#root = resolve(options.provenanceAssetsPath ?? defaultAssets);
+        this.#root = options.provenanceAssetsPath
+            ? resolve(options.provenanceAssetsPath)
+            : undefined;
     }
     async manifest(): Promise<ManifestIdentity> {
         return authenticateManifest(
-            await readFile(join(this.#root, "manifest.json")),
+            this.#root
+                ? await readFile(join(this.#root, "manifest.json"))
+                : new TextEncoder().encode(PROVENANCE_MANIFEST_TEXT),
             PROVENANCE_MANIFEST_SHA256
         );
     }
     private asset(relative: string): string {
+        if (!this.#root) throw Error("Local resource directory is not configured");
         const path = resolve(this.#root, relative);
         if (!path.startsWith(this.#root + sep)) throw Error("Invalid Provenance asset path");
         return path;
@@ -54,8 +53,18 @@ export class NativeProvenanceBackend implements OfflineProver {
             | undefined;
         if (!entry) throw Error("Unsupported Provenance capacity");
         const [artifact, vk] = await Promise.all([
-            readFile(this.asset(entry.artifact)),
-            readFile(this.asset(entry.vk)),
+            this.#root
+                ? readFile(this.asset(entry.artifact))
+                : nodeResources(this.options.resources).load(
+                      `provenance/${entry.artifact}`,
+                      this.options.signal
+                  ),
+            this.#root
+                ? readFile(this.asset(entry.vk))
+                : nodeResources(this.options.resources).load(
+                      `provenance/${entry.vk}`,
+                      this.options.signal
+                  ),
         ]);
         if (digest(artifact) !== entry.artifactSha256 || digest(vk) !== entry.vkSha256)
             throw Error("Provenance artifact identity mismatch");
@@ -65,7 +74,9 @@ export class NativeProvenanceBackend implements OfflineProver {
         const bb = this.options.bbBin ?? "bb";
         await assertBBVersion(bb, this.options);
         const witness = await generateWitness(
-            JSON.parse(artifact.toString()) as CompiledCircuit,
+            JSON.parse(
+                new TextDecoder("utf8", { fatal: true }).decode(artifact)
+            ) as CompiledCircuit,
             JSON.parse(witnessJSON(request.witness))
         );
         let directory: string | undefined;

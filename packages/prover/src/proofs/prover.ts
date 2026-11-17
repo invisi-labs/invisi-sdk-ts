@@ -1,11 +1,11 @@
 import { proveWithBB, verifyWithBB, type NativeOptions } from "../backends/backend-bb";
-import { proveWithWasm, verifyWithWasm, type WasmOptions } from "../backends/backend-wasm";
+import { proveWithWasm, verifyWithWasm, type WasmOptions } from "../backends/backend-wasm-node";
 import type { CircuitName, Hex, ProofBundle, ProofTarget } from "../circuits/circuit-types";
-import { loadCircuit } from "../circuits/circuits";
+import { loadCircuitAsync } from "../circuits/circuits";
 import { generateWitness } from "../witness/witness";
 import { getCircuitKey } from "./proof-data";
 export type Backend = "bb" | "wasm";
-export interface ProveParams extends NativeOptions, WasmOptions {
+export interface ProveParams extends NativeOptions, Omit<WasmOptions, "resources"> {
     circuitName: CircuitName;
     inputs: Record<string, unknown>;
     backend?: Backend;
@@ -14,7 +14,7 @@ export interface ProveParams extends NativeOptions, WasmOptions {
 }
 export async function generateProofBundle(params: ProveParams): Promise<ProofBundle> {
     getCircuitKey(params.circuitName, params.target ?? "evm");
-    const circuit = loadCircuit(params.circuitName),
+    const circuit = await loadCircuitAsync(params.circuitName, params.resources, params.signal),
         witness = await generateWitness(circuit, params.inputs);
     try {
         if ((params.backend ?? "bb") === "bb") return await proveWithBB({ ...params, witness });

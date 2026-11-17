@@ -13,7 +13,10 @@ import {
     makeProofBundle,
     toHex,
 } from "../proofs/proof-data";
+import type { ResourceOptions } from "../resources/loader";
 export interface WasmOptions {
+    resources?: ResourceOptions;
+    signal?: AbortSignal;
     threads?: number;
     wasmPath?: string;
     crsPath?: string;
@@ -47,7 +50,12 @@ export async function verifyWithWasm(
     options: WasmOptions = {}
 ): Promise<boolean> {
     await assertProofBundle(bundle);
-    const key = await loadVerificationKeyBrowser(bundle.circuitName, bundle.target),
+    const key = await loadVerificationKeyBrowser(
+            bundle.circuitName,
+            bundle.target,
+            options.resources,
+            options.signal
+        ),
         api = await runtime(key, options);
     try {
         const { verified } = await api.circuitVerify({
@@ -73,7 +81,12 @@ export async function proveWithWasm(
 ): Promise<ProofBundle> {
     const target = params.target ?? "evm";
     await authenticateCircuit(params.circuitName, params.circuit);
-    const key = await loadVerificationKeyBrowser(params.circuitName, target);
+    const key = await loadVerificationKeyBrowser(
+        params.circuitName,
+        target,
+        params.resources,
+        params.signal
+    );
     const api = await runtime(key, params);
     let raw: Uint8Array | undefined;
     try {

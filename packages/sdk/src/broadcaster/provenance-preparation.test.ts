@@ -71,7 +71,9 @@ it.each([
             "0x" +
             Buffer.from(sign(null, rootCertificateMessage(certificate), key)).toString("hex");
         const manifest = authenticateManifest(
-            readFileSync(new URL("../../../prover/provenance/manifest.json", import.meta.url)),
+            readFileSync(
+                new URL("../../../prover/src/resources/provenance-manifest.json", import.meta.url)
+            ),
             PROVENANCE_MANIFEST_SHA256
         );
         const prover = {

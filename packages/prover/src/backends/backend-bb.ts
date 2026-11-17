@@ -4,10 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { CircuitName, ProofBundle, ProofTarget } from "../circuits/circuit-types";
-import { loadCircuit, loadVerificationKey } from "../circuits/circuits";
+import { loadCircuitAsync, loadVerificationKeyAsync } from "../circuits/circuits";
 import { assertProofBundle, fieldHex, fromHex, makeProofBundle } from "../proofs/proof-data";
 const execFileAsync = promisify(execFile);
+import type { NodeResourceOptions } from "../resources/node";
 export interface NativeOptions {
+    resources?: NodeResourceOptions;
     bbBin?: string;
     crsPath?: string;
     threads?: number;
@@ -54,7 +56,15 @@ async function verifyInDirectory(
     const keyPath = join(directory, "vk"),
         proofPath = join(directory, "proof"),
         inputPath = join(directory, "public_inputs");
-    await writeFile(keyPath, loadVerificationKey(bundle.circuitName, bundle.target));
+    await writeFile(
+        keyPath,
+        await loadVerificationKeyAsync(
+            bundle.circuitName,
+            bundle.target,
+            options.resources,
+            options.signal
+        )
+    );
     await writeFile(proofPath, fromHex(bundle.proofHex));
     await writeFile(inputPath, Buffer.concat(bundle.publicInputs.map((value) => fromHex(value))));
     const result = await runBB(
@@ -89,8 +99,13 @@ export async function proveWithBB(
     const bbBin = params.bbBin ?? "bb",
         target = params.target ?? "evm";
     // Loading both assets checks identity and rejects unpublished target combinations.
-    const circuit = loadCircuit(params.circuitName),
-        key = loadVerificationKey(params.circuitName, target);
+    const circuit = await loadCircuitAsync(params.circuitName, params.resources, params.signal),
+        key = await loadVerificationKeyAsync(
+            params.circuitName,
+            target,
+            params.resources,
+            params.signal
+        );
     await assertBBVersion(bbBin, params);
     const directory = await mkdtemp(join(tmpdir(), "invisi-proof-"));
     try {

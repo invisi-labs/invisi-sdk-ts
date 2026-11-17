@@ -31,3 +31,7 @@ examples/*.sqlite*
 .cache/provenance/
 
 # Public Provenance native assets are versioned beside the authenticated manifest.
+
+# Circuit binaries are published by Core and provisioned into external caches.
+/packages/prover/circuits/
+/packages/prover/provenance/

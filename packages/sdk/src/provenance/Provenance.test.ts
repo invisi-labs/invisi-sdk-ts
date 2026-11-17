@@ -68,7 +68,9 @@ async function fixture(execution: "single" | "aggregate" = "single") {
     const capacity = (publicInputs.length - 17) / 3;
     const digest = operationDigest({ ...h.context, mainCircuitCapacity: capacity, publicInputs });
     const manifest = authenticateManifest(
-        readFileSync(new URL("../../../prover/provenance/manifest.json", import.meta.url)),
+        readFileSync(
+            new URL("../../../prover/src/resources/provenance-manifest.json", import.meta.url)
+        ),
         "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
     );
     const key = createPrivateKey({

@@ -11,7 +11,7 @@ export interface ProveBrowserParams extends WasmOptions {
 }
 export async function generateProofBundle(params: ProveBrowserParams): Promise<ProofBundle> {
     getCircuitKey(params.circuitName, params.target ?? "evm");
-    const circuit = await loadCircuitBrowser(params.circuitName),
+    const circuit = await loadCircuitBrowser(params.circuitName, params.resources, params.signal),
         witness = await generateWitness(circuit, params.inputs);
     try {
         return await proveWithWasm({ ...params, circuit, witness });
@@ -60,12 +60,19 @@ export class WasmProver extends BackendProver {
                 circuitName: request.circuitName,
                 target: request.target,
                 expectedPublicInputs: request.expectedPublicInputs,
+                ...(options.signal ? { signal: options.signal } : {}),
                 inputs,
             })
         );
     }
     protected verifyBundle(bundle: ProofBundle, options: ProverOptions) {
         options.signal?.throwIfAborted();
-        return verifyWithWasm(bundle, this.#options);
+        return verifyWithWasm(bundle, {
+            ...this.#options,
+            ...(options.signal ? { signal: options.signal } : {}),
+        });
     }
 }
+
+export type { ResourceOptions, ResourceCache } from "./resources/loader";
+export { PROVER_ASSET_INDEX_SHA256 } from "./resources/pin";

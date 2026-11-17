@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { validateRelease } from "./check-release.mjs";
+import { reviewedPin } from "./sync-prover-assets.mjs";
 
 const [tag, directory] = process.argv.slice(2);
 assert(tag && directory, "Usage: node scripts/check-packed-release.mjs vX.Y.Z PACK_DIRECTORY");
@@ -29,6 +30,41 @@ const packages = archives.map((name) => {
         license,
         `${manifest.name}: packaged LICENSE must contain the complete terms`
     );
+    if (manifest.name === "@invisi-labs/prover") {
+        assert(
+            !manifest.scripts?.postinstall,
+            "Prover package must not download resources during install"
+        );
+        const payloadFiles = [...files].filter((name) => !name.endsWith("/"));
+        assert(
+            payloadFiles.every(
+                (name) =>
+                    !/^package\/(?:.*\/)?(?:circuits|provenance|target)\//.test(name) &&
+                    !name.endsWith(".vk")
+            ),
+            "Prover archive contains heavy circuit/VK payloads"
+        );
+        const javascript = payloadFiles
+            .filter(
+                (name) =>
+                    name.startsWith("package/dist/") && /\.(?:js|cjs|mjs|json|map)$/.test(name)
+            )
+            .map((name) =>
+                execFileSync("tar", ["-xOf", archive, name], {
+                    encoding: "utf8",
+                    maxBuffer: 32 * 1024 * 1024,
+                })
+            )
+            .join("\n");
+        assert(
+            javascript.includes(reviewedPin()),
+            "Packed prover code must contain the reviewed resource index pin"
+        );
+        assert(
+            !/["']?bytecode["']?\s*:\s*["'][A-Za-z0-9+/=]{1000}/.test(javascript),
+            "Packed prover code embeds a compiled circuit"
+        );
+    }
     const entries = [];
     for (const [subpath, target] of Object.entries(manifest.exports)) {
         const conditions = typeof target === "string" ? { import: target } : target;

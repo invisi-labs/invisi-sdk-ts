@@ -1,5 +1,5 @@
 import { selectAggregateRoute } from "@invisi-labs/protocol";
-import manifest from "../../circuits/manifest.json";
+import manifest from "../resources/circuits-metadata.json";
 import type {
     CircuitMetadata,
     CircuitName,

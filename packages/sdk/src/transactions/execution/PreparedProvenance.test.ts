@@ -70,7 +70,9 @@ async function configured(historical = false, execution: "direct" | "aggregate" 
         : cert;
     if (historical) latest.signature = hexlify(sign(null, rootCertificateMessage(latest), key));
     const manifest = authenticateManifest(
-        readFileSync(new URL("../../../../prover/provenance/manifest.json", import.meta.url)),
+        readFileSync(
+            new URL("../../../../prover/src/resources/provenance-manifest.json", import.meta.url)
+        ),
         "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
     );
     const trust: TrustContext = {

@@ -144,7 +144,9 @@ it("reopens encrypted original operations and proves only after payment and reco
             sign(null, rootCertificateMessage(certificate), signingKey)
         );
         const manifest = authenticateManifest(
-            await readFile(new URL("../../../prover/provenance/manifest.json", import.meta.url)),
+            await readFile(
+                new URL("../../../prover/src/resources/provenance-manifest.json", import.meta.url)
+            ),
             PROVENANCE_MANIFEST_SHA256
         );
         const trust: TrustContext = {

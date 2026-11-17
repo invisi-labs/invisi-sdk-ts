@@ -63,9 +63,7 @@
     "@aztec-foundation/bb.js": "6.0.0"
   },
   "files": [
-    "dist",
-    "circuits",
-    "provenance"
+    "dist"
   ],
   "repository": {
     "type": "git",

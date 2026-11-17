@@ -1,8 +1,10 @@
 /** Import only authenticated, published proving artifacts. No witnesses or source maps. */
 import assert from "node:assert/strict";
-import { format, resolveConfig } from "prettier";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { parseIndex, reviewedPin } from "../../../scripts/sync-prover-assets.mjs";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync, mkdirSync, rmSync, renameSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, mkdtempSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -30,11 +32,17 @@ for (const [i, version, format] of [
     assert.equal(manifests[i].version, version, "retired manifest version");
     assert.equal(manifests[i].formatVersion, format, "retired proof format");
 }
-const destination = join(packageRoot, "circuits"),
-    stage = destination + ".sync-tmp";
-rmSync(stage, { recursive: true, force: true });
-mkdirSync(stage, { recursive: true });
+const destination = join(packageRoot, "src/resources/circuits-metadata.json");
+const stage = mkdtempSync(join(tmpdir(), "invisi-resource-metadata-"));
+// Authenticate the exact public resource set before changing SDK metadata. The
+// reviewed SDK pin is never rewritten by synchronization.
+const resources = join(stage, "resources");
 try {
+    execFileSync(process.execPath, [join(root, "scripts/prover-assets.mjs"), resources], {
+        cwd: root,
+        stdio: "inherit",
+    });
+    const resourceIndex = parseIndex(readFileSync(join(resources, "index.json")), reviewedPin());
     const entries = [];
     for (const manifest of manifests) {
         assert.equal(manifest.complete, true);
@@ -54,8 +62,10 @@ try {
                 entry.artifactSha256,
                 `stale artifact ${entry.name}`
             );
-            const { debug_symbols, file_map, ...published } = artifact;
-            writeFileSync(join(stage, entry.name + ".json"), JSON.stringify(published) + "\n");
+            assert(
+                resourceIndex.files[`circuits/${entry.name}.json`],
+                "circuit absent from reviewed resource index"
+            );
             const keys = {};
             for (const key of [entry.direct ?? entry, entry.recursive].filter(Boolean)) {
                 const bytes = readFileSync(join(root, key.vk));
@@ -103,7 +113,11 @@ try {
                     recursiveMetadata = { vkFields, vkHash };
                 }
                 const filename = entry.name + "." + key.target + ".vk";
-                writeFileSync(join(stage, filename), bytes);
+                assert.equal(
+                    resourceIndex.files[`circuits/${filename}`]?.sha256,
+                    key.vkSha256,
+                    "VK absent from reviewed resource index"
+                );
                 keys[key.target] = {
                     target: key.target,
                     vkSha256: key.vkSha256,
@@ -149,43 +163,18 @@ try {
         })),
         entries,
     };
-    writeFileSync(join(stage, "manifest.json"), JSON.stringify(release, null, 2) + "\n");
-    const releaseIdentityPath = join(packageRoot, "../protocol/src/release-identity.ts");
-    writeFileSync(
-        releaseIdentityPath,
-        await format(
-            "// Generated from authenticated protocol manifests.\nexport const CIRCUIT_RELEASE = " +
-                JSON.stringify(
-                    {
-                        note: {
-                            version: manifests[0].version,
-                            formatVersion: manifests[0].formatVersion,
-                            aggregateFormatVersion: manifests[0].aggregateFormatVersion,
-                        },
-                        credit: {
-                            version: manifests[1].version,
-                            formatVersion: manifests[1].formatVersion,
-                            manifestSha256: release.manifests[1].sha256,
-                        },
-                    },
-                    null,
-                    2
-                ) +
-                " as const;\n",
-            { ...(await resolveConfig(releaseIdentityPath)), filepath: releaseIdentityPath }
-        )
-    );
-    mkdirSync(destination, { recursive: true });
-    for (const filename of readdirSync(destination))
-        if (!readdirSync(stage).includes(filename))
-            rmSync(join(destination, filename), { force: true });
-    for (const filename of readdirSync(stage))
-        renameSync(join(stage, filename), join(destination, filename));
-    for (const filename of ["wallet_registration.json", "wallet_registration.evm.vk"])
-        rmSync(join(destination, filename), { force: true });
+    mkdirSync(dirname(destination), { recursive: true });
+    const metadata = JSON.stringify(release, null, 2) + "\n";
+    if (process.argv.includes("--check"))
+        assert.equal(
+            readFileSync(destination, "utf8"),
+            metadata,
+            "Circuit metadata differs from reviewed resource release"
+        );
+    else writeFileSync(destination, metadata);
     rmSync(stage, { recursive: true, force: true });
     console.log(
-        `Synced ${entries.length} authenticated circuits and their published verification keys`
+        `Synced ${entries.length} authenticated circuit metadata entries without packaged artifacts`
     );
 } catch (error) {
     rmSync(stage, { recursive: true, force: true });
