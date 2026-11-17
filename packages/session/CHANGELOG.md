@@ -1,6 +1,6 @@
 # @invisi-labs/session
 
-## Unreleased
+## 1.2.5
 
 - Read SQLite pages with one bounded query when the driver supports `all`, retaining the get-only fallback and detached result bytes.
 - Reuse one detached inventory snapshot across a broadcaster quote's fee iterations and precompute record prefixes, preserving final operation-generation, invalidation, spent-state and reservation checks.

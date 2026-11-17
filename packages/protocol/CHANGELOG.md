@@ -1,5 +1,10 @@
 # @invisi-labs/protocol
 
+## 1.2.5
+
+- Synchronize contract ABIs and bindings with Invisi Core.
+
+
 ## 1.2.4
 
 - Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.

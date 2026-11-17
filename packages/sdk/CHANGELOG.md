@@ -1,5 +1,10 @@
 # @invisi-labs/sdk
 
+## 1.2.5
+
+- Support independent IPP preparation through the separate IPP adapter without adding IPP to the main SDK dependency graph.
+
+
 ## 1.2.4
 
 - Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.

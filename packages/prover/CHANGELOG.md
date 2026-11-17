@@ -1,5 +1,11 @@
 # @invisi-labs/prover
 
+## 1.2.5
+
+- Load pinned, authenticated circuit resources on demand instead of including large circuit files in npm packages. Support local resource directories, offline circuit loading and the shared verified disk cache.
+- Defer Noir runtime imports until witness generation; retain upstream WASM and official CRS distribution.
+
+
 ## 1.2.4
 
 - Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.

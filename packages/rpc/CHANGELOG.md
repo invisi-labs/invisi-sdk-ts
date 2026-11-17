@@ -1,5 +1,10 @@
 # @invisi-labs/rpc
 
+## 1.2.5
+
+- Align the fixed release cohort with current Invisi Core interfaces and independent prover resources.
+
+
 ## 1.2.4
 
 - Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.

@@ -1,5 +1,10 @@
 # @invisi-labs/react
 
+## 1.2.5
+
+- Align exact sibling dependencies with the 1.2.5 SDK cohort.
+
+
 ## 1.2.4
 
 - Refresh gas benchmarks for the optimized Protocol contracts and validate authorization boundaries.
