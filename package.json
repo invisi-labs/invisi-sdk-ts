@@ -14,6 +14,7 @@
     "examples": "pnpm --filter @invisi-examples/scenarios example:note:output",
     "lint:english": "node scripts/check-english.mjs",
     "check:browser": "node scripts/check-browser-entrypoints.mjs",
+    "check:wasm": "node scripts/check-wasm-loading.mjs",
     "check:surface": "node scripts/check-public-surface.mjs",
     "format": "prettier --write \"{packages,examples,scripts,test-support}/**/*.{ts,tsx,js,mjs,cjs}\"",
     "format:check": "prettier --check \"{packages,examples,scripts,test-support}/**/*.{ts,tsx,js,mjs,cjs}\"",

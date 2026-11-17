@@ -1,7 +1,6 @@
 import { browserResources } from "./resources/browser";
 import type { ResourceOptions } from "./resources/loader";
 import { hexlify, sha256 } from "ethers";
-import { Noir } from "@noir-lang/noir_js";
 import type { CompiledCircuit } from "@noir-lang/noir_js";
 import { authenticateManifest, witnessJSON } from "./provenance-witness";
 import { PUBLIC_INPUTS, word } from "@invisi-labs/protocol/provenance";
@@ -90,6 +89,7 @@ export class LocalProvenanceProver implements OfflineProver {
         const expected = PUBLIC_INPUTS.map((k) => word(request.witness[k] as bigint));
         if (JSON.stringify(expected) !== JSON.stringify(request.expectedPublicInputs))
             throw new Error("Witness statement mismatch");
+        const { Noir } = await import("@noir-lang/noir_js");
         const noir = new Noir(circuit),
             executed = await noir.execute(JSON.parse(witnessJSON(request.witness)));
         let raw: Uint8Array | undefined;

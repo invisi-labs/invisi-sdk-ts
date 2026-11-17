@@ -60,6 +60,9 @@ jobs:
             pnpm --dir "$package" pack --pack-destination "$RUNNER_TEMP/release-packages"
           done
 
+      - name: Check lazy browser WASM runtime loading
+        run: pnpm check:wasm
+
       - name: Validate packed versions and dependencies
         run: node scripts/check-release.mjs "$GITHUB_REF_NAME" "$RUNNER_TEMP/release-packages"
 
