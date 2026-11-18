@@ -1,5 +1,9 @@
 # @invisi-labs/protocol
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Synchronize contract ABIs and bindings with Invisi Core.

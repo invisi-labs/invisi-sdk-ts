@@ -1,5 +1,9 @@
 # @invisi-labs/rpc
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Align the fixed release cohort with current Invisi Core interfaces and independent prover resources.

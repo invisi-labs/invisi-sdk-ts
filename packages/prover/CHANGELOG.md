@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Load pinned, authenticated circuit resources on demand instead of including large circuit files in npm packages. Support local resource directories, offline circuit loading and the shared verified disk cache.

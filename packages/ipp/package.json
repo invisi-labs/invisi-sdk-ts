@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/ipp",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "IPP payment sessions, authenticated HTTP interactions and optional Invisi transaction preparation",
   "type": "module",
   "sideEffects": false,

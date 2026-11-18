@@ -2,7 +2,7 @@
 
 Pure public protocol contracts: ABIs, public DTOs, strict codecs, public inputs, signature digests, capacities, deployment validation and receipt-calibrated local gas estimates. Depends on primitives; contains no network calls or proving runtime.
 
-Install with `npm install @invisi-labs/protocol@1.2.5`. API documentation and runnable examples are in the [SDK repository](https://github.com/invisi-labs/invisi-sdk-ts).
+Install with `npm install @invisi-labs/protocol@1.2.6`. API documentation and runnable examples are in the [SDK repository](https://github.com/invisi-labs/invisi-sdk-ts).
 
 ## Contributing
 

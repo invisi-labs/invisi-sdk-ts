@@ -1,5 +1,9 @@
 # @invisi-labs/session
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Read SQLite pages with one bounded query when the driver supports `all`, retaining the get-only fallback and detached result bytes.

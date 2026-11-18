@@ -1,5 +1,9 @@
 # @invisi-labs/primitives
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Reduce Decaf377 FMD clue-generation work with a fixed-field inverse square root, shared scalar multiplication and a bounded cache of public clue-key precomputations. Preserve canonical encodings, deterministic cross-language clue bytes and fresh per-clue randomness.

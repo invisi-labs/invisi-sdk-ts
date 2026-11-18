@@ -1,5 +1,9 @@
 # @invisi-labs/react
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Align exact sibling dependencies with the 1.2.5 SDK cohort.

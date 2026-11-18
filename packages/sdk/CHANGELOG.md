@@ -1,5 +1,9 @@
 # @invisi-labs/sdk
 
+## 1.2.6
+
+- Update GitHub repository and release references to the `invisi-labs` organization.
+
 ## 1.2.5
 
 - Support independent IPP preparation through the separate IPP adapter without adding IPP to the main SDK dependency graph.
