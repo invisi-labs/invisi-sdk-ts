@@ -1,5 +1,9 @@
 # @invisi-labs/ipp
 
+## 1.2.7
+
+- Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.
+
 ## 1.2.6
 
 - Update GitHub repository and release references to the `invisi-labs` organization.

@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.2.7
+
+- Align BN254 SRS point requests with Barretenberg 6.0 batch sizes for WASM proving, verification, and Provenance.
+
 ## 1.2.6
 
 - Update GitHub repository and release references to the `invisi-labs` organization.
