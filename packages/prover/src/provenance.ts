@@ -1,4 +1,5 @@
 import { browserResources } from "./resources/browser";
+import { wasmSrsSize } from "./backends/wasm-srs";
 import type { ResourceOptions } from "./resources/loader";
 import { hexlify, sha256 } from "ethers";
 import type { CompiledCircuit } from "@noir-lang/noir_js";
@@ -98,13 +99,10 @@ export class LocalProvenanceProver implements OfflineProver {
             raw = await decompress(executed.witness);
             this.options.signal?.throwIfAborted();
             const { Barretenberg, BackendType } = await import("@aztec-foundation/bb.js");
-            const logN = Number(BigInt(hexlify(assets.verificationKey.slice(0, 32))));
-            if (!Number.isInteger(logN) || logN < 1 || logN > 28)
-                throw new Error("Invalid provenance VK size");
             api = await Barretenberg.new({
                 backend: BackendType.WasmWorker,
                 threads: this.options.threads ?? 4,
-                srsSize: 2 ** logN + 1,
+                srsSize: wasmSrsSize(assets.verificationKey),
                 ...(this.options.wasmPath ? { wasmPath: this.options.wasmPath } : {}),
                 ...(this.options.crsPath ? { crsPath: this.options.crsPath } : {}),
             });

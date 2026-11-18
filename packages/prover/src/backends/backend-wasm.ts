@@ -14,6 +14,7 @@ import {
     toHex,
 } from "../proofs/proof-data";
 import type { ResourceOptions } from "../resources/loader";
+import { wasmSrsSize } from "./wasm-srs";
 export interface WasmOptions {
     resources?: ResourceOptions;
     signal?: AbortSignal;
@@ -31,13 +32,10 @@ function settings(target: ProofTarget) {
 }
 async function runtime(key: Uint8Array, options: WasmOptions): Promise<BBApi> {
     const { Barretenberg, BackendType } = await import("@aztec-foundation/bb.js");
-    const logN = Number(BigInt(toHex(key.slice(0, 32))));
-    if (!Number.isInteger(logN) || logN < 1 || logN > 28)
-        throw new Error("Invalid verification key circuit size");
     return Barretenberg.new({
         backend: BackendType.WasmWorker,
         threads: options.threads ?? 4,
-        srsSize: 2 ** logN + 1,
+        srsSize: wasmSrsSize(key),
         ...(options.wasmPath === undefined ? {} : { wasmPath: options.wasmPath }),
         ...(options.crsPath === undefined ? {} : { crsPath: options.crsPath }),
     });
