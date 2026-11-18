@@ -63,7 +63,7 @@ const directory = resolve(
         options.output ?? join(root, ".tools/provenance-e2e/runs", String(Date.now()))
     ),
     repoRoot = resolve(root, ".."),
-    rpcRoot = join(repoRoot, "invisi-protocol-rpc"),
+    rpcRoot = join(repoRoot, "invisi-rpc"),
     serviceRoot = join(repoRoot, "invisi-provenance"),
     bin = join(directory, "bin");
 mkdirSync(bin, { recursive: true });
@@ -173,14 +173,14 @@ const fingerprint = (path) => sha(readFileSync(path));
 try {
     if (!options["chain-only"]) {
         step("build-real-services");
-        run("go", ["build", "-mod=readonly", "-o", join(bin, "protocol-rpc"), "./cmd"], rpcRoot);
+        run("go", ["build", "-mod=readonly", "-o", join(bin, "invisi-rpc"), "./cmd"], rpcRoot);
         run(
             "go",
             ["build", "-mod=readonly", "-o", join(bin, "provenance"), "./cmd/provenance"],
             serviceRoot
         );
         report.serviceBinaries = {
-            protocolRPCSha256: fingerprint(join(bin, "protocol-rpc")),
+            protocolRPCSha256: fingerprint(join(bin, "invisi-rpc")),
             provenanceSha256: fingerprint(join(bin, "provenance")),
         };
     }
@@ -321,11 +321,11 @@ try {
     });
     let sourceBundle, cert, serviceURL, trackingPreflight;
     if (!options["chain-only"]) {
-        step("start-real-protocol-rpc");
+        step("start-real-invisi-rpc");
         const rpcPort = await port(options["rpc-port"]),
-            rpcDir = join(directory, "protocol-rpc");
+            rpcDir = join(directory, "invisi-rpc");
         run(
-            join(bin, "protocol-rpc"),
+            join(bin, "invisi-rpc"),
             ["init", "--dir", rpcDir, "--listen", `127.0.0.1:${rpcPort}`],
             rpcRoot
         );
@@ -354,10 +354,10 @@ try {
             mode: 0o600,
         });
         const rpcProcess = start(
-            join(bin, "protocol-rpc"),
+            join(bin, "invisi-rpc"),
             ["run", "--dir", rpcDir],
             rpcRoot,
-            "protocol-rpc"
+            "invisi-rpc"
         );
         const protocolRPC = `http://127.0.0.1:${rpcPort}/v1/chains/31337`;
         report.realProtocolRPC = true;

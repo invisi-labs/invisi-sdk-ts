@@ -38,7 +38,7 @@ profile(
     async () => {
         const directory = resolve(process.env.INVISI_NATIVE_PREPARATION_PROFILE!);
         const root = resolve(process.cwd(), "../../../invisi-core");
-        const rpcRoot = resolve(root, "../invisi-protocol-rpc");
+        const rpcRoot = resolve(root, "../invisi-rpc");
         const bbBin = join(root, ".tools/bb/bb"),
             crsPath = resolve(process.env.HOME!, ".bb-crs");
         mkdirSync(directory, { recursive: true });
@@ -85,7 +85,7 @@ profile(
             );
         save();
         console.log("native-c20: building real Protocol RPC");
-        const binary = join(directory, "protocol-rpc");
+        const binary = join(directory, "invisi-rpc");
         execFileSync("go", ["build", "-mod=readonly", "-o", binary, "./cmd"], {
             cwd: rpcRoot,
             stdio: "pipe",
