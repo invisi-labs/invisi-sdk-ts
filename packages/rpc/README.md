@@ -75,3 +75,10 @@ Each response must match the complete deployment and `v1`/`1` version pins. Head
 ## Contributing
 
 See the [contribution guidelines](../../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.
+
+After broadcasting an address registration, persist
+`ready.trackTransaction(hash).confirmationSnapshot()` as JSON. On restart,
+pass the same wallet and registry deployment to
+`RegistrationOperation.restoreConfirmation(registry, { wallet, reader }, snapshot)`.
+It checks the original transaction and receipt. If the result is uncertain,
+call `reconcile()` again. Restored operations cannot export a transaction.

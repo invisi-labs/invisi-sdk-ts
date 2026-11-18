@@ -238,7 +238,7 @@ export class RegistrationOperation {
 
     async exportTransaction(): Promise<TransactionCall> {
         check(
-            this.#signature !== undefined && this.status !== "prepared",
+            this.#signature !== undefined && this.status === "ready",
             "registry operation is not ready"
         );
         await this.validateFreshness();
@@ -281,6 +281,67 @@ export class RegistrationOperation {
             this.#signature,
             transactionHash as Hex
         );
+    }
+
+    /** Persist the public transaction data for receipt verification after a restart. */
+    confirmationSnapshot() {
+        check(this.#hash, "registration is not tracked");
+        return {
+            chainId: this.#plan.context.chainId.toString(),
+            registryAddress: this.#plan.context.registryAddress,
+            transactionHash: this.#hash,
+            calldata: this.call().data,
+        };
+    }
+
+    static async restoreConfirmation(
+        registry: AddressRegistry,
+        runtime: RegistrationPreparation,
+        snapshot: ReturnType<RegistrationOperation["confirmationSnapshot"]>
+    ): Promise<RegistrationOperation> {
+        const context = registry.context;
+        check(
+            snapshot.chainId === context.chainId.toString() &&
+                snapshot.registryAddress.toLowerCase() === context.registryAddress.toLowerCase(),
+            "registration snapshot deployment mismatch"
+        );
+        check(
+            /^0x[a-fA-F0-9]{64}$/.test(snapshot.transactionHash),
+            "invalid registry transaction hash"
+        );
+        const decoded = new Interface(invisiAddressRegistryAbi).parseTransaction({
+            data: snapshot.calldata,
+        });
+        check(
+            decoded && ["registerKeys", "updateKeys"].includes(decoded.name),
+            "invalid registry call"
+        );
+        const [request, signature] = decoded.args;
+        const ownerAddress = runtime.wallet.ownerAddress;
+        check(BigInt(request[0]) === BigInt(ownerAddress), "registration snapshot owner mismatch");
+        const operation = new RegistrationOperation(
+            registry,
+            runtime,
+            {
+                id: crypto.randomUUID(),
+                context,
+                registration: {
+                    ownerAddress,
+                    keys: { viewingPublicKey: request[1][0], clueKey: request[1][1] },
+                    nonce: request[2],
+                    deadline: request[3],
+                },
+                update: decoded.name === "updateKeys",
+            },
+            "uncertain",
+            signature,
+            snapshot.transactionHash
+        );
+        check(
+            operation.call().data.toLowerCase() === snapshot.calldata.toLowerCase(),
+            "registration snapshot calldata mismatch"
+        );
+        return operation.reconcile();
     }
 
     async reconcile(

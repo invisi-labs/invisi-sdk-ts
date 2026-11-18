@@ -12,6 +12,7 @@ import type { Hex } from "@invisi-labs/protocol/contracts";
 import { invisiAddressRegistryAbi } from "@invisi-labs/protocol/contracts";
 
 import { expect, it, vi } from "vitest";
+import { RegistrationOperation } from "./RegistrationOperation";
 import { AddressRegistry } from "./AddressRegistry";
 const context = {
         chainId: 31337n,
@@ -151,6 +152,17 @@ it.each([false, true])(
             from: direct ? h.wallet.ownerAddress : context.registryAddress,
         });
         expect((await ready.reconcile({ transactionHash: hash })).status).toBe("confirmed");
+        const snapshot = JSON.parse(
+            JSON.stringify(ready.trackTransaction(hash).confirmationSnapshot())
+        );
+        h.setNonce(1n);
+        const restored = await RegistrationOperation.restoreConfirmation(
+            new AddressRegistry(context, { expectedRuntimeCodeHash: keccak256("0x6000") as Hex }),
+            { wallet: Wallet.fromAddress(h.wallet.getAddress()), reader: h.reader },
+            snapshot
+        );
+        expect(restored.status).toBe("confirmed");
+        await expect(restored.exportTransaction()).rejects.toThrow("not ready");
     }
 );
 
