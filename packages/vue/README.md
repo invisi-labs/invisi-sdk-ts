@@ -2,7 +2,7 @@
 
 Invisi Protocol Vue composables.
 
-Install with `npm install @invisi-labs/vue@1.2.5`. API documentation and runnable examples are in the [SDK repository](https://github.com/invisi-lab/invisi-sdk-ts).
+Install with `npm install @invisi-labs/vue@1.2.5`. API documentation and runnable examples are in the [SDK repository](https://github.com/invisi-labs/invisi-sdk-ts).
 
 ## Contributing
 

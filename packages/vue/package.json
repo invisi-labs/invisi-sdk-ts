@@ -37,7 +37,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
+    "url": "git+https://github.com/invisi-labs/invisi-sdk-ts.git",
     "directory": "packages/vue"
   },
   "license": "Apache-2.0"

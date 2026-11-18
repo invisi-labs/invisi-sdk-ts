@@ -121,7 +121,7 @@ export async function provision({
     );
     const bases = [
         `https://assets.invisipay.fi/prover/sets/${pin}/`,
-        `https://github.com/invisi-lab/invisi-core/releases/download/prover-assets-${pin}/`,
+        `https://github.com/invisi-labs/invisi-core/releases/download/prover-assets-${pin}/`,
     ];
     const obtain = async (name, limit) => {
         if (source) return localBytes(join(resolve(source), name), limit);

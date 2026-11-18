@@ -42,7 +42,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/invisi-lab/invisi-sdk-ts.git",
+    "url": "git+https://github.com/invisi-labs/invisi-sdk-ts.git",
     "directory": "packages/react"
   },
   "license": "Apache-2.0"
