@@ -154,3 +154,23 @@ test("new publication fails closed on unavailable registry, forbidden reads and 
         /offline/
     );
 });
+
+test("default propagation budget tolerates npm archive delays beyond one minute", async () => {
+    let retries = 0;
+    await verifyPublishedArchive(
+        publishedMetadata.name,
+        publishedMetadata.version,
+        publishedIntegrity,
+        {
+            fetchImpl: registrySequence([
+                ...Array.from({ length: 24 }, () => new Response(null, { status: 404 })),
+                Response.json(publishedMetadata),
+                new Response(publishedBytes),
+            ]),
+            delay: async () => {
+                retries++;
+            },
+        }
+    );
+    assert.equal(retries, 24);
+});

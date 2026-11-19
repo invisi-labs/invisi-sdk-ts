@@ -104,7 +104,11 @@ export async function parseCreditCandidates(
     for (const value of values) {
         const raw = object(value),
             m = await metadata(canonical, value, range);
-        if (!["CreditCreated", "CreditStateTransition", "CreditUpdated"].includes(m.kind))
+        if (
+            !["CreditCreated", "CreditDraw", "CreditStateTransition", "CreditUpdated"].includes(
+                m.kind
+            )
+        )
             invalid("Invalid Credit state event");
         const deliveries = list(raw.deliveries);
         if (deliveries.length !== 2) invalid("Credit state requires both role deliveries");

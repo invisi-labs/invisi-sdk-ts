@@ -356,6 +356,7 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             if (
                 ![
                     "CreditCreated",
+                    "CreditDraw",
                     "CreditStateTransition",
                     "CreditUpdated",
                     "CreditRevoked",

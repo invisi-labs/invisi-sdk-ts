@@ -39,7 +39,7 @@ export async function verifyPublishedArchive(
     {
         fetchImpl = fetch,
         delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        attempts = 12,
+        attempts = 120,
     } = {}
 ) {
     const metadataUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`;

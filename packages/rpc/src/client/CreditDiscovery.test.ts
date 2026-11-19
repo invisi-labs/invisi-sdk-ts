@@ -159,3 +159,22 @@ it("rejects conflicting public transaction Credit envelopes sharing a leaf", asy
         "Conflicting"
     );
 });
+
+it("accepts CreditDraw transitions and post-draw Credit state together", async () => {
+    const raw = { ...state(), kind: "CreditDraw", transactionHash: h(123) };
+    const { client } = setup((m) =>
+        m === "invisi_getStatus"
+            ? status()
+            : {
+                  ...transactionWire(),
+                  states: [raw],
+                  transitions: [{ ...event("CreditDraw"), transactionHash: h(123) }],
+              }
+    );
+    const result = await client.getTransactionCreditUpdates(context, h(123));
+    expect(result.status).toBe("indexed");
+    if (result.status !== "indexed") throw new Error("indexed required");
+    expect(result.states[0]).toMatchObject({ kind: "CreditDraw" });
+    expect(result.states[0]?.deliveries).toHaveLength(2);
+    expect(result.transitions[0]).toMatchObject({ name: "CreditDraw" });
+});
