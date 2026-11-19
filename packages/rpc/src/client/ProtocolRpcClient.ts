@@ -354,9 +354,12 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             if (block.number < range.fromBlock || block.number > range.toBlock)
                 invalid("RPC Credit transition outside update range");
             if (
-                !["CreditCreated", "CreditDraw", "CreditUpdated", "CreditRevoked"].includes(
-                    event.name as string
-                )
+                ![
+                    "CreditCreated",
+                    "CreditStateTransition",
+                    "CreditUpdated",
+                    "CreditRevoked",
+                ].includes(event.name as string)
             )
                 invalid("Invalid Credit transition name");
             const transition: ProtocolCreditTransition = {

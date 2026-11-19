@@ -5786,7 +5786,7 @@
       "signature"
     ]
   },
-  "create_credit_and_draw": {
+  "create_credit_initial_payment": {
     "artifactSha256": "915a60c94da9852648a9df075f6f466f797a76dbca14980f6aa68d5a1be2f7d6",
     "keys": {
       "evm": "7ca4a0e6a4c0bd555eaf084ef769972fef99f94b73dbb60909078c0d1c78b3b0"

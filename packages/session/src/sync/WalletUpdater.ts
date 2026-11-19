@@ -160,15 +160,12 @@ export class WalletUpdater extends InventoryProcessor {
             // Positions come from independently obtained canonical receipts, not service metadata.
             const leaves = new Map<string, bigint>();
             for (const event of logs) {
-                if (event.eventName !== "CommitmentsInserted" && event.eventName !== "BatchOutputs")
-                    continue;
+                if (event.eventName !== "CommitmentsInserted") continue;
                 const { treeId, startLeafIndex } = event.args as {
                     treeId: bigint;
                     startLeafIndex: bigint;
                 };
-                const commitments = (event.args as Record<string, unknown>)[
-                    event.eventName === "BatchOutputs" ? "noteCommitments" : "commitments"
-                ] as Hex[];
+                const commitments = (event.args as Record<string, unknown>)["commitments"] as Hex[];
                 for (const [i, commitment] of commitments.entries()) {
                     const key = position(treeId, Number(startLeafIndex) + i);
                     check(

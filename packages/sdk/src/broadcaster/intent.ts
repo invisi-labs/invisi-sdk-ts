@@ -37,7 +37,7 @@ export function exportBroadcasterIntent(plan: OperationPlan) {
             funding,
         ];
     } else if (plan.credit?.creation) {
-        if (plan.credit.creation.hasFirstDraw !== undefined)
+        if (plan.credit.creation.hasInitialPayment !== undefined)
             throw Error("new Credit creation ABI is not supported by the broadcaster");
         return {
             sendable: false as const,

@@ -25,7 +25,7 @@
     "example:credit:1": "tsx 04-credit/01-bob-and-charlie-create.ts",
     "example:credit:2": "tsx 04-credit/02-alice-batch-draw.ts",
     "example:credit:3": "tsx 04-credit/03-bob-update.ts",
-    "example:credit:first-draw": "tsx 04-credit/05-create-with-first-draw.ts",
+    "example:credit:initial-payment": "tsx 04-credit/05-create-with-initial-payment.ts",
     "example:credit:4": "tsx 04-credit/04-charlie-revoke.ts",
     "example:hidden:6": "tsx 03-hidden-amount/06-bob-and-charlie-aggregate.ts",
     "example:session:1": "tsx 05-wallet-session/01-restore-session.ts",

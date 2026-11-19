@@ -74,7 +74,7 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
                   payers: p.credit.draw.payers.map((payer) => ({ ...payer })),
               }
             : undefined,
-        creditFirstDraw: p.credit?.creation?.hasFirstDraw
+        creditInitialPayment: p.credit?.creation?.hasInitialPayment
             ? {
                   grossAmount: p.credit.creation.totalAmount,
                   feeAmount: p.credit.creation.feeAmount ?? 0n,

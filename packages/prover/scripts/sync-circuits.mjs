@@ -34,7 +34,9 @@ for (const [i, version, format] of [
 }
 function reviewedCircuitPin() {
     const source = readFileSync(join(packageRoot, "src/resources/pin.ts"), "utf8");
-    const pin = source.match(/FIRST_DRAW_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/)?.[1];
+    const pin = source.match(
+        /INITIAL_PAYMENT_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/
+    )?.[1];
     assert(pin, "Missing reviewed circuit resource pin");
     return pin;
 }

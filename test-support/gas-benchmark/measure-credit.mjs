@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { Wallet, toBeHex, ZeroAddress } from "ethers";
 import { createSettlementRuntime } from "../../scripts/settlement-fixtures/runtime.mjs";
 import {
@@ -23,6 +24,16 @@ const rt = await createSettlementRuntime({ root, directory });
 const { rpc, context, protocol, proto, token, sender, recipient, call } = rt;
 const report = {
     commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+    sourceState: "working-tree",
+    sourceSha256: createHash("sha256")
+        .update(readFileSync(import.meta.filename))
+        .update(readFileSync(join(root, "contracts/src/interfaces/IInvisiCore.sol")))
+        .update(readFileSync(join(root, "contracts/src/libraries/CreditLifecycleLib.sol")))
+        .update(readFileSync(join(root, "contracts/src/libraries/CreateCreditLib.sol")))
+        .update(readFileSync(join(root, "circuits/credit/manifest.json")))
+        .digest("hex"),
+    conditions:
+        "Anvil31337, Prague, Solidity0.8.38 optimizer200, real verifiers, funded owners and allowance, snapshot-isolated receipts",
     samples: 3,
     rows: [],
 };
@@ -89,7 +100,18 @@ async function measure(shape, data, from = sender) {
     console.log("MEASURED", JSON.stringify(shape), values[1]);
 }
 const encoding = (name, f, b) =>
-    proto.encodeFunctionData(name, [b.encodedProof, f.params, f.deliveries]);
+    proto.encodeFunctionData(name, [
+        b.encodedProof,
+        name === "createCredit"
+            ? {
+                  ...f.params,
+                  hasInitialPayment: false,
+                  totalAmount: 0n,
+                  noteCommitment: toBeHex(0, 32),
+              }
+            : f.params,
+        f.deliveries,
+    ]);
 async function proof(id, family, f) {
     console.log("PROVE", id);
     return proveCreditNative(family, f, {

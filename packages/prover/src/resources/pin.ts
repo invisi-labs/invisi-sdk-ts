@@ -4,10 +4,10 @@ export const PROVER_ASSET_INDEX_SHA256 =
 export const PROVER_ASSET_BASE_URL = `https://assets.invisipay.fi/prover/sets/${PROVER_ASSET_INDEX_SHA256}/`;
 
 /** Authenticated Core resource set introducing the combined Credit circuit. */
-export const FIRST_DRAW_ASSET_INDEX_SHA256 =
-    "bae15f5bd62017735a62093a60279cb9dd86abe25cafc268a46dda17ff0e2a63";
+export const INITIAL_PAYMENT_ASSET_INDEX_SHA256 =
+    "9161f92f5789d8eedae15b23fa2651d5399f64ff8fbfc8de6f3f683f0d93be36";
 export function circuitResourcePin(name: string): string {
-    return name === "create_credit_and_draw"
-        ? FIRST_DRAW_ASSET_INDEX_SHA256
+    return name === "create_credit_initial_payment"
+        ? INITIAL_PAYMENT_ASSET_INDEX_SHA256
         : PROVER_ASSET_INDEX_SHA256;
 }

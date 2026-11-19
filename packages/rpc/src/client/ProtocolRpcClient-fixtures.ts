@@ -81,7 +81,7 @@ export const encryptedOutput = () => ({
     clue: "0x" + "02".repeat(68),
     transactionHash: h(22),
     logIndex: 4,
-    kind: "Transact",
+    kind: "NoteOutputs",
 });
 
 export const transactionWire = (state = "indexed") => ({
@@ -104,5 +104,5 @@ export const transactionOutput = () => ({
     clue: "0x" + "00".repeat(68),
     transactionHash: h(123),
     logIndex: 1,
-    kind: "Shield",
+    kind: "NoteOutputs",
 });

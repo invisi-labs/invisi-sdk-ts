@@ -13,7 +13,7 @@ import {
 
 const transition = () => ({
     block: wireBlock,
-    name: "CreditDraw",
+    name: "CreditStateTransition",
     transactionHash: h(123),
     logIndex: 2,
     data: { totalAmount: "10" },

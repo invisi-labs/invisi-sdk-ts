@@ -89,7 +89,7 @@ it.each([
     { clue: "0x" + "04".repeat(68) },
     { transactionHash: h(23) },
     { logIndex: 5 },
-    { kind: "Shield" },
+    { kind: "CreditDraw" },
 ])("rejects conflicting indexed outputs %j", async (patch) => {
     const { client } = setup((method) =>
         method === "invisi_getStatus"

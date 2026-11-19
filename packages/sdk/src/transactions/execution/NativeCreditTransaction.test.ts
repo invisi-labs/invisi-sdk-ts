@@ -134,10 +134,10 @@ real(
     600000
 );
 
-const firstDrawNative =
-    process.env.BB_BINARY_PATH && process.env.INVISI_TEST_FIRST_DRAW === "1" ? it : it.skip;
-firstDrawNative(
-    "proves an SDK-prepared atomic first draw with only the owner signing",
+const initialPaymentNative =
+    process.env.BB_BINARY_PATH && process.env.INVISI_TEST_INITIAL_PAYMENT === "1" ? it : it.skip;
+initialPaymentNative(
+    "proves an SDK-prepared atomic initial payment with only the owner signing",
     async () => {
         const h = await setup();
         const prepared = await h.invisi.prepareCreateCredit({
@@ -147,7 +147,7 @@ firstDrawNative(
             spender: h.bob.getAddress(),
             expiry: 2000003600n,
             availableCredit: 10n,
-            firstDraw: { amount: 7n },
+            initialPayment: { amount: 7n },
         });
         const prover = new (await import("@invisi-labs/prover/native")).NativeProver({
             bbBin: process.env.BB_BINARY_PATH!,
@@ -156,7 +156,7 @@ firstDrawNative(
         });
         const ready = await (await externallyAuthorize(prepared)).prove(prover);
         const tx = new Interface(invisiCoreAbi).parseTransaction(await ready.exportTransaction())!;
-        expect(tx.args[1].hasFirstDraw).toBe(true);
+        expect(tx.args[1].hasInitialPayment).toBe(true);
         expect(tx.args[2]).toHaveLength(3);
         expect(ready.preview().creditOutputs?.[0]?.availableCredit).toBe(3n);
     },

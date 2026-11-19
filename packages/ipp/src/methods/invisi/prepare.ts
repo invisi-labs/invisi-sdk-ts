@@ -13,9 +13,9 @@ export interface InvisiPreparationTarget<T> {
 }
 export interface InvisiPreparationOptions {
     now?: () => number;
-    /** Select the new deployed selector for pure grants; first draws always use it. */
+    /** Select the new deployed selector for pure grants; initial payments always use it. */
     creationAbi?: CreateCreditPreparation["creationAbi"];
-    /** Actual token fee for first draw; omit for direct owner submission with no token fee. */
+    /** Actual token fee for initial payment; omit for direct owner submission with no token fee. */
     initialPaymentFee?: { recipient: `0x${string}`; amount: bigint };
 }
 
@@ -51,7 +51,7 @@ export async function prepareInvisiRequest<T>(
     if (options.initialPaymentFee && (request.mode !== "credit" || !request.credit.initialPayment))
         throw new IppError(
             "execution_not_allowed",
-            "First draw fee requires a first draw request."
+            "First draw fee requires a initial payment request."
         );
     if (request.mode === "payment") {
         if (!target.prepareTransfer)
@@ -82,12 +82,12 @@ export async function prepareInvisiRequest<T>(
             !/^0x[0-9a-fA-F]{40}$/.test(fee.recipient) ||
             (fee.amount === 0n) !== (BigInt(fee.recipient) === 0n))
     )
-        throw new IppError("execution_not_allowed", "Invalid local first draw fee.");
+        throw new IppError("execution_not_allowed", "Invalid local initial payment fee.");
     return target.prepareCreateCredit({
         ...(options.creationAbi !== undefined ? { creationAbi: options.creationAbi } : {}),
         ...(initialPayment
             ? {
-                  firstDraw: {
+                  initialPayment: {
                       amount: BigInt(initialPayment.amount) + (fee?.amount ?? 0n),
                   },
                   ...(fee ? { fee } : {}),

@@ -1,3 +1,4 @@
+import { noteLogs } from "../../../../test-support/note-event-fixtures";
 import { it, expect } from "vitest";
 import { ViewingCapability } from "@invisi-labs/primitives";
 import { toBeHex } from "ethers";
@@ -34,15 +35,15 @@ const viewing = () =>
 const decrypt = (logs: DeliveryEventLog[]) =>
     decryptCandidates(logs, { context, viewing: viewing(), confirmedThrough: 12n });
 it("recovers ordinary Notes from canonical receipts and independent viewing keys", async () => {
-    const logs = [
-            inserted([vectors.note.commitment]),
+    const logs = noteLogs(
+            context,
             {
-                ...meta,
-                logIndex: 2,
-                eventName: "Shield",
-                args: { token, treeId: 1n, startLeafIndex: 0, deliveries: [note] },
+                token: token as `0x${string}`,
+                commitments: [vectors.note.commitment as `0x${string}`],
+                deliveries: [note],
             },
-        ],
+            meta
+        ),
         result = await decrypt(logs);
     expect(result.notes).toHaveLength(1);
     expect(result.notes[0]!.note.amount).toBe(70n);
@@ -51,22 +52,21 @@ it("recovers ordinary Notes from canonical receipts and independent viewing keys
     expect((await decrypt(logs)).notes[0]!.note.amount).toBe(70n);
 });
 it("requires matching insertion commitments, confirmed metadata and no removed logs", async () => {
-    const log = {
-        ...meta,
-        logIndex: 2,
-        eventName: "Shield",
-        args: { token, treeId: 1n, startLeafIndex: 0, deliveries: [note] },
-    };
-    await expect(decrypt([log])).rejects.toThrow(/insertion/);
+    const logs = noteLogs(
+        context,
+        {
+            token: token as `0x${string}`,
+            commitments: [vectors.note.commitment as `0x${string}`],
+            deliveries: [note],
+        },
+        meta
+    );
     await expect(
-        decrypt([inserted([vectors.note.commitment]), { ...log, removed: true }])
-    ).rejects.toThrow(/reorg/);
+        decrypt(logs.filter((l) => l.eventName !== "CommitmentsInserted"))
+    ).rejects.toThrow(/insertion/);
+    await expect(decrypt(logs.map((l) => ({ ...l, removed: true })))).rejects.toThrow(/reorg/);
     await expect(
-        decryptCandidates([inserted([vectors.note.commitment]), log], {
-            context,
-            viewing: viewing(),
-            confirmedThrough: 11n,
-        })
+        decryptCandidates(logs, { context, viewing: viewing(), confirmedThrough: 11n })
     ).rejects.toThrow(/confirmed/);
 });
 it("maps two Credit role envelopes to one physical state leaf", async () => {
@@ -99,23 +99,48 @@ it("maps two Credit role envelopes to one physical state leaf", async () => {
         "spender",
     ]);
 });
-it("routes a Credit draw ordinary Note separately from its successor states", () => {
-    const draw = {
+function drawLogs(): DeliveryEventLog[] {
+    return [
+        inserted([vectors.credit.commitment, vectors.note.commitment]),
+        {
             ...meta,
             logIndex: 2,
-            eventName: "CreditDraw",
+            eventName: "CreditStateTransition",
             args: {
                 outputTreeId: 1n,
-                params: {
-                    token,
+                noteCommitment: vectors.note.commitment,
+                state: {
+                    sources: [{ treeId: 1n, merkleRoot: hex(9n) }],
+                    payers: [{ payer: token, amount: 70n }],
+                    grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
+                    nullifiers: [hex(99n)],
                     creditCommitments: [vectors.credit.commitment],
-                    noteCommitment: vectors.note.commitment,
+                    recoveryAmounts: [hex(1n)],
                 },
-                leafIndices: [0, 1],
-                deliveries: [owner, spender, note],
+                creditLeafIndices: [0],
+                creditDeliveries: [owner, spender],
             },
         },
-        logs = [inserted([vectors.credit.commitment, vectors.note.commitment]), draw];
+        {
+            ...meta,
+            logIndex: 3,
+            eventName: "CreditDraw",
+            args: {
+                token,
+                outputTreeId: 1n,
+                noteCommitment: vectors.note.commitment,
+                noteLeafIndex: 1,
+                totalAmount: 70n,
+                deadline: 900n,
+                feeRecipient: "0x0000000000000000000000000000000000000000",
+                feeAmount: 0n,
+                delivery: note,
+            },
+        },
+    ];
+}
+it("routes a unified CreditDraw Note separately from its successor states", () => {
+    const logs = drawLogs();
     expect(extractDeliveryCandidates(logs, context, 12n).map((x) => [x.role, x.leafIndex])).toEqual(
         [
             ["owner", 0],
@@ -123,13 +148,62 @@ it("routes a Credit draw ordinary Note separately from its successor states", ()
             ["funds", 1],
         ]
     );
+    const state = logs[1]!;
     expect(() =>
         extractDeliveryCandidates(
-            [logs[0]!, { ...draw, args: { ...draw.args, deliveries: [owner, spender] } }],
+            [logs[0]!, { ...state, args: { ...state.args, creditDeliveries: [owner] } }, logs[2]!],
             context,
             12n
         )
     ).toThrow(/slots/);
+});
+it("requires a unique matching result in the same canonical receipt for each transition", () => {
+    const logs = drawLogs();
+    expect(() => extractDeliveryCandidates(logs.slice(0, 2), context, 12n)).toThrow(
+        /matching.*draw/i
+    );
+    for (const change of [
+        { transactionHash: hex(101n) },
+        { blockHash: hex(13n) },
+        { args: { ...logs[2]!.args, outputTreeId: 2n } },
+        { args: { ...logs[2]!.args, noteCommitment: hex(111n) } },
+        { logIndex: 1 },
+    ])
+        expect(() =>
+            extractDeliveryCandidates(
+                [logs[0]!, logs[1]!, { ...logs[2]!, ...change }],
+                context,
+                12n
+            )
+        ).toThrow();
+    expect(() =>
+        extractDeliveryCandidates([...logs, { ...logs[2]!, logIndex: 4 }], context, 12n)
+    ).toThrow(/duplicate/);
+    expect(() =>
+        extractDeliveryCandidates(
+            [logs[0]!, logs[1]!, { ...logs[1]!, logIndex: 4 }, logs[2]!],
+            context,
+            12n
+        )
+    ).toThrow();
+});
+it("validates transition dimensions and consecutive positions before discovering Credit", () => {
+    const logs = drawLogs(),
+        event = logs[1]!,
+        state = event.args!.state as Record<string, unknown>;
+    for (const change of [
+        { state: { ...state, nullifiers: [] } },
+        { state: { ...state, recoveryAmounts: [] } },
+        { state: { ...state, grantRefs: [] } },
+        { creditLeafIndices: [1] },
+    ])
+        expect(() =>
+            extractDeliveryCandidates(
+                [logs[0]!, { ...event, args: { ...event.args, ...change } }, logs[2]!],
+                context,
+                12n
+            )
+        ).toThrow();
 });
 it("routes updates to dual envelopes and ignores proofless revocation as a delivery", () => {
     const updated = {
@@ -172,65 +246,157 @@ it("authenticates recipient Credit roles and rejects redirected envelopes", asyn
     ];
     expect((await decrypt(logs)).credits).toEqual([]);
 });
-it("decodes packed atomic batch output deliveries with their explicit tokens", () => {
-    const cipher = note.ciphertext.slice(2),
-        packed = `0x${(cipher.length / 2).toString(16).padStart(4, "0")}${cipher}${clue.slice(2)}`,
-        batch = {
-            ...meta,
-            eventName: "BatchOutputs",
-            args: {
-                treeId: 1n,
-                startLeafIndex: 0,
-                firstOutputOffset: 0n,
-                tokens: [token],
-                noteCommitments: [vectors.note.commitment],
-                packedDeliveries: packed,
-            },
-        };
-    expect(extractDeliveryCandidates([batch], context, 12n)).toMatchObject([
-        { role: "funds", leafIndex: 0 },
-    ]);
+it("rejects a NoteOutputs range from a different transaction", () => {
+    const logs = noteLogs(
+        context,
+        {
+            token: token as `0x${string}`,
+            commitments: [vectors.note.commitment as `0x${string}`],
+            deliveries: [note],
+        },
+        meta
+    );
     expect(() =>
         extractDeliveryCandidates(
-            [{ ...batch, args: { ...batch.args, packedDeliveries: packed + "00" } }],
+            [...logs.slice(0, -1), { ...logs.at(-1)!, transactionHash: hex(999n) }],
+            context,
+            12n
+        )
+    ).toThrow(/operation/);
+});
+
+it("rejects trailing packed bytes in a unified NoteOutputs range", () => {
+    const logs = noteLogs(
+        context,
+        {
+            token: token as `0x${string}`,
+            commitments: [vectors.note.commitment as `0x${string}`],
+            deliveries: [note],
+        },
+        meta
+    );
+    expect(extractDeliveryCandidates(logs, context, 12n)).toMatchObject([
+        { role: "funds", leafIndex: 0 },
+    ]);
+    const output = logs.at(-1)!;
+    expect(() =>
+        extractDeliveryCandidates(
+            [
+                ...logs.slice(0, -1),
+                {
+                    ...output,
+                    args: {
+                        ...output.args,
+                        packedDeliveries: String(output.args.packedDeliveries) + "00",
+                    },
+                },
+            ],
             context,
             12n
         )
     ).toThrow(/trailing/);
 });
 
-it("recovers the first draw Note only with its adjacent CreditCreated in the same receipt", () => {
-    const creditCommitment = vectors.credit.commitment,
-        noteCommitment = vectors.note.commitment;
-    const create: DeliveryEventLog = {
+it("pairs multiple draws by Note commitment instead of transaction hash alone", () => {
+    const first = drawLogs();
+    const secondCredit = hex(200n),
+        secondNote = hex(201n);
+    const second = [
+        { ...inserted([secondCredit, secondNote], 1n, 2), logIndex: 4 },
+        {
+            ...first[1]!,
+            logIndex: 5,
+            args: {
+                ...first[1]!.args,
+                noteCommitment: secondNote,
+                state: {
+                    ...(first[1]!.args!.state as Record<string, unknown>),
+                    creditCommitments: [secondCredit],
+                    nullifiers: [hex(202n)],
+                },
+                creditLeafIndices: [2],
+            },
+        },
+        {
+            ...first[2]!,
+            logIndex: 6,
+            args: { ...first[2]!.args, noteCommitment: secondNote, noteLeafIndex: 3 },
+        },
+    ];
+    const candidates = extractDeliveryCandidates([...first, ...second], context, 12n);
+    expect(candidates.filter((c) => c.role === "funds").map((c) => c.commitment)).toEqual([
+        vectors.note.commitment,
+        secondNote,
+    ]);
+    expect(candidates).toHaveLength(6);
+});
+it("rejects adjacent initial-payment leaves from different insertion batches", () => {
+    const logs = drawLogs();
+    const created = {
         ...meta,
-        logIndex: 2,
+        logIndex: 3,
         eventName: "CreditCreated",
         args: {
             token,
             outputTreeId: 1n,
             leafIndex: 0,
-            creditCommitment,
+            creditCommitment: vectors.credit.commitment,
             deliveries: [owner, spender],
         },
     };
-    const first: DeliveryEventLog = {
-        ...meta,
-        logIndex: 3,
-        eventName: "CreditFirstDraw",
-        args: {
-            outputTreeId: 1n,
-            noteLeafIndex: 1,
-            noteCommitment,
-            creditCommitment,
-            delivery: note,
+    const result = { ...logs[2]!, logIndex: 4 };
+    expect(() =>
+        extractDeliveryCandidates(
+            [
+                inserted([vectors.credit.commitment]),
+                { ...inserted([vectors.note.commitment], 1n, 1), logIndex: 2 },
+                created,
+                result,
+            ],
+            context,
+            12n
+        )
+    ).toThrow(/insertion batch/);
+});
+
+it("recovers an initial payment through CreditCreated and the unified CreditDraw", () => {
+    const logs = [
+        inserted([vectors.credit.commitment, vectors.note.commitment]),
+        {
+            ...meta,
+            logIndex: 2,
+            eventName: "CreditCreated",
+            args: {
+                token,
+                outputTreeId: 1n,
+                leafIndex: 0,
+                creditCommitment: vectors.credit.commitment,
+                deliveries: [owner, spender],
+            },
         },
-    };
-    const insertion = inserted([creditCommitment, noteCommitment]);
-    expect(
-        extractDeliveryCandidates([insertion, create, first], context, 12n).map((v) => v.role)
-    ).toEqual(["owner", "spender", "funds"]);
-    expect(() => extractDeliveryCandidates([insertion, first], context, 12n)).toThrow(
+        {
+            ...meta,
+            logIndex: 3,
+            eventName: "CreditDraw",
+            args: {
+                token,
+                outputTreeId: 1n,
+                noteLeafIndex: 1,
+                noteCommitment: vectors.note.commitment,
+                totalAmount: 70n,
+                deadline: 900n,
+                feeRecipient: "0x0000000000000000000000000000000000000000",
+                feeAmount: 0n,
+                delivery: note,
+            },
+        },
+    ];
+    expect(extractDeliveryCandidates(logs, context, 12n).map((x) => x.role)).toEqual([
+        "owner",
+        "spender",
+        "funds",
+    ]);
+    expect(() => extractDeliveryCandidates([logs[0]!, logs[2]!], context, 12n)).toThrow(
         /matching Credit/
     );
 });

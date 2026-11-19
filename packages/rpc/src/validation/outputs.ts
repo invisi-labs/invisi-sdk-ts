@@ -88,16 +88,7 @@ export async function parseNoteCandidates(
     const notes: ProtocolNoteOutput[] = [];
     for (const value of values) {
         const m = await metadata(canonical, value, range);
-        if (
-            ![
-                "Shield",
-                "Transact",
-                "CrossTreeTransact",
-                "BatchOutputs",
-                "CreditDraw",
-                "CreditFirstDraw",
-            ].includes(m.kind)
-        )
+        if (!["NoteOutputs", "CreditDraw"].includes(m.kind))
             invalid("Credit state cannot appear in Note results");
         notes.push({ ...m, ...delivery(value, true) });
     }
@@ -113,7 +104,7 @@ export async function parseCreditCandidates(
     for (const value of values) {
         const raw = object(value),
             m = await metadata(canonical, value, range);
-        if (!["CreditCreated", "CreditDraw", "CreditUpdated"].includes(m.kind))
+        if (!["CreditCreated", "CreditStateTransition", "CreditUpdated"].includes(m.kind))
             invalid("Invalid Credit state event");
         const deliveries = list(raw.deliveries);
         if (deliveries.length !== 2) invalid("Credit state requires both role deliveries");

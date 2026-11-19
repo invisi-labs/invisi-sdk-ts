@@ -15,8 +15,11 @@ export function estimateOperationGas(plan: OperationPlan, execution?: "direct" |
         plan.params?.feeAmount ??
         plan.shieldParams?.feeAmount ??
         0n;
-    if (credit?.creation?.hasFirstDraw) return estimateGas({ kind: "create-credit-and-draw" });
-    if (credit?.draw) {
+    if (credit?.creation?.hasInitialPayment) {
+        query = { kind: "create-credit-initial-payment" };
+    } else if (credit?.creation?.hasInitialPayment === false) {
+        query = { kind: "create-credit", creationAbi: "initial-payment" };
+    } else if (credit?.draw) {
         query = {
             kind: "draw-credit",
             capacity: plan.capacity!,

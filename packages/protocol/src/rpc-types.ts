@@ -79,7 +79,7 @@ export interface ProtocolNoteOutput {
 /** Public indexed Credit event data; verify the canonical receipt before using it. */
 export interface ProtocolCreditTransition {
     block: CanonicalBlock;
-    name: "CreditCreated" | "CreditDraw" | "CreditUpdated" | "CreditRevoked";
+    name: "CreditCreated" | "CreditStateTransition" | "CreditUpdated" | "CreditRevoked";
     transactionHash: Hex;
     logIndex: number;
     data: Readonly<Record<string, unknown>>;
@@ -95,7 +95,7 @@ export interface IndexedCreditState {
     deliveries: readonly { ciphertext: Hex; clue: Hex }[];
     transactionHash: Hex;
     logIndex: number;
-    kind: "CreditCreated" | "CreditDraw" | "CreditUpdated";
+    kind: "CreditCreated" | "CreditStateTransition" | "CreditUpdated";
 }
 interface TransactionCommon {
     transactionHash: Hex;

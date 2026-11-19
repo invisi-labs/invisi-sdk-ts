@@ -152,22 +152,22 @@ export abstract class InventoryProcessor {
             protocolAddress: BigInt(this.#options.scope.protocolAddress),
         };
         for (const event of logs) {
-            if (event.eventName === "CreditDraw") {
+            if (event.eventName === "CreditStateTransition") {
                 const block = await this.#options.reader.getBlock(event.blockNumber!);
                 if (block.hash !== event.blockHash)
                     throw new CanonicalConflict("draw block changed during Credit recovery");
                 const args = event.args!;
-                const params = args.params as {
+                const params = args.state as {
                     nullifiers: readonly Hex[];
                     creditCommitments: readonly Hex[];
                     recoveryAmounts: readonly Hex[];
                 };
-                const indices = args.leafIndices as readonly number[];
+                const indices = args.creditLeafIndices as readonly number[];
                 check(
                     Array.isArray(params.nullifiers) &&
                         params.nullifiers.length === params.creditCommitments.length &&
                         params.nullifiers.length === params.recoveryAmounts.length &&
-                        params.nullifiers.length + 1 === indices.length,
+                        params.nullifiers.length === indices.length,
                     "invalid draw recovery slots"
                 );
                 for (const [index, nullifier] of params.nullifiers.entries()) {

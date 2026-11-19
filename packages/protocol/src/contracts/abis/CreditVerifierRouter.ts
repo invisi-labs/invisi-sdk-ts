@@ -23,7 +23,7 @@ export const creditVerifierRouterAbi = [
     },
     {
         "type": "function",
-        "name": "createCreditAndDrawVerifier",
+        "name": "createCreditInitialPaymentVerifier",
         "inputs": [],
         "outputs": [
             {
@@ -244,7 +244,7 @@ export const creditVerifierRouterAbi = [
     },
     {
         "type": "function",
-        "name": "getCreateCreditAndDrawVerifier",
+        "name": "getCreateCreditInitialPaymentVerifier",
         "inputs": [],
         "outputs": [
             {

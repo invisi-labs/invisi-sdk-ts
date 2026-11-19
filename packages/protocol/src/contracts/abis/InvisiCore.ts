@@ -225,7 +225,7 @@ export const invisiCoreAbi = [
                         "internalType": "uint256",
                     },
                     {
-                        "name": "hasFirstDraw",
+                        "name": "hasInitialPayment",
                         "type": "bool",
                         "internalType": "bool",
                     },
@@ -1455,140 +1455,6 @@ export const invisiCoreAbi = [
     },
     {
         "type": "event",
-        "name": "BatchOutputs",
-        "inputs": [
-            {
-                "name": "treeId",
-                "type": "uint256",
-                "indexed": true,
-                "internalType": "uint256",
-            },
-            {
-                "name": "startLeafIndex",
-                "type": "uint32",
-                "indexed": false,
-                "internalType": "uint32",
-            },
-            {
-                "name": "firstOutputOffset",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "tokens",
-                "type": "address[]",
-                "indexed": false,
-                "internalType": "address[]",
-            },
-            {
-                "name": "noteCommitments",
-                "type": "bytes32[]",
-                "indexed": false,
-                "internalType": "bytes32[]",
-            },
-            {
-                "name": "packedDeliveries",
-                "type": "bytes",
-                "indexed": false,
-                "internalType": "bytes",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "BatchRequest",
-        "inputs": [
-            {
-                "name": "token",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address",
-            },
-            {
-                "name": "requestIndex",
-                "type": "uint256",
-                "indexed": true,
-                "internalType": "uint256",
-            },
-            {
-                "name": "capacity",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "sources",
-                "type": "tuple[]",
-                "indexed": false,
-                "internalType": "struct IInvisiCore.InputSource[]",
-                "components": [
-                    {
-                        "name": "treeId",
-                        "type": "uint256",
-                        "internalType": "uint256",
-                    },
-                    {
-                        "name": "merkleRoot",
-                        "type": "bytes32",
-                        "internalType": "bytes32",
-                    },
-                ],
-            },
-            {
-                "name": "nullifiers",
-                "type": "bytes32[]",
-                "indexed": false,
-                "internalType": "bytes32[]",
-            },
-            {
-                "name": "outputCount",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "payer",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address",
-            },
-            {
-                "name": "depositAmount",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "withdrawalAddress",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address",
-            },
-            {
-                "name": "withdrawalAmount",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "deadline",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "statementHash",
-                "type": "bytes32",
-                "indexed": false,
-                "internalType": "bytes32",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
         "name": "BroadcasterFee",
         "inputs": [
             {
@@ -1765,162 +1631,16 @@ export const invisiCoreAbi = [
         "name": "CreditDraw",
         "inputs": [
             {
-                "name": "outputTreeId",
-                "type": "uint256",
+                "name": "token",
+                "type": "address",
                 "indexed": true,
-                "internalType": "uint256",
+                "internalType": "address",
             },
-            {
-                "name": "params",
-                "type": "tuple",
-                "indexed": false,
-                "internalType": "struct IInvisiCore.CreditDrawParams",
-                "components": [
-                    {
-                        "name": "token",
-                        "type": "address",
-                        "internalType": "address",
-                    },
-                    {
-                        "name": "sources",
-                        "type": "tuple[]",
-                        "internalType": "struct IInvisiCore.InputSource[]",
-                        "components": [
-                            {
-                                "name": "treeId",
-                                "type": "uint256",
-                                "internalType": "uint256",
-                            },
-                            {
-                                "name": "merkleRoot",
-                                "type": "bytes32",
-                                "internalType": "bytes32",
-                            },
-                        ],
-                    },
-                    {
-                        "name": "payers",
-                        "type": "tuple[]",
-                        "internalType": "struct IInvisiCore.CreditPayer[]",
-                        "components": [
-                            {
-                                "name": "payer",
-                                "type": "address",
-                                "internalType": "address",
-                            },
-                            {
-                                "name": "amount",
-                                "type": "uint256",
-                                "internalType": "uint256",
-                            },
-                        ],
-                    },
-                    {
-                        "name": "grantRefs",
-                        "type": "tuple[]",
-                        "internalType": "struct IInvisiCore.CreditGrantRef[]",
-                        "components": [
-                            {
-                                "name": "payerIndex",
-                                "type": "uint256",
-                                "internalType": "uint256",
-                            },
-                            {
-                                "name": "shard",
-                                "type": "uint64",
-                                "internalType": "uint64",
-                            },
-                            {
-                                "name": "slot",
-                                "type": "uint16",
-                                "internalType": "uint16",
-                            },
-                        ],
-                    },
-                    {
-                        "name": "nullifiers",
-                        "type": "bytes32[]",
-                        "internalType": "bytes32[]",
-                    },
-                    {
-                        "name": "creditCommitments",
-                        "type": "bytes32[]",
-                        "internalType": "bytes32[]",
-                    },
-                    {
-                        "name": "recoveryAmounts",
-                        "type": "bytes32[]",
-                        "internalType": "bytes32[]",
-                    },
-                    {
-                        "name": "noteCommitment",
-                        "type": "bytes32",
-                        "internalType": "bytes32",
-                    },
-                    {
-                        "name": "totalAmount",
-                        "type": "uint256",
-                        "internalType": "uint256",
-                    },
-                    {
-                        "name": "deadline",
-                        "type": "uint256",
-                        "internalType": "uint256",
-                    },
-                    {
-                        "name": "feeRecipient",
-                        "type": "address",
-                        "internalType": "address",
-                    },
-                    {
-                        "name": "feeAmount",
-                        "type": "uint256",
-                        "internalType": "uint256",
-                    },
-                ],
-            },
-            {
-                "name": "leafIndices",
-                "type": "uint32[]",
-                "indexed": false,
-                "internalType": "uint32[]",
-            },
-            {
-                "name": "deliveries",
-                "type": "tuple[]",
-                "indexed": false,
-                "internalType": "struct IInvisiCore.Delivery[]",
-                "components": [
-                    {
-                        "name": "ciphertext",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                    {
-                        "name": "clue",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                ],
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "CreditFirstDraw",
-        "inputs": [
             {
                 "name": "outputTreeId",
                 "type": "uint256",
                 "indexed": true,
                 "internalType": "uint256",
-            },
-            {
-                "name": "creditCommitment",
-                "type": "bytes32",
-                "indexed": true,
-                "internalType": "bytes32",
             },
             {
                 "name": "noteCommitment",
@@ -1936,6 +1656,12 @@ export const invisiCoreAbi = [
             },
             {
                 "name": "totalAmount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256",
+            },
+            {
+                "name": "deadline",
                 "type": "uint256",
                 "indexed": false,
                 "internalType": "uint256",
@@ -2012,6 +1738,128 @@ export const invisiCoreAbi = [
                 "type": "uint256",
                 "indexed": false,
                 "internalType": "uint256",
+            },
+        ],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "CreditStateTransition",
+        "inputs": [
+            {
+                "name": "outputTreeId",
+                "type": "uint256",
+                "indexed": true,
+                "internalType": "uint256",
+            },
+            {
+                "name": "noteCommitment",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32",
+            },
+            {
+                "name": "state",
+                "type": "tuple",
+                "indexed": false,
+                "internalType": "struct IInvisiCore.CreditDrawState",
+                "components": [
+                    {
+                        "name": "sources",
+                        "type": "tuple[]",
+                        "internalType": "struct IInvisiCore.InputSource[]",
+                        "components": [
+                            {
+                                "name": "treeId",
+                                "type": "uint256",
+                                "internalType": "uint256",
+                            },
+                            {
+                                "name": "merkleRoot",
+                                "type": "bytes32",
+                                "internalType": "bytes32",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "payers",
+                        "type": "tuple[]",
+                        "internalType": "struct IInvisiCore.CreditPayer[]",
+                        "components": [
+                            {
+                                "name": "payer",
+                                "type": "address",
+                                "internalType": "address",
+                            },
+                            {
+                                "name": "amount",
+                                "type": "uint256",
+                                "internalType": "uint256",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "grantRefs",
+                        "type": "tuple[]",
+                        "internalType": "struct IInvisiCore.CreditGrantRef[]",
+                        "components": [
+                            {
+                                "name": "payerIndex",
+                                "type": "uint256",
+                                "internalType": "uint256",
+                            },
+                            {
+                                "name": "shard",
+                                "type": "uint64",
+                                "internalType": "uint64",
+                            },
+                            {
+                                "name": "slot",
+                                "type": "uint16",
+                                "internalType": "uint16",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "nullifiers",
+                        "type": "bytes32[]",
+                        "internalType": "bytes32[]",
+                    },
+                    {
+                        "name": "creditCommitments",
+                        "type": "bytes32[]",
+                        "internalType": "bytes32[]",
+                    },
+                    {
+                        "name": "recoveryAmounts",
+                        "type": "bytes32[]",
+                        "internalType": "bytes32[]",
+                    },
+                ],
+            },
+            {
+                "name": "creditLeafIndices",
+                "type": "uint32[]",
+                "indexed": false,
+                "internalType": "uint32[]",
+            },
+            {
+                "name": "creditDeliveries",
+                "type": "tuple[]",
+                "indexed": false,
+                "internalType": "struct IInvisiCore.Delivery[]",
+                "components": [
+                    {
+                        "name": "ciphertext",
+                        "type": "bytes",
+                        "internalType": "bytes",
+                    },
+                    {
+                        "name": "clue",
+                        "type": "bytes",
+                        "internalType": "bytes",
+                    },
+                ],
             },
         ],
         "anonymous": false,
@@ -2131,19 +1979,118 @@ export const invisiCoreAbi = [
     },
     {
         "type": "event",
-        "name": "CrossTreeTransact",
+        "name": "EIP712DomainChanged",
+        "inputs": [],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "NonceInvalidated",
         "inputs": [
             {
+                "name": "signer",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address",
+            },
+            {
+                "name": "newNonce",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256",
+            },
+        ],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "NoteOperation",
+        "inputs": [
+            {
+                "name": "operationId",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32",
+            },
+            {
                 "name": "token",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address",
+            },
+            {
+                "name": "kind",
+                "type": "uint8",
+                "indexed": false,
+                "internalType": "enum IInvisiCore.NoteOperationKind",
+            },
+            {
+                "name": "outputCount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256",
+            },
+            {
+                "name": "deadline",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256",
+            },
+            {
+                "name": "feeRecipient",
                 "type": "address",
                 "indexed": false,
                 "internalType": "address",
             },
             {
-                "name": "outputTreeId",
+                "name": "feeAmount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256",
+            },
+        ],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "NoteOutputs",
+        "inputs": [
+            {
+                "name": "operationId",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32",
+            },
+            {
+                "name": "treeId",
                 "type": "uint256",
                 "indexed": true,
                 "internalType": "uint256",
+            },
+            {
+                "name": "startLeafIndex",
+                "type": "uint32",
+                "indexed": false,
+                "internalType": "uint32",
+            },
+            {
+                "name": "packedDeliveries",
+                "type": "bytes",
+                "indexed": false,
+                "internalType": "bytes",
+            },
+        ],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "NoteStateTransition",
+        "inputs": [
+            {
+                "name": "operationId",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32",
             },
             {
                 "name": "sources",
@@ -2168,79 +2115,6 @@ export const invisiCoreAbi = [
                 "type": "bytes32[]",
                 "indexed": false,
                 "internalType": "bytes32[]",
-            },
-            {
-                "name": "noteCommitments",
-                "type": "bytes32[]",
-                "indexed": false,
-                "internalType": "bytes32[]",
-            },
-            {
-                "name": "leafIndices",
-                "type": "uint32[]",
-                "indexed": false,
-                "internalType": "uint32[]",
-            },
-            {
-                "name": "deliveries",
-                "type": "tuple[]",
-                "indexed": false,
-                "internalType": "struct IInvisiCore.Delivery[]",
-                "components": [
-                    {
-                        "name": "ciphertext",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                    {
-                        "name": "clue",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                ],
-            },
-            {
-                "name": "withdrawalAddress",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address",
-            },
-            {
-                "name": "withdrawalAmount",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "deadline",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "EIP712DomainChanged",
-        "inputs": [],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "NonceInvalidated",
-        "inputs": [
-            {
-                "name": "signer",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address",
-            },
-            {
-                "name": "newNonce",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
             },
         ],
         "anonymous": false,
@@ -2301,6 +2175,12 @@ export const invisiCoreAbi = [
         "name": "PublicDeposit",
         "inputs": [
             {
+                "name": "operationId",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32",
+            },
+            {
                 "name": "token",
                 "type": "address",
                 "indexed": true,
@@ -2318,11 +2198,36 @@ export const invisiCoreAbi = [
                 "indexed": false,
                 "internalType": "uint256",
             },
+        ],
+        "anonymous": false,
+    },
+    {
+        "type": "event",
+        "name": "PublicWithdrawal",
+        "inputs": [
             {
-                "name": "proofHash",
+                "name": "operationId",
                 "type": "bytes32",
-                "indexed": false,
+                "indexed": true,
                 "internalType": "bytes32",
+            },
+            {
+                "name": "token",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address",
+            },
+            {
+                "name": "recipient",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address",
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256",
             },
         ],
         "anonymous": false,
@@ -2342,146 +2247,6 @@ export const invisiCoreAbi = [
     },
     {
         "type": "event",
-        "name": "Shield",
-        "inputs": [
-            {
-                "name": "token",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address",
-            },
-            {
-                "name": "payer",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address",
-            },
-            {
-                "name": "amount",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "treeId",
-                "type": "uint256",
-                "indexed": true,
-                "internalType": "uint256",
-            },
-            {
-                "name": "startLeafIndex",
-                "type": "uint32",
-                "indexed": false,
-                "internalType": "uint32",
-            },
-            {
-                "name": "deliveries",
-                "type": "tuple[]",
-                "indexed": false,
-                "internalType": "struct IInvisiCore.Delivery[]",
-                "components": [
-                    {
-                        "name": "ciphertext",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                    {
-                        "name": "clue",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                ],
-            },
-            {
-                "name": "deadline",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "Transact",
-        "inputs": [
-            {
-                "name": "token",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address",
-            },
-            {
-                "name": "inputTreeId",
-                "type": "uint256",
-                "indexed": true,
-                "internalType": "uint256",
-            },
-            {
-                "name": "outputTreeId",
-                "type": "uint256",
-                "indexed": true,
-                "internalType": "uint256",
-            },
-            {
-                "name": "nullifiers",
-                "type": "bytes32[]",
-                "indexed": false,
-                "internalType": "bytes32[]",
-            },
-            {
-                "name": "noteCommitments",
-                "type": "bytes32[]",
-                "indexed": false,
-                "internalType": "bytes32[]",
-            },
-            {
-                "name": "leafIndices",
-                "type": "uint32[]",
-                "indexed": false,
-                "internalType": "uint32[]",
-            },
-            {
-                "name": "deliveries",
-                "type": "tuple[]",
-                "indexed": false,
-                "internalType": "struct IInvisiCore.Delivery[]",
-                "components": [
-                    {
-                        "name": "ciphertext",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                    {
-                        "name": "clue",
-                        "type": "bytes",
-                        "internalType": "bytes",
-                    },
-                ],
-            },
-            {
-                "name": "withdrawalAddress",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address",
-            },
-            {
-                "name": "withdrawalAmount",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "deadline",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
         "name": "TransactAggregated",
         "inputs": [
             {
@@ -2491,10 +2256,10 @@ export const invisiCoreAbi = [
                 "internalType": "bytes32",
             },
             {
-                "name": "requestCount",
-                "type": "uint256",
+                "name": "operationIds",
+                "type": "bytes32[]",
                 "indexed": false,
-                "internalType": "uint256",
+                "internalType": "bytes32[]",
             },
         ],
         "anonymous": false,

@@ -18,7 +18,7 @@ async function noteFixture() {
         clue: "0x",
         transactionHash: h(22),
         logIndex: 0,
-        kind: "Shield",
+        kind: "NoteOutputs",
     };
     return { root, anchor, membership, output };
 }

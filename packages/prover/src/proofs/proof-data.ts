@@ -78,7 +78,7 @@ export function assertPublicInputs(
     const metadata = getCircuitMetadata(name);
     if (
         name === "create_credit" ||
-        name === "create_credit_and_draw" ||
+        name === "create_credit_initial_payment" ||
         name === "credit_update" ||
         name.startsWith("credit_")
     )

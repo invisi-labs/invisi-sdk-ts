@@ -1,5 +1,5 @@
-import FIRST_DRAW_FIXTURE from "../testing/first-draw-fixture.json";
-import { testResourceOptions, hasFirstDrawTestResources } from "../testing/resource-options";
+import INITIAL_PAYMENT_FIXTURE from "../testing/initial-payment-fixture.json";
+import { testResourceOptions, hasInitialPaymentTestResources } from "../testing/resource-options";
 import { describe, expect, it } from "vitest";
 import { generateProofBundle, verifyProofBundle } from "../proofs/prover";
 import {
@@ -17,8 +17,8 @@ wasm("real WASM/native interoperability (set INVISI_TEST_WASM=1)", () => {
         ["credit_draw_slots1", DRAW_FIXTURE, "evm"],
         ["credit_update", UPDATE_FIXTURE, "evm"],
         ["create_credit", CREATE_FIXTURE, "evm"],
-        ...(hasFirstDrawTestResources
-            ? [["create_credit_and_draw", FIRST_DRAW_FIXTURE, "evm"] as const]
+        ...(hasInitialPaymentTestResources
+            ? [["create_credit_initial_payment", INITIAL_PAYMENT_FIXTURE, "evm"] as const]
             : []),
         ["transact_user_slots2", USER_FIXTURE, "evm"],
         ["transact_user_slots1", SWEEP_FIXTURE, "evm"],

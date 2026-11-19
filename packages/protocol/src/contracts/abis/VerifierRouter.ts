@@ -2,7 +2,7 @@
 export const verifierRouterAbi = [
     {
         "type": "function",
-        "name": "getCreateCreditAndDrawVerifier",
+        "name": "getCreateCreditInitialPaymentVerifier",
         "inputs": [],
         "outputs": [
             {

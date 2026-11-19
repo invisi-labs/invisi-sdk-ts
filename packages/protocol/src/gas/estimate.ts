@@ -1,3 +1,4 @@
+import initialPayment from "./data/initial-payment-measurements.json";
 import measured from "./data/measured-model.json";
 export type DocumentedReleaseIdentity =
     | { creditManifestVersion: number; creditFormatVersion: number; creditManifestSha256?: string }
@@ -58,6 +59,40 @@ function result(gas: number, exact: boolean, id: string): GasEstimate {
 /** Local receipt-calibrated preview. Valid direct shapes always return nonzero gas units. */
 export function estimateGas(query: GasShape): GasEstimate {
     const kind = query.kind;
+    if (
+        kind === "create-credit-initial-payment" ||
+        (kind === "create-credit" && query.creationAbi === "initial-payment")
+    ) {
+        const fee = flag(query, "feeEnabled", flag(query, "fee"));
+        const row = initialPayment.rows.find((r) => r.kind === kind && r.feeEnabled === fee)!;
+        const extras =
+            count(query, "extraDeliveryBytes", 0) +
+            2 * Math.max(0, count(query, "creditCiphertextBytes", 485) - 485) +
+            (kind === "create-credit-initial-payment"
+                ? Math.max(0, count(query, "noteCiphertextBytes", 160) - 160)
+                : 0) +
+            (kind === "create-credit-initial-payment" ? 3 : 2) *
+                Math.max(0, count(query, "clueBytes", 68) - 68);
+        const base = result(row.gasUnits + extras * 32, extras === 0, "initial-payment-receipt-v1");
+        if (!base.available) return base;
+        return {
+            ...base,
+            sampleCount: extras ? 0 : row.samples.length,
+            protocolCommit: initialPayment.protocolCommit,
+            sourceSha256: initialPayment.sourceSha256,
+            releaseIdentity: {
+                creditManifestVersion: 7,
+                creditFormatVersion: 8,
+                creditManifestSha256: initialPayment.creditManifestSha256,
+            },
+            conditions: initialPayment.conditions,
+            document: "scripts/benchmark-credit-initial-payment-gas.mjs",
+            assumptions: [
+                ...base.assumptions,
+                "Measured against the recorded working-tree source hash before commit.",
+            ],
+        };
+    }
     if (
         ![
             "shield",
@@ -201,9 +236,24 @@ export function estimateGas(query: GasShape): GasEstimate {
         Object.entries(shape).every(([key, value]) => (r.shape as GasShape)[key] === value)
     );
     const exact = !!row && extra === 0;
-    return result(
+    const preview = result(
         (exact ? row.gasUnits : gas) + extra,
         exact,
         exact ? `receipt-${measured.rows.indexOf(row)}` : `${kind}-benchmark-estimate-v1`
     );
+    if (kind === "draw-credit" && preview.available) {
+        const evidence = measured.creditDrawMeasurement;
+        return {
+            ...preview,
+            protocolCommit: evidence.protocolCommit,
+            sourceSha256: evidence.sourceSha256,
+            document: "test-support/gas-benchmark/measure-credit.mjs",
+            conditions: evidence.conditions,
+            assumptions: [
+                ...preview.assumptions,
+                "Unified CreditDraw / CreditStateTransition receipts; measured working-tree source hash before commit.",
+            ],
+        };
+    }
+    return preview;
 }

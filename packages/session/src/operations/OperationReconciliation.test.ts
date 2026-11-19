@@ -1,3 +1,4 @@
+import { noteLogs, encodeNoteLogs } from "../../../../test-support/note-event-fixtures";
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -161,31 +162,22 @@ it("late confirmation updates a previously discovered change note to its current
         from: signer.address,
         nonce: 0n,
     });
-    const logs = [
-        await receiptLog(
-            "CommitmentsInserted",
-            { treeId: 1n, startLeafIndex: 1, commitments: [output.commitment] },
-            0,
-            hash
-        ),
-        await receiptLog(
-            "Transact",
+    const logs = encodeNoteLogs(
+        noteLogs(
+            h.context,
             {
-                token: "0x2222222222222222222222222222222222222222" as const,
-                inputTreeId: 1n,
-                outputTreeId: 1n,
-                nullifiers: plan.params!.nullifiers,
-                noteCommitments: [output.commitment],
-                leafIndices: [1],
+                token: "0x2222222222222222222222222222222222222222",
+                kind: 1,
+                params: plan.params!,
+                commitments: [output.commitment],
                 deliveries: [output.delivery],
-                withdrawalAddress: signer.address,
-                withdrawalAmount: 30n,
+                start: 1,
                 deadline: plan.deadline,
+                deposit: 0n,
             },
-            1,
-            hash
-        ),
-    ];
+            { transactionHash: hash }
+        )
+    );
     h.reader.getReceipt = async () => ({
         block: canonicalBlock(13n),
         transactionHash: hash,
@@ -310,31 +302,24 @@ it("recovers a known unencrypted owned opening on confirmation without inventing
         from: signer.address,
         nonce: 0n,
     });
-    const logs = [
-        await receiptLog(
-            "CommitmentsInserted",
-            { treeId: 1n, startLeafIndex: 1, commitments: [owned.commitment, opaque.commitment] },
-            0,
-            hash
-        ),
-        await receiptLog(
-            "Shield",
+    const logs = encodeNoteLogs(
+        noteLogs(
+            h.context,
             {
                 token: h.context.tokenAddress,
-                treeId: 1n,
-                startLeafIndex: 1,
+                commitments: [owned.commitment, opaque.commitment],
+                deliveries: [owned.delivery, opaque.delivery],
+                start: 1,
                 payer: signer.address,
-                amount: 50n,
+                deposit: 50n,
                 deadline: (
                     (await h.store.readSnapshot(h.scope)).operations[ready.id]!
                         .payload as import("@invisi-labs/sdk/session-support").SavedOperation
                 ).plan.deadline,
-                deliveries: [owned.delivery, opaque.delivery],
             },
-            1,
-            hash
-        ),
-    ];
+            { transactionHash: hash }
+        )
+    );
     h.reader.getReceipt = async () => ({
         block: await h.reader.getBlock(12n),
         transactionHash: hash,

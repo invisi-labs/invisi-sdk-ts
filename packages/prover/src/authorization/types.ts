@@ -44,7 +44,7 @@ export interface CreateCreditWitnessParams {
     deliveries: readonly Delivery[];
     state: CreditDeliveryState;
     authorization: AuthorizedStatement;
-    firstDraw?: {
+    initialPayment?: {
         initialAvailableCredit: bigint;
         output: Note;
     };

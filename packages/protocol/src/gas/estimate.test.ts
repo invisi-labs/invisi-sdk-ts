@@ -9,7 +9,10 @@ describe("current-release local gas previews", () => {
                 available: true,
                 source: "benchmark",
                 gasUnits: BigInt(row.gasUnits),
-                protocolCommit: measured.protocolCommit,
+                protocolCommit:
+                    row.shape.kind === "draw-credit"
+                        ? measured.creditDrawMeasurement.protocolCommit
+                        : measured.protocolCommit,
             });
         }
     });
@@ -66,4 +69,45 @@ describe("current-release local gas previews", () => {
     it("keeps unsupported aggregate previews explicitly separate", () => {
         expect(estimateGas({ kind: "aggregate" })).toMatchObject({ available: false });
     });
+});
+
+it("estimates both new Credit creation modes with fee and delivery-size accounting", () => {
+    for (const kind of ["create-credit", "create-credit-initial-payment"]) {
+        const base = estimateGas({ kind, creationAbi: "initial-payment", feeEnabled: false });
+        const fee = estimateGas({ kind, creationAbi: "initial-payment", feeEnabled: true });
+        const payload = estimateGas({
+            kind,
+            creationAbi: "initial-payment",
+            feeEnabled: true,
+            extraDeliveryBytes: 100,
+        });
+        expect(base.available && fee.available && payload.available).toBe(true);
+        if (base.available && fee.available && payload.available) {
+            expect(base.sampleCount).toBe(3);
+            expect(fee.gasUnits).toBeGreaterThan(base.gasUnits);
+            expect(payload.gasUnits - fee.gasUnits).toBe(3200n);
+            expect(payload.statistic).toBe("estimate");
+            expect(fee.releaseIdentity).toHaveProperty("creditManifestSha256");
+        }
+    }
+});
+
+it("identifies the unified CreditDraw event measurements instead of the previous event model", () => {
+    expect(estimateGas({ kind: "draw-credit", creditInputs: 1, fee: false })).toMatchObject({
+        available: true,
+        document: "test-support/gas-benchmark/measure-credit.mjs",
+    });
+});
+
+it("uses the refreshed draw calibration for every measured draw grouping", () => {
+    const rows = measured.rows.filter((r) => r.shape.kind === "draw-credit");
+    expect(rows.length).toBe(48);
+    for (const row of rows)
+        expect(estimateGas(row.shape as never)).toMatchObject({
+            available: true,
+            statistic: "median",
+            sampleCount: 3,
+            gasUnits: BigInt(row.gasUnits),
+            sourceSha256: measured.creditDrawMeasurement.sourceSha256,
+        });
 });

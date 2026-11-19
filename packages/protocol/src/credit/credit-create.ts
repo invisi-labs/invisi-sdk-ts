@@ -32,7 +32,7 @@ export const CREATE_CREDIT_FIELDS = [
     "deadline",
     "feeRecipient",
     "feeAmount",
-    "hasFirstDraw",
+    "hasInitialPayment",
     "totalAmount",
     "noteCommitment",
 ] as const;
@@ -54,28 +54,30 @@ export function validateCreateCreditRequest(
         !BigInt(creditCommitment)
     )
         throw Error("invalid Credit authority, token or commitment");
-    const firstDraw = p.hasFirstDraw === true;
+    const initialPayment = p.hasInitialPayment === true;
     const totalAmount = uint(p.totalAmount ?? 0n, 126, "totalAmount");
     const noteCommitment = word(field(p.noteCommitment ?? word(0n)));
     const fee = normalizeFee(p);
-    if (p.hasFirstDraw !== undefined && typeof p.hasFirstDraw !== "boolean")
-        throw Error("invalid first draw mode");
+    if (p.hasInitialPayment !== undefined && typeof p.hasInitialPayment !== "boolean")
+        throw Error("invalid initial payment mode");
     if (
-        !firstDraw &&
+        !initialPayment &&
         (totalAmount !== 0n ||
             BigInt(noteCommitment) !== 0n ||
-            (p.hasFirstDraw === undefined &&
+            (p.hasInitialPayment === undefined &&
                 (p.totalAmount !== undefined || p.noteCommitment !== undefined)))
     )
-        throw Error("first draw fields are not valid for pure or legacy creation");
+        throw Error("initial payment fields are not valid for pure or legacy creation");
     if (
-        firstDraw &&
+        initialPayment &&
         (totalAmount <= fee.feeAmount || !BigInt(noteCommitment) || c.timestamp === undefined)
     )
-        throw Error("first draw requires a positive net amount, a Note commitment and a timestamp");
-    if (firstDraw && noteCommitment === creditCommitment)
+        throw Error(
+            "initial payment requires a positive net amount, a Note commitment and a timestamp"
+        );
+    if (initialPayment && noteCommitment === creditCommitment)
         throw Error("duplicate output commitment");
-    if (dense(deliveries, "deliveries").length !== (firstDraw ? 3 : 2))
+    if (dense(deliveries, "deliveries").length !== (initialPayment ? 3 : 2))
         throw Error("deliveries count mismatch");
     return {
         ...ctx,
@@ -110,7 +112,7 @@ export function createCreditBaseInputs(
         h & ((1n << 128n) - 1n),
         BigInt(r.feeRecipient),
         r.feeAmount,
-        ...(p.hasFirstDraw
+        ...(p.hasInitialPayment
             ? [
                   BigInt(r.noteCommitment),
                   r.totalAmount,
@@ -122,7 +124,7 @@ export function createCreditBaseInputs(
 }
 export function authorizedCreditInputs(
     c: TransactionContext,
-    operation: "create-credit" | "create-credit-and-draw" | "credit-draw" | "update-credit",
+    operation: "create-credit" | "create-credit-initial-payment" | "credit-draw" | "update-credit",
     capacity: number,
     base: readonly Hex[]
 ) {
@@ -137,7 +139,7 @@ export function authorizedCreditInputs(
     return [...base, word(digest >> 128n), word(digest & ((1n << 128n) - 1n))];
 }
 export function createCreditOperation(p: CreditCreationParams) {
-    return p.hasFirstDraw ? "create-credit-and-draw" : "create-credit";
+    return p.hasInitialPayment ? "create-credit-initial-payment" : "create-credit";
 }
 export function createCreditPublicInputs(
     c: TransactionContext,
@@ -180,10 +182,10 @@ export function encodeCreateCreditCall(
 ) {
     const args = { ...p, ...normalizeFee(p) };
     return (
-        p.hasFirstDraw === undefined ? legacyCreateCredit : currentCreateCredit
+        p.hasInitialPayment === undefined ? legacyCreateCredit : currentCreateCredit
     ).encodeFunctionData("createCredit", [
         encodedProof,
-        p.hasFirstDraw === undefined
+        p.hasInitialPayment === undefined
             ? args
             : {
                   ...args,
@@ -195,7 +197,7 @@ export function encodeCreateCreditCall(
 }
 export function buildCreateCreditCalldata(p: BuildCreateCreditCalldataParams) {
     const r = validateCreateCreditRequest(p.context, p.params, p.deliveries);
-    const amount = p.params.hasFirstDraw ? r.totalAmount : r.feeAmount;
+    const amount = p.params.hasInitialPayment ? r.totalAmount : r.feeAmount;
     return {
         data: encodeCreateCreditCall(p.params, encodeCreditProof(p.proof), r.deliveries),
         approveAmount: amount,

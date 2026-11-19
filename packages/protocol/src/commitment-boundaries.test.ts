@@ -41,13 +41,11 @@ it("keeps tree insertions generic and exposes registration rather than payment s
     expect(
         abi.getEvent("CommitmentsInserted")!.inputs.some((input) => input.name === "commitments")
     ).toBe(true);
-    const batchNames = abi.getEvent("BatchOutputs")!.inputs.map((input) => input.name);
-    expect(batchNames).toEqual([
+    expect(abi.getEvent("BatchOutputs")).toBeNull();
+    expect(abi.getEvent("NoteOutputs")!.inputs.map((x) => x.name)).toEqual([
+        "operationId",
         "treeId",
         "startLeafIndex",
-        "firstOutputOffset",
-        "tokens",
-        "noteCommitments",
         "packedDeliveries",
     ]);
     expect(abi.getFunction("isCommitmentRegistered")).not.toBeNull();

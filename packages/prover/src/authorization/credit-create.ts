@@ -20,9 +20,9 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
             (await w.creditLeaf(n)) === p.params.creditCommitment,
         "Credit creation mismatch"
     );
-    if (p.params.hasFirstDraw) {
-        check(!!p.firstDraw, "first draw witness required");
-        const { initialAvailableCredit, output } = p.firstDraw;
+    if (p.params.hasInitialPayment) {
+        check(!!p.initialPayment, "initial payment witness required");
+        const { initialAvailableCredit, output } = p.initialPayment;
         const timestamp = w.protocol.context.timestamp!;
         const initial = {
             ...n,
@@ -39,16 +39,16 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
                 (
                     ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"] as const
                 ).every((k) => expected[k] === n[k]),
-            "first draw Credit usage mismatch"
+            "initial payment Credit usage mismatch"
         );
         check(
             output.ownerAddress === n.spenderWalletIdentity &&
                 output.nonce !== 0n &&
                 output.amount === p.params.totalAmount - (p.params.feeAmount ?? 0n) &&
                 (await w.noteLeaf(output)) === p.params.noteCommitment,
-            "first draw Note mismatch"
+            "initial payment Note mismatch"
         );
-        const operation = "create-credit-and-draw";
+        const operation = "create-credit-initial-payment";
         const owner = await w.authority(
             operation,
             1,
@@ -57,7 +57,7 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
             n.ownerWalletIdentity
         );
         return provingRequest(
-            "create_credit_and_draw",
+            "create_credit_initial_payment",
             {
                 ...owner,
                 spender_wallet_identity: BigInt(n.spenderWalletIdentity),
@@ -72,7 +72,7 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
             words
         );
     }
-    check(!p.firstDraw, "unexpected first draw witness");
+    check(!p.initialPayment, "unexpected initial payment witness");
     for (const k of ["lastDay", "dailySpent", "lastMonth", "monthlySpent", "totalSpent"] as const)
         check(normalizeCreditUsage(n)[k] === 0n, "initial Credit usage must be zero");
     return provingRequest(

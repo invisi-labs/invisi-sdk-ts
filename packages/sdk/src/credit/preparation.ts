@@ -193,7 +193,7 @@ export class CreditPreparation<Result> {
                     "dailyLimit",
                     "monthlyLimit",
                     "creditSharedKey",
-                    "firstDraw",
+                    "initialPayment",
                     "creationAbi",
                     "availableCredit",
                     "unlimited",
@@ -227,11 +227,11 @@ export class CreditPreparation<Result> {
         ]);
         if (
             options.creationAbi !== undefined &&
-            !["legacy", "first-draw"].includes(options.creationAbi)
+            !["legacy", "initial-payment"].includes(options.creationAbi)
         )
             throw Error("unsupported Credit creation ABI");
-        if (options.firstDraw && options.creationAbi === "legacy")
-            throw Error("first draw requires the new Credit creation ABI");
+        if (options.initialPayment && options.creationAbi === "legacy")
+            throw Error("initial payment requires the new Credit creation ABI");
         const fee = this.fee(options);
         const initialAvailableCredit = options.availableCredit ?? 0n;
         const initial: CreditDeliveryState["note"] = {
@@ -250,13 +250,16 @@ export class CreditPreparation<Result> {
             nonce: generateNonce(),
             creditSharedKey: options.creditSharedKey ?? generateCreditSharedKey(),
         };
-        const firstDraw = options.firstDraw;
-        if (firstDraw && Object.keys(firstDraw).some((key) => !["amount", "payload"].includes(key)))
-            throw Error("unsupported first draw option");
-        const totalAmount = firstDraw ? positiveAmount(firstDraw.amount, 126) : 0n;
-        if (firstDraw && totalAmount <= fee.feeAmount)
-            throw Error("first draw must leave a positive Note");
-        const ordinary = firstDraw
+        const initialPayment = options.initialPayment;
+        if (
+            initialPayment &&
+            Object.keys(initialPayment).some((key) => !["amount", "payload"].includes(key))
+        )
+            throw Error("unsupported initial payment option");
+        const totalAmount = initialPayment ? positiveAmount(initialPayment.amount, 126) : 0n;
+        if (initialPayment && totalAmount <= fee.feeAmount)
+            throw Error("initial payment must leave a positive Note");
+        const ordinary = initialPayment
             ? await this.#prepare.output(
                   await NoteOutput.create({
                       chainId: frame.context.chainId,
@@ -264,14 +267,14 @@ export class CreditPreparation<Result> {
                       tokenAddress: frame.context.tokenAddress,
                       amount: totalAmount - fee.feeAmount,
                       recipient: { type: "invisi", address: options.spender },
-                      payload: copyApplicationPayload(firstDraw.payload),
+                      payload: copyApplicationPayload(initialPayment.payload),
                   }),
                   frame.context,
                   false
               )
             : undefined;
         if (ordinary && !ordinary.note)
-            throw Error("first draw requires an encrypted Note recipient");
+            throw Error("initial payment requires an encrypted Note recipient");
         const output = await this.seal(
             {
                 note: ordinary
@@ -293,12 +296,12 @@ export class CreditPreparation<Result> {
                 ...fee,
                 ...(ordinary
                     ? {
-                          hasFirstDraw: true as const,
+                          hasInitialPayment: true as const,
                           totalAmount,
                           noteCommitment: ordinary.commitment,
                       }
-                    : options.creationAbi === "first-draw"
-                      ? { hasFirstDraw: false as const }
+                    : options.creationAbi === "initial-payment"
+                      ? { hasInitialPayment: false as const }
                       : {}),
             };
         const deliveries = ordinary ? [...output.deliveries, ordinary.delivery] : output.deliveries;
@@ -309,10 +312,10 @@ export class CreditPreparation<Result> {
             outputs: [output],
             deliveries,
             creation: params,
-            ...(ordinary ? { firstDrawInitialAvailableCredit: initialAvailableCredit } : {}),
+            ...(ordinary ? { initialPaymentInitialAvailableCredit: initialAvailableCredit } : {}),
         };
         plan.statement = WitnessBuilder.statement(
-            ordinary ? "create_credit_and_draw" : "create_credit",
+            ordinary ? "create_credit_initial_payment" : "create_credit",
             createCreditPublicInputs(frame.context, params, deliveries)
         );
         await this.#prepare.assertBlock(frame);

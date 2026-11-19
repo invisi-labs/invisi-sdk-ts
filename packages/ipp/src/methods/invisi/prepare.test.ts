@@ -80,7 +80,7 @@ it("never repeats wallet execution for expired, processing or terminal requests"
     ).rejects.toThrow();
     expect(calls).toBe(0);
 });
-it("prepares first draw to the frozen spender with the gross amount, without a merchant authorization link", async () => {
+it("prepares initial payment to the frozen spender with the gross amount, without a merchant authorization link", async () => {
     const r = request("credit");
     r.credit.initialPayment = { amount: "5" };
     const target = { protocol, prepareCreateCredit: async (options: unknown) => options };
@@ -90,7 +90,7 @@ it("prepares first draw to the frozen spender with the gross amount, without a m
             initialPaymentFee: { recipient: address, amount: 1n },
         })
     ).toMatchObject({
-        firstDraw: { amount: 6n },
+        initialPayment: { amount: 6n },
         creditSharedKey: BigInt(hash),
     });
     expect(
@@ -98,9 +98,9 @@ it("prepares first draw to the frozen spender with the gross amount, without a m
             now,
             initialPaymentFee: { recipient: address, amount: 2n },
         })
-    ).toMatchObject({ firstDraw: { amount: 7n } });
+    ).toMatchObject({ initialPayment: { amount: 7n } });
     expect(await prepareInvisiRequest(r, target, { now })).toMatchObject({
-        firstDraw: { amount: 5n },
+        initialPayment: { amount: 5n },
     });
     await expect(
         prepareInvisiRequest(r, target, {
@@ -137,7 +137,7 @@ it("prepares first draw to the frozen spender with the gross amount, without a m
     ).toThrow();
     expect(() =>
         parsePaymentRequest(
-            { ...r, links: { ...r.links, authorizeFirstDraw: r.links.credentials } },
+            { ...r, links: { ...r.links, authorizeInitialPayment: r.links.credentials } },
             origin
         )
     ).toThrow();

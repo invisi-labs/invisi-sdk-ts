@@ -1,10 +1,10 @@
 import { Interface } from "ethers";
-import fixture from "../../../prover/src/testing/first-draw-fixture.json";
+import fixture from "../../../prover/src/testing/initial-payment-fixture.json";
 import { invisiCoreAbi, type CreditCreationParams, type Delivery } from "../contracts";
 import { expect, it } from "vitest";
 import { buildCreateCreditCalldata, createCreditPublicInputs } from "./credit-create";
 
-it("rejects first-draw fields on the legacy create selector", () => {
+it("rejects initial-payment fields on the legacy create selector", () => {
     const base = {
         chainId: 1n,
         protocolAddress: "0x1111111111111111111111111111111111111111",
@@ -19,10 +19,10 @@ it("rejects first-draw fields on the legacy create selector", () => {
         deadline: 100n,
         totalAmount: 1n,
     } as unknown as CreditCreationParams;
-    expect(() => createCreditPublicInputs(base, params, [])).toThrow(/first draw/i);
+    expect(() => createCreditPublicInputs(base, params, [])).toThrow(/initial payment/i);
     expect(() =>
         buildCreateCreditCalldata({ context: base, params, deliveries: [], proof: "0xaa" })
-    ).toThrow(/first draw/i);
+    ).toThrow(/initial payment/i);
 });
 
 it("matches the Core proof statement and preserves legacy pure creation calldata", () => {
@@ -48,17 +48,17 @@ it("matches the Core proof statement and preserves legacy pure creation calldata
         { token: params.token, payer: params.owner, amount: 7n },
     ]);
     const iface = new Interface(invisiCoreAbi);
-    expect(iface.parseTransaction({ data: combined.data })!.args[1].hasFirstDraw).toBe(true);
-    const { hasFirstDraw, totalAmount, noteCommitment, ...legacy } = params;
+    expect(iface.parseTransaction({ data: combined.data })!.args[1].hasInitialPayment).toBe(true);
+    const { hasInitialPayment, totalAmount, noteCommitment, ...legacy } = params;
     const pure = { context, deliveries: deliveries.slice(0, 2), proof: "0xaa" as const };
     const current = buildCreateCreditCalldata({
         ...pure,
-        params: { ...legacy, hasFirstDraw: false },
+        params: { ...legacy, hasInitialPayment: false },
     });
     const old = buildCreateCreditCalldata({ ...pure, params: legacy });
-    expect(iface.parseTransaction({ data: current.data })!.args[1].hasFirstDraw).toBe(false);
+    expect(iface.parseTransaction({ data: current.data })!.args[1].hasInitialPayment).toBe(false);
     expect(current.data.slice(0, 10)).not.toEqual(old.data.slice(0, 10));
     expect(
-        createCreditPublicInputs(context, { ...legacy, hasFirstDraw: false }, pure.deliveries)
+        createCreditPublicInputs(context, { ...legacy, hasInitialPayment: false }, pure.deliveries)
     ).toEqual(createCreditPublicInputs(context, legacy, pure.deliveries));
 });

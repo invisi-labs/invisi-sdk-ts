@@ -1,3 +1,4 @@
+import { noteLogs, encodeNoteLogs } from "../../../../test-support/note-event-fixtures";
 import { TestWallet } from "../../../../test-support/test-wallet";
 import {
     testDecryptor,
@@ -54,7 +55,7 @@ function noteCandidate(transactionHash: Hex) {
         tokenAddress: token,
         ciphertext: vectors.note.ciphertext as Hex,
         clue: `0x${clues.vectors[0]!.clue}` as Hex,
-        logIndex: 1,
+        logIndex: 3,
         kind: "note",
     };
 }
@@ -72,22 +73,23 @@ async function harness() {
         block: block(),
         transactionHash: hex(101n),
         status: "success",
-        logs: [
-            event("CommitmentsInserted", [1n, 0, [vectors.note.commitment]], 0),
-            event(
-                "Shield",
-                [
+        logs: encodeNoteLogs(
+            noteLogs(
+                context,
+                {
                     token,
-                    context.protocolAddress,
-                    70n,
-                    1n,
-                    0,
-                    [{ ciphertext: vectors.note.ciphertext, clue: `0x${clues.vectors[0]!.clue}` }],
-                    2000n,
-                ],
-                1
-            ),
-        ] as CanonicalReceipt["logs"],
+                    commitments: [vectors.note.commitment as Hex],
+                    deliveries: [
+                        {
+                            ciphertext: vectors.note.ciphertext as Hex,
+                            clue: `0x${clues.vectors[0]!.clue}`,
+                        },
+                    ],
+                    deadline: 2000n,
+                },
+                { transactionHash: hex(101n) }
+            )
+        ) as CanonicalReceipt["logs"],
     };
     let reorg = false;
     let spent = false;
@@ -472,28 +474,39 @@ it.each([
                     2
                 ),
                 event(
-                    "CreditDraw",
+                    "CreditStateTransition",
                     {
                         outputTreeId,
-                        params: {
-                            token,
+                        noteCommitment: ordinary,
+                        state: {
                             sources: [{ treeId: 1n, merkleRoot: hex(inputTree.getRoot()) }],
                             payers: [{ payer: ownerHex(p.ownerWalletIdentity), amount: 30n }],
                             grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
                             nullifiers: [p.nullifier],
                             creditCommitments: [p.draw.stateCommitment],
                             recoveryAmounts: [p.draw.recoveryAmount],
-                            noteCommitment: ordinary,
-                            totalAmount: 30n,
-                            deadline: 2000000100n,
-                            feeRecipient: "0x0000000000000000000000000000000000000000",
-                            feeAmount: 0n,
                         },
-                        leafIndices: [childIndex, childIndex + 1],
-                        deliveries: [childDelivery, corrupt, { ciphertext: "0x", clue: "0x" }],
+                        creditLeafIndices: [childIndex],
+                        creditDeliveries: [childDelivery, corrupt],
                     },
                     hex(102n),
                     3
+                ),
+                event(
+                    "CreditDraw",
+                    {
+                        token,
+                        outputTreeId,
+                        noteCommitment: ordinary,
+                        noteLeafIndex: childIndex + 1,
+                        totalAmount: 30n,
+                        deadline: 2000000100n,
+                        feeRecipient: "0x0000000000000000000000000000000000000000",
+                        feeAmount: 0n,
+                        delivery: { ciphertext: "0x", clue: "0x" },
+                    },
+                    hex(102n),
+                    4
                 ),
             ] as CanonicalReceipt["logs"],
         };

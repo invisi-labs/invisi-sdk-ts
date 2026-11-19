@@ -32,10 +32,10 @@ export async function witnessFor(
                 deliveries: credit.deliveries,
                 state: credit.outputs[0]!.state,
                 authorization,
-                ...(credit.creation.hasFirstDraw
+                ...(credit.creation.hasInitialPayment
                     ? {
-                          firstDraw: {
-                              initialAvailableCredit: credit.firstDrawInitialAvailableCredit!,
+                          initialPayment: {
+                              initialAvailableCredit: credit.initialPaymentInitialAvailableCredit!,
                               output: plan.outputs[0]!.note!,
                           },
                       }

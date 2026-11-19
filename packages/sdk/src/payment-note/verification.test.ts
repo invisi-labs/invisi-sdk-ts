@@ -32,7 +32,7 @@ async function setup() {
         clue: "0x",
         transactionHash: h.leaf,
         logIndex: 0,
-        kind: "Shield",
+        kind: "NoteOutputs",
     };
     const getNote = vi.fn(async () => ({ output, membership: proof }));
     const options = {

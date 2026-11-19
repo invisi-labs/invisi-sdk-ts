@@ -1,4 +1,4 @@
-import { hasFirstDrawTestResources } from "../testing/resource-options";
+import { hasInitialPaymentTestResources } from "../testing/resource-options";
 import { poseidonHash } from "@invisi-labs/primitives";
 import { AGGREGATE_ROUTES } from "@invisi-labs/protocol";
 import { describe, it, expect } from "vitest";
@@ -7,7 +7,7 @@ import { CIRCUIT_NAMES, loadCircuit, loadVerificationKey } from "./circuits";
 describe("current authenticated release", () => {
     it.each(
         CIRCUIT_NAMES.filter(
-            (name) => name !== "create_credit_and_draw" || hasFirstDrawTestResources
+            (name) => name !== "create_credit_initial_payment" || hasInitialPaymentTestResources
         )
     )("authenticates %s and its direct key", (name) => {
         const circuit = loadCircuit(name);

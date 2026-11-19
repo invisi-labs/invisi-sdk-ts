@@ -1,3 +1,4 @@
+import { noteLogs, encodeNoteLogs } from "../../../../test-support/note-event-fixtures";
 import {
     computeNoteCommitment,
     computeNoteIdentity,
@@ -28,18 +29,31 @@ const meta = {
     logIndex: 1,
     removed: false,
 };
-function batch(packed: string, commitments: string[]): DeliveryEventLog {
-    return {
-        ...meta,
-        eventName: "BatchOutputs",
-        args: {
-            tokens: commitments.map(() => token),
-            treeId: 1n,
-            startLeafIndex: 0,
-            noteCommitments: commitments,
-            packedDeliveries: packed,
+function batch(packed: string, commitments: string[]): DeliveryEventLog[] {
+    const deliveries: { ciphertext: `0x${string}`; clue: `0x${string}` }[] = [];
+    let at = 2;
+    while (at + 4 <= packed.length) {
+        const n = Number.parseInt(packed.slice(at, at + 4), 16);
+        at += 4;
+        deliveries.push({
+            ciphertext: `0x${packed.slice(at, at + n * 2)}`,
+            clue: `0x${packed.slice(at + n * 2, at + n * 2 + (n ? 136 : 0))}`,
+        });
+        at += n * 2 + (n ? 136 : 0);
+    }
+    while (deliveries.length < commitments.length)
+        deliveries.push({ ciphertext: "0x", clue: "0x" });
+    const logs = noteLogs(
+        context,
+        {
+            token,
+            commitments: commitments as `0x${string}`[],
+            deliveries: deliveries.slice(0, commitments.length),
         },
-    };
+        meta
+    );
+    logs.at(-1)!.args.packedDeliveries = packed;
+    return logs;
 }
 it("discovers mixed empty, text and maximum opaque memos at their exact aggregate positions", async () => {
     const commitments: string[] = [];
@@ -75,13 +89,7 @@ it("discovers mixed empty, text and maximum opaque memos at their exact aggregat
     segments.push("0001" + "7f" + clue);
     commitments.push(toBeHex(1234n, 32));
     const log = batch("0x" + segments.join(""), commitments);
-    const inserted: DeliveryEventLog = {
-        ...meta,
-        logIndex: 0,
-        eventName: "CommitmentsInserted",
-        args: { treeId: 1n, startLeafIndex: 0, commitments },
-    };
-    const result = await decryptCandidates([inserted, log], {
+    const result = await decryptCandidates(log, {
         context,
         viewing: new ViewingCapability(ownerAddress, key),
         confirmedThrough: 12n,
@@ -108,12 +116,12 @@ it("rejects truncated prefixes, bounds, unsupported versions, truncated clues, t
         "0x" + framed + framed,
     ]) {
         expect(() =>
-            extractDeliveryCandidates([batch(packed, [vectors.note.commitment])], context, 12n)
+            extractDeliveryCandidates(batch(packed, [vectors.note.commitment]), context, 12n)
         ).toThrow();
     }
     expect(() =>
         extractDeliveryCandidates(
-            [batch("0x" + framed, [vectors.note.commitment, vectors.credit.commitment])],
+            batch("0x" + framed, [vectors.note.commitment, vectors.credit.commitment]),
             context,
             12n
         )

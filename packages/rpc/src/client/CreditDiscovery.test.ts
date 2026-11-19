@@ -126,7 +126,7 @@ it("returns Credit transaction state records and transitions without Note arrays
 });
 
 it.each([
-    { kind: "Transact" },
+    { kind: "NoteOutputs" },
     { deliveries: [delivery()] },
     { deliveries: [delivery(), delivery(), delivery()] },
     { deliveries: [delivery(), { ciphertext: "0x", clue: "0x" }] },

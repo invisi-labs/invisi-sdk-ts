@@ -62,7 +62,7 @@ export const CIRCUIT_NAMES = [
     "transact_aggregate_mixed_1_5_4",
     "transact_aggregate_mixed_1_5_5",
     "create_credit",
-    "create_credit_and_draw",
+    "create_credit_initial_payment",
     "credit_draw_slots1",
     "credit_draw_slots2",
     "credit_draw_slots3",

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { settlementSourceIdentity } from "../../scripts/settlement-fixtures/source-identity.mjs";
 import { ZeroAddress, ZeroHash } from "ethers";
 import { createSettlementRuntime } from "../../scripts/settlement-fixtures/runtime.mjs";
 import {
@@ -48,6 +50,11 @@ const capacities = [
 ];
 const report = {
     commit,
+    sourceState: "working-tree",
+    sourceSha256: createHash("sha256")
+        .update(readFileSync(import.meta.filename))
+        .update(JSON.stringify(settlementSourceIdentity(root)))
+        .digest("hex"),
     environment: {
         chainId: 31337,
         evm: "prague",
@@ -204,7 +211,7 @@ try {
         console.log("PROVE", index, cases.length, s.c, s.i, s.o, s.path);
         const b = await proveUserNative(fixture, {
             root,
-            directory: join(directory, "proof-" + index),
+            directory: join(process.env.PROOF_CACHE_DIRECTORY ?? directory, "proof-" + index),
             threads: 4,
         });
         const request = settlementDirectRequest(fixture);

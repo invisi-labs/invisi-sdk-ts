@@ -1,3 +1,4 @@
+import { noteLogs, encodeNoteLogs } from "../../../../test-support/note-event-fixtures";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { Interface, keccak256 } from "ethers";
 
@@ -43,31 +44,23 @@ async function harness() {
         block,
         transactionHash: reference.transactionHash,
         status: "success",
-        logs: [
-            log(
-                "CommitmentsInserted",
-                { treeId: 1n, startLeafIndex: 0, commitments: [vectors.note.commitment] },
-                0
-            ),
-            log(
-                "Shield",
+        logs: encodeNoteLogs(
+            noteLogs(
+                context,
                 {
                     token: context.tokenAddress,
-                    payer: context.protocolAddress,
-                    amount: 70n,
-                    treeId: 1n,
-                    startLeafIndex: 0,
+                    commitments: [vectors.note.commitment as Hex],
                     deliveries: [
                         {
-                            ciphertext: vectors.note.ciphertext,
+                            ciphertext: vectors.note.ciphertext as Hex,
                             clue: `0x${clues.vectors[0]!.clue}`,
                         },
                     ],
                     deadline: 2000n,
                 },
-                1
-            ),
-        ],
+                { transactionHash: reference.transactionHash }
+            )
+        ),
     };
     const current = {
         receipt: receipt as CanonicalReceipt | null,
@@ -130,27 +123,23 @@ describe("canonical disclosure verifier", () => {
     it("rejects an output for another token before returning canonical evidence", async () => {
         const h = await harness();
         const receipt = structuredClone(h.current.receipt!);
-        receipt.logs = [
-            receipt.logs[0]!,
-            log(
-                "Shield",
+        receipt.logs = encodeNoteLogs(
+            noteLogs(
+                context,
                 {
                     token: "0x2222222222222222222222222222222222222222",
-                    payer: context.protocolAddress,
-                    amount: 70n,
-                    treeId: 1n,
-                    startLeafIndex: 0,
+                    commitments: [vectors.note.commitment as Hex],
                     deliveries: [
                         {
-                            ciphertext: vectors.note.ciphertext,
+                            ciphertext: vectors.note.ciphertext as Hex,
                             clue: `0x${clues.vectors[0]!.clue}`,
                         },
                     ],
                     deadline: 2000n,
                 },
-                1
-            ),
-        ];
+                { transactionHash: reference.transactionHash }
+            )
+        );
         h.current.receipt = receipt;
         await expect(
             new wallet.DisclosureVerifier({ protocol: h.protocol, reader: h.reader }).readOutput(

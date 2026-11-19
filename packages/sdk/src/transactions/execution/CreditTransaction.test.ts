@@ -534,7 +534,7 @@ it("schedules, submits and cancels all four detached Credit operations through o
     }
 });
 
-it("prepares an atomic first draw and requires only the owner signature", async () => {
+it("prepares an atomic initial payment and requires only the owner signature", async () => {
     const h = await creditSetup();
     const prepared = await h.invisi.prepareCreateCredit({
         ...h.identity,
@@ -543,11 +543,12 @@ it("prepares an atomic first draw and requires only the owner signature", async 
         availableCredit: 10n,
         dailyLimit: 10n,
         monthlyLimit: 10n,
-        firstDraw: { amount: 7n },
+        initialPayment: { amount: 7n },
         fee: { recipient: h.wallet.ownerAddress, amount: 1n },
     });
+    expect(prepared.estimateGas()).toMatchObject({ available: true, sampleCount: 3 });
     expect(prepared.preview()).toMatchObject({
-        creditFirstDraw: { grossAmount: 7n, netAmount: 6n, feeAmount: 1n },
+        creditInitialPayment: { grossAmount: 7n, netAmount: 6n, feeAmount: 1n },
         creditOutputs: [{ availableCredit: 3n, dailySpent: 7n, monthlySpent: 7n, totalSpent: 7n }],
         outputs: [{ amount: 6n }],
     });
@@ -559,18 +560,18 @@ it("prepares an atomic first draw and requires only the owner signature", async 
     );
     const ready = await (await externallyAuthorize(prepared, owner)).prove();
     const decoded = iface.parseTransaction(await ready.exportTransaction())!;
-    expect(decoded.args[1].hasFirstDraw).toBe(true);
+    expect(decoded.args[1].hasInitialPayment).toBe(true);
     expect(decoded.args[1].totalAmount).toBe(7n);
     expect(decoded.args[2]).toHaveLength(3);
     expect(h.prover.prove).toHaveBeenCalledWith(
         expect.objectContaining({
-            circuitName: "create_credit_and_draw",
+            circuitName: "create_credit_initial_payment",
             expectedPublicInputs: expect.arrayContaining([expect.any(String)]),
         }),
         expect.anything()
     );
 });
-it("rejects a separate first draw recipient before preparing a transaction", async () => {
+it("rejects a separate initial payment recipient before preparing a transaction", async () => {
     const h = await creditSetup();
     await expect(
         h.invisi.prepareCreateCredit({
@@ -578,9 +579,9 @@ it("rejects a separate first draw recipient before preparing a transaction", asy
             spender: h.bob.getAddress(),
             expiry: 2000003600n,
             availableCredit: 10n,
-            firstDraw: { amount: 7n, recipient: h.wallet.getAddress() } as unknown as {
+            initialPayment: { amount: 7n, recipient: h.wallet.getAddress() } as unknown as {
                 amount: bigint;
             },
         })
-    ).rejects.toThrow(/unsupported first draw option/);
+    ).rejects.toThrow(/unsupported initial payment option/);
 });

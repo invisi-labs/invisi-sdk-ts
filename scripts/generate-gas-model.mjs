@@ -161,8 +161,32 @@ assert(
     validation.every((v) => Math.abs(v.errorPercent) <= 15),
     "Model exceeds 15% held-out tolerance"
 );
+const creditReport = reports.find((r) => r.rows.some((row) => row.shape.kind === "draw-credit"));
+const noteReports = reports.filter((r) => r.rows.some((row) => row.shape.kind === "shield"));
+const creditEvidence = creditReport.sourceSha256
+    ? {
+          protocolCommit: creditReport.commit,
+          sourceSha256: creditReport.sourceSha256,
+          sourceState: creditReport.sourceState,
+          reportSha256: createHash("sha256")
+              .update(readFileSync(paths[reports.indexOf(creditReport)]))
+              .digest("hex"),
+          conditions: creditReport.conditions,
+          sampleCount: 3,
+      }
+    : undefined;
 const result = {
     formatVersion: 1,
+    ...(creditEvidence ? { creditDrawMeasurement: creditEvidence } : {}),
+    noteMeasurement: {
+        sourceState: noteReports[0].sourceState ?? "committed",
+        sourceSha256: noteReports.map((r) => r.sourceSha256),
+        reportSha256: noteReports.map((r) =>
+            createHash("sha256")
+                .update(readFileSync(paths[reports.indexOf(r)]))
+                .digest("hex")
+        ),
+    },
     sourceSha256: createHash("sha256")
         .update(
             paths.map((p) => createHash("sha256").update(readFileSync(p)).digest("hex")).join("\n")

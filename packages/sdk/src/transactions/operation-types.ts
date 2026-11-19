@@ -103,10 +103,10 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
-    /** Select the new ABI for pure creation; firstDraw always uses the new ABI. */
-    creationAbi?: "legacy" | "first-draw";
+    /** Select the new ABI for pure creation; initialPayment always uses the new ABI. */
+    creationAbi?: "legacy" | "initial-payment";
     /** Gross debit includes the optional broadcaster fee; amount is in token base units. */
-    firstDraw?: { amount: bigint; payload?: Uint8Array };
+    initialPayment?: { amount: bigint; payload?: Uint8Array };
     /** Explicit grant correlation key; canonical nonzero field, preserved without derivation. */
     creditSharedKey?: bigint;
     fee?: { recipient: Address; amount: bigint };
@@ -166,7 +166,7 @@ export interface CreditPlan {
     outputs: PreparedCreditOutput[];
     deliveries: Delivery[];
     creation?: CreditCreationParams;
-    firstDrawInitialAvailableCredit?: bigint;
+    initialPaymentInitialAvailableCredit?: bigint;
     draw?: CreditDrawParams;
     update?: UpdateCreditParams;
     updateChanges?: CreditUpdateChanges;

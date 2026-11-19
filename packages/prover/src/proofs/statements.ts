@@ -139,18 +139,18 @@ export function assertCreditStatement(values: readonly string[], name: string): 
             ? "create-credit"
             : name === "credit_update"
               ? "update-credit"
-              : name === "create_credit_and_draw"
-                ? "create-credit-and-draw"
+              : name === "create_credit_initial_payment"
+                ? "create-credit-initial-payment"
                 : "credit-draw";
     const capacity =
         operation === "credit-draw" ? Number(name.slice("credit_draw_slots".length)) : 1;
-    const firstDraw = operation === "create-credit-and-draw";
-    const feeRecipient = uint(firstDraw ? w[10]! : w.at(-4)!, 160),
-        feeAmount = uint(firstDraw ? w[11]! : w.at(-3)!, 128);
-    if (firstDraw) {
-        check(w[12] !== 0n && w[12] !== w[6], "Invalid first draw Note commitment");
+    const initialPayment = operation === "create-credit-initial-payment";
+    const feeRecipient = uint(initialPayment ? w[10]! : w.at(-4)!, 160),
+        feeAmount = uint(initialPayment ? w[11]! : w.at(-3)!, 128);
+    if (initialPayment) {
+        check(w[12] !== 0n && w[12] !== w[6], "Invalid initial payment Note commitment");
         check(uint(w[13]!, 126) > feeAmount, "First draw fee must leave a positive Note");
-        check(uint(w[14]!, 64) > 0n && uint(w[15]!, 64) > 0n, "Invalid first draw periods");
+        check(uint(w[14]!, 64) > 0n && uint(w[15]!, 64) > 0n, "Invalid initial payment periods");
     }
     check((feeRecipient === 0n) === (feeAmount === 0n), "Invalid Credit fee context");
     if (operation === "credit-draw")

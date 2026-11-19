@@ -69,12 +69,12 @@ export interface CreateCreditParams {
     feeRecipient?: Address;
     feeAmount?: bigint;
 }
-/** Omit hasFirstDraw to use the legacy deployed ABI. Set false for pure creation on the new ABI. */
+/** Omit hasInitialPayment to use the legacy deployed ABI. Set false for pure creation on the new ABI. */
 export type CreditCreationParams = CreateCreditParams &
     (
-        | { hasFirstDraw?: undefined; totalAmount?: never; noteCommitment?: never }
-        | { hasFirstDraw: false; totalAmount?: 0n; noteCommitment?: Hex }
-        | { hasFirstDraw: true; totalAmount: bigint; noteCommitment: Hex }
+        | { hasInitialPayment?: undefined; totalAmount?: never; noteCommitment?: never }
+        | { hasInitialPayment: false; totalAmount?: 0n; noteCommitment?: Hex }
+        | { hasInitialPayment: true; totalAmount: bigint; noteCommitment: Hex }
     );
 export interface CreditPayer {
     payer: Address;
@@ -85,14 +85,17 @@ export interface CreditGrantRef {
     shard: bigint;
     slot: bigint;
 }
-export interface CreditDrawParams {
-    token: Address;
+/** Actual consumed Credit and successor recovery fields emitted by CreditStateTransition. */
+export interface CreditDrawState {
     sources: readonly InputSource[];
     payers: readonly CreditPayer[];
     grantRefs: readonly CreditGrantRef[];
     nullifiers: readonly Hex[];
     creditCommitments: readonly Hex[];
     recoveryAmounts: readonly Hex[];
+}
+export interface CreditDrawParams extends CreditDrawState {
+    token: Address;
     noteCommitment: Hex;
     totalAmount: bigint;
     deadline: bigint;

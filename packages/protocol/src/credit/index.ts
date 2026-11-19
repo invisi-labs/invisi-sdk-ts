@@ -4,6 +4,7 @@ export type {
     CreateCreditParams,
     CreditCreationParams,
     CreditDrawParams,
+    CreditDrawState,
     UpdateCreditParams,
     RevokeCreditParams,
     CreditPayer,

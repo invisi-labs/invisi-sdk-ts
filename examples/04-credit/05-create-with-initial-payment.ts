@@ -46,9 +46,9 @@ try {
         monthlyLimit: 10000n,
         availableCredit: 50000n,
         unlimited: false,
-        firstDraw: { amount: 7n },
+        initialPayment: { amount: 7n },
     });
-    console.log("First draw preview:", json(prepared.preview().creditFirstDraw));
+    console.log("First draw preview:", json(prepared.preview().creditInitialPayment));
 
     // 3. Sign the frozen EIP-712 authorization with ethers.
     const signer = new EthersWallet(

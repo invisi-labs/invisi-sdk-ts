@@ -1,6 +1,6 @@
+import { extractNoteOutputs } from "./note-operations";
 import { DeliveryAuthenticationError, validateDeliveryCiphertext } from "@invisi-labs/primitives";
 import type { authenticatedDecryptor } from "@invisi-labs/primitives";
-import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/primitives";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import { isAddress } from "ethers";
 
@@ -40,12 +40,14 @@ export interface DeliveryCandidate {
 }
 const EVENTS = new Set([
     "CommitmentsInserted",
-    "BatchOutputs",
-    "Shield",
-    "Transact",
-    "CrossTreeTransact",
+    "NoteOperation",
+    "NoteStateTransition",
+    "PublicDeposit",
+    "PublicWithdrawal",
+    "NoteOutputs",
+    "TransactAggregated",
     "CreditCreated",
-    "CreditFirstDraw",
+    "CreditStateTransition",
     "CreditDraw",
     "CreditUpdated",
     "CreditRevoked",
@@ -108,6 +110,7 @@ export function extractDeliveryCandidates(
             EVENTS.has(log.eventName)
     );
     const insertions = new Map<string, Hex>();
+    const insertionBatches = new Map<string, string>();
     const metadata = (log: DeliveryEventLog) => {
         check(!log.removed, "discovery resync required after reorg");
         check(
@@ -127,11 +130,11 @@ export function extractDeliveryCandidates(
         `${hash(log.blockHash)}:${hash(log.transactionHash)}:${position(tree, at)}`;
     for (const log of relevant) {
         metadata(log);
-        if (log.eventName !== "CommitmentsInserted" && log.eventName !== "BatchOutputs") continue;
+        if (log.eventName !== "CommitmentsInserted") continue;
         const a = object(log.args),
             tree = integer(a.treeId),
             start = index(a.startLeafIndex),
-            leaves = array(log.eventName === "BatchOutputs" ? a.noteCommitments : a.commitments);
+            leaves = array(a.commitments);
         check(tree > 0n && tree < 1n << 64n, "invalid insertion tree");
         check(start + leaves.length <= 65536, "insertion exceeds tree capacity");
         for (const [i, leaf] of leaves.entries()) {
@@ -140,6 +143,7 @@ export function extractDeliveryCandidates(
                 previous = insertions.get(key);
             check(!previous || previous === value, "conflicting insertion events");
             insertions.set(key, value);
+            insertionBatches.set(key, `${log.logIndex}:${tree}:${start}:${leaves.length}`);
         }
     }
     const results = new Map<string, DeliveryCandidate>();
@@ -206,89 +210,137 @@ export function extractDeliveryCandidates(
         check(!created.has(key), "duplicate Credit creation position");
         created.set(key, log);
     }
+    const drawKey = (log: DeliveryEventLog) => {
+        const a = object(log.args);
+        return `${hash(log.blockHash)}:${hash(log.transactionHash)}:${integer(a.outputTreeId)}:${hash(a.noteCommitment)}`;
+    };
+    const draws = new Map<string, DeliveryEventLog>();
+    const transitions = new Map<string, DeliveryEventLog>();
+    for (const log of relevant) {
+        if (log.eventName !== "CreditDraw" && log.eventName !== "CreditStateTransition") continue;
+        const map = log.eventName === "CreditDraw" ? draws : transitions;
+        const key = drawKey(log);
+        check(!map.has(key), "duplicate Credit draw result or transition");
+        map.set(key, log);
+    }
+    const sameInsertion = (
+        left: DeliveryEventLog,
+        tree: bigint,
+        at: number,
+        right: DeliveryEventLog,
+        to: number
+    ) => {
+        const a = insertionBatches.get(insertionKey(left, tree, at));
+        check(
+            a !== undefined && a === insertionBatches.get(insertionKey(right, tree, to)),
+            "Credit outputs have no matching insertion batch"
+        );
+    };
+    for (const group of extractNoteOutputs(relevant, context)) {
+        group.commitments.forEach((c, i) =>
+            add(
+                group.log,
+                group.tree,
+                group.start + i,
+                c,
+                "funds",
+                group.deliveries[i],
+                group.token
+            )
+        );
+    }
     for (const log of relevant) {
         const a = object(log.args);
-        if (log.eventName === "Shield") {
-            const ds = array(a.deliveries),
-                tree = integer(a.treeId),
-                start = index(a.startLeafIndex);
-            check(start + ds.length <= 65536, "shield exceeds tree capacity");
-            ds.forEach((d, i) => add(log, tree, start + i, undefined, "funds", d));
-        } else if (log.eventName === "Transact" || log.eventName === "CrossTreeTransact") {
-            const cs = array(a.noteCommitments),
-                ds = array(a.deliveries),
-                leaves = array(a.leafIndices),
-                tree = integer(a.outputTreeId);
-            check(
-                cs.length === ds.length && cs.length === leaves.length,
-                "invalid transact delivery slots"
-            );
-            cs.forEach((c, i) => add(log, tree, index(leaves[i]), c, "funds", ds[i]));
-        } else if (log.eventName === "BatchOutputs") {
-            const tokens = array(a.tokens);
-            const cs = array(a.noteCommitments),
-                tree = integer(a.treeId),
-                start = index(a.startLeafIndex),
-                packed = a.packedDeliveries;
-            check(
-                typeof packed === "string" && /^0x(?:[0-9a-fA-F]{2})*$/.test(packed),
-                "invalid packed deliveries"
-            );
-            check(tokens.length === cs.length, "batch token count mismatch");
-            check(start + cs.length <= 65536, "batch exceeds tree capacity");
-            let offset = 2;
-            cs.forEach((c, i) => {
-                check(offset + 4 <= packed.length, "truncated delivery length prefix");
-                const length = Number.parseInt(packed.slice(offset, offset + 4), 16);
-                offset += 4;
-                check(
-                    length <= MAX_CIPHERTEXT_BYTES &&
-                        offset + length * 2 + (length === 0 ? 0 : 136) <= packed.length,
-                    "invalid packed delivery length"
-                );
-                const ciphertext = `0x${packed.slice(offset, offset + length * 2)}`;
-                offset += length * 2;
-                const clue = length === 0 ? "0x" : `0x${packed.slice(offset, offset + 136)}`;
-                if (length !== 0) offset += 136;
-                add(log, tree, start + i, c, "funds", { ciphertext, clue }, tokens[i]);
-            });
-            check(offset === packed.length, "trailing packed delivery bytes");
-        } else if (log.eventName === "CreditCreated") creation(log, a, a);
-        else if (log.eventName === "CreditFirstDraw") {
+        if (log.eventName === "CreditCreated") creation(log, a, a);
+        else if (log.eventName === "CreditDraw") {
             const tree = integer(a.outputTreeId),
                 leaf = index(a.noteLeafIndex);
+            const transition = transitions.get(drawKey(log));
             const grant = leaf > 0 ? created.get(insertionKey(log, tree, leaf - 1)) : undefined;
-            check(
-                grant &&
+            check(transition || grant, "draw has no matching Credit creation or transition");
+            check(!(transition && grant), "ambiguous Credit draw association");
+            if (grant) {
+                check(
                     grant.logIndex! < log.logIndex! &&
-                    hash(grant.args?.creditCommitment) === hash(a.creditCommitment),
-                "first draw has no matching Credit creation"
-            );
-            add(log, tree, leaf, a.noteCommitment, "funds", a.delivery, grant.args?.token);
+                        String(grant.args?.token).toLowerCase() === String(a.token).toLowerCase(),
+                    "draw has no matching Credit creation"
+                );
+                sameInsertion(grant, tree, leaf - 1, log, leaf);
+            }
+            const total = integer(a.totalAmount),
+                fee = integer(a.feeAmount);
+            check(total > 0n && total < 1n << 128n && fee < total, "invalid draw amount or fee");
+            add(log, tree, leaf, a.noteCommitment, "funds", a.delivery);
         } else if (log.eventName === "CreditUpdated") creation(log, a, object(a.params));
-        else if (log.eventName === "CreditDraw") {
-            const p = object(a.params),
-                cs = array(p.creditCommitments),
-                ds = array(a.deliveries),
-                leaves = array(a.leafIndices),
-                tree = integer(a.outputTreeId);
+        else if (log.eventName === "CreditStateTransition") {
+            const result = draws.get(drawKey(log));
             check(
-                ds.length === 2 * cs.length + 1 && leaves.length === cs.length + 1,
-                "invalid draw delivery slots"
+                result && result.logIndex! > log.logIndex!,
+                "transition has no matching subsequent Credit draw"
             );
-            cs.forEach((c, i) => {
-                add(log, tree, index(leaves[i]), c, "owner", ds[2 * i]);
-                add(log, tree, index(leaves[i]), c, "spender", ds[2 * i + 1]);
+            const r = object(result.args),
+                p = object(a.state),
+                cs = array(p.creditCommitments),
+                ns = array(p.nullifiers),
+                recovery = array(p.recoveryAmounts),
+                refs = array(p.grantRefs),
+                payers = array(p.payers),
+                sources = array(p.sources),
+                ds = array(a.creditDeliveries),
+                leaves = array(a.creditLeafIndices),
+                tree = integer(a.outputTreeId),
+                noteLeaf = index(r.noteLeafIndex),
+                n = cs.length;
+            check(
+                n > 0 &&
+                    n <= 80 &&
+                    ns.length === n &&
+                    recovery.length === n &&
+                    refs.length === n &&
+                    ds.length === 2 * n &&
+                    leaves.length === n &&
+                    sources.length > 0 &&
+                    sources.length <= n &&
+                    payers.length > 0 &&
+                    payers.length <= n,
+                "invalid draw state or delivery slots"
+            );
+            check(new Set(ns.map(hash)).size === n, "duplicate Credit nullifiers");
+            recovery.forEach(hash);
+            sources.forEach((value) => {
+                const source = object(value);
+                check(integer(source.treeId) > 0n, "invalid source tree");
+                hash(source.merkleRoot);
             });
-            add(
-                log,
-                tree,
-                index(leaves[cs.length]),
-                p.noteCommitment,
-                "funds",
-                ds[2 * cs.length],
-                p.token
-            );
+            refs.forEach((value) => {
+                const ref = object(value);
+                check(
+                    integer(ref.payerIndex) < BigInt(payers.length) &&
+                        integer(ref.shard) > 0n &&
+                        integer(ref.slot) < 65536n,
+                    "invalid Credit grant reference"
+                );
+            });
+            const total = payers.reduce<bigint>((sum, value) => {
+                const payer = object(value),
+                    amount = integer(payer.amount);
+                check(
+                    typeof payer.payer === "string" &&
+                        isAddress(payer.payer) &&
+                        BigInt(payer.payer) !== 0n &&
+                        amount > 0n,
+                    "invalid Credit payer"
+                );
+                return sum + amount;
+            }, 0n);
+            check(total === integer(r.totalAmount), "draw payer total mismatch");
+            cs.forEach((c, i) => {
+                const leaf = index(leaves[i]);
+                check(leaf + n - i === noteLeaf, "noncontiguous Credit draw output positions");
+                sameInsertion(log, tree, leaf, result, noteLeaf);
+                add(log, tree, leaf, c, "owner", ds[2 * i], r.token);
+                add(log, tree, leaf, c, "spender", ds[2 * i + 1], r.token);
+            });
         }
     }
     return [...results.values()];
