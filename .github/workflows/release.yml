@@ -8,11 +8,27 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write
-  id-token: write # OIDC for npm Trusted Publishing
+  contents: read
+  actions: read
 
 jobs:
+  previous:
+    uses: ./.github/workflows/ci-reuse.yml
+    with:
+      ref: ${{ github.sha }}
+      branches: develop,main
+  verify:
+    needs: previous
+    if: needs.previous.outputs.verified != 'true'
+    uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ github.sha }}
   release:
+    needs: [previous, verify]
+    if: always() && needs.previous.result == 'success' && (needs.verify.result == 'success' || (needs.verify.result == 'skipped' && needs.previous.outputs.verified == 'true'))
+    permissions:
+      contents: write
+      id-token: write
     name: Release
     runs-on: ubuntu-latest
     env:
@@ -31,6 +47,14 @@ jobs:
       - name: Upgrade npm for Trusted Publishing
         run: npm install -g npm@11
 
+      - name: Cache content-addressed build outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ts-build-${{ runner.os }}-node22-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ts-build-${{ runner.os }}-node22-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -46,12 +70,8 @@ jobs:
       - name: Verify tiny trusted Provenance metadata
         run: python3 scripts/sync-provenance.py --check-package packages/prover/src/resources
 
-      - name: Test release validation
-        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs scripts/release-archive.test.mjs
-
       - name: Validate complete versioned release notes
         run: |
-          python3 scripts/test_release_notes.py
           python3 scripts/release-notes.py "$GITHUB_REF_NAME" --output "$RUNNER_TEMP/release-notes.md"
 
       - name: Validate release versions and dependencies

@@ -1,0 +1,85 @@
+name: Verify TypeScript SDK
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      INVISI_PROVER_CACHE_DIR: ${{ github.workspace }}/.cache/invisi-prover
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cache content-addressed build outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ts-build-${{ runner.os }}-node22-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ts-build-${{ runner.os }}-node22-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache pinned public prover resources
+        uses: actions/cache@v4
+        with:
+          path: .cache/invisi-prover
+          key: prover-resources-${{ hashFiles('packages/prover/src/resources/pin.ts') }}
+
+      - name: Explicitly provision verified pinned prover resources
+        run: node scripts/sync-prover-assets.mjs
+
+      - name: Verify tiny trusted Provenance metadata
+        run: python3 scripts/sync-provenance.py --check-package packages/prover/src/resources
+
+      - name: Test release validation
+        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs scripts/release-archive.test.mjs
+
+      - name: Test CI reuse safety
+        run: python3 scripts/test_ci_reuse.py
+      - name: Test versioned release notes
+        run: python3 scripts/test_release_notes.py
+
+      - name: Check source formatting
+        run: pnpm format:check
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Check lazy browser WASM runtime loading
+        run: pnpm check:wasm
+
+      - name: Run the offline Note output example
+        run: pnpm examples
+
+      - name: Check public API and example boundaries
+        run: pnpm check:surface
+
+      - name: Run package tests with bounded concurrency
+        run: pnpm exec turbo run test --concurrency=1 -- --maxWorkers=2 --minWorkers=1
+
+      - name: Run real native and WASM proof tests sequentially
+        run: |
+          SDK_BB_BIN="$PWD/packages/prover/node_modules/@aztec-foundation/bb.js/build/amd64-linux/bb"
+          test -x "$SDK_BB_BIN"
+          "$SDK_BB_BIN" --version
+          BB_BINARY_PATH="$SDK_BB_BIN" INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover exec vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+
+      - name: Type check
+        run: pnpm lint
