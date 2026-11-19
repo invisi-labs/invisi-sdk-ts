@@ -1,5 +1,11 @@
 # @invisi-labs/primitives
 
+## 1.3.1
+
+- Accept unified CreditDraw events in indexed Credit RPC responses, including post-debit state deliveries.
+- Preserve canonical block, range, membership, duplicate and ciphertext checks; restore automatic IPP Credit reconciliation.
+- Allow up to ten minutes for npm metadata and archive propagation while requiring matching archive integrity.
+
 ## 1.3.0
 
 - Recognize owner-only Credit initial-payment authorization with the combined statement domain.

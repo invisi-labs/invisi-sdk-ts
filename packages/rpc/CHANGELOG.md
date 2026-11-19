@@ -1,5 +1,11 @@
 # @invisi-labs/rpc
 
+## 1.3.1
+
+- Accept unified CreditDraw events in indexed Credit RPC responses, including post-debit state deliveries.
+- Preserve canonical block, range, membership, duplicate and ciphertext checks; restore automatic IPP Credit reconciliation.
+- Allow up to ten minutes for npm metadata and archive propagation while requiring matching archive integrity.
+
 ## 1.3.0
 
 - Recognize NoteOutputs, CreditDraw and CreditStateTransition in authenticated Note and Credit discovery.
