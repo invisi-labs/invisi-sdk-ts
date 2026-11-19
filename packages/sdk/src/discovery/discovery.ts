@@ -45,6 +45,7 @@ const EVENTS = new Set([
     "Transact",
     "CrossTreeTransact",
     "CreditCreated",
+    "CreditFirstDraw",
     "CreditDraw",
     "CreditUpdated",
     "CreditRevoked",
@@ -123,7 +124,7 @@ export function extractDeliveryCandidates(
         };
     };
     const insertionKey = (log: DeliveryEventLog, tree: bigint, at: number) =>
-        `${hash(log.transactionHash)}:${position(tree, at)}`;
+        `${hash(log.blockHash)}:${hash(log.transactionHash)}:${position(tree, at)}`;
     for (const log of relevant) {
         metadata(log);
         if (log.eventName !== "CommitmentsInserted" && log.eventName !== "BatchOutputs") continue;
@@ -197,6 +198,14 @@ export function extractDeliveryCandidates(
         add(log, tree, leaf, fields.creditCommitment, "owner", ds[0]);
         add(log, tree, leaf, fields.creditCommitment, "spender", ds[1]);
     };
+    const created = new Map<string, DeliveryEventLog>();
+    for (const log of relevant) {
+        if (log.eventName !== "CreditCreated") continue;
+        const a = object(log.args);
+        const key = insertionKey(log, integer(a.outputTreeId), index(a.leafIndex));
+        check(!created.has(key), "duplicate Credit creation position");
+        created.set(key, log);
+    }
     for (const log of relevant) {
         const a = object(log.args);
         if (log.eventName === "Shield") {
@@ -245,7 +254,18 @@ export function extractDeliveryCandidates(
             });
             check(offset === packed.length, "trailing packed delivery bytes");
         } else if (log.eventName === "CreditCreated") creation(log, a, a);
-        else if (log.eventName === "CreditUpdated") creation(log, a, object(a.params));
+        else if (log.eventName === "CreditFirstDraw") {
+            const tree = integer(a.outputTreeId),
+                leaf = index(a.noteLeafIndex);
+            const grant = leaf > 0 ? created.get(insertionKey(log, tree, leaf - 1)) : undefined;
+            check(
+                grant &&
+                    grant.logIndex! < log.logIndex! &&
+                    hash(grant.args?.creditCommitment) === hash(a.creditCommitment),
+                "first draw has no matching Credit creation"
+            );
+            add(log, tree, leaf, a.noteCommitment, "funds", a.delivery, grant.args?.token);
+        } else if (log.eventName === "CreditUpdated") creation(log, a, object(a.params));
         else if (log.eventName === "CreditDraw") {
             const p = object(a.params),
                 cs = array(p.creditCommitments),

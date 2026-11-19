@@ -1,3 +1,4 @@
+import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { expect, it } from "vitest";
 import { Interface } from "ethers";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
@@ -16,7 +17,9 @@ it("uses the exact external shared key in the frozen grant and both encrypted ro
         creditSharedKey: 123456789n,
     });
     const ready = await (await externallyAuthorize(prepared)).prove();
-    const decoded = new Interface(invisiCoreAbi).parseTransaction(await ready.exportTransaction())!;
+    const decoded = new Interface([...invisiCoreAbi, ...legacyCreateCreditAbi]).parseTransaction(
+        await ready.exportTransaction()
+    )!;
     const commitment = prepared.preview().creditOutputs![0]!.commitment;
     for (const [index, wallet, role] of [
         [0, h.wallet, "owner"],

@@ -1,16 +1,14 @@
 import { assertCreditUpdatePlan } from "../../credit/state";
 import { type AuthorizedStatement } from "@invisi-labs/primitives";
 import { WitnessBuilder } from "@invisi-labs/prover";
-import { type TokenProtocol } from "@invisi-labs/rpc";
 import type { ProvingRequest } from "@invisi-labs/prover";
 import type { OperationPlan } from "../operation-types";
 
 export async function witnessFor(
-    protocol: TokenProtocol,
     plan: OperationPlan,
     authorization?: AuthorizedStatement
 ): Promise<ProvingRequest> {
-    const builder = new WitnessBuilder(protocol);
+    const builder = new WitnessBuilder({ context: plan.context });
     const credit = plan.credit;
 
     if (credit) {
@@ -34,6 +32,14 @@ export async function witnessFor(
                 deliveries: credit.deliveries,
                 state: credit.outputs[0]!.state,
                 authorization,
+                ...(credit.creation.hasFirstDraw
+                    ? {
+                          firstDraw: {
+                              initialAvailableCredit: credit.firstDrawInitialAvailableCredit!,
+                              output: plan.outputs[0]!.note!,
+                          },
+                      }
+                    : {}),
             });
         if (credit.draw) {
             return builder.drawCredit({

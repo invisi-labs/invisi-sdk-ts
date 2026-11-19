@@ -76,7 +76,12 @@ export function assertPublicInputs(
             throw new Error("Non-canonical public input");
     }
     const metadata = getCircuitMetadata(name);
-    if (name === "create_credit" || name === "credit_update" || name.startsWith("credit_"))
+    if (
+        name === "create_credit" ||
+        name === "create_credit_and_draw" ||
+        name === "credit_update" ||
+        name.startsWith("credit_")
+    )
         assertCreditStatement(actual, name);
     if (name.startsWith("transact_user_")) assertUserStatement(actual, metadata.capacity!);
     if (name.startsWith("transact_aggregate_")) {

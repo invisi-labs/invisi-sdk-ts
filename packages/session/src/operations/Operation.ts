@@ -436,13 +436,7 @@ export class Operation {
             requiresAuthorization(plan) ? ["authorized"] : ["prepared"],
             async (saved) => {
                 const p = saved.plan;
-                saved.proof = await proveOperation(
-                    this.#runtime.options.protocol,
-                    p,
-                    this.#authorization,
-                    prover,
-                    options
-                );
+                saved.proof = await proveOperation(p, this.#authorization, prover, options);
                 if (p.fundingMode === "signature") {
                     return { status: "proved" };
                 }

@@ -28,22 +28,30 @@ function spender(value: unknown): void {
 }
 
 function creditTerms(value: ObjectValue, extra: string[] = []): void {
-    const c = object(value, [
-        "spender",
-        "availableCredit",
-        "unlimited",
-        "singleLimit",
-        "dailyLimit",
-        "monthlyLimit",
-        "expiresAt",
-        ...extra,
-    ]);
+    const c = object(
+        value,
+        [
+            "spender",
+            "availableCredit",
+            "unlimited",
+            "singleLimit",
+            "dailyLimit",
+            "monthlyLimit",
+            "expiresAt",
+            ...extra,
+        ],
+        ["initialPayment"]
+    );
     spender(c.spender);
     const amount = integer(c.availableCredit, 128);
     if (typeof c.unlimited !== "boolean" || (c.unlimited ? amount !== 0n : amount === 0n))
         return invalid();
     for (const k of ["singleLimit", "dailyLimit", "monthlyLimit"]) integer(c[k], 126);
     timestamp(c.expiresAt);
+    if (c.initialPayment !== undefined) {
+        const d = object(c.initialPayment, ["amount"]);
+        integer(d.amount, 126, true);
+    }
 }
 
 function option(value: ObjectValue, mode: Mode): void {
@@ -65,7 +73,6 @@ function option(value: ObjectValue, mode: Mode): void {
 }
 
 function request(raw: ObjectValue): void {
-    if (object(raw.action, ["type"]).type !== "invisi_transaction") return invalid();
     if (raw.mode === "payment") {
         if (raw.credit !== undefined) return invalid();
         const p = object(raw.payment, [
@@ -103,26 +110,30 @@ function request(raw: ObjectValue): void {
 
 function receipt(value: unknown, mode: Mode): void {
     const credit = mode === "credit";
-    const r = object(value, [
-        "network",
-        "protocolAddress",
-        "transactionHash",
-        "commitment",
-        "blockNumber",
-        "blockHash",
-        "completedAt",
-        ...(credit
-            ? [
-                  "creditId",
-                  "creditStatus",
-                  "owner",
-                  "revocationShard",
-                  "revocationSlot",
-                  "verificationBlock",
-                  "expiresAt",
-              ]
-            : []),
-    ]);
+    const r = object(
+        value,
+        [
+            "network",
+            "protocolAddress",
+            "transactionHash",
+            "commitment",
+            "blockNumber",
+            "blockHash",
+            "completedAt",
+            ...(credit
+                ? [
+                      "creditId",
+                      "creditStatus",
+                      "owner",
+                      "revocationShard",
+                      "revocationSlot",
+                      "verificationBlock",
+                      "expiresAt",
+                  ]
+                : []),
+        ],
+        credit ? ["initialPayment"] : []
+    );
     network(r.network);
     hex(r.protocolAddress, 20, true);
     hex(r.transactionHash, 32, true);
@@ -132,7 +143,27 @@ function receipt(value: unknown, mode: Mode): void {
     timestamp(r.completedAt);
     if (credit) {
         text(r.creditId);
-        if (r.creditStatus !== "active") return invalid();
+        if (
+            r.creditStatus !== "active" &&
+            !(r.creditStatus === "depleted" && r.initialPayment !== undefined)
+        )
+            return invalid();
+        if (r.initialPayment !== undefined) {
+            const d = object(r.initialPayment, [
+                "noteCommitment",
+                "grossAmount",
+                "netAmount",
+                "feeAmount",
+                "feeRecipient",
+            ]);
+            if (field(d.noteCommitment) === r.commitment) return invalid();
+            const fee = integer(d.feeAmount, 126);
+            if (
+                integer(d.grossAmount, 126, true) !== integer(d.netAmount, 126, true) + fee ||
+                (fee === 0n) !== (BigInt(hex(d.feeRecipient, 20)) === 0n)
+            )
+                return invalid();
+        }
         hex(r.owner, 20, true);
         integer(r.revocationShard, 64);
         number(r.revocationSlot, 65535);
@@ -153,7 +184,11 @@ function match(request: Request, option: Option): void {
     } else {
         if (!("credit" in option)) return invalid();
         for (const key of Object.keys(option.credit) as (keyof CreditTerms)[])
-            if (request.credit[key] !== option.credit[key]) return invalid();
+            if (key !== "initialPayment" && request.credit[key] !== option.credit[key])
+                return invalid();
+        const a = request.credit.initialPayment,
+            b = option.credit.initialPayment;
+        if (!!a !== !!b || (a && b && a.amount !== b.amount)) return invalid();
     }
 }
 
@@ -175,6 +210,12 @@ function matchReceipt(value: PaymentReceipt | CreditReceipt, request: Request): 
     const details = request.mode === "payment" ? request.payment : request.credit;
     if (value.network !== details.network || value.protocolAddress !== details.protocolAddress)
         return invalid();
+    if (request.mode === "credit") {
+        const terms = request.credit.initialPayment,
+            draw = (value as CreditReceipt).initialPayment;
+        if (!!terms !== !!draw || (terms && draw && terms.amount !== draw.netAmount))
+            return invalid();
+    }
 }
 function privateValues(request: Request): string[] {
     return request.mode === "credit" ? [request.credit.creditSharedKey] : [];

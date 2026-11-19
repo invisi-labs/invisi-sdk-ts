@@ -1,4 +1,4 @@
-import { normalizeFunding } from "@invisi-labs/protocol";
+import { encodeCreateCreditCall, normalizeFunding } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { Interface } from "ethers";
@@ -37,8 +37,12 @@ export function exportBroadcasterIntent(plan: OperationPlan) {
             funding,
         ];
     } else if (plan.credit?.creation) {
-        method = "createCredit";
-        args = ["0x", plan.credit.creation, plan.credit.deliveries];
+        if (plan.credit.creation.hasFirstDraw !== undefined)
+            throw Error("new Credit creation ABI is not supported by the broadcaster");
+        return {
+            sendable: false as const,
+            data: encodeCreateCreditCall(plan.credit.creation, "0x", plan.credit.deliveries),
+        };
     } else if (plan.credit?.draw) {
         method = "creditDraw";
         args = ["0x", plan.credit.draw, plan.credit.deliveries];

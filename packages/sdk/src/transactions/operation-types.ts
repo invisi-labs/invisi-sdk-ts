@@ -2,7 +2,7 @@ import type { CreditUpdateChanges } from "@invisi-labs/primitives";
 import type {
     Address,
     RevokeCreditParams,
-    CreateCreditParams,
+    CreditCreationParams,
     CreditDrawParams,
     Delivery,
     Hex,
@@ -103,6 +103,10 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
+    /** Select the new ABI for pure creation; firstDraw always uses the new ABI. */
+    creationAbi?: "legacy" | "first-draw";
+    /** Gross debit includes the optional broadcaster fee; amount is in token base units. */
+    firstDraw?: { amount: bigint; payload?: Uint8Array };
     /** Explicit grant correlation key; canonical nonzero field, preserved without derivation. */
     creditSharedKey?: bigint;
     fee?: { recipient: Address; amount: bigint };
@@ -161,7 +165,8 @@ export interface CreditPlan {
     inputs: PreparedCreditInput[];
     outputs: PreparedCreditOutput[];
     deliveries: Delivery[];
-    creation?: CreateCreditParams;
+    creation?: CreditCreationParams;
+    firstDrawInitialAvailableCredit?: bigint;
     draw?: CreditDrawParams;
     update?: UpdateCreditParams;
     updateChanges?: CreditUpdateChanges;

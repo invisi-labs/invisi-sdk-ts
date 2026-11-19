@@ -80,3 +80,65 @@ it("never repeats wallet execution for expired, processing or terminal requests"
     ).rejects.toThrow();
     expect(calls).toBe(0);
 });
+it("prepares first draw to the frozen spender with the gross amount, without a merchant authorization link", async () => {
+    const r = request("credit");
+    r.credit.initialPayment = { amount: "5" };
+    const target = { protocol, prepareCreateCredit: async (options: unknown) => options };
+    expect(
+        await prepareInvisiRequest(r, target, {
+            now,
+            initialPaymentFee: { recipient: address, amount: 1n },
+        })
+    ).toMatchObject({
+        firstDraw: { amount: 6n },
+        creditSharedKey: BigInt(hash),
+    });
+    expect(
+        await prepareInvisiRequest(r, target, {
+            now,
+            initialPaymentFee: { recipient: address, amount: 2n },
+        })
+    ).toMatchObject({ firstDraw: { amount: 7n } });
+    expect(await prepareInvisiRequest(r, target, { now })).toMatchObject({
+        firstDraw: { amount: 5n },
+    });
+    await expect(
+        prepareInvisiRequest(r, target, {
+            now,
+            initialPaymentFee: { recipient: address, amount: (1n << 126n) - 5n },
+        })
+    ).rejects.toThrow(/fee/);
+    expect(() =>
+        parsePaymentRequest(
+            {
+                ...r,
+                credit: {
+                    ...r.credit,
+                    initialPayment: { ...r.credit.initialPayment, recipient: r.credit.spender },
+                },
+            },
+            origin
+        )
+    ).toThrow();
+    expect(() =>
+        parsePaymentRequest(
+            {
+                ...r,
+                credit: {
+                    ...r.credit,
+                    initialPayment: { ...r.credit.initialPayment, maxFeeAmount: "1" },
+                },
+            },
+            origin
+        )
+    ).toThrow();
+    expect(() =>
+        parsePaymentRequest({ ...r, action: { type: "invisi_transaction" } }, origin)
+    ).toThrow();
+    expect(() =>
+        parsePaymentRequest(
+            { ...r, links: { ...r.links, authorizeFirstDraw: r.links.credentials } },
+            origin
+        )
+    ).toThrow();
+});

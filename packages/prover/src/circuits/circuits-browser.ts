@@ -1,3 +1,4 @@
+import { circuitResourcePin } from "../resources/pin";
 import { authenticateCircuit, getCircuitKey, sha256 } from "../proofs/proof-data";
 import { browserResources } from "../resources/browser";
 import type { ResourceOptions } from "../resources/loader";
@@ -9,7 +10,10 @@ export async function loadCircuitBrowser(
     options?: ResourceOptions,
     signal?: AbortSignal
 ): Promise<CompiledCircuit> {
-    const bytes = await browserResources(options).load(`circuits/${name}.json`, signal);
+    const bytes = await browserResources(options, circuitResourcePin(name)).load(
+        `circuits/${name}.json`,
+        signal
+    );
     const circuit = JSON.parse(
         new TextDecoder("utf8", { fatal: true }).decode(bytes)
     ) as CompiledCircuit;
@@ -23,7 +27,10 @@ export async function loadVerificationKeyBrowser(
     signal?: AbortSignal
 ): Promise<Uint8Array> {
     const key = getCircuitKey(name, target),
-        bytes = await browserResources(options).load(`circuits/${key.vk}`, signal);
+        bytes = await browserResources(options, circuitResourcePin(name)).load(
+            `circuits/${key.vk}`,
+            signal
+        );
     if ((await sha256(bytes)) !== key.vkSha256)
         throw new Error("Verification key identity mismatch");
     return bytes;

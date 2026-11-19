@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { parseIndex, reviewedPin } from "../../../scripts/sync-prover-assets.mjs";
+import { parseIndex } from "../../../scripts/sync-prover-assets.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, rmSync, mkdtempSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
@@ -32,6 +32,12 @@ for (const [i, version, format] of [
     assert.equal(manifests[i].version, version, "retired manifest version");
     assert.equal(manifests[i].formatVersion, format, "retired proof format");
 }
+function reviewedCircuitPin() {
+    const source = readFileSync(join(packageRoot, "src/resources/pin.ts"), "utf8");
+    const pin = source.match(/FIRST_DRAW_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/)?.[1];
+    assert(pin, "Missing reviewed circuit resource pin");
+    return pin;
+}
 const destination = join(packageRoot, "src/resources/circuits-metadata.json");
 const stage = mkdtempSync(join(tmpdir(), "invisi-resource-metadata-"));
 // Authenticate the exact public resource set before changing SDK metadata. The
@@ -42,7 +48,10 @@ try {
         cwd: root,
         stdio: "inherit",
     });
-    const resourceIndex = parseIndex(readFileSync(join(resources, "index.json")), reviewedPin());
+    const resourceIndex = parseIndex(
+        readFileSync(join(resources, "index.json")),
+        reviewedCircuitPin()
+    );
     const entries = [];
     for (const manifest of manifests) {
         assert.equal(manifest.complete, true);

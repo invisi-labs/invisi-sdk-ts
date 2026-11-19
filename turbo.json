@@ -17,6 +17,7 @@
       "env": [
         "BB_BINARY_PATH",
         "INVISI_TEST_WASM",
+        "INVISI_TEST_FIRST_DRAW",
         "INVISI_PROVER_RESOURCE_DIR",
         "INVISI_PROVER_CACHE_DIR",
         "INVISI_PROVER_OFFLINE"

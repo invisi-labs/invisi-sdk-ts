@@ -8,9 +8,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-export function reviewedPin() {
+export function reviewedPin(set = "default") {
     const text = readFileSync(join(repository, "packages/prover/src/resources/pin.ts"), "utf8");
-    const pin = text.match(/PROVER_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/)?.[1];
+    assert(set === "default" || set === "first-draw", "Unknown prover resource set");
+    const pattern =
+        set === "default"
+            ? /PROVER_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/
+            : /FIRST_DRAW_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/;
+    const pin = text.match(pattern)?.[1];
     assert(pin, "Missing reviewed prover resource pin");
     return pin;
 }
@@ -174,11 +179,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     while (args.length) {
         const flag = args.shift();
         assert(
-            ["--source", "--output", "--path"].includes(flag) && args.length,
-            "Usage: sync-prover-assets.mjs [--source CORE_RESOURCE_DIRECTORY] [--output CACHE_DIRECTORY] [--path LOGICAL_PATH ...]"
+            ["--source", "--output", "--path", "--set"].includes(flag) && args.length,
+            "Usage: sync-prover-assets.mjs [--source CORE_RESOURCE_DIRECTORY] [--output CACHE_DIRECTORY] [--path LOGICAL_PATH ...] [--set default|first-draw]"
         );
         const value = args.shift();
         if (flag === "--path") options.paths.push(value);
+        else if (flag === "--set") options.pin = reviewedPin(value);
         else options[flag.slice(2)] = value;
     }
     const { destination, indexSha256, objects } = await provision(options);

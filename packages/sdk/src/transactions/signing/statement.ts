@@ -67,7 +67,7 @@ export function authorizationRequest(plan: OperationPlan) {
     if (plan.kind === "draw-credit") {
         operation = "credit-draw";
     } else if (plan.kind === "create-credit" || plan.kind === "update-credit") {
-        operation = plan.kind;
+        operation = plan.credit?.creation?.hasFirstDraw ? "create-credit-and-draw" : plan.kind;
     }
 
     return {
@@ -86,7 +86,7 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
 
     const credit = plan.credit;
     if (credit?.inputs.some((i) => now > i.state.note.expiry)) return true;
-    if (credit?.draw) {
+    if (credit?.draw || credit?.creation?.hasFirstDraw) {
         const prepared = creditPeriods(plan.context.now ?? plan.preparedAt.timestamp),
             current = creditPeriods(now);
         if (

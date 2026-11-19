@@ -5785,5 +5785,99 @@
       "public_key_y",
       "signature"
     ]
+  },
+  "create_credit_and_draw": {
+    "artifactSha256": "915a60c94da9852648a9df075f6f466f797a76dbca14980f6aa68d5a1be2f7d6",
+    "keys": {
+      "evm": "7ca4a0e6a4c0bd555eaf084ef769972fef99f94b73dbb60909078c0d1c78b3b0"
+    },
+    "publicInputCount": 18,
+    "public": [
+      {
+        "name": "chain_id",
+        "count": 1
+      },
+      {
+        "name": "protocol_address",
+        "count": 1
+      },
+      {
+        "name": "token_address",
+        "count": 1
+      },
+      {
+        "name": "owner_address",
+        "count": 1
+      },
+      {
+        "name": "revocation_shard",
+        "count": 1
+      },
+      {
+        "name": "revocation_slot",
+        "count": 1
+      },
+      {
+        "name": "credit_commitment",
+        "count": 1
+      },
+      {
+        "name": "deadline",
+        "count": 1
+      },
+      {
+        "name": "delivery_hash_high",
+        "count": 1
+      },
+      {
+        "name": "delivery_hash_low",
+        "count": 1
+      },
+      {
+        "name": "fee_recipient",
+        "count": 1
+      },
+      {
+        "name": "fee_amount",
+        "count": 1
+      },
+      {
+        "name": "note_commitment",
+        "count": 1
+      },
+      {
+        "name": "total_amount",
+        "count": 1
+      },
+      {
+        "name": "current_day",
+        "count": 1
+      },
+      {
+        "name": "current_month",
+        "count": 1
+      },
+      {
+        "name": "auth_digest_high",
+        "count": 1
+      },
+      {
+        "name": "auth_digest_low",
+        "count": 1
+      }
+    ],
+    "private": [
+      "spender_wallet_identity",
+      "credit_nonce",
+      "expiry",
+      "credit_shared_key",
+      "limits",
+      "available_credit",
+      "unlimited",
+      "public_key_x",
+      "public_key_y",
+      "signature",
+      "output_nonce"
+    ]
   }
 }

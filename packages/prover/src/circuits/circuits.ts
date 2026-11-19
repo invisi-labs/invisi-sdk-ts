@@ -1,3 +1,4 @@
+import { circuitResourcePin } from "../resources/pin";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { localResourcePath, nodeResources, type NodeResourceOptions } from "../resources/node";
@@ -17,7 +18,7 @@ export { CIRCUIT_NAMES };
 export type { CircuitName, CompiledCircuit };
 export function getCircuitPath(name: CircuitName, options?: NodeResourceOptions): string {
     getCircuitMetadata(name);
-    return localResourcePath(`circuits/${name}.json`, options);
+    return localResourcePath(`circuits/${name}.json`, options, circuitResourcePin(name));
 }
 export function getVerificationKeyPath(
     name: CircuitName,
@@ -25,7 +26,7 @@ export function getVerificationKeyPath(
     options?: NodeResourceOptions
 ): string {
     const key = getCircuitKey(name, target);
-    return localResourcePath(`circuits/${key.vk}`, options);
+    return localResourcePath(`circuits/${key.vk}`, options, circuitResourcePin(name));
 }
 export function loadCircuit(name: CircuitName, options?: NodeResourceOptions): CompiledCircuit {
     const metadata = getCircuitMetadata(name),
@@ -56,7 +57,10 @@ export async function loadCircuitAsync(
     signal?: AbortSignal
 ): Promise<CompiledCircuit> {
     getCircuitMetadata(name);
-    const bytes = await nodeResources(options).load(`circuits/${name}.json`, signal);
+    const bytes = await nodeResources(options, circuitResourcePin(name)).load(
+        `circuits/${name}.json`,
+        signal
+    );
     const circuit = JSON.parse(
         new TextDecoder("utf8", { fatal: true }).decode(bytes)
     ) as CompiledCircuit;
@@ -70,7 +74,10 @@ export async function loadVerificationKeyAsync(
     signal?: AbortSignal
 ): Promise<Uint8Array> {
     const key = getCircuitKey(name, target),
-        bytes = await nodeResources(options).load(`circuits/${key.vk}`, signal);
+        bytes = await nodeResources(options, circuitResourcePin(name)).load(
+            `circuits/${key.vk}`,
+            signal
+        );
     if (createHash("sha256").update(bytes).digest("hex") !== key.vkSha256)
         throw new Error("Verification key identity mismatch");
     return bytes;

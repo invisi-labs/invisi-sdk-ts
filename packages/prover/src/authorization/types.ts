@@ -6,7 +6,7 @@ import {
 } from "@invisi-labs/primitives";
 import { type ProofTarget } from "../index";
 import type {
-    CreateCreditParams,
+    CreditCreationParams,
     CreditDrawParams,
     Delivery,
     Hex,
@@ -40,10 +40,14 @@ export interface TransactWitnessParams extends Omit<
 }
 
 export interface CreateCreditWitnessParams {
-    params: CreateCreditParams;
+    params: CreditCreationParams;
     deliveries: readonly Delivery[];
     state: CreditDeliveryState;
     authorization: AuthorizedStatement;
+    firstDraw?: {
+        initialAvailableCredit: bigint;
+        output: Note;
+    };
 }
 export interface DrawCreditWitnessParams {
     timestamp: bigint;

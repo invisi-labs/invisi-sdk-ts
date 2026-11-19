@@ -198,3 +198,39 @@ it("decodes packed atomic batch output deliveries with their explicit tokens", (
         )
     ).toThrow(/trailing/);
 });
+
+it("recovers the first draw Note only with its adjacent CreditCreated in the same receipt", () => {
+    const creditCommitment = vectors.credit.commitment,
+        noteCommitment = vectors.note.commitment;
+    const create: DeliveryEventLog = {
+        ...meta,
+        logIndex: 2,
+        eventName: "CreditCreated",
+        args: {
+            token,
+            outputTreeId: 1n,
+            leafIndex: 0,
+            creditCommitment,
+            deliveries: [owner, spender],
+        },
+    };
+    const first: DeliveryEventLog = {
+        ...meta,
+        logIndex: 3,
+        eventName: "CreditFirstDraw",
+        args: {
+            outputTreeId: 1n,
+            noteLeafIndex: 1,
+            noteCommitment,
+            creditCommitment,
+            delivery: note,
+        },
+    };
+    const insertion = inserted([creditCommitment, noteCommitment]);
+    expect(
+        extractDeliveryCandidates([insertion, create, first], context, 12n).map((v) => v.role)
+    ).toEqual(["owner", "spender", "funds"]);
+    expect(() => extractDeliveryCandidates([insertion, first], context, 12n)).toThrow(
+        /matching Credit/
+    );
+});

@@ -52,6 +52,7 @@ The App decryptor must authenticate the ciphertext (including the AEAD tag) befo
 - `01-address-registry`: initial registration and update, with external EVM authorization.
 - `02-transparent-amount`: offline Note output construction, shield one or nine outputs, registered-address lookup, explicit chain lookup, external funding signature, and memo.
 - `03-hidden-amount`: cash plus change, notes plus cash, three recipients, full owner withdrawal, partial public withdrawal plus private output/change, third-party owner sweep, and four-member two-party aggregation. Full owner sweeps require proof but no private spending authorization. Other transfers request authorization when their prepared preview requires it.
+- Run `pnpm --filter @invisi-examples/scenarios example:credit:first-draw --execute` against a Core deployment with first-draw support. This exports a transaction after one owner signature; it does not approve tokens or broadcast.
 - `04-credit`: independent owner grants, batch draws, current-state policy/balance update, and public owner revocation. Principal remains with the owner until draw.
 - `05-wallet-session`: encrypted SQLite restoration, explicit refresh batches, persisted Note and Credit preparation, grant reservations, and operation reconciliation. There is no injected private executor or automatic signer.
 - `07-broadcaster`: concrete-transaction estimation, one common prepare/quote/relay submission flow, tracking confirmation and self-submitted source proofs. Both use Session inventory discovery and automatic selection.

@@ -1,3 +1,4 @@
+import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import {
     Wallet,
     computeCreditCommitment,
@@ -9,7 +10,7 @@ import { Interface, Wallet as EvmWallet } from "ethers";
 import { it, expect, vi } from "vitest";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
-const iface = new Interface(invisiCoreAbi);
+const iface = new Interface([...invisiCoreAbi, ...legacyCreateCreditAbi]);
 async function creditSetup(
     policy: Partial<
         import("@invisi-labs/primitives").CreditPolicy &
@@ -531,4 +532,55 @@ it("schedules, submits and cancels all four detached Credit operations through o
         expect(handles.at(-1)?.id).toBe("opaque-credit-job");
         expect((await client.cancel(ready)).state).toBe("cancelled");
     }
+});
+
+it("prepares an atomic first draw and requires only the owner signature", async () => {
+    const h = await creditSetup();
+    const prepared = await h.invisi.prepareCreateCredit({
+        ...h.identity,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+        availableCredit: 10n,
+        dailyLimit: 10n,
+        monthlyLimit: 10n,
+        firstDraw: { amount: 7n },
+        fee: { recipient: h.wallet.ownerAddress, amount: 1n },
+    });
+    expect(prepared.preview()).toMatchObject({
+        creditFirstDraw: { grossAmount: 7n, netAmount: 6n, feeAmount: 1n },
+        creditOutputs: [{ availableCredit: 3n, dailySpent: 7n, monthlySpent: 7n, totalSpent: 7n }],
+        outputs: [{ amount: 6n }],
+    });
+    const request = await prepared.exportWalletAuthorization();
+    const owner = new EvmWallet(`0x${"01".repeat(32)}`);
+    const spender = new EvmWallet(`0x${"02".repeat(32)}`);
+    await expect(externallyAuthorize(prepared, spender)).rejects.toThrow(
+        /invalid wallet authorization/
+    );
+    const ready = await (await externallyAuthorize(prepared, owner)).prove();
+    const decoded = iface.parseTransaction(await ready.exportTransaction())!;
+    expect(decoded.args[1].hasFirstDraw).toBe(true);
+    expect(decoded.args[1].totalAmount).toBe(7n);
+    expect(decoded.args[2]).toHaveLength(3);
+    expect(h.prover.prove).toHaveBeenCalledWith(
+        expect.objectContaining({
+            circuitName: "create_credit_and_draw",
+            expectedPublicInputs: expect.arrayContaining([expect.any(String)]),
+        }),
+        expect.anything()
+    );
+});
+it("rejects a separate first draw recipient before preparing a transaction", async () => {
+    const h = await creditSetup();
+    await expect(
+        h.invisi.prepareCreateCredit({
+            ...h.identity,
+            spender: h.bob.getAddress(),
+            expiry: 2000003600n,
+            availableCredit: 10n,
+            firstDraw: { amount: 7n, recipient: h.wallet.getAddress() } as unknown as {
+                amount: bigint;
+            },
+        })
+    ).rejects.toThrow(/unsupported first draw option/);
 });

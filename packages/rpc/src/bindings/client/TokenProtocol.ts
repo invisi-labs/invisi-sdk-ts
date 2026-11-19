@@ -100,11 +100,19 @@ export class TokenProtocol {
         };
     }
 
-    createCredit(request: Omit<BuildCreateCreditCalldataParams, "context">) {
+    createCredit(
+        request: Omit<BuildCreateCreditCalldataParams, "context"> & { timestamp?: bigint }
+    ) {
         return {
             to: this.context.protocolAddress,
             value: 0n,
-            ...buildCreateCreditCalldata({ ...request, context: this.context }),
+            ...buildCreateCreditCalldata({
+                ...request,
+                context: {
+                    ...this.context,
+                    ...(request.timestamp !== undefined ? { timestamp: request.timestamp } : {}),
+                },
+            }),
         };
     }
 

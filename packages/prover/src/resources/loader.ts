@@ -1,4 +1,4 @@
-import { PROVER_ASSET_BASE_URL, PROVER_ASSET_INDEX_SHA256 } from "./pin";
+import { PROVER_ASSET_INDEX_SHA256 } from "./pin";
 export interface ResourceCache {
     get(
         key: string,
@@ -102,7 +102,9 @@ export class ResourceLoader {
             throw new Error("Invalid resource timeout");
         this.#options = { ...options, timeoutMs: timeout };
         this.#pin = pin;
-        this.#bases = [...(options.baseUrls ?? [PROVER_ASSET_BASE_URL])].map((base) => {
+        this.#bases = [
+            ...(options.baseUrls ?? [`https://assets.invisipay.fi/prover/sets/${pin}/`]),
+        ].map((base) => {
             const url = new URL(base);
             if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash)
                 throw new Error("Invalid prover resource source");

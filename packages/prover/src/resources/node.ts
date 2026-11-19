@@ -41,6 +41,7 @@ class DiskCache implements ResourceCache {
         options?: { maxBytes: number; signal: AbortSignal }
     ): Promise<Uint8Array | undefined> {
         for (const path of [
+            directory(this.options) && join(directory(this.options)!, key),
             directory(this.options) && join(directory(this.options)!, fileName(key)),
             join(resourceCacheDir(this.options), key),
         ].filter(Boolean) as string[]) {
@@ -86,32 +87,45 @@ export function nodeResourceOptions(options: NodeResourceOptions = {}): NodeReso
     };
 }
 const defaults: NodeResourceOptions = {};
-const loaders = new WeakMap<NodeResourceOptions, ResourceLoader>();
-export function nodeResources(options: NodeResourceOptions = defaults): ResourceLoader {
-    let loader = loaders.get(options);
+const loaders = new WeakMap<NodeResourceOptions, Map<string, ResourceLoader>>();
+export function nodeResources(
+    options: NodeResourceOptions = defaults,
+    pin = PROVER_ASSET_INDEX_SHA256
+): ResourceLoader {
+    let byPin = loaders.get(options);
+    if (!byPin) loaders.set(options, (byPin = new Map()));
+    let loader = byPin.get(pin);
     if (!loader) {
-        loader = new ResourceLoader({
-            ...options,
-            offline: options.offline ?? process.env.INVISI_PROVER_OFFLINE === "1",
-            cache: options.cache ?? new DiskCache(options),
-        });
-        loaders.set(options, loader);
+        loader = new ResourceLoader(
+            {
+                ...options,
+                offline: options.offline ?? process.env.INVISI_PROVER_OFFLINE === "1",
+                cache: options.cache ?? new DiskCache(options),
+            },
+            pin
+        );
+        byPin.set(pin, loader);
     }
     return loader;
 }
 /** Synchronous helpers only read already provisioned or cached resources. */
-export function localResourcePath(logical: string, options: NodeResourceOptions = {}): string {
+export function localResourcePath(
+    logical: string,
+    options: NodeResourceOptions = {},
+    pin = PROVER_ASSET_INDEX_SHA256
+): string {
     resourcePath(logical);
     const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
     let index: Uint8Array | undefined;
     for (const path of [
+        directory(options) && join(directory(options)!, `${pin}.index.json`),
         directory(options) && join(directory(options)!, "index.json"),
-        join(resourceCacheDir(options), `${PROVER_ASSET_INDEX_SHA256}.index.json`),
+        join(resourceCacheDir(options), `${pin}.index.json`),
     ].filter(Boolean) as string[]) {
         try {
             if (statSync(path).size > 2 * 1024 * 1024) continue;
             const bytes = readFileSync(path);
-            if (digest(bytes) === PROVER_ASSET_INDEX_SHA256) {
+            if (digest(bytes) === pin) {
                 index = bytes;
                 break;
             }

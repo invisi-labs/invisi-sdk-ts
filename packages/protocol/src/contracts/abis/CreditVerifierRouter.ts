@@ -15,11 +15,24 @@ export const creditVerifierRouterAbi = [
             },
             {
                 "name": "creditVerifiers",
-                "type": "address[15]",
-                "internalType": "contract IVerifier[15]",
+                "type": "address[16]",
+                "internalType": "contract IVerifier[16]",
             },
         ],
         "stateMutability": "nonpayable",
+    },
+    {
+        "type": "function",
+        "name": "createCreditAndDrawVerifier",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "contract IVerifier",
+            },
+        ],
+        "stateMutability": "view",
     },
     {
         "type": "function",
@@ -225,6 +238,19 @@ export const creditVerifierRouterAbi = [
                 "name": "",
                 "type": "address",
                 "internalType": "contract CrossTreeVerifierRegistry",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "getCreateCreditAndDrawVerifier",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "contract IVerifier",
             },
         ],
         "stateMutability": "view",

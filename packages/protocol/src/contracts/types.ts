@@ -69,6 +69,13 @@ export interface CreateCreditParams {
     feeRecipient?: Address;
     feeAmount?: bigint;
 }
+/** Omit hasFirstDraw to use the legacy deployed ABI. Set false for pure creation on the new ABI. */
+export type CreditCreationParams = CreateCreditParams &
+    (
+        | { hasFirstDraw?: undefined; totalAmount?: never; noteCommitment?: never }
+        | { hasFirstDraw: false; totalAmount?: 0n; noteCommitment?: Hex }
+        | { hasFirstDraw: true; totalAmount: bigint; noteCommitment: Hex }
+    );
 export interface CreditPayer {
     payer: Address;
     amount: bigint;

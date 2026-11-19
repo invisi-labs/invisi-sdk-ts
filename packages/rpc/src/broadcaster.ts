@@ -1,3 +1,4 @@
+import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { provenanceIntentHash } from "@invisi-labs/primitives";
 import type { ProofSidecar } from "@invisi-labs/protocol/provenance";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
@@ -103,9 +104,10 @@ const intentAbi = invisiCoreAbi.filter(
     (item) =>
         item.type === "function" &&
         supportedMethods.includes(item.name) &&
+        item.name !== "createCredit" &&
         (item.name !== "transact" || item.inputs[1]?.type === "tuple")
 );
-export const broadcasterTransactInterface = new Interface(intentAbi);
+export const broadcasterTransactInterface = new Interface([...intentAbi, ...legacyCreateCreditAbi]);
 /** Decode a canonical supported direct public intent. Registry and aggregates are excluded. */
 export function decodeBroadcasterIntent(data: string) {
     const parsed = broadcasterTransactInterface.parseTransaction({ data });

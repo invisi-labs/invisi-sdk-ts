@@ -1,20 +1,25 @@
+import { hasFirstDrawTestResources } from "../testing/resource-options";
 import { poseidonHash } from "@invisi-labs/primitives";
 import { AGGREGATE_ROUTES } from "@invisi-labs/protocol";
 import { describe, it, expect } from "vitest";
 import { getCircuitKey, getCircuitMetadata } from "../proofs/proof-data";
 import { CIRCUIT_NAMES, loadCircuit, loadVerificationKey } from "./circuits";
 describe("current authenticated release", () => {
-    it.each(CIRCUIT_NAMES)("authenticates %s and its direct key", (name) => {
+    it.each(
+        CIRCUIT_NAMES.filter(
+            (name) => name !== "create_credit_and_draw" || hasFirstDrawTestResources
+        )
+    )("authenticates %s and its direct key", (name) => {
         const circuit = loadCircuit(name);
         expect(circuit.noir_version).toMatch(/^1\.0\.0\+/);
         expect(circuit.debug_symbols).toBeUndefined();
         expect(circuit.file_map).toBeUndefined();
         expect(loadVerificationKey(name).length).toBeGreaterThan(1000);
     });
-    it("publishes28 direct Note,34 aggregate and15 direct Credit circuits", () => {
+    it("publishes28 direct Note,34 aggregate and16 direct Credit circuits", () => {
         expect(CIRCUIT_NAMES.filter((n) => n.startsWith("transact_user_"))).toHaveLength(28);
         expect(CIRCUIT_NAMES.filter((n) => n.startsWith("transact_aggregate_"))).toHaveLength(34);
-        expect(CIRCUIT_NAMES.filter((n) => !n.startsWith("transact_"))).toHaveLength(15);
+        expect(CIRCUIT_NAMES.filter((n) => !n.startsWith("transact_"))).toHaveLength(16);
     });
     it("authenticates each C1..C10 native key and dedicated outer pin", async () => {
         for (let c = 1; c <= 10; c++) {

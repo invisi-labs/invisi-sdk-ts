@@ -80,7 +80,6 @@ export function request(mode: "payment" | "credit" = "payment"): unknown {
                       creditSharedKey: hash,
                   },
               }),
-        action: { type: "invisi_transaction" },
         createdAt: "2026-11-17T08:02:00Z",
         expiresAt: "2026-11-17T08:20:00Z",
         links: { credentials: { href: `${origin}/custom/hints`, method: "POST" } },

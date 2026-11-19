@@ -21,6 +21,7 @@ export interface InvisiWallet {
 const OPERATIONS = {
     transact: "Transact",
     "create-credit": "CreateCredit",
+    "create-credit-and-draw": "CreateCreditAndDraw",
     "credit-draw": "CreditDraw",
     "update-credit": "UpdateCredit",
 } as const;

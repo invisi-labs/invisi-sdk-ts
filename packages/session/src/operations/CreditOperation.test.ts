@@ -1,3 +1,4 @@
+import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
 import { it, expect } from "vitest";
@@ -14,7 +15,7 @@ import { fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
 import { backend } from "../../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
 import { WalletSession } from "../wallet/WalletSession";
-const iface = new Interface(invisiCoreAbi);
+const iface = new Interface([...invisiCoreAbi, ...legacyCreateCreditAbi]);
 async function creditFixture(
     changes: Partial<
         Pick<

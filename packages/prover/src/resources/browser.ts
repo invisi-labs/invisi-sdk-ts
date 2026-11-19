@@ -1,3 +1,4 @@
+import { PROVER_ASSET_INDEX_SHA256 } from "./pin";
 import { ResourceLoader, type ResourceCache, type ResourceOptions } from "./loader";
 export class BrowserCache implements ResourceCache {
     async get(
@@ -51,12 +52,20 @@ export class BrowserCache implements ResourceCache {
     }
 }
 const defaults: ResourceOptions = {};
-const loaders = new WeakMap<ResourceOptions, ResourceLoader>();
-export function browserResources(options: ResourceOptions = defaults): ResourceLoader {
-    let loader = loaders.get(options);
+const loaders = new WeakMap<ResourceOptions, Map<string, ResourceLoader>>();
+export function browserResources(
+    options: ResourceOptions = defaults,
+    pin = PROVER_ASSET_INDEX_SHA256
+): ResourceLoader {
+    let byPin = loaders.get(options);
+    if (!byPin) loaders.set(options, (byPin = new Map()));
+    let loader = byPin.get(pin);
     if (!loader) {
-        loader = new ResourceLoader({ ...options, cache: options.cache ?? new BrowserCache() });
-        loaders.set(options, loader);
+        loader = new ResourceLoader(
+            { ...options, cache: options.cache ?? new BrowserCache() },
+            pin
+        );
+        byPin.set(pin, loader);
     }
     return loader;
 }

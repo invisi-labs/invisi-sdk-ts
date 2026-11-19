@@ -1,4 +1,4 @@
-import { testResourceOptions } from "./testing/resource-options";
+import { testResourceOptions, hasFirstDrawTestResources } from "./testing/resource-options";
 import { describe, expect, it } from "vitest";
 import { loadCircuit, loadVerificationKey } from "./circuits/circuits";
 import {
@@ -8,7 +8,11 @@ import {
     loadVerificationKeyBrowser,
 } from "./wasm";
 describe("browser assets", () => {
-    it.each(CIRCUIT_NAMES)("matches authenticated Node assets for %s", async (name) => {
+    it.each(
+        CIRCUIT_NAMES.filter(
+            (name) => name !== "create_credit_and_draw" || hasFirstDrawTestResources
+        )
+    )("matches authenticated Node assets for %s", async (name) => {
         expect(await loadCircuitBrowser(name, testResourceOptions)).toEqual(loadCircuit(name));
         expect(await loadVerificationKeyBrowser(name, "evm", testResourceOptions)).toEqual(
             new Uint8Array(loadVerificationKey(name))

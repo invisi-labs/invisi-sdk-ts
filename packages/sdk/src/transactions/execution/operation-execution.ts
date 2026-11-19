@@ -6,7 +6,6 @@ import {
     walletAuthorizationTypedData,
 } from "@invisi-labs/primitives";
 import { WitnessBuilder } from "@invisi-labs/prover";
-import { type TokenProtocol } from "@invisi-labs/rpc";
 import type { Prover } from "@invisi-labs/prover";
 import { Signature, SigningKey, concat, getBytes, verifyTypedData } from "ethers";
 import type {
@@ -25,7 +24,6 @@ import { fundingTypedData } from "../signing/funding";
 import { authorizationRequest, statement } from "../signing/statement";
 
 export async function proveOperation(
-    protocol: TokenProtocol,
     plan: OperationPlan,
     authorization: AuthorizedStatement | undefined,
     prover: Prover,
@@ -53,7 +51,7 @@ export async function proveOperation(
             execution === "aggregate" ? "noir-recursive" : "evm"
         );
     }
-    const request = await witnessFor(protocol, plan, authorization);
+    const request = await witnessFor(plan, authorization);
     if (JSON.stringify({ ...request, witness: undefined }) !== JSON.stringify(plan.statement))
         throw new Error("prepared proof statement changed");
     try {

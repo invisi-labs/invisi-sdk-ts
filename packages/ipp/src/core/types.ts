@@ -2,6 +2,7 @@ import type { Option, PaymentReceipt, CreditReceipt } from "../methods/invisi/ty
 export type {
     Asset,
     CreditTerms,
+    InitialPaymentTerms,
     PaymentOption,
     CreditOption,
     Option,

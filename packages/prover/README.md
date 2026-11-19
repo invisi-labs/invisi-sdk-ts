@@ -32,3 +32,18 @@ runtime URL against the Core circuit index. No custom CDN is enabled by default.
 CRS parameters retain the upstream official CDN and fallback behavior.
 `resources.offline` only disables circuit/VK resource downloads: it does not make
 upstream WASM initialization or CRS access offline automatically.
+
+The atomic Credit first-draw circuit has a separate authenticated resource set.
+Until Core publishes it, build the set from the matching Core checkout and provision
+the two first-draw objects into your local cache:
+
+```sh
+# In invisi-core, after generating the release verifiers and keys:
+node scripts/prover-assets.mjs .tools/first-draw-assets
+
+# In invisi-sdk-ts:
+node scripts/sync-prover-assets.mjs --set first-draw --source ../invisi-core/.tools/first-draw-assets \
+  --path circuits/create_credit_and_draw.json --path circuits/create_credit_and_draw.evm.vk
+```
+
+Existing circuits keep using their original resource set.

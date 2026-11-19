@@ -15,6 +15,7 @@ export function estimateOperationGas(plan: OperationPlan, execution?: "direct" |
         plan.params?.feeAmount ??
         plan.shieldParams?.feeAmount ??
         0n;
+    if (credit?.creation?.hasFirstDraw) return estimateGas({ kind: "create-credit-and-draw" });
     if (credit?.draw) {
         query = {
             kind: "draw-credit",

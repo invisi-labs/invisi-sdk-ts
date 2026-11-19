@@ -105,7 +105,6 @@ export function parsePaymentRequest(value: unknown, origin?: string): Request {
             "requestId",
             "optionId",
             "status",
-            "action",
             "createdAt",
             "expiresAt",
             "links",
@@ -218,7 +217,10 @@ export function assertReceiptMatchesRequest(
     methodValidation(request.method).matchReceipt(receipt, request);
 }
 export function assertRequestLinksSafe(request: Request, token: string): void {
-    assertNoSecret(request.links.credentials.href, token);
-    for (const value of methodValidation(request.method).privateValues(request))
-        assertNoSecret(request.links.credentials.href, value);
+    const urls = [request.links.credentials.href];
+    for (const url of urls) {
+        assertNoSecret(url, token);
+        for (const value of methodValidation(request.method).privateValues(request))
+            assertNoSecret(url, value);
+    }
 }

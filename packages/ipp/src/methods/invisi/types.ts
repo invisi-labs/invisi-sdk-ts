@@ -5,7 +5,11 @@ export interface Asset {
     symbol: string;
     decimals: number;
 }
+export interface InitialPaymentTerms {
+    amount: string;
+}
 export interface CreditTerms {
+    initialPayment?: InitialPaymentTerms;
     spender: string;
     availableCredit: string;
     unlimited: boolean;
@@ -38,7 +42,14 @@ export interface PaymentReceipt {
 }
 export interface CreditReceipt extends PaymentReceipt {
     creditId: string;
-    creditStatus: "active";
+    creditStatus: "active" | "depleted";
+    initialPayment?: {
+        noteCommitment: string;
+        grossAmount: string;
+        netAmount: string;
+        feeAmount: string;
+        feeRecipient: string;
+    };
     owner: string;
     revocationShard: string;
     revocationSlot: number;
@@ -52,7 +63,6 @@ interface RequestBase {
     requestId: string;
     optionId: string;
     status: RequestStatus;
-    action: { type: "invisi_transaction" };
     createdAt: string;
     expiresAt: string;
     links: { credentials: Link<"POST"> };

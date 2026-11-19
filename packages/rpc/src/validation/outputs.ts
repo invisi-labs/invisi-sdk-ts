@@ -89,9 +89,14 @@ export async function parseNoteCandidates(
     for (const value of values) {
         const m = await metadata(canonical, value, range);
         if (
-            !["Shield", "Transact", "CrossTreeTransact", "BatchOutputs", "CreditDraw"].includes(
-                m.kind
-            )
+            ![
+                "Shield",
+                "Transact",
+                "CrossTreeTransact",
+                "BatchOutputs",
+                "CreditDraw",
+                "CreditFirstDraw",
+            ].includes(m.kind)
         )
             invalid("Credit state cannot appear in Note results");
         notes.push({ ...m, ...delivery(value, true) });

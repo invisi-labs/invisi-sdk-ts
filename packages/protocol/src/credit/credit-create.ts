@@ -2,12 +2,13 @@ import { normalizeFee } from "../fees/fee";
 import { AbiCoder, Interface, getAddress, isHexString, dataLength } from "ethers";
 import {
     computeWalletAuthorizationDigest,
+    creditPeriods,
     walletAuthorizationTypedData,
 } from "@invisi-labs/primitives";
 import {
     invisiCoreAbi,
     type Hex,
-    type CreateCreditParams,
+    type CreditCreationParams,
     type Delivery,
 } from "../contracts/index";
 import {
@@ -31,10 +32,13 @@ export const CREATE_CREDIT_FIELDS = [
     "deadline",
     "feeRecipient",
     "feeAmount",
+    "hasFirstDraw",
+    "totalAmount",
+    "noteCommitment",
 ] as const;
 export function validateCreateCreditRequest(
     c: TransactionContext,
-    p: CreateCreditParams,
+    p: CreditCreationParams,
     deliveries: readonly Delivery[]
 ) {
     known(p, CREATE_CREDIT_FIELDS);
@@ -50,10 +54,34 @@ export function validateCreateCreditRequest(
         !BigInt(creditCommitment)
     )
         throw Error("invalid Credit authority, token or commitment");
-    if (dense(deliveries, "deliveries").length !== 2) throw Error("deliveries count mismatch");
+    const firstDraw = p.hasFirstDraw === true;
+    const totalAmount = uint(p.totalAmount ?? 0n, 126, "totalAmount");
+    const noteCommitment = word(field(p.noteCommitment ?? word(0n)));
+    const fee = normalizeFee(p);
+    if (p.hasFirstDraw !== undefined && typeof p.hasFirstDraw !== "boolean")
+        throw Error("invalid first draw mode");
+    if (
+        !firstDraw &&
+        (totalAmount !== 0n ||
+            BigInt(noteCommitment) !== 0n ||
+            (p.hasFirstDraw === undefined &&
+                (p.totalAmount !== undefined || p.noteCommitment !== undefined)))
+    )
+        throw Error("first draw fields are not valid for pure or legacy creation");
+    if (
+        firstDraw &&
+        (totalAmount <= fee.feeAmount || !BigInt(noteCommitment) || c.timestamp === undefined)
+    )
+        throw Error("first draw requires a positive net amount, a Note commitment and a timestamp");
+    if (firstDraw && noteCommitment === creditCommitment)
+        throw Error("duplicate output commitment");
+    if (dense(deliveries, "deliveries").length !== (firstDraw ? 3 : 2))
+        throw Error("deliveries count mismatch");
     return {
         ...ctx,
-        ...normalizeFee(p),
+        ...fee,
+        totalAmount,
+        noteCommitment,
         owner,
         revocationShard,
         revocationSlot,
@@ -64,7 +92,7 @@ export function validateCreateCreditRequest(
 }
 export function createCreditBaseInputs(
     c: TransactionContext,
-    p: CreateCreditParams,
+    p: CreditCreationParams,
     d: readonly Delivery[]
 ) {
     const r = validateCreateCreditRequest(c, p, d),
@@ -82,11 +110,19 @@ export function createCreditBaseInputs(
         h & ((1n << 128n) - 1n),
         BigInt(r.feeRecipient),
         r.feeAmount,
+        ...(p.hasFirstDraw
+            ? [
+                  BigInt(r.noteCommitment),
+                  r.totalAmount,
+                  creditPeriods(c.timestamp!).currentDay,
+                  creditPeriods(c.timestamp!).currentMonth,
+              ]
+            : []),
     ].map(word);
 }
 export function authorizedCreditInputs(
     c: TransactionContext,
-    operation: "create-credit" | "credit-draw" | "update-credit",
+    operation: "create-credit" | "create-credit-and-draw" | "credit-draw" | "update-credit",
     capacity: number,
     base: readonly Hex[]
 ) {
@@ -100,21 +136,24 @@ export function authorizedCreditInputs(
     );
     return [...base, word(digest >> 128n), word(digest & ((1n << 128n) - 1n))];
 }
+export function createCreditOperation(p: CreditCreationParams) {
+    return p.hasFirstDraw ? "create-credit-and-draw" : "create-credit";
+}
 export function createCreditPublicInputs(
     c: TransactionContext,
-    p: CreateCreditParams,
+    p: CreditCreationParams,
     d: readonly Delivery[]
 ) {
-    return authorizedCreditInputs(c, "create-credit", 1, createCreditBaseInputs(c, p, d));
+    return authorizedCreditInputs(c, createCreditOperation(p), 1, createCreditBaseInputs(c, p, d));
 }
 export function encodeCreateCreditTypedData(
     c: TransactionContext,
-    p: CreateCreditParams,
+    p: CreditCreationParams,
     d: readonly Delivery[]
 ) {
     return walletAuthorizationTypedData({
         context: { chainId: c.chainId, protocolAddress: BigInt(c.protocolAddress) },
-        operation: "create-credit",
+        operation: createCreditOperation(p),
         capacity: 1,
         words: createCreditBaseInputs(c, p, d).map(BigInt),
     });
@@ -126,20 +165,40 @@ export function encodeCreditProof(proof: Hex): Hex {
 export interface BuildCreateCreditCalldataParams {
     context: TransactionContext;
     proof: Hex;
-    params: CreateCreditParams;
+    params: CreditCreationParams;
     deliveries: readonly Delivery[];
+}
+export const legacyCreateCreditAbi = [
+    "function createCredit(bytes proof,(address token,address owner,uint64 revocationShard,uint16 revocationSlot,bytes32 creditCommitment,uint256 deadline,address feeRecipient,uint256 feeAmount) p,(bytes ciphertext,bytes clue)[] deliveries)",
+] as const;
+const legacyCreateCredit = new Interface(legacyCreateCreditAbi);
+const currentCreateCredit = new Interface(invisiCoreAbi);
+export function encodeCreateCreditCall(
+    p: CreditCreationParams,
+    encodedProof: Hex,
+    d: readonly Delivery[]
+) {
+    const args = { ...p, ...normalizeFee(p) };
+    return (
+        p.hasFirstDraw === undefined ? legacyCreateCredit : currentCreateCredit
+    ).encodeFunctionData("createCredit", [
+        encodedProof,
+        p.hasFirstDraw === undefined
+            ? args
+            : {
+                  ...args,
+                  totalAmount: p.totalAmount ?? 0n,
+                  noteCommitment: p.noteCommitment ?? word(0n),
+              },
+        d,
+    ]) as Hex;
 }
 export function buildCreateCreditCalldata(p: BuildCreateCreditCalldataParams) {
     const r = validateCreateCreditRequest(p.context, p.params, p.deliveries);
+    const amount = p.params.hasFirstDraw ? r.totalAmount : r.feeAmount;
     return {
-        data: new Interface(invisiCoreAbi).encodeFunctionData("createCredit", [
-            encodeCreditProof(p.proof),
-            { ...p.params, ...normalizeFee(p.params) },
-            p.deliveries,
-        ]) as Hex,
-        approveAmount: r.feeAmount,
-        approvalRequirements: r.feeAmount
-            ? [{ token: r.tokenAddress, payer: r.owner, amount: r.feeAmount }]
-            : [],
+        data: encodeCreateCreditCall(p.params, encodeCreditProof(p.proof), r.deliveries),
+        approveAmount: amount,
+        approvalRequirements: amount ? [{ token: r.tokenAddress, payer: r.owner, amount }] : [],
     };
 }

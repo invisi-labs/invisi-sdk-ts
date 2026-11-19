@@ -1,3 +1,4 @@
+import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { it, expect } from "vitest";
 import {
     Wallet,
@@ -107,9 +108,10 @@ real(
                 ),
                 ready = await (await externallyAuthorize(prepared, signer)).prove(prover);
             expect(ready.exportProof().proofHex.length).toBeGreaterThan(1000);
-            const decoded = new Interface(invisiCoreAbi).parseTransaction(
-                await ready.exportTransaction()
-            )!;
+            const decoded = new Interface([
+                ...invisiCoreAbi,
+                ...legacyCreateCreditAbi,
+            ]).parseTransaction(await ready.exportTransaction())!;
             expect(decoded.args[1].feeAmount).toBe(3n);
             if (prepared === update)
                 expect(ready.preview().creditOutputs![0]!.availableCredit).toBe(110n);
@@ -130,4 +132,33 @@ real(
         }
     },
     600000
+);
+
+const firstDrawNative =
+    process.env.BB_BINARY_PATH && process.env.INVISI_TEST_FIRST_DRAW === "1" ? it : it.skip;
+firstDrawNative(
+    "proves an SDK-prepared atomic first draw with only the owner signing",
+    async () => {
+        const h = await setup();
+        const prepared = await h.invisi.prepareCreateCredit({
+            wallet: Wallet.fromAddress(h.wallet.getAddress()),
+            protocol: h.protocol,
+            tokenAddress: h.context.tokenAddress,
+            spender: h.bob.getAddress(),
+            expiry: 2000003600n,
+            availableCredit: 10n,
+            firstDraw: { amount: 7n },
+        });
+        const prover = new (await import("@invisi-labs/prover/native")).NativeProver({
+            bbBin: process.env.BB_BINARY_PATH!,
+            threads: 4,
+            resources: { offline: true },
+        });
+        const ready = await (await externallyAuthorize(prepared)).prove(prover);
+        const tx = new Interface(invisiCoreAbi).parseTransaction(await ready.exportTransaction())!;
+        expect(tx.args[1].hasFirstDraw).toBe(true);
+        expect(tx.args[2]).toHaveLength(3);
+        expect(ready.preview().creditOutputs?.[0]?.availableCredit).toBe(3n);
+    },
+    60_000
 );

@@ -1,7 +1,7 @@
 import { mapPreparation } from "../transactions/preparation/parallel";
 import { NoteOutput } from "../notes/NoteOutput";
 import type {
-    CreateCreditParams,
+    CreditCreationParams,
     Delivery,
     Hex,
     InputSource,
@@ -193,6 +193,8 @@ export class CreditPreparation<Result> {
                     "dailyLimit",
                     "monthlyLimit",
                     "creditSharedKey",
+                    "firstDraw",
+                    "creationAbi",
                     "availableCredit",
                     "unlimited",
                     "tokenAddress",
@@ -223,50 +225,95 @@ export class CreditPreparation<Result> {
                 { field: "wallet" }
             ),
         ]);
+        if (
+            options.creationAbi !== undefined &&
+            !["legacy", "first-draw"].includes(options.creationAbi)
+        )
+            throw Error("unsupported Credit creation ABI");
+        if (options.firstDraw && options.creationAbi === "legacy")
+            throw Error("first draw requires the new Credit creation ABI");
+        const fee = this.fee(options);
+        const initialAvailableCredit = options.availableCredit ?? 0n;
+        const initial: CreditDeliveryState["note"] = {
+            chainId: frame.context.chainId,
+            protocolAddress: BigInt(frame.context.protocolAddress),
+            tokenAddress: BigInt(frame.context.tokenAddress),
+            ownerWalletIdentity: this.runtime.scope.ownerAddress,
+            spenderWalletIdentity: spender.ownerAddress,
+            revocationShard: allocation.shard,
+            revocationSlot: BigInt(allocation.slot),
+            ...normalizeCreditPolicy(options),
+            availableCredit: options.availableCredit === undefined ? 0n : options.availableCredit,
+            unlimited: options.unlimited === undefined ? false : options.unlimited,
+            payload: copyApplicationPayload(options.payload),
+            expiry,
+            nonce: generateNonce(),
+            creditSharedKey: options.creditSharedKey ?? generateCreditSharedKey(),
+        };
+        const firstDraw = options.firstDraw;
+        if (firstDraw && Object.keys(firstDraw).some((key) => !["amount", "payload"].includes(key)))
+            throw Error("unsupported first draw option");
+        const totalAmount = firstDraw ? positiveAmount(firstDraw.amount, 126) : 0n;
+        if (firstDraw && totalAmount <= fee.feeAmount)
+            throw Error("first draw must leave a positive Note");
+        const ordinary = firstDraw
+            ? await this.#prepare.output(
+                  await NoteOutput.create({
+                      chainId: frame.context.chainId,
+                      protocolAddress: frame.context.protocolAddress,
+                      tokenAddress: frame.context.tokenAddress,
+                      amount: totalAmount - fee.feeAmount,
+                      recipient: { type: "invisi", address: options.spender },
+                      payload: copyApplicationPayload(firstDraw.payload),
+                  }),
+                  frame.context,
+                  false
+              )
+            : undefined;
+        if (ordinary && !ordinary.note)
+            throw Error("first draw requires an encrypted Note recipient");
         const output = await this.seal(
             {
-                note: {
-                    chainId: frame.context.chainId,
-                    protocolAddress: BigInt(frame.context.protocolAddress),
-                    tokenAddress: BigInt(frame.context.tokenAddress),
-                    ownerWalletIdentity: this.runtime.scope.ownerAddress,
-                    spenderWalletIdentity: spender.ownerAddress,
-                    revocationShard: allocation.shard,
-                    revocationSlot: BigInt(allocation.slot),
-                    ...normalizeCreditPolicy(options),
-                    availableCredit:
-                        options.availableCredit === undefined ? 0n : options.availableCredit,
-                    unlimited: options.unlimited === undefined ? false : options.unlimited,
-                    payload: copyApplicationPayload(options.payload),
-                    expiry,
-                    nonce: generateNonce(),
-                    creditSharedKey: options.creditSharedKey ?? generateCreditSharedKey(),
-                },
+                note: ordinary
+                    ? { ...initial, ...applyCreditDrawUsage(initial, totalAmount, frame.timestamp) }
+                    : initial,
                 ownerReceivingKeys: owner.getReceivingKeys(),
                 spenderReceivingKeys: spender.getReceivingKeys(),
             },
             frame
         );
         const plan = this.base(frame, "create-credit"),
-            params = {
+            params: CreditCreationParams = {
                 token: frame.context.tokenAddress,
                 owner: this.runtime.scope.ownerAddress,
                 revocationShard: allocation.shard,
                 revocationSlot: BigInt(allocation.slot),
                 creditCommitment: output.commitment,
                 deadline: frame.deadline,
-                ...this.fee(options),
+                ...fee,
+                ...(ordinary
+                    ? {
+                          hasFirstDraw: true as const,
+                          totalAmount,
+                          noteCommitment: ordinary.commitment,
+                      }
+                    : options.creationAbi === "first-draw"
+                      ? { hasFirstDraw: false as const }
+                      : {}),
             };
+        const deliveries = ordinary ? [...output.deliveries, ordinary.delivery] : output.deliveries;
         plan.capacity = 1;
+        if (ordinary) plan.outputs = [ordinary];
         plan.credit = {
             inputs: [],
             outputs: [output],
-            deliveries: output.deliveries,
+            deliveries,
             creation: params,
+            ...(ordinary ? { firstDrawInitialAvailableCredit: initialAvailableCredit } : {}),
         };
         plan.statement = WitnessBuilder.statement(
-            "create_credit",
-            createCreditPublicInputs(frame.context, params, output.deliveries)
+            ordinary ? "create_credit_and_draw" : "create_credit",
+            createCreditPublicInputs(frame.context, params, deliveries)
         );
         await this.#prepare.assertBlock(frame);
         return this.runtime.complete(plan);
