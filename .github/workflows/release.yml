@@ -25,7 +25,7 @@ jobs:
       ref: ${{ github.sha }}
   release:
     needs: [previous, verify]
-    if: always() && needs.previous.result == 'success' && (needs.verify.result == 'success' || (needs.verify.result == 'skipped' && needs.previous.outputs.verified == 'true'))
+    if: ${{ !cancelled() && needs.previous.result == 'success' && (needs.verify.result == 'success' || (needs.verify.result == 'skipped' && needs.previous.outputs.verified == 'true')) }}
     permissions:
       contents: write
       id-token: write

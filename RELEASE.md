@@ -42,3 +42,5 @@ its matching version. Release retries update the same body from the same source.
 Push checks run on `develop` and `main`; pull requests targeting either branch remain checked. `main` reuses successful `develop` push CI only for the identical commit SHA. Tag releases reuse successful `develop` or `main` push CI for that exact SHA; otherwise they run verification before release. Running, cancelled, skipped and failed results are never accepted. API failures block release instead of granting reuse. New merge commits require their own checks. Publishing remains tag-only, with package/archive validation retained. Branch pushes do not create releases.
 
 New npm publications wait for registry metadata and the tarball to become available, then verify package identity, version, metadata integrity and downloaded SHA-512 before continuing. Native/WASM CI runs only the backend proof cases in its second test pass; source formatting runs once.
+
+Release jobs require `!cancelled()` as well as successful verification. Cancelling a workflow therefore also cancels publication work; completed registry writes remain immutable.
