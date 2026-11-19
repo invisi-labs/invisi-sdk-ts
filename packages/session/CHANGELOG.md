@@ -1,5 +1,10 @@
 # @invisi-labs/session
 
+## 1.3.0
+
+- Recover unified Note settlements and separate Credit state transitions without double-counting outputs.
+- Validate the full initial-payment debit against owner balance and allowance before submission.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

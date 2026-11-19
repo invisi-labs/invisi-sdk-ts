@@ -1,5 +1,10 @@
 # @invisi-labs/sdk
 
+## 1.3.0
+
+- Support optional owner-authorized initial payment when creating Credit, with gross funding, merchant net Note and UTC-period validation.
+- Align transaction discovery, calldata, previews and Gas estimates with the redeployed Core contracts.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

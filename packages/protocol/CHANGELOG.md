@@ -1,5 +1,10 @@
 # @invisi-labs/protocol
 
+## 1.3.0
+
+- Adopt unified Note settlement events and CreditDraw/CreditStateTransition, with canonical operation IDs and insertion-range validation.
+- Refresh measured Note, Credit and optional initial-payment gas data; keep unsupported aggregate estimates explicit.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

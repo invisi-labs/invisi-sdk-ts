@@ -1,5 +1,10 @@
 # @invisi-labs/rpc
 
+## 1.3.0
+
+- Recognize NoteOutputs, CreditDraw and CreditStateTransition in authenticated Note and Credit discovery.
+- Align current contract bindings while preserving explicitly supported legacy creation codecs.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

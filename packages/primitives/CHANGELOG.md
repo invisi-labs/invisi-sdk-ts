@@ -1,5 +1,9 @@
 # @invisi-labs/primitives
 
+## 1.3.0
+
+- Recognize owner-only Credit initial-payment authorization with the combined statement domain.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

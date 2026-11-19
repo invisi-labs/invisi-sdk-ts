@@ -1,5 +1,9 @@
 # @invisi-labs/vue
 
+## 1.3.0
+
+- Align the Vue adapter with the SDK 1.3.0 cohort and updated managed Note/Credit flows.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

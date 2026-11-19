@@ -1,5 +1,10 @@
 # @invisi-labs/ipp
 
+## 1.3.0
+
+- Add optional credit.initialPayment.amount and verified initial-payment receipt metadata, preserving frozen net terms.
+- Remove the Invisi action field; select execution from method, mode and immutable request terms.
+
 ## 1.2.7
 
 - Release with the SDK 1.2.7 package group, which includes the Barretenberg WASM SRS sizing fix.

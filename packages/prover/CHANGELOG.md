@@ -1,5 +1,10 @@
 # @invisi-labs/prover
 
+## 1.3.0
+
+- Add the 18-input combined Credit initial-payment circuit using an independently pinned, lazily loaded resource set.
+- Keep the existing circuit resource set and authenticated local directory, offline and cache behavior.
+
 ## 1.2.7
 
 - Align BN254 SRS point requests with Barretenberg 6.0 batch sizes for WASM proving, verification, and Provenance.
