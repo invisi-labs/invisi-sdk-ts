@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createWriteStream, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { Readable } from "node:stream";
@@ -29,6 +30,58 @@ export function publicationState(status, metadata, integrity, name, version) {
         `${name}@${version} already exists with different bytes`
     );
     return "skip";
+}
+
+export async function verifyPublishedArchive(
+    name,
+    version,
+    integrity,
+    {
+        fetchImpl = fetch,
+        delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        attempts = 12,
+    } = {}
+) {
+    const metadataUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const response = await fetchImpl(metadataUrl, { signal: AbortSignal.timeout(30000) });
+        if (response.status === 404 || response.status === 429 || response.status >= 500) {
+            if (attempt + 1 < attempts) {
+                await delay(5000);
+                continue;
+            }
+            throw new Error(`Registry propagation timed out: ${name}@${version}`);
+        }
+        const metadata = response.status === 200 ? await response.json() : null;
+        publicationState(response.status, metadata, integrity, name, version);
+        const url = new URL(metadata.dist.tarball);
+        assert(
+            url.protocol === "https:" && url.hostname === "registry.npmjs.org",
+            "Unexpected registry tarball origin"
+        );
+        const archive = await fetchImpl(url, { signal: AbortSignal.timeout(600000) });
+        if (archive.status === 404 || archive.status === 429 || archive.status >= 500) {
+            if (attempt + 1 < attempts) {
+                await delay(5000);
+                continue;
+            }
+            throw new Error(`Registry archive unavailable: ${name}@${version}`);
+        }
+        assert(
+            archive.ok && archive.body,
+            `Cannot download published archive: HTTP ${archive.status}`
+        );
+        const hash = createHash("sha512");
+        for await (const chunk of Readable.fromWeb(archive.body)) hash.update(chunk);
+        assert.equal(
+            `sha512-${hash.digest("base64")}`,
+            integrity,
+            "Published archive SHA-512 mismatch"
+        );
+        console.log(`Verified published ${name}@${version}: registry and downloaded archive match`);
+        return;
+    }
+    throw new Error(`Registry propagation timed out: ${name}@${version}`);
 }
 
 async function main() {
@@ -107,6 +160,7 @@ async function main() {
         ],
         { stdio: "inherit" }
     );
+    await verifyPublishedArchive(manifest.name, manifest.version, integrity);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
     await main();

@@ -79,7 +79,7 @@ jobs:
           SDK_BB_BIN="$PWD/packages/prover/node_modules/@aztec-foundation/bb.js/build/amd64-linux/bb"
           test -x "$SDK_BB_BIN"
           "$SDK_BB_BIN" --version
-          BB_BINARY_PATH="$SDK_BB_BIN" INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover exec vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+          BB_BINARY_PATH="$SDK_BB_BIN" INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover exec vitest run src/backends/backend-bb.test.ts src/backends/backend-wasm.test.ts src/backends/backend-service.test.ts -t "real BB6|real WASM/native interoperability|runs explicit native and WASM services" --maxWorkers=1 --minWorkers=1 --no-file-parallelism
 
       - name: Type check
-        run: pnpm lint
+        run: pnpm lint:english && pnpm check:boundaries && pnpm exec turbo run lint
