@@ -24,6 +24,7 @@ import {
     type TransactionContext,
 } from "../validation";
 export const CREATE_CREDIT_FIELDS = [
+    "creationAbi",
     "token",
     "owner",
     "revocationShard",
@@ -42,6 +43,10 @@ export function validateCreateCreditRequest(
     deliveries: readonly Delivery[]
 ) {
     known(p, CREATE_CREDIT_FIELDS);
+    if (p.creationAbi !== undefined && !["legacy", "initial-payment"].includes(p.creationAbi))
+        throw Error("unsupported Credit creation ABI");
+    if (p.creationAbi === "legacy" && p.hasInitialPayment !== undefined)
+        throw Error("initial payment fields are not valid for legacy creation");
     const ctx = normalizeContext(c),
         owner = getAddress(p.owner) as Hex,
         revocationShard = uint(p.revocationShard, 64, "revocationShard"),
@@ -180,15 +185,18 @@ export function encodeCreateCreditCall(
     encodedProof: Hex,
     d: readonly Delivery[]
 ) {
+    if (p.creationAbi === "legacy" && p.hasInitialPayment !== undefined)
+        throw Error("initial payment fields are not valid for legacy creation");
     const args = { ...p, ...normalizeFee(p) };
     return (
-        p.hasInitialPayment === undefined ? legacyCreateCredit : currentCreateCredit
+        p.creationAbi === "legacy" ? legacyCreateCredit : currentCreateCredit
     ).encodeFunctionData("createCredit", [
         encodedProof,
-        p.hasInitialPayment === undefined
+        p.creationAbi === "legacy"
             ? args
             : {
                   ...args,
+                  hasInitialPayment: p.hasInitialPayment ?? false,
                   totalAmount: p.totalAmount ?? 0n,
                   noteCommitment: p.noteCommitment ?? word(0n),
               },

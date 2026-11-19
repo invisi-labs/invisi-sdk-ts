@@ -622,3 +622,21 @@ it("pins the newest leaf root when refreshed inventory includes an older retaine
     expect(paths.length).toBeGreaterThan(1);
     expect(paths.every((p) => p.root === newest)).toBe(true);
 });
+
+it("checks the complete owner gross debit for atomic creation rather than only its fee", async () => {
+    const h = await synchronized();
+    const prepared = await h.session.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+        availableCredit: 20n,
+        initialPayment: { amount: 10n, netAmount: 7n },
+        fee: { recipient: h.bob.ownerAddress, amount: 3n },
+    });
+    h.reader.getTokenBalanceAllowance = async () => ({ balance: 9n, allowance: 10n });
+    await expect(prepared.validateSubmission()).rejects.toThrow(/balance/);
+    h.reader.getTokenBalanceAllowance = async () => ({ balance: 10n, allowance: 9n });
+    await expect(prepared.validateSubmission()).rejects.toThrow(/allowance/);
+    h.reader.getTokenBalanceAllowance = async () => ({ balance: 10n, allowance: 10n });
+    await expect(prepared.validateSubmission()).resolves.toBeUndefined();
+});

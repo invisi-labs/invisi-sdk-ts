@@ -60,6 +60,8 @@ export interface TransactRequest {
     funding: FundingParams;
 }
 export interface CreateCreditParams {
+    /** Current ABI by default; legacy deployments require explicit opt-in. */
+    creationAbi?: "legacy" | "initial-payment";
     token: Address;
     owner: Address;
     revocationShard: bigint;
@@ -69,7 +71,7 @@ export interface CreateCreditParams {
     feeRecipient?: Address;
     feeAmount?: bigint;
 }
-/** Omit hasInitialPayment to use the legacy deployed ABI. Set false for pure creation on the new ABI. */
+/** Pure creation uses the current ABI unless creationAbi is explicitly legacy. */
 export type CreditCreationParams = CreateCreditParams &
     (
         | { hasInitialPayment?: undefined; totalAmount?: never; noteCommitment?: never }

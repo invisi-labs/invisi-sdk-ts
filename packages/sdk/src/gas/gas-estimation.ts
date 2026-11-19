@@ -19,6 +19,8 @@ export function estimateOperationGas(plan: OperationPlan, execution?: "direct" |
         query = { kind: "create-credit-initial-payment" };
     } else if (credit?.creation?.hasInitialPayment === false) {
         query = { kind: "create-credit", creationAbi: "initial-payment" };
+    } else if (credit?.creation?.creationAbi === "legacy") {
+        query = { kind: "create-credit", creationAbi: "legacy" };
     } else if (credit?.draw) {
         query = {
             kind: "draw-credit",

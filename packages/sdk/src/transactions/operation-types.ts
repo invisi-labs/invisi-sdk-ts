@@ -103,10 +103,16 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
-    /** Select the new ABI for pure creation; initialPayment always uses the new ABI. */
+    /** Current ABI by default; select legacy only for an older deployment. */
     creationAbi?: "legacy" | "initial-payment";
     /** Gross debit includes the optional broadcaster fee; amount is in token base units. */
-    initialPayment?: { amount: bigint; payload?: Uint8Array };
+    initialPayment?: {
+        /** Gross owner debit, including the fee. */
+        amount: bigint;
+        /** Optional merchant net pin; amount must equal netAmount + fee. Preserved on quotes. */
+        netAmount?: bigint;
+        payload?: Uint8Array;
+    };
     /** Explicit grant correlation key; canonical nonzero field, preserved without derivation. */
     creditSharedKey?: bigint;
     fee?: { recipient: Address; amount: bigint };

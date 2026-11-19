@@ -35,7 +35,12 @@ describe("deferred Credit independent protocol vectors", () => {
             expect(words(context, f.params, f.deliveries)).toEqual(f.publicInputs);
             expect(typed(context, f.params, f.deliveries)).toEqual(f.typedData);
             expect(
-                build({ context, params: f.params, deliveries: f.deliveries, proof: "0x1234" }).data
+                build({
+                    context,
+                    params: key === "create" ? { ...f.params, creationAbi: "legacy" } : f.params,
+                    deliveries: f.deliveries,
+                    proof: "0x1234",
+                }).data
             ).toBe(f.calldata);
             expect(f.deliveries).toHaveLength(2);
         }

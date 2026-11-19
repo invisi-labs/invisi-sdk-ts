@@ -585,3 +585,72 @@ it("rejects a separate initial payment recipient before preparing a transaction"
         })
     ).rejects.toThrow(/unsupported initial payment option/);
 });
+
+it("defaults pure creation to the current selector and keeps explicit legacy opt-in", async () => {
+    const h = await creditSetup();
+    for (const creationAbi of [undefined, "initial-payment", "legacy"] as const) {
+        const prepared = await h.invisi.prepareCreateCredit({
+            ...h.identity,
+            spender: h.bob.getAddress(),
+            expiry: 2000003600n,
+            ...(creationAbi ? { creationAbi } : {}),
+        });
+        const intent = await prepared.exportBroadcasterIntent();
+        expect(intent.data.slice(0, 10)).toBe(
+            creationAbi === "legacy"
+                ? new Interface(legacyCreateCreditAbi).getFunction("createCredit")!.selector
+                : "0x00b6fa56"
+        );
+        const ready = await (await externallyAuthorize(prepared)).prove();
+        expect((await ready.exportTransaction()).data.slice(0, 10)).toBe(intent.data.slice(0, 10));
+    }
+});
+
+it("preserves a pinned merchant net while rebuilding gross usage and authorization on quotes", async () => {
+    const h = await creditSetup();
+    const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+    const prepared = await h.invisi.prepareCreateCredit({
+        ...h.identity,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+        availableCredit: 20n,
+        singleLimit: 12n,
+        initialPayment: { amount: 7n, netAmount: 7n },
+    });
+    let calls = 0;
+    const quoted = await quoteClient(h.context, () => (++calls === 1 ? 2n : 3n)).quote(prepared, {
+        maxFeeAmount: 4n,
+    });
+    expect(quoted.preview().outputs[0]!.amount).toBe(7n);
+    expect(quoted.preview().creditOutputs![0]).toMatchObject({
+        availableCredit: 10n,
+        totalSpent: 10n,
+        dailySpent: 10n,
+        monthlySpent: 10n,
+    });
+    expect(quoted.preview().creditInitialPayment).toMatchObject({
+        grossAmount: 10n,
+        feeAmount: 3n,
+        netAmount: 7n,
+    });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    const tx = new Interface(invisiCoreAbi).parseTransaction(await ready.exportTransaction())!;
+    expect(tx.args[1].toObject()).toMatchObject({
+        hasInitialPayment: true,
+        totalAmount: 10n,
+        feeAmount: 3n,
+    });
+    expect(tx.args[2]).toHaveLength(3);
+    await expect(
+        quoteClient(h.context, () => 6n).quote(prepared, { maxFeeAmount: 6n })
+    ).rejects.toThrow();
+    await expect(
+        h.invisi.prepareCreateCredit({
+            ...h.identity,
+            spender: h.bob.getAddress(),
+            expiry: 2000003600n,
+            availableCredit: 20n,
+            initialPayment: { amount: 8n, netAmount: 7n },
+        })
+    ).rejects.toThrow(/net|gross/);
+});

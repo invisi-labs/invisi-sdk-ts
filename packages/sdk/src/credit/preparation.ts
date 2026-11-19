@@ -253,10 +253,17 @@ export class CreditPreparation<Result> {
         const initialPayment = options.initialPayment;
         if (
             initialPayment &&
-            Object.keys(initialPayment).some((key) => !["amount", "payload"].includes(key))
+            Object.keys(initialPayment).some(
+                (key) => !["amount", "netAmount", "payload"].includes(key)
+            )
         )
             throw Error("unsupported initial payment option");
         const totalAmount = initialPayment ? positiveAmount(initialPayment.amount, 126) : 0n;
+        if (
+            initialPayment?.netAmount !== undefined &&
+            totalAmount !== positiveAmount(initialPayment.netAmount, 126) + fee.feeAmount
+        )
+            throw Error("initial payment gross amount must equal netAmount plus fee");
         if (initialPayment && totalAmount <= fee.feeAmount)
             throw Error("initial payment must leave a positive Note");
         const ordinary = initialPayment
@@ -300,9 +307,9 @@ export class CreditPreparation<Result> {
                           totalAmount,
                           noteCommitment: ordinary.commitment,
                       }
-                    : options.creationAbi === "initial-payment"
-                      ? { hasInitialPayment: false as const }
-                      : {}),
+                    : options.creationAbi === "legacy"
+                      ? { creationAbi: "legacy" as const }
+                      : { hasInitialPayment: false as const }),
             };
         const deliveries = ordinary ? [...output.deliveries, ordinary.delivery] : output.deliveries;
         plan.capacity = 1;

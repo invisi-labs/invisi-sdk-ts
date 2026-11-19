@@ -90,7 +90,7 @@ it("prepares initial payment to the frozen spender with the gross amount, withou
             initialPaymentFee: { recipient: address, amount: 1n },
         })
     ).toMatchObject({
-        initialPayment: { amount: 6n },
+        initialPayment: { amount: 6n, netAmount: 5n },
         creditSharedKey: BigInt(hash),
     });
     expect(
@@ -98,9 +98,9 @@ it("prepares initial payment to the frozen spender with the gross amount, withou
             now,
             initialPaymentFee: { recipient: address, amount: 2n },
         })
-    ).toMatchObject({ initialPayment: { amount: 7n } });
+    ).toMatchObject({ initialPayment: { amount: 7n, netAmount: 5n } });
     expect(await prepareInvisiRequest(r, target, { now })).toMatchObject({
-        initialPayment: { amount: 5n },
+        initialPayment: { amount: 5n, netAmount: 5n },
     });
     await expect(
         prepareInvisiRequest(r, target, {

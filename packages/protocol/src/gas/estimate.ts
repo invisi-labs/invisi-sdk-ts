@@ -61,7 +61,7 @@ export function estimateGas(query: GasShape): GasEstimate {
     const kind = query.kind;
     if (
         kind === "create-credit-initial-payment" ||
-        (kind === "create-credit" && query.creationAbi === "initial-payment")
+        (kind === "create-credit" && query.creationAbi !== "legacy")
     ) {
         const fee = flag(query, "feeEnabled", flag(query, "fee"));
         const row = initialPayment.rows.find((r) => r.kind === kind && r.feeEnabled === fee)!;

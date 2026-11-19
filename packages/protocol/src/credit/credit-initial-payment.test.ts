@@ -55,8 +55,13 @@ it("matches the Core proof statement and preserves legacy pure creation calldata
         ...pure,
         params: { ...legacy, hasInitialPayment: false },
     });
-    const old = buildCreateCreditCalldata({ ...pure, params: legacy });
+    const old = buildCreateCreditCalldata({
+        ...pure,
+        params: { ...legacy, creationAbi: "legacy" },
+    });
     expect(iface.parseTransaction({ data: current.data })!.args[1].hasInitialPayment).toBe(false);
+    expect(current.data.slice(0, 10)).toBe("0x00b6fa56");
+    expect(buildCreateCreditCalldata({ ...pure, params: legacy }).data).toBe(current.data);
     expect(current.data.slice(0, 10)).not.toEqual(old.data.slice(0, 10));
     expect(
         createCreditPublicInputs(context, { ...legacy, hasInitialPayment: false }, pure.deliveries)

@@ -22,7 +22,7 @@ it("matches independently encoded positive owner fees and gross draw deductions"
         expect(encode(context, f.params, f.deliveries)).toEqual(f.publicInputs);
         const call = build({
             context,
-            params: f.params,
+            params: key === "createFee" ? { ...f.params, creationAbi: "legacy" } : f.params,
             deliveries: f.deliveries,
             proof: "0x1234",
         });

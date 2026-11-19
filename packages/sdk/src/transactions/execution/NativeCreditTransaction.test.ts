@@ -1,3 +1,4 @@
+import { testResourceOptions } from "../../../../prover/src/testing/resource-options";
 import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { it, expect } from "vitest";
 import {
@@ -16,7 +17,10 @@ real(
         const h = await setup(),
             prover =
                 process.env.INVISI_TEST_WASM === "1"
-                    ? new (await import("@invisi-labs/prover/wasm")).WasmProver({ threads: 4 })
+                    ? new (await import("@invisi-labs/prover/wasm")).WasmProver({
+                          threads: 4,
+                          resources: testResourceOptions,
+                      })
                     : new (await import("@invisi-labs/prover/native")).NativeProver({
                           bbBin: process.env.BB_BINARY_PATH!,
                           threads: 4,
@@ -134,10 +138,12 @@ real(
     600000
 );
 
+if (process.env.CI && process.env.INVISI_SKIP_INITIAL_PAYMENT_PROOFS === "1")
+    throw Error("CI must run initial-payment proofs");
 const initialPaymentNative =
-    process.env.BB_BINARY_PATH && process.env.INVISI_TEST_INITIAL_PAYMENT === "1" ? it : it.skip;
+    process.env.INVISI_SKIP_INITIAL_PAYMENT_PROOFS === "1" ? it.skip : real;
 initialPaymentNative(
-    "proves an SDK-prepared atomic initial payment with only the owner signing",
+    "proves a net-pinned repriced SDK initial payment with only the owner signing",
     async () => {
         const h = await setup();
         const prepared = await h.invisi.prepareCreateCredit({
@@ -146,19 +152,44 @@ initialPaymentNative(
             tokenAddress: h.context.tokenAddress,
             spender: h.bob.getAddress(),
             expiry: 2000003600n,
-            availableCredit: 10n,
-            initialPayment: { amount: 7n },
+            availableCredit: 20n,
+            initialPayment: { amount: 7n, netAmount: 7n },
         });
-        const prover = new (await import("@invisi-labs/prover/native")).NativeProver({
-            bbBin: process.env.BB_BINARY_PATH!,
-            threads: 4,
-            resources: { offline: true },
-        });
-        const ready = await (await externallyAuthorize(prepared)).prove(prover);
+        const prover =
+            process.env.INVISI_TEST_WASM === "1"
+                ? new (await import("@invisi-labs/prover/wasm")).WasmProver({
+                      threads: 4,
+                      resources: testResourceOptions,
+                  })
+                : new (await import("@invisi-labs/prover/native")).NativeProver({
+                      bbBin: process.env.BB_BINARY_PATH!,
+                      threads: 4,
+                      resources: { offline: true },
+                  });
+        const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+        const quoted = await quoteClient(h.context, () => 3n).quote(prepared, { maxFeeAmount: 3n });
+        const ready = await (await externallyAuthorize(quoted)).prove(prover);
+        if (process.env.BB_BINARY_PATH) {
+            const { verifyProofBundle } = await import("@invisi-labs/prover/native");
+            expect(
+                await verifyProofBundle(ready.exportProof(), {
+                    bbBin: process.env.BB_BINARY_PATH,
+                    resources: { offline: true },
+                })
+            ).toBe(true);
+        }
+        expect(ready.getOutputs()[0]!.amount).toBe(7n);
         const tx = new Interface(invisiCoreAbi).parseTransaction(await ready.exportTransaction())!;
         expect(tx.args[1].hasInitialPayment).toBe(true);
         expect(tx.args[2]).toHaveLength(3);
-        expect(ready.preview().creditOutputs?.[0]?.availableCredit).toBe(3n);
+        expect(tx.args[1].totalAmount).toBe(10n);
+        expect(tx.args[1].feeAmount).toBe(3n);
+        expect(ready.preview().creditOutputs?.[0]).toMatchObject({
+            availableCredit: 10n,
+            totalSpent: 10n,
+            dailySpent: 10n,
+            monthlySpent: 10n,
+        });
     },
-    60_000
+    600_000
 );

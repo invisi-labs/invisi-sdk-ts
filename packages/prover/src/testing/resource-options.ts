@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { INITIAL_PAYMENT_ASSET_INDEX_SHA256 } from "../resources/pin";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { resourceCacheDir } from "../resources/node";
@@ -24,11 +22,15 @@ export const testResourceOptions: ResourceOptions = {
     },
 };
 
-/** Proof CI can run before the new Core resource set is published. */
-export const hasInitialPaymentTestResources = [
-    process.env.INVISI_PROVER_RESOURCE_DIR,
-    resourceCacheDir(),
-].some(
-    (directory) =>
-        directory && existsSync(join(directory, `${INITIAL_PAYMENT_ASSET_INDEX_SHA256}.index.json`))
-);
+/** Real proof suites always exercise both pins unless local offline work explicitly skips. */
+export function initialPaymentProofsEnabled(env: Record<string, string | undefined>) {
+    if (env.INVISI_SKIP_INITIAL_PAYMENT_PROOFS === "1") {
+        if (env.CI)
+            throw Error(
+                "CI must run initial-payment proofs with the independently pinned resources"
+            );
+        return false;
+    }
+    return true;
+}
+export const runInitialPaymentProofs = initialPaymentProofsEnabled(process.env);

@@ -163,7 +163,9 @@ export async function validateOperationSubmission(
         );
     for (const payer of plan.credit?.draw?.payers ?? []) debit(payer.payer, payer.amount);
     const fee = plan.credit?.creation ?? plan.credit?.update ?? plan.credit?.revocation;
-    if (fee) debit(fee.owner, fee.feeAmount ?? 0n);
+    if (plan.credit?.creation?.hasInitialPayment)
+        debit(plan.credit.creation.owner, plan.credit.creation.totalAmount);
+    else if (fee) debit(fee.owner, fee.feeAmount ?? 0n);
     if (plan.submissionValidation && debits.size)
         check(reader.getTokenBalanceAllowance, "token balance and allowance reader required");
     if (reader.getTokenBalanceAllowance)

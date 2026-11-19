@@ -158,6 +158,12 @@ export async function prepareBroadcasterPlan(
                 throw new Error("broadcaster fee exceeds user limit or is invalid");
             const request = structuredClone(intent);
             request.options.fee = { recipient, amount };
+            if (
+                request.kind === "create-credit" &&
+                request.options.initialPayment?.netAmount !== undefined
+            )
+                request.options.initialPayment.amount =
+                    request.options.initialPayment.netAmount + amount;
             current = await reprepare(request);
             await assertCreditUpdatePlan(current);
             if (current.credit?.revocation)

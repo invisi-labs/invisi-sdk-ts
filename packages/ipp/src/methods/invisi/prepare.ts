@@ -89,6 +89,7 @@ export async function prepareInvisiRequest<T>(
             ? {
                   initialPayment: {
                       amount: BigInt(initialPayment.amount) + (fee?.amount ?? 0n),
+                      netAmount: BigInt(initialPayment.amount),
                   },
                   ...(fee ? { fee } : {}),
               }

@@ -1,4 +1,4 @@
-import { testResourceOptions, hasInitialPaymentTestResources } from "./testing/resource-options";
+import { testResourceOptions, runInitialPaymentProofs } from "./testing/resource-options";
 import { describe, expect, it } from "vitest";
 import { loadCircuit, loadVerificationKey } from "./circuits/circuits";
 import {
@@ -10,7 +10,7 @@ import {
 describe("browser assets", () => {
     it.each(
         CIRCUIT_NAMES.filter(
-            (name) => name !== "create_credit_initial_payment" || hasInitialPaymentTestResources
+            (name) => name !== "create_credit_initial_payment" || runInitialPaymentProofs
         )
     )("matches authenticated Node assets for %s", async (name) => {
         expect(await loadCircuitBrowser(name, testResourceOptions)).toEqual(loadCircuit(name));

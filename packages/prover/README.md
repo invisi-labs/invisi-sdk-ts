@@ -47,3 +47,13 @@ node scripts/sync-prover-assets.mjs --set initial-payment --source ../invisi-cor
 ```
 
 Existing circuits keep using their original resource set.
+
+Real proof suites include `create_credit_initial_payment` whenever native or WASM proving
+is enabled. CI provisions both the base (`ca3ee…`) and initial-payment (`9161…`)
+sets independently and fails if either download or proof is unavailable. The
+initial-payment set is not yet published; this CI prerequisite remains outstanding.
+For deliberate local offline development only, `INVISI_SKIP_INITIAL_PAYMENT_PROOFS=1`
+skips that circuit; CI rejects this setting. To run all real proofs locally,
+provision both sets, set `BB_BINARY_PATH` for native tests and `INVISI_TEST_WASM=1`
+for browser-entry WASM tests. The SDK's `NativeCreditTransaction.test.ts` also runs
+owner-signed prepared initial-payment proofs under either setting, without another opt-in.

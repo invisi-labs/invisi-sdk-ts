@@ -104,7 +104,6 @@ const intentAbi = invisiCoreAbi.filter(
     (item) =>
         item.type === "function" &&
         supportedMethods.includes(item.name) &&
-        item.name !== "createCredit" &&
         (item.name !== "transact" || item.inputs[1]?.type === "tuple")
 );
 export const broadcasterTransactInterface = new Interface([...intentAbi, ...legacyCreateCreditAbi]);

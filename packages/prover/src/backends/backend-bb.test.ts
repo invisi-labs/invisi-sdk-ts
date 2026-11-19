@@ -1,4 +1,4 @@
-import { hasInitialPaymentTestResources } from "../testing/resource-options";
+import { runInitialPaymentProofs } from "../testing/resource-options";
 import INITIAL_PAYMENT_FIXTURE from "../testing/initial-payment-fixture.json";
 import { describe, expect, it } from "vitest";
 import { generateProofBundle, verifyProofBundle } from "../proofs/prover";
@@ -21,7 +21,7 @@ native("real BB6.0.0 native proving (set BB_BINARY_PATH)", () => {
         ["credit_draw_slots1", DRAW_FIXTURE, "evm"],
         ["credit_update", UPDATE_FIXTURE, "evm"],
         ["create_credit", CREATE_FIXTURE, "evm"],
-        ...(hasInitialPaymentTestResources
+        ...(runInitialPaymentProofs
             ? [["create_credit_initial_payment", INITIAL_PAYMENT_FIXTURE, "evm"] as const]
             : []),
         ["transact_user_slots2", USER_FIXTURE, "evm"],

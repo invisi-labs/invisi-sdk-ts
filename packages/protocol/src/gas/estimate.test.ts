@@ -5,7 +5,12 @@ import { estimateGas } from "./estimate";
 describe("current-release local gas previews", () => {
     it("retains receipt provenance and exact medians for measured shapes", () => {
         for (const row of measured.rows) {
-            expect(estimateGas(row.shape as never)).toMatchObject({
+            expect(
+                estimateGas({
+                    ...row.shape,
+                    ...(row.shape.kind === "create-credit" ? { creationAbi: "legacy" } : {}),
+                } as never)
+            ).toMatchObject({
                 available: true,
                 source: "benchmark",
                 gasUnits: BigInt(row.gasUnits),
