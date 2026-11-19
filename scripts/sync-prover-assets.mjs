@@ -130,15 +130,15 @@ export async function provision({
     ];
     const obtain = async (name, limit) => {
         if (source) return localBytes(join(resolve(source), name), limit);
-        let lastError;
+        const failures = [];
         for (const base of bases) {
             try {
                 return await download(new URL(name, base), limit, fetcher);
             } catch (error) {
-                lastError = error;
+                failures.push(`${new URL(name, base)}: ${error.message}`);
             }
         }
-        throw lastError;
+        throw new Error(`Cannot provision ${name}: ${failures.join("; ")}`);
     };
     let indexBytes;
     try {
