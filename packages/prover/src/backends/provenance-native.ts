@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { nodeResources } from "../resources/node";
+import { nodeProvenanceResources } from "../resources/node";
 import { PROVENANCE_MANIFEST_TEXT } from "../resources/provenance-manifest";
 import { authenticateManifest, witnessJSON, type OfflineProver } from "../provenance-witness";
 import {
@@ -55,13 +55,13 @@ export class NativeProvenanceBackend implements OfflineProver {
         const [artifact, vk] = await Promise.all([
             this.#root
                 ? readFile(this.asset(entry.artifact))
-                : nodeResources(this.options.resources).load(
+                : nodeProvenanceResources(this.options.resources).load(
                       `provenance/${entry.artifact}`,
                       this.options.signal
                   ),
             this.#root
                 ? readFile(this.asset(entry.vk))
-                : nodeResources(this.options.resources).load(
+                : nodeProvenanceResources(this.options.resources).load(
                       `provenance/${entry.vk}`,
                       this.options.signal
                   ),

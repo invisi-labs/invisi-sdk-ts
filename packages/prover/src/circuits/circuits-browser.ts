@@ -10,7 +10,7 @@ export async function loadCircuitBrowser(
     options?: ResourceOptions,
     signal?: AbortSignal
 ): Promise<CompiledCircuit> {
-    const bytes = await browserResources(options, circuitResourcePin(name)).load(
+    const bytes = await browserResources(options, circuitResourcePin(name, options?.release)).load(
         `circuits/${name}.json`,
         signal
     );
@@ -27,7 +27,7 @@ export async function loadVerificationKeyBrowser(
     signal?: AbortSignal
 ): Promise<Uint8Array> {
     const key = getCircuitKey(name, target),
-        bytes = await browserResources(options, circuitResourcePin(name)).load(
+        bytes = await browserResources(options, circuitResourcePin(name, options?.release)).load(
             `circuits/${key.vk}`,
             signal
         );

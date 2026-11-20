@@ -33,27 +33,17 @@ CRS parameters retain the upstream official CDN and fallback behavior.
 `resources.offline` only disables circuit/VK resource downloads: it does not make
 upstream WASM initialization or CRS access offline automatically.
 
-The atomic Credit initial-payment circuit has a separate authenticated resource set.
-Until Core publishes it, build the set from the matching Core checkout and provision
-the two initial-payment objects into your local cache:
+Core and Provenance are independently pinned. All Core circuits, including initial-payment, use the Core-only set; Provenance uses the Periphery set. Provision the two catalogs separately into the same verified cache:
 
 ```sh
-# In invisi-core, after generating the release verifiers and keys:
-node scripts/prover-assets.mjs .tools/initial-payment-assets
-
-# In invisi-sdk-ts:
-node scripts/sync-prover-assets.mjs --set initial-payment --source ../invisi-core/.tools/initial-payment-assets \
-  --path circuits/create_credit_initial_payment.json --path circuits/create_credit_initial_payment.evm.vk
+node scripts/sync-prover-assets.mjs --set core --source ../invisi-core/.tools/core-assets
+node scripts/sync-prover-assets.mjs --set provenance --source ../invisi-periphery/.tools/provenance-assets
 ```
 
-Existing circuits keep using their original resource set.
+Generate each source directory with that producer's `scripts/prover-assets.mjs` and an empty output directory. The provisioner checks the reviewed index pin and every selected object before writing the cache. Omit `--source` only after the corresponding release is published.
 
-Real proof suites include `create_credit_initial_payment` whenever native or WASM proving
-is enabled. CI provisions both the base (`ca3ee…`) and initial-payment (`9161…`)
-sets independently and fails if either download or proof is unavailable. The
-initial-payment set is not yet published; this CI prerequisite remains outstanding.
-For deliberate local offline development only, `INVISI_SKIP_INITIAL_PAYMENT_PROOFS=1`
-skips that circuit; CI rejects this setting. To run all real proofs locally,
-provision both sets, set `BB_BINARY_PATH` for native tests and `INVISI_TEST_WASM=1`
-for browser-entry WASM tests. The SDK's `NativeCreditTransaction.test.ts` also runs
-owner-signed prepared initial-payment proofs under either setting, without another opt-in.
+`new NativeProver({ resources: { directory: coreCatalog, provenanceDirectory: provenanceCatalog, offline: true } })` uses separate local catalogs. Use `baseUrls` and `provenanceBaseUrls` for separate mirrors; custom locations cannot replace the trust pins. Browser/WASM options support the same independent URL lists and a shared `ResourceCache`.
+
+For historical combined catalogs, set `resources.release = "legacy"` and provision with `--set legacy` and `--set legacy-initial-payment`. Legacy mode is explicit and never an automatic retry. The historical extra set is needed only for legacy initial-payment.
+
+The new split sets are locally verified and must be independently published before SDK release. CI provisions Core and Provenance separately and fails if either required release is missing.

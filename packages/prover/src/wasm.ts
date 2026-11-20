@@ -76,3 +76,5 @@ export class WasmProver extends BackendProver {
 
 export type { ResourceOptions, ResourceCache } from "./resources/loader";
 export { PROVER_ASSET_INDEX_SHA256 } from "./resources/pin";
+
+export type { ResourceRelease } from "./resources/pin";

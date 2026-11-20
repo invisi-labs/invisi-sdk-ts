@@ -1,4 +1,4 @@
-import { browserResources } from "./resources/browser";
+import { browserProvenanceResources } from "./resources/browser";
 import { wasmSrsSize } from "./backends/wasm-srs";
 import type { ResourceOptions } from "./resources/loader";
 import { hexlify, sha256 } from "ethers";
@@ -52,7 +52,7 @@ export class LocalProvenanceProver implements OfflineProver {
         const loadAssets =
             this.options.loadAssets ??
             (async (capacity: number): Promise<ProvenanceAssets> => {
-                const loader = browserResources(this.options.resources);
+                const loader = browserProvenanceResources(this.options.resources);
                 const manifest = await loader.load("provenance/manifest.json", this.options.signal);
                 authenticateManifest(manifest, this.options.trustedManifestSha256);
                 const raw = JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(manifest));
@@ -139,3 +139,5 @@ export class LocalProvenanceProver implements OfflineProver {
 }
 
 export type { ResourceOptions, ResourceCache } from "./resources/loader";
+
+export type { ResourceRelease } from "./resources/pin";

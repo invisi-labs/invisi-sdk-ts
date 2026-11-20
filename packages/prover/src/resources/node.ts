@@ -10,9 +10,10 @@ import {
     type ResourceCache,
     type ResourceOptions,
 } from "./loader";
-import { PROVER_ASSET_INDEX_SHA256 } from "./pin";
+import { coreResourcePin, provenanceResourcePin } from "./pin";
 export interface NodeResourceOptions extends ResourceOptions {
     directory?: string;
+    provenanceDirectory?: string;
     cacheDir?: string;
 }
 export function resourceCacheDir(options: NodeResourceOptions = {}): string {
@@ -32,7 +33,7 @@ function directory(options: NodeResourceOptions): string | undefined {
     return options.directory ?? process.env.INVISI_PROVER_RESOURCE_DIR;
 }
 function fileName(key: string): string {
-    return key === `${PROVER_ASSET_INDEX_SHA256}.index.json` ? "index.json" : key;
+    return key.endsWith(".index.json") ? "index.json" : key;
 }
 class DiskCache implements ResourceCache {
     constructor(private readonly options: NodeResourceOptions) {}
@@ -60,7 +61,10 @@ class DiskCache implements ResourceCache {
                     if (total > max) throw new Error("Cached resource exceeds limit");
                     chunks.push(chunk);
                 }
-                return new Uint8Array(Buffer.concat(chunks, total));
+                const bytes = Buffer.concat(chunks, total);
+                if (createHash("sha256").update(bytes).digest("hex") !== key.split(".")[0])
+                    continue;
+                return new Uint8Array(bytes);
             } catch {
                 /* Missing files are cache misses. */
             }
@@ -90,7 +94,7 @@ const defaults: NodeResourceOptions = {};
 const loaders = new WeakMap<NodeResourceOptions, Map<string, ResourceLoader>>();
 export function nodeResources(
     options: NodeResourceOptions = defaults,
-    pin = PROVER_ASSET_INDEX_SHA256
+    pin = coreResourcePin(options.release)
 ): ResourceLoader {
     let byPin = loaders.get(options);
     if (!byPin) loaders.set(options, (byPin = new Map()));
@@ -112,7 +116,7 @@ export function nodeResources(
 export function localResourcePath(
     logical: string,
     options: NodeResourceOptions = {},
-    pin = PROVER_ASSET_INDEX_SHA256
+    pin = coreResourcePin(options.release)
 ): string {
     resourcePath(logical);
     const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -156,4 +160,22 @@ export function localResourcePath(
         } catch {}
     }
     throw new Error("Pinned prover resource is unavailable in the local cache");
+}
+
+const provenanceOptions = new WeakMap<NodeResourceOptions, NodeResourceOptions>();
+export function nodeProvenanceResources(options: NodeResourceOptions = defaults): ResourceLoader {
+    let selected = provenanceOptions.get(options);
+    if (!selected) {
+        const { directory, baseUrls, ...rest } = options;
+        const selectedDirectory = options.provenanceDirectory ?? directory;
+        const selectedUrls =
+            options.provenanceBaseUrls ?? (options.release === "legacy" ? baseUrls : undefined);
+        selected = {
+            ...rest,
+            ...(selectedDirectory !== undefined ? { directory: selectedDirectory } : {}),
+            ...(selectedUrls !== undefined ? { baseUrls: selectedUrls } : {}),
+        };
+        provenanceOptions.set(options, selected);
+    }
+    return nodeResources(selected, provenanceResourcePin(options.release));
 }

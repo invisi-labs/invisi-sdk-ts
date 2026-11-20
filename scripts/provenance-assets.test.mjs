@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -119,4 +119,30 @@ test("explicit Node provisioning tries the browser CDN before the verified GitHu
         "assets.invisipay.fi",
         "github.com",
     ]);
+});
+
+test("resource provisioning selects independent capabilities and explicit legacy pins", () => {
+    assert.equal(
+        reviewedPin("core"),
+        "36f58bac1a0f70c6f8422b47f7cc35a30416a20f8a0f30038d23db0832e2bc93"
+    );
+    assert.equal(
+        reviewedPin("provenance"),
+        "8d5a3e60e3e5cbe315150511207d7aff67f4e2924148d396b67d82017ecd1f1c"
+    );
+    assert.equal(reviewedPin("initial-payment"), reviewedPin("core"));
+    assert.notEqual(reviewedPin("legacy"), reviewedPin("core"));
+    assert.throws(() => reviewedPin("unreviewed"), /Unknown/);
+});
+test("provisioning another catalog preserves the existing bare index", async (t) => {
+    const options = fixture(t);
+    mkdirSync(options.output, { recursive: true });
+    const existing = Buffer.from('{"existingCoreCatalog":true}');
+    writeFileSync(join(options.output, "index.json"), existing);
+    await provision(options);
+    assert.deepEqual(readFileSync(join(options.output, "index.json")), existing);
+    assert.deepEqual(
+        readFileSync(join(options.output, options.pin + ".index.json")),
+        options.bytes
+    );
 });

@@ -82,3 +82,5 @@ export class NativeProver extends BackendProver implements ProvenanceProvider {
 export type { NodeResourceOptions } from "./resources/node";
 export type { ResourceCache } from "./resources/loader";
 export { PROVER_ASSET_INDEX_SHA256 } from "./resources/pin";
+
+export type { ResourceRelease } from "./resources/pin";

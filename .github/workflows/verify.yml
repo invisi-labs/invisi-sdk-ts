@@ -45,7 +45,7 @@ jobs:
       - name: Explicitly provision verified pinned prover resources
         run: |
           node scripts/sync-prover-assets.mjs
-          node scripts/sync-prover-assets.mjs --set initial-payment
+          node scripts/sync-prover-assets.mjs --set provenance
 
       - name: Verify tiny trusted Provenance metadata
         run: python3 scripts/sync-provenance.py --check-package packages/prover/src/resources

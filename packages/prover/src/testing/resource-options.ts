@@ -22,7 +22,7 @@ export const testResourceOptions: ResourceOptions = {
     },
 };
 
-/** Real proof suites always exercise both pins unless local offline work explicitly skips. */
+/** Real proof suites include initial-payment from the same Core catalog. */
 export function initialPaymentProofsEnabled(env: Record<string, string | undefined>) {
     if (env.INVISI_SKIP_INITIAL_PAYMENT_PROOFS === "1") {
         if (env.CI)

@@ -1,4 +1,4 @@
-import { PROVER_ASSET_INDEX_SHA256 } from "./pin";
+import { coreResourcePin, type ResourceRelease } from "./pin";
 export interface ResourceCache {
     get(
         key: string,
@@ -7,6 +7,10 @@ export interface ResourceCache {
     put(key: string, value: Uint8Array): Promise<void>;
 }
 export interface ResourceOptions {
+    /** Split is the default; legacy explicitly selects the historical combined catalogs. */
+    release?: ResourceRelease;
+    /** Provenance transport is independent of Core baseUrls in split mode. */
+    provenanceBaseUrls?: readonly string[];
     baseUrls?: readonly string[];
     offline?: boolean;
     timeoutMs?: number;
@@ -95,7 +99,7 @@ export class ResourceLoader {
     readonly #flights = new Map<string, Flight>();
     readonly #memory = new Map<string, Uint8Array>();
     readonly #bases: string[];
-    constructor(options: ResourceOptions = {}, pin = PROVER_ASSET_INDEX_SHA256) {
+    constructor(options: ResourceOptions = {}, pin = coreResourcePin(options.release)) {
         if (!hashPattern.test(pin)) throw new Error("Invalid prover resource pin");
         const timeout = options.timeoutMs ?? 60_000;
         if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 2_147_483_647)

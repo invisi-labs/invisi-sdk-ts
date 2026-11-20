@@ -1,4 +1,4 @@
-import { PROVER_ASSET_INDEX_SHA256 } from "./pin";
+import { coreResourcePin, provenanceResourcePin } from "./pin";
 import { ResourceLoader, type ResourceCache, type ResourceOptions } from "./loader";
 export class BrowserCache implements ResourceCache {
     async get(
@@ -55,7 +55,7 @@ const defaults: ResourceOptions = {};
 const loaders = new WeakMap<ResourceOptions, Map<string, ResourceLoader>>();
 export function browserResources(
     options: ResourceOptions = defaults,
-    pin = PROVER_ASSET_INDEX_SHA256
+    pin = coreResourcePin(options.release)
 ): ResourceLoader {
     let byPin = loaders.get(options);
     if (!byPin) loaders.set(options, (byPin = new Map()));
@@ -68,4 +68,17 @@ export function browserResources(
         byPin.set(pin, loader);
     }
     return loader;
+}
+
+const provenanceOptions = new WeakMap<ResourceOptions, ResourceOptions>();
+export function browserProvenanceResources(options: ResourceOptions = defaults): ResourceLoader {
+    let selected = provenanceOptions.get(options);
+    if (!selected) {
+        const { baseUrls, ...rest } = options;
+        const selectedUrls =
+            options.provenanceBaseUrls ?? (options.release === "legacy" ? baseUrls : undefined);
+        selected = { ...rest, ...(selectedUrls !== undefined ? { baseUrls: selectedUrls } : {}) };
+        provenanceOptions.set(options, selected);
+    }
+    return browserResources(selected, provenanceResourcePin(options.release));
 }

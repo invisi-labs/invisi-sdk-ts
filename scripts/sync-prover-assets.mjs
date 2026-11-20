@@ -1,7 +1,7 @@
 /** Explicit provisioning of reviewed public prover resources; never an install hook. */
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -10,11 +10,16 @@ const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 export function reviewedPin(set = "default") {
     const text = readFileSync(join(repository, "packages/prover/src/resources/pin.ts"), "utf8");
-    assert(set === "default" || set === "initial-payment", "Unknown prover resource set");
-    const pattern =
-        set === "default"
-            ? /PROVER_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/
-            : /INITIAL_PAYMENT_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/;
+    const bindings = {
+        default: "PROVER_ASSET_INDEX_SHA256",
+        core: "PROVER_ASSET_INDEX_SHA256",
+        "initial-payment": "PROVER_ASSET_INDEX_SHA256",
+        provenance: "PROVENANCE_ASSET_INDEX_SHA256",
+        legacy: "LEGACY_PROVER_ASSET_INDEX_SHA256",
+        "legacy-initial-payment": "INITIAL_PAYMENT_ASSET_INDEX_SHA256",
+    };
+    assert(Object.hasOwn(bindings, set), "Unknown prover resource set");
+    const pattern = new RegExp(`\\b${bindings[set]}\\s*=\\s*["']([a-f0-9]{64})["']`);
     const pin = text.match(pattern)?.[1];
     assert(pin, "Missing reviewed prover resource pin");
     return pin;
@@ -126,7 +131,7 @@ export async function provision({
     );
     const bases = [
         `https://assets.invisipay.fi/prover/sets/${pin}/`,
-        `https://github.com/invisi-labs/invisi-core/releases/download/prover-assets-${pin}/`,
+        `https://github.com/invisi-labs/${pin === reviewedPin("provenance") ? "invisi-periphery" : "invisi-core"}/releases/download/prover-assets-${pin}/`,
     ];
     const obtain = async (name, limit) => {
         if (source) return localBytes(join(resolve(source), name), limit);
@@ -170,7 +175,12 @@ export async function provision({
     }
     // Publish the index only after every selected object has passed integrity checks.
     await atomicWrite(join(destination, `${pin}.index.json`), indexBytes);
-    await atomicWrite(join(destination, "index.json"), indexBytes);
+    // The bare name is a compatibility alias, never a selector for another set.
+    try {
+        await link(join(destination, `${pin}.index.json`), join(destination, "index.json"));
+    } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+    }
     return { destination, indexSha256: pin, objects: objects.size, index };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -180,7 +190,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         const flag = args.shift();
         assert(
             ["--source", "--output", "--path", "--set"].includes(flag) && args.length,
-            "Usage: sync-prover-assets.mjs [--source CORE_RESOURCE_DIRECTORY] [--output CACHE_DIRECTORY] [--path LOGICAL_PATH ...] [--set default|initial-payment]"
+            "Usage: sync-prover-assets.mjs [--source CORE_RESOURCE_DIRECTORY] [--output CACHE_DIRECTORY] [--path LOGICAL_PATH ...] [--set core|provenance|legacy|legacy-initial-payment]"
         );
         const value = args.shift();
         if (flag === "--path") options.paths.push(value);

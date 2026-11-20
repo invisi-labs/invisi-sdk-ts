@@ -18,7 +18,11 @@ export { CIRCUIT_NAMES };
 export type { CircuitName, CompiledCircuit };
 export function getCircuitPath(name: CircuitName, options?: NodeResourceOptions): string {
     getCircuitMetadata(name);
-    return localResourcePath(`circuits/${name}.json`, options, circuitResourcePin(name));
+    return localResourcePath(
+        `circuits/${name}.json`,
+        options,
+        circuitResourcePin(name, options?.release)
+    );
 }
 export function getVerificationKeyPath(
     name: CircuitName,
@@ -26,7 +30,11 @@ export function getVerificationKeyPath(
     options?: NodeResourceOptions
 ): string {
     const key = getCircuitKey(name, target);
-    return localResourcePath(`circuits/${key.vk}`, options, circuitResourcePin(name));
+    return localResourcePath(
+        `circuits/${key.vk}`,
+        options,
+        circuitResourcePin(name, options?.release)
+    );
 }
 export function loadCircuit(name: CircuitName, options?: NodeResourceOptions): CompiledCircuit {
     const metadata = getCircuitMetadata(name),
@@ -57,7 +65,7 @@ export async function loadCircuitAsync(
     signal?: AbortSignal
 ): Promise<CompiledCircuit> {
     getCircuitMetadata(name);
-    const bytes = await nodeResources(options, circuitResourcePin(name)).load(
+    const bytes = await nodeResources(options, circuitResourcePin(name, options?.release)).load(
         `circuits/${name}.json`,
         signal
     );
@@ -74,7 +82,7 @@ export async function loadVerificationKeyAsync(
     signal?: AbortSignal
 ): Promise<Uint8Array> {
     const key = getCircuitKey(name, target),
-        bytes = await nodeResources(options, circuitResourcePin(name)).load(
+        bytes = await nodeResources(options, circuitResourcePin(name, options?.release)).load(
             `circuits/${key.vk}`,
             signal
         );

@@ -235,6 +235,12 @@ INVISI_PERIPHERY_REPO=/absolute/path/to/invisi-periphery pnpm --filter @invisi-l
 
 Supply an absolute repository path when running from a package directory. The tests exercise real Router/native/ERC20 settlement with external liquidity and proof-verification boundary doubles; they do not claim genuine ZK proving or live API routing.
 
-## Periphery resource ownership
+## Independent proving resource sets
 
-Independent Provenance circuits and `scripts/provenance-*` tools now live in `invisi-periphery`, alongside Payment Router contracts. Core continues to own protocol contracts and Transact/Credit circuits. SDK packages stay in this workspace. Use the Periphery checkout as the positional source for `scripts/sync-provenance.py`. Historical resource URLs and production pins are unchanged. New unified catalogs require explicitly pinned Core and Periphery inputs via Periphery's `scripts/combine-prover-assets.mjs`; do not point a unified SDK loader at a Core-only or Provenance-only catalog.
+Core (Transact/Credit, including initial-payment) and Provenance use separate immutable catalogs. The default Core index is `36f58bac1a0f70c6f8422b47f7cc35a30416a20f8a0f30038d23db0832e2bc93`; the Provenance index is `8d5a3e60e3e5cbe315150511207d7aff67f4e2924148d396b67d82017ecd1f1c`. Public objects retain their existing bytes and logical names. Downloads use `/prover/sets/<index-hash>/`, and verified objects share the same content-addressed cache.
+
+Core operations do not require the Provenance catalog; Provenance operations do not load Core. Missing or corrupt split resources fail without a legacy downgrade. Historical catalogs remain available through explicit legacy configuration.
+
+**Release prerequisite:** these split catalogs have been built and verified locally but are not claimed published. Publish each producer's authenticated CI artifact before releasing SDKs with these new defaults. Until then, provision matching local catalogs or select legacy mode explicitly. No production pins are fetched from an untrusted URL or inferred from a failed download.
+
+Native and WASM resource options accept `release: "legacy"`. Native `directory`/`baseUrls` configure Core; `provenanceDirectory`/`provenanceBaseUrls` configure Provenance. Browser options use the two URL lists and share their cache. In legacy mode, an unspecified Provenance URL inherits the combined source.
