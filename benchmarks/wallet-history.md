@@ -54,10 +54,10 @@ Run three times and compare medians. For a baseline comparison, apply the benchm
 ## Regression and verification coverage
 
 - Full-header batch response ordering, duplicate/missing/unexpected IDs, partial errors, version/deployment mismatch, corrupt complete header hashes and missing/out-of-order/broken-parent history batches.
-- Shared discovery status is scoped to one combined read; either stream's anchor mismatch and a reorg between acquisition and final checks fail the whole read.
+- Shared discovery status is scoped to one combined read; either stream's anchor mismatch and a reorg between acquisition and final checks fail the whole read. The combined result also rejects individually valid streams from different block hashes, parent hashes, heights or timestamps.
 - New account scans freshly observe a spend even when the height is unchanged; changed block hashes and revocation word keys do not reuse observations.
 - Missing-only spent responses must preserve count/type validation; failed and malformed results are not cached, and large responses remain complete when cache retention evicts old entries.
-- Credit replay with absent delivery ciphertext, late historical parent recovery, repeated scans, unrelated grants, interrupted empty replay and restart.
+- Credit replay with absent delivery ciphertext, late historical parent recovery, repeated scans, unrelated grants, interrupted empty replay and restart. A replay-only scan with `refreshState: false` must still use the original live chain reader for the commit fence; a same-height fork cannot clear the pending replay marker or commit old-fork state.
 - Existing session suites cover corrupted membership, consumed/revoked state, reorg/generation invalidation, preparation snapshot boundaries and retained operation reservations.
 
 ## Remaining costs
@@ -66,6 +66,6 @@ Dense history still performs fresh membership acquisition/status checks per outp
 
 ## Validation results
 
-The complete workspace build passes (11 tasks). Targeted protocol, RPC and session tests and TypeScript checks pass; the complete workspace test command passes (21 tasks; 1,472 passed tests, 35 skipped across the workspace, including existing opt-in/live tests). Package boundaries, public surface interoperability, English-only source checks and formatting pass.
+The complete workspace build passes (11 tasks). Targeted protocol, RPC and session tests and TypeScript checks pass; the complete workspace test command passes (21 tasks; 1,475 passed tests, 35 skipped across the workspace, including existing opt-in/live tests). Package boundaries, public surface interoperability, English-only source checks and formatting pass.
 
-The browser bundle size gate has a pre-existing failure: the unchanged baseline main checkout produces 1,072,923 eager bytes against the existing 1 MiB ceiling. This change produces 1,076,015 bytes (+3,092 bytes), with no added dependencies or proving resources. The threshold is not changed. This warning must be handled as a separate bundle-budget change rather than being reported as a passing browser gate.
+The browser bundle size gate has a pre-existing failure: the unchanged baseline main checkout produces 1,072,923 eager bytes against the existing 1 MiB ceiling. This change produces 1,076,295 bytes (+3,372 bytes), with no added dependencies or proving resources. The threshold is not changed. This warning must be handled as a separate bundle-budget change rather than being reported as a passing browser gate.

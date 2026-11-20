@@ -47,3 +47,22 @@ it("rejects a reorg after stream acquisition instead of reusing its canonical fe
     ).rejects.toThrow("block changed");
     expect(calls).toBeGreaterThanOrEqual(3);
 });
+it("rejects individually valid streams acquired from different canonical snapshots", async () => {
+    const f = setup((method, params) =>
+        method === "invisi_getStatus"
+            ? status()
+            : method === "invisi_getNoteUpdates"
+              ? { blockHash: (params[0] as { blockHash: string }).blockHash, notes: [] }
+              : []
+    );
+    let reads = 0;
+    f.reader.getBlock.mockImplementation(async (number) => ({
+        number,
+        hash: ++reads % 2 ? h(9) : h(109),
+        parentHash: h(8),
+        timestamp: 123n,
+    }));
+    await expect(
+        f.client.getHistoryUpdates(context, { fromBlock: 1n, toBlock: 9n })
+    ).rejects.toThrow("history stream anchors differ");
+});

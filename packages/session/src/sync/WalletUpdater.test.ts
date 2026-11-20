@@ -1453,3 +1453,40 @@ it("coalesces empty Credit replay checkpoints without advancing an interrupted p
     await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n, pageSize: 1 });
     expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBeUndefined();
 });
+
+it.each([false, true])(
+    "keeps the Credit replay commit fence live with state refresh disabled (fork: %s)",
+    async (fork) => {
+        const h = await sharedHarness();
+        await h.history.synchronize({ fromBlock: 12n, toBlock: 16n, pageSize: 1 });
+        await h.a.scanHistory(testDecryptor);
+        await h.store.transaction(h.a.scope, (draft) => {
+            draft.creditReplayFrom = 13n;
+            draft.creditReplayTarget = { number: 16n, hash: hex(16n) };
+        });
+        const before = await h.store.readSnapshot(h.a.scope);
+        const pages = h.history.pages.bind(h.history);
+        h.history.pages = async function* (...args) {
+            for await (const page of pages(...args)) {
+                // Change the live chain after discovery has completed, while public pages
+                // still describe the old fork. Only the uncached commit fence can detect it.
+                if (fork) h.fork(16n);
+                yield page;
+            }
+        };
+        const replay = h.a.scanHistory(testDecryptor, { pageSize: 1, refreshState: false });
+        if (fork) {
+            await expect(replay).rejects.toThrow(
+                "canonical history changed during Credit recovery"
+            );
+            const after = await h.store.readSnapshot(h.a.scope);
+            expect(after.creditReplayFrom).toBe(13n);
+            expect(after.creditReplayThrough).toBeUndefined();
+            expect(after.revision).toBe(before.revision);
+            expect(after.credits).toEqual(before.credits);
+        } else {
+            await replay;
+            expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBeUndefined();
+        }
+    }
+);

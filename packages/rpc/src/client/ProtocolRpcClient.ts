@@ -470,6 +470,13 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             this.noteUpdates(context, range, observation),
             this.creditUpdates(context, range, observation),
         ]);
+        if (
+            notes.block.number !== credits.block.number ||
+            hash(notes.block.hash) !== hash(credits.block.hash) ||
+            hash(notes.block.parentHash) !== hash(credits.block.parentHash) ||
+            notes.block.timestamp !== credits.block.timestamp
+        )
+            invalid("RPC history stream anchors differ");
         return { notes, credits };
     }
     private async creditUpdates(

@@ -294,7 +294,7 @@ export async function scanAccount(
     if (!settings.offline && lower <= target) {
         const replay = await replayCredits(
             history,
-            { ...options, chainReader: reader },
+            options,
             scope,
             decryptor,
             target,
