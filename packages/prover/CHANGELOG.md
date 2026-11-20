@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## Unreleased
+
+- Load Core and Provenance from independent authenticated catalogs with separate source options, a shared content-addressed cache, and explicit legacy compatibility. All Core circuits use one Core-only set. Publish both split catalogs before releasing these SDK defaults.
+
 ## 1.3.1
 
 - Accept unified CreditDraw events in indexed Credit RPC responses, including post-debit state deliveries.
