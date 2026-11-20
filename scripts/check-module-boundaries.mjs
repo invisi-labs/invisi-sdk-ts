@@ -9,6 +9,7 @@ export const allowedDependencies = {
     prover: ["primitives", "protocol"],
     rpc: ["primitives", "protocol"],
     ipp: ["primitives", "sdk"],
+    "payment-router": ["primitives", "protocol", "sdk"],
     sdk: ["primitives", "protocol", "prover", "rpc"],
     session: ["primitives", "protocol", "sdk", "rpc"],
     react: ["sdk", "session"],

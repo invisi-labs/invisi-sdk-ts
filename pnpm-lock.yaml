@@ -26,6 +26,9 @@ importers:
 
   examples:
     dependencies:
+      '@invisi-labs/payment-router':
+        specifier: workspace:*
+        version: link:../packages/payment-router
       '@invisi-labs/primitives':
         specifier: workspace:*
         version: link:../packages/primitives
@@ -64,6 +67,34 @@ importers:
       '@invisi-labs/sdk':
         specifier: workspace:*
         version: link:../sdk
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.37
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.8)(tsx@4.23.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.37)(jsdom@24.1.3)
+
+  packages/payment-router:
+    dependencies:
+      '@invisi-labs/primitives':
+        specifier: workspace:*
+        version: link:../primitives
+      '@invisi-labs/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@invisi-labs/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      ethers:
+        specifier: ^6.17.0
+        version: 6.17.0
+    devDependencies:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.37

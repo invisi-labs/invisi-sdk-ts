@@ -123,3 +123,14 @@ Gas estimation: the Note funding, four Credit and Broadcaster examples call `pre
 ## Contributing
 
 See the [contribution guidelines](../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.
+
+## Native input Payment Router
+
+`08-payment-router/01-uniswap-v3.ts` and `02-zeroex.ts` prepare public ETH-to-token payments through the separately deployed contracts in `invisi-payment-router`. Configure verified Router/WETH/V3 addresses and the same chain/deployment in `08-payment-router/settings.ts`. V3 also needs QuoterV2 and a liquid configured route. The 0x example requires a `ZeroExPaymentRouter` deployment, its AllowanceHolder/registry, and an explicitly supplied backend `ZEROX_API_KEY`; browser applications should inject a backend quote proxy instead.
+
+Both examples explicitly create two Note outputs, matching the current pure-funding circuit shape. They bind the Router as payer before proving, refresh the quote after proving, simulate the whole payable call with Alice as sender, and export the unsigned transaction. They do not approve ERC20s from Alice or submit transactions. The native budget excludes network gas. Current 0x execution accepts only the reviewed native execute/exec/NATIVE_CHECK payload subset; an API route outside that subset is rejected.
+
+```sh
+pnpm --filter @invisi-examples/scenarios example:payment-router:v3 --execute
+pnpm --filter @invisi-examples/scenarios example:payment-router:zeroex --execute
+```

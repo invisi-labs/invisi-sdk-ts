@@ -21,7 +21,9 @@
     "deploy:local": "node scripts/deploy-local.mjs",
     "check:session": "node scripts/check-session-boundary.mjs",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
-    "check:ipp": "node scripts/check-ipp-package.mjs"
+    "check:ipp": "node scripts/check-ipp-package.mjs",
+    "sync:payment-router-abis": "node scripts/sync-payment-router-abis.mjs",
+    "check:payment-router": "node scripts/check-payment-router-package.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

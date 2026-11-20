@@ -9,6 +9,7 @@ const entries = {
     "primitives": [".", "./address", "./note", "./credit"],
     "sdk": [".", "./ethers", "./session-support", "./note", "./credit", "./provenance"],
     "ipp": [".", "./invisi"],
+    "payment-router": ["."],
     "prover": [".", "./native", "./wasm", "./aggregate", "./provenance", "./provenance-witness"],
     "rpc": [".", "./provenance", "./broadcaster", "./trusted-provider"],
     "react": ["."],
@@ -189,3 +190,16 @@ assert(
 );
 console.log("Current public surface PASS: explicit package entries and capability boundaries");
 await import("./check-session-boundary.mjs");
+
+const paymentRouter = await import(resolve("packages/payment-router/dist/index.js"));
+functions(
+    paymentRouter,
+    [
+        "PaymentRouterClient",
+        "UniswapV3Adapter",
+        "ZeroExAdapter",
+        "createZeroExQuoteFetcher",
+        "encodeV3ExactOutputPath",
+    ],
+    "payment-router"
+);

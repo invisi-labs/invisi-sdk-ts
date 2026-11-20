@@ -11,7 +11,8 @@
       "@invisi-labs/sdk",
       "@invisi-labs/session",
       "@invisi-labs/vue",
-      "@invisi-labs/ipp"
+      "@invisi-labs/ipp",
+      "@invisi-labs/payment-router"
     ]
   ],
   "linked": [],

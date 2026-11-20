@@ -24,6 +24,25 @@ console.log(
     `IPP browser entry PASS: ${ipp.outputFiles[0].contents.length} bytes; no wallet/prover dependencies`
 );
 
+const paymentRouter = await build({
+    entryPoints: ["packages/payment-router/src/index.ts"],
+    bundle: true,
+    platform: "browser",
+    format: "esm",
+    write: false,
+    metafile: true,
+    logLevel: "silent",
+});
+assert(
+    !Object.keys(paymentRouter.metafile.inputs).some((path) =>
+        /packages\/(?:session|prover)\/|node:|bb\.js|@noir/.test(path)
+    ),
+    "payment-router entry acquired wallet state or a proving runtime"
+);
+console.log(
+    `Payment Router browser entry PASS: ${paymentRouter.outputFiles[0].contents.length} bytes; no state/prover dependencies`
+);
+
 const result = await build({
     stdin: {
         contents:

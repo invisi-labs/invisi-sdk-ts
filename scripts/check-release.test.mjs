@@ -66,7 +66,7 @@ test("rejects empty, duplicate or private release package lists", () => {
 test("tag publication covers every public package and orders required dependencies first", () => {
     const root = new URL("../", import.meta.url);
     const workflow = readFileSync(new URL(".github/workflows/release.yml", root), "utf8");
-    const match = /for package in ([a-z ]+); do\s*node scripts\/publish-release/.exec(workflow);
+    const match = /for package in ([a-z -]+); do\s*node scripts\/publish-release/.exec(workflow);
     assert(match, "Missing tagged-release package publication loop");
     const order = match[1].trim().split(/\s+/);
     const names = readdirSync(new URL("packages", root)).filter((name) =>

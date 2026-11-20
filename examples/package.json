@@ -42,7 +42,9 @@
     "example:session:8": "tsx 05-wallet-session/08-revoke-credit.ts",
     "example:broadcaster:1": "tsx 07-broadcaster/01-prepare-and-broadcast.ts",
     "example:broadcaster:2": "tsx 07-broadcaster/02-pre-submit-provenance.ts",
-    "example:broadcaster:3": "tsx 07-broadcaster/03-recover-and-submit-provenance.ts"
+    "example:broadcaster:3": "tsx 07-broadcaster/03-recover-and-submit-provenance.ts",
+    "example:payment-router:v3": "tsx 08-payment-router/01-uniswap-v3.ts",
+    "example:payment-router:zeroex": "tsx 08-payment-router/02-zeroex.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",
@@ -50,7 +52,8 @@
     "@invisi-labs/sdk": "workspace:*",
     "ethers": "6.17.0",
     "@invisi-labs/session": "workspace:*",
-    "@invisi-labs/primitives": "workspace:*"
+    "@invisi-labs/primitives": "workspace:*",
+    "@invisi-labs/payment-router": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

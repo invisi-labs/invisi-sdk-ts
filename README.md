@@ -1,6 +1,6 @@
 # Invisi TypeScript SDK
 
-Release preparation targets `1.3.0` for all nine packages; see [local package verification](RELEASE.md).
+Workspace manifests currently use `1.3.1`. The new, unreleased Payment Router package follows the same fixed release group; see [local package verification](RELEASE.md).
 
 A capability SDK for ordinary private Notes and deferred Credit grants. Workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
 
@@ -11,6 +11,7 @@ A capability SDK for ordinary private Notes and deferred Credit grants. Workspac
 | `@invisi-labs/prover` | Local witness construction, authenticated artifacts and explicit `/native`, `/wasm`, `/aggregate` backends. |
 | `@invisi-labs/rpc` | Protocol RPC, Broadcaster and Provenance clients, deployment/registry bindings, response validation and transport errors. |
 | `@invisi-labs/sdk` | Stateless preparation, external signing requests, proofs, output factories and calldata. Note/Credit public subpaths retain separate business types. |
+| `@invisi-labs/payment-router` | Optional original Uniswap V3 and native 0x quote adapters, Router-funded preparation, payable transaction encoding and full-call simulation. |
 | `@invisi-labs/session` | Inventory, selection, reservations, synchronization, history and operation recovery. |
 | `@invisi-labs/react`, `@invisi-labs/vue` | Thin operation lifecycle bindings. |
 
@@ -213,3 +214,23 @@ an independent chain reader.
 ## Contributing
 
 Open a focused GitHub issue or pull request describing the problem, scope, and validation. Run `pnpm test` and `pnpm lint` (plus the relevant package/release checks) for your change. Never include private keys, credentials, or private witnesses in issues, pull requests, logs, or fixtures.
+
+## Optional atomic swap payments
+
+`@invisi-labs/payment-router` composes the existing stateless SDK with the separately deployed `PaymentRouter` / `ZeroExPaymentRouter` contracts. Dependency direction is payment-router -> sdk/protocol/primitives; installing the core SDK alone does not install this extension. It exports ESM, CommonJS, types and public Router ABI snapshots from `invisi-payment-router` revision `b246f29`.
+
+`PaymentRouterClient` takes explicit trusted deployment addresses and an ethers Provider. `preparePayment` binds the Router as direct funding payer and uses only explicitly requested Note outputs, without wallet inventory or private inputs. Pure funding currently requires at least two Notes. Funding covers all output amounts plus the optional same-token core fee. The host runs the returned PreparedTransaction's existing proving lifecycle.
+
+`UniswapV3Adapter` quotes configured forward token/fee routes using QuoterV2 and encodes reversed exact-output paths with integer-rounded slippage limits. `ZeroExAdapter` accepts an injected quote transport; `createZeroExQuoteFetcher` is an explicit backend HTTP option. Both use exact target-token funding and a native input ceiling. A 0x quote's native value must equal maxSellAmount and its NATIVE_CHECK budget, with this Router as taker and output recipient. Metadata, target, nested operator, slippage header, native guard, deadlines and the current registry Settler are checked; underlying 0x actions are not individually audited or rewritten. Ordinary minimum-output / surplus-producing quotes may revert and are not automatically converted to exact-buy routes.
+
+After proving, obtain or refresh a short-lived quote. `buildPaymentTransaction` decodes the ready core call, checks its deployment, payer, token and exact funding amount, then encodes the matching Router entry point. `simulatePayment` uses the full call, ETH value and actual sender for eth_call and gas estimation. It reports measured simulated native input and refund separately from gas units. No method signs, approves tokens from the player, broadcasts, or reserves wallet inventory. Quotes expire using chain time, and registry rotations require refreshing 0x quotes. WETH output, ERC20 sell input, private-input swaps, cross-chain settlement, asynchronous 0x orders and signature/Permit2 funding are outside this release.
+
+Examples are in [08-payment-router](examples/08-payment-router/01-uniswap-v3.ts). API keys belong to a backend, not a browser bundle. Full API-generated 0x quote execution requires an actual credential and supported quote; structural unit fixtures are not evidence of a live API quote.
+
+Compiled-contract integration is optional and runs on a fresh local Anvil using the sibling Router project's built artifacts:
+
+```sh
+INVISI_PAYMENT_ROUTER_REPO=/absolute/path/to/invisi-payment-router pnpm --filter @invisi-labs/payment-router exec vitest run src/contracts.integration.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+Supply an absolute repository path when running from a package directory. The tests exercise real Router/native/ERC20 settlement with external liquidity and proof-verification boundary doubles; they do not claim genuine ZK proving or live API routing.
