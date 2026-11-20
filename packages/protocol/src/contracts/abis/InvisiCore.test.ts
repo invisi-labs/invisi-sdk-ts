@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { Interface } from "ethers";
+import { AbiCoder, Interface } from "ethers";
 import { invisiCoreAbi } from "./InvisiCore";
 const iface = new Interface(invisiCoreAbi);
 it("exposes current Credit operations and public revocation queries", () => {
@@ -31,4 +31,15 @@ it("uses payer/grant arrays and one ordinary Note commitment in draw tuples", ()
         "feeRecipient",
         "feeAmount",
     ]);
+});
+
+it("encodes deployment parameters and the immutable address registry", () => {
+    const addresses = Array.from({ length: 6 }, (_, i) => `0x${String(i + 1).repeat(40)}`);
+    const params = addresses.slice(0, 5);
+    expect(iface.encodeDeploy([params, addresses[5]])).toBe(
+        AbiCoder.defaultAbiCoder().encode(
+            ["tuple(address,address,address,address,address)", "address"],
+            [params, addresses[5]]
+        )
+    );
 });

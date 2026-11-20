@@ -1,4 +1,7 @@
-/** Synthetic fixture for owned local acceptance only; never imported by the production SDK. */
+/**
+ * Synthetic off-chain Provenance service screening fixture for owned local acceptance only.
+ * Independent of the removed Core screening hook; never imported by the production SDK.
+ */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 export function provisionOwnedScreeningFixture(directory) {

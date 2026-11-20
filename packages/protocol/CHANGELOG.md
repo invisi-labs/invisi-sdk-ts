@@ -1,5 +1,10 @@
 # @invisi-labs/protocol
 
+## Unreleased (planned v1.3.3)
+
+- Synchronize Core and Factory ABIs with Core `9f61a55`: deploy Core with `(params, addressRegistry)` and call Factory `deploy` / `computeInstanceAddress` with `(creationCode, salt, initialOwner, emergencyAdmin, addressRegistry)`.
+- Remove the Core screening getter, setter, event and error from exported ABIs; refresh ABI identity hashes. Settlement calls, events, proofs and circuit resources remain compatible.
+
 ## 1.3.2
 
 - Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.

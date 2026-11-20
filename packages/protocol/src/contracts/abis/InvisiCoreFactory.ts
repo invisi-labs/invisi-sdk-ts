@@ -71,11 +71,6 @@ export const invisiCoreFactoryAbi = [
                 "internalType": "address",
             },
             {
-                "name": "screener_",
-                "type": "address",
-                "internalType": "address",
-            },
-            {
                 "name": "addressRegistry_",
                 "type": "address",
                 "internalType": "address",
@@ -124,11 +119,6 @@ export const invisiCoreFactoryAbi = [
             },
             {
                 "name": "emergencyAdmin_",
-                "type": "address",
-                "internalType": "address",
-            },
-            {
-                "name": "screener_",
                 "type": "address",
                 "internalType": "address",
             },
