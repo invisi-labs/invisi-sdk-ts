@@ -1,7 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { publicationState, verifyPublishedArchive } from "./publish-release.mjs";
+import {
+    publicationState,
+    verifyPublishedArchive,
+    validateReleasePackageName,
+} from "./publish-release.mjs";
+
+test("accepts the optional hyphenated Payment Router release package", () => {
+    validateReleasePackageName("@invisi-labs/payment-router");
+    validateReleasePackageName("@invisi-labs/prover");
+    for (const name of [
+        "@other/payment-router",
+        "@invisi-labs/payment--router",
+        "@invisi-labs/payment-router/extra",
+        "@invisi-labs/-router",
+        "@invisi-labs/router-",
+    ])
+        assert.throws(() => validateReleasePackageName(name));
+});
 
 test("publishes a missing version", () => {
     assert.equal(

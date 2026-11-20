@@ -15,6 +15,10 @@ import {
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+export function validateReleasePackageName(name) {
+    assert(/^@invisi-labs\/[a-z]+(?:-[a-z]+)*$/.test(name), "Unexpected release package");
+}
+
 export function publicationState(status, metadata, integrity, name, version) {
     if (status === 404) return "publish";
     assert.equal(
@@ -89,7 +93,7 @@ async function main() {
     const manifest = JSON.parse(
         execFileSync("tar", ["-xOf", filename, "package/package.json"], { encoding: "utf8" })
     );
-    assert(/^@invisi-labs\/[a-z]+$/.test(manifest.name), "Unexpected release package");
+    validateReleasePackageName(manifest.name);
     assert(/^\d+\.\d+\.\d+$/.test(manifest.version), "Invalid release version");
     const release = JSON.parse(
         readFileSync(

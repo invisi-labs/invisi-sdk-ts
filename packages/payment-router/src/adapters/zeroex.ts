@@ -18,6 +18,9 @@ export class ZeroExAdapter implements SwapQuoteAdapter {
         );
         uint(request.maxInput, 256, "ETH budget", true);
         uint(request.amountOut, 128, "funding amount", true);
+        uint(request.deadline, 64, "quote deadline");
+        const bps = request.slippageBps ?? 50;
+        check(Number.isInteger(bps) && bps >= 0 && bps <= 10000, "invalid slippageBps");
         check(request.deadline >= request.now, "quote expired");
         const body = record(await this.#transport(snapshotQuoteRequest(request)), "0x quote");
         request.signal?.throwIfAborted();

@@ -1,5 +1,9 @@
 # @invisi-labs/sdk
 
+## 1.3.2
+
+- Support detached Router-funded payment preparation with no private inputs; preserve the host-managed proof lifecycle and exact funding amount. Release with the independent Core and Provenance resource catalogs.
+
 ## 1.3.1
 
 - Accept unified CreditDraw events in indexed Credit RPC responses, including post-debit state deliveries.

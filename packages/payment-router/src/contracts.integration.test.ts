@@ -76,7 +76,7 @@ describe.skipIf(!repository)("compiled Solidity Router execution on an isolated 
         provider?.destroy();
         anvil?.kill();
     });
-    it.each(["uniswap-v3", "zeroex"] as const)(
+    it.each(["uniswap-v3", "zeroex", "zeroex-holder"] as const)(
         "executes %s calldata, exact core funding and refunds",
         async (channel) => {
             const token = await deploy("TestToken"),
@@ -160,7 +160,7 @@ describe.skipIf(!repository)("compiled Solidity Router execution on an isolated 
                     reversePath: encodeV3ExactOutputPath([deployment.wethAddress, target], [3000]),
                 };
             else {
-                const calldata = zeroExInterface.encodeFunctionData("execute", [
+                const inner = zeroExInterface.encodeFunctionData("execute", [
                     [deployment.routerAddress, target, 10n],
                     [
                         zeroExInterface.encodeFunctionData("NATIVE_CHECK", [
@@ -170,6 +170,16 @@ describe.skipIf(!repository)("compiled Solidity Router execution on an isolated 
                     ],
                     "0x" + "00".repeat(32),
                 ]);
+                const useHolder = channel === "zeroex-holder";
+                const calldata = useHolder
+                    ? zeroExInterface.encodeFunctionData("exec", [
+                          await settler.getAddress(),
+                          NATIVE_TOKEN,
+                          0n,
+                          await settler.getAddress(),
+                          inner,
+                      ])
+                    : inner;
                 quote = await client.quote(
                     new ZeroExAdapter({
                         transport: async () => ({
@@ -180,7 +190,9 @@ describe.skipIf(!repository)("compiled Solidity Router execution on an isolated 
                             sellAmount: "600000000000000000",
                             maxSellAmount: "1000000000000000000",
                             transaction: {
-                                to: await settler.getAddress(),
+                                to: useHolder
+                                    ? await holder.getAddress()
+                                    : await settler.getAddress(),
                                 data: calldata,
                                 value: "1000000000000000000",
                             },
@@ -213,6 +225,32 @@ describe.skipIf(!repository)("compiled Solidity Router execution on an isolated 
             expect(await provider.getBalance(deployment.routerAddress, receipt!.blockNumber)).toBe(
                 0n
             );
+            expect(
+                await token.getFunction("allowance")(
+                    deployment.routerAddress,
+                    deployment.coreAddress
+                )
+            ).toBe(0n);
+            // A failed Core settlement must unwind the swap and its transient approvals.
+            const coreBalance = await token.getFunction("balanceOf")(deployment.coreAddress);
+            const liquidityBalance = await token.getFunction("balanceOf")(
+                channel === "uniswap-v3" ? await swap.getAddress() : await settler.getAddress()
+            );
+            await (await core.getFunction("configure")(true, false)).wait();
+            await expect(client.simulatePayment(call, { from: player })).rejects.toThrow();
+            await expect(
+                (async () => {
+                    const failed = await signer.sendTransaction({ ...call, gasLimit: 2000000n });
+                    await failed.wait();
+                })()
+            ).rejects.toThrow();
+            expect(await token.getFunction("balanceOf")(deployment.coreAddress)).toBe(coreBalance);
+            expect(
+                await token.getFunction("balanceOf")(
+                    channel === "uniswap-v3" ? await swap.getAddress() : await settler.getAddress()
+                )
+            ).toBe(liquidityBalance);
+            expect(await provider.getBalance(deployment.routerAddress, "latest")).toBe(0n);
             expect(
                 await token.getFunction("allowance")(
                     deployment.routerAddress,

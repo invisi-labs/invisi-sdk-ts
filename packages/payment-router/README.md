@@ -24,3 +24,11 @@ Quotes may be refreshed without regenerating the core proof when the target toke
 ERC20 sell input, WETH output, private-input swaps, cross-chain settlement, Permit2 and asynchronous orders are outside this release. The host retains signing, proof execution, transaction submission and confirmation tracking.
 
 See the workspace `examples/08-payment-router/` scenarios. Public ABI snapshots match `invisi-periphery` revision `b246f29`. Run `pnpm sync:payment-router-abis --check` from the workspace with the sibling contracts built to verify ABI identity. Optional Anvil contract tests use external liquidity and proof-verification doubles; live API quotes and genuine ZK proving require separate integration acceptance.
+
+## Cross-SDK validation
+
+The workspace golden vectors in `test-support/payment-router/vectors.json` cover reversed paths, native 0x acceptance and rejection, complete Router calldata and simulation accounting. Go and Rust consume the same bytes. Run `UPDATE_PAYMENT_ROUTER_VECTORS=1 pnpm --filter @invisi-labs/payment-router exec vitest run src/parity-vectors.test.ts` only when deliberately updating the reviewed reference.
+
+Run contract execution tests with `INVISI_PERIPHERY_REPO=/path/to/invisi-periphery pnpm --filter @invisi-labs/payment-router exec vitest run src/contracts.integration.test.ts`. Build Periphery contracts first. The tests execute V3, direct 0x and Holder-wrapped 0x payments and reject failed Core settlement with full rollback. They use real Router bytecode with Core and external liquidity doubles on an owned Anvil chain.
+
+`scripts/payment-router-test-chain.mjs` provisions a separate loopback Anvil fixture for each native SDK using only public development accounts. Pass the Periphery checkout and a temporary output JSON path, then set `INVISI_PAYMENT_ROUTER_FIXTURE` to that file for the native SDK integration test. Stop the fixture process to close its owned chain.

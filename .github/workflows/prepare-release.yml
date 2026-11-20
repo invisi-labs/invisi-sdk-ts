@@ -1,0 +1,54 @@
+name: Prepare canonical SDK archives
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Exact commit with successful develop or main CI
+        required: true
+        type: string
+      version:
+        description: Stable release tag matching all package manifests
+        required: true
+        default: v1.3.2
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_commit }}
+          persist-credentials: false
+      - name: Require successful trusted CI for the exact source commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          python3 scripts/check-ci-reuse.py "$SOURCE_COMMIT" develop,main > "$RUNNER_TEMP/reuse-result"
+          grep -Fx 'verified=true' "$RUNNER_TEMP/reuse-result"
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Prepare canonical archives without publishing
+        env:
+          RELEASE_TAG: ${{ inputs.version }}
+        run: node scripts/prepare-release-archives.mjs "$RELEASE_TAG" "$RUNNER_TEMP/canonical-packages"
+      - name: Validate all archives in an independent consumer
+        env:
+          RELEASE_TAG: ${{ inputs.version }}
+        run: |
+          node scripts/check-release.mjs "$RELEASE_TAG" "$RUNNER_TEMP/canonical-packages"
+          node scripts/check-packed-release.mjs "$RELEASE_TAG" "$RUNNER_TEMP/canonical-packages"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canonical-npm-archives
+          path: ${{ runner.temp }}/canonical-packages/
+          if-no-files-found: error

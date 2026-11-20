@@ -1,5 +1,9 @@
 # @invisi-labs/session
 
+## 1.3.2
+
+- Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.
+
 ## 1.3.1
 
 - Accept unified CreditDraw events in indexed Credit RPC responses, including post-debit state deliveries.

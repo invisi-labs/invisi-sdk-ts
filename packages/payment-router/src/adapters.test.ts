@@ -4,6 +4,25 @@ import { A, chain, deployment, quoteOptions, apiQuote, nativePayload } from "./t
 function request() {
     return { ...quoteOptions, deployment, now: 1000n, blockNumber: 10, settlerAddress: A.settler };
 }
+it("rejects invalid standalone 0x deadlines and slippage before calling transport", async () => {
+    let calls = 0;
+    const adapter = new ZeroExAdapter({
+        transport: async () => {
+            calls++;
+            return apiQuote();
+        },
+    });
+    for (const changes of [
+        { deadline: -1n },
+        { deadline: 1n << 64n },
+        { slippageBps: -1 },
+        { slippageBps: 10001 },
+        { slippageBps: 0.5 },
+        { slippageBps: Number.NaN },
+    ])
+        await expect(adapter.quote({ ...request(), ...changes })).rejects.toThrow();
+    expect(calls).toBe(0);
+});
 it("quotes V3 exact output with integer-rounded slippage and a strict user budget", async () => {
     const h = chain(),
         a = new UniswapV3Adapter({

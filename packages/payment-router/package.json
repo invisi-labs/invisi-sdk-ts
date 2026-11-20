@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/payment-router",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Exact-output Uniswap V3 and 0x quotes, Invisi payment preparation and atomic Router transactions",
   "type": "module",
   "sideEffects": false,
