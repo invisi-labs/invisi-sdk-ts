@@ -93,9 +93,11 @@ function header(raw: unknown, hash: unknown): CanonicalBlock {
 export class TrustedProvider implements ChainReader {
     readonly #read: (request: unknown) => Promise<Record<string, unknown>>;
     readonly #scope: DeploymentContext;
+    readonly #readBatch: (requests: readonly unknown[]) => Promise<Record<string, unknown>[]>;
     constructor(client: ProtocolRpcClient, scope: DeploymentContext) {
         this.#scope = { ...scope };
         this.#read = client.trustedChainState(this.#scope);
+        this.#readBatch = client.trustedChainStateBatch(this.#scope);
     }
     private context(scope: DeploymentContext) {
         check(
@@ -113,6 +115,16 @@ export class TrustedProvider implements ChainReader {
         const b = header(r.header, r.headerHash);
         check(b.number === number, "trusted header number mismatch");
         return b;
+    }
+    async getBlocks(numbers: readonly bigint[]): Promise<CanonicalBlock[]> {
+        const results = await this.#readBatch(
+            numbers.map((number) => ({ kind: "header", block: blockTag(number) }))
+        );
+        return results.map((r, index) => {
+            const block = header(r.header, r.headerHash);
+            check(block.number === numbers[index], "trusted header number mismatch");
+            return block;
+        });
     }
     async getLatestBlockNumber() {
         const b = await this.getBlockByTag("latest");

@@ -77,16 +77,79 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             throw Error("trusted provider requires explicit deployment pins");
         this.context(context);
         return async (request) => {
-            const result = object(await this.rpc("invisi_readChainState", [request]));
-            if (result.apiVersion !== "v1" || result.protocolVersion !== "1")
-                throw Error("trusted chain state version mismatch");
-            const snapshot = (value: unknown) =>
-                JSON.stringify(value, (_, item) =>
-                    typeof item === "bigint" ? item.toString() : item
+            return this.validateTrustedChainState(
+                await this.rpc("invisi_readChainState", [request])
+            );
+        };
+    }
+    private validateTrustedChainState(value: unknown) {
+        const result = object(value);
+        if (result.apiVersion !== "v1" || result.protocolVersion !== "1")
+            throw Error("trusted chain state version mismatch");
+        const snapshot = (value: unknown) =>
+            JSON.stringify(value, (_, item) => (typeof item === "bigint" ? item.toString() : item));
+        if (snapshot(defineDeployment(result.deployment)) !== snapshot(this.deployment))
+            throw Error("trusted chain state deployment mismatch");
+        return result;
+    }
+    /** @internal Bounded JSON-RPC transport for explicitly pinned public chain reads. */
+    trustedChainStateBatch(context: DeploymentContext) {
+        if (!this.#explicitDeployment)
+            throw Error("trusted provider requires explicit deployment pins");
+        this.context(context);
+        return async (requests: readonly unknown[]): Promise<Record<string, unknown>[]> => {
+            if (requests.length > 256) invalid("trusted batch requires at most 256 requests");
+            const output: Record<string, unknown>[] = [];
+            const url = new URL(this.#options.url);
+            const path = url.pathname.replace(/\/$/, "");
+            if (path.endsWith("/v1")) url.pathname = `${path}/chains/${this.deployment.chainId}`;
+            for (let offset = 0; offset < requests.length; offset += 20) {
+                const batch = requests.slice(offset, offset + 20).map((request) => ({
+                    jsonrpc: "2.0",
+                    id: this.#nextId++,
+                    method: "invisi_readChainState",
+                    params: [request],
+                }));
+                const raw = await requestJson(
+                    { ...this.#options, url: url.href },
+                    { method: "POST", body: JSON.stringify(batch) }
                 );
-            if (snapshot(defineDeployment(result.deployment)) !== snapshot(this.deployment))
-                throw Error("trusted chain state deployment mismatch");
-            return result;
+                if (
+                    !Array.isArray(raw) ||
+                    raw.length !== batch.length ||
+                    JSON.stringify(raw).length > 16 * 1024 * 1024
+                )
+                    invalid("Invalid JSON-RPC batch response");
+                const expected = new Set(batch.map((request) => request.id));
+                const values = new Map<number, Record<string, unknown>>();
+                for (const entry of list(raw)) {
+                    const body = object(entry);
+                    if (
+                        body.jsonrpc !== "2.0" ||
+                        typeof body.id !== "number" ||
+                        !expected.delete(body.id) ||
+                        Object.hasOwn(body, "result") === Object.hasOwn(body, "error")
+                    )
+                        invalid("Invalid JSON-RPC batch response envelope");
+                    if (Object.hasOwn(body, "error")) {
+                        const error = object(body.error);
+                        if (
+                            typeof error.code !== "number" ||
+                            !Number.isSafeInteger(error.code) ||
+                            typeof error.message !== "string"
+                        )
+                            invalid("Invalid JSON-RPC error");
+                        throw new ProtocolRpcError(
+                            "Protocol RPC returned an error",
+                            "rpc",
+                            error.code as number
+                        );
+                    }
+                    values.set(body.id as number, this.validateTrustedChainState(body.result));
+                }
+                output.push(...batch.map((request) => values.get(request.id)!));
+            }
+            return output;
         };
     }
 
@@ -284,7 +347,8 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
     private async updatePage(
         context: DeploymentContext,
         range: ProtocolUpdateRange,
-        method: string
+        method: string,
+        observation?: { indexedHead: unknown; finality: unknown }
     ) {
         this.context(context);
         if (
@@ -293,10 +357,9 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             range.toBlock - range.fromBlock >= BigInt(MAX_UPDATE_BLOCKS)
         )
             invalid(`RPC updates require at most ${MAX_UPDATE_BLOCKS} deployment blocks`);
-        const status = await this.readStatusMetadata(
-            context,
-            range.signal ? { signal: range.signal } : {}
-        );
+        const status =
+            observation ??
+            (await this.readStatusMetadata(context, range.signal ? { signal: range.signal } : {}));
         if (status.indexedHead === null) invalid("RPC has not indexed any blocks");
         const head = blockReference(status.indexedHead);
         if (range.toBlock > head.number) invalid("RPC range exceeds indexed history");
@@ -332,7 +395,19 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             invalid("RPC query block changed during query");
     }
     async getNoteUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
-        const { block, raw } = await this.updatePage(context, range, "invisi_getNoteUpdates");
+        return this.noteUpdates(context, range);
+    }
+    private async noteUpdates(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange,
+        observation?: { indexedHead: unknown; finality: unknown }
+    ) {
+        const { block, raw } = await this.updatePage(
+            context,
+            range,
+            "invisi_getNoteUpdates",
+            observation
+        );
         const page = await parseNoteCandidates(
             this.canonical.bind(this),
             block,
@@ -383,7 +458,31 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         return transitions;
     }
     async getCreditTransitions(context: DeploymentContext, range: ProtocolUpdateRange) {
-        const { block, raw } = await this.updatePage(context, range, "invisi_getCreditTransitions");
+        return this.creditUpdates(context, range);
+    }
+    /** Acquire both public streams under one authenticated deployment/indexed observation. */
+    async getHistoryUpdates(context: DeploymentContext, range: ProtocolUpdateRange) {
+        const observation = await this.readStatusMetadata(
+            context,
+            range.signal ? { signal: range.signal } : {}
+        );
+        const [notes, credits] = await Promise.all([
+            this.noteUpdates(context, range, observation),
+            this.creditUpdates(context, range, observation),
+        ]);
+        return { notes, credits };
+    }
+    private async creditUpdates(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange,
+        observation?: { indexedHead: unknown; finality: unknown }
+    ) {
+        const { block, raw } = await this.updatePage(
+            context,
+            range,
+            "invisi_getCreditTransitions",
+            observation
+        );
         const transitions = await this.parseTransitions(list(raw), range);
         await this.recheck(block);
         return { block, transitions };

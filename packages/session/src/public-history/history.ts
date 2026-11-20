@@ -264,7 +264,11 @@ export class PublicHistory {
                     : this.scope.deploymentBlock
                 : highest + 1n;
         if (start <= target)
-            await this.synchronizeRange({ ...settings, fromBlock: start, toBlock: target });
+            await this.synchronizeRange(
+                { ...settings, fromBlock: start, toBlock: target },
+                undefined,
+                status
+            );
         while (true) {
             const state = await this.snapshot();
             const gap = highestGap(state.coverage ?? [], this.scope.deploymentBlock, target);
@@ -273,7 +277,11 @@ export class PublicHistory {
                 gap.toBlock - BigInt(size) + 1n > gap.fromBlock
                     ? gap.toBlock - BigInt(size) + 1n
                     : gap.fromBlock;
-            await this.synchronizeRange({ ...settings, fromBlock: from, toBlock: gap.toBlock });
+            await this.synchronizeRange(
+                { ...settings, fromBlock: from, toBlock: gap.toBlock },
+                undefined,
+                status
+            );
         }
         if ((await this.options.reader.getBlock(target)).hash !== block.hash)
             throw Error("canonical history changed during synchronization");
@@ -281,7 +289,8 @@ export class PublicHistory {
     }
     private async synchronizeRange(
         settings: Omit<PublicSyncOptions, "signal" | "onProgress">,
-        capture?: (page: PublicHistoryPage, generation: number) => void
+        capture?: (page: PublicHistoryPage, generation: number) => void,
+        observation?: import("@invisi-labs/protocol").ProtocolDataStatus
     ) {
         const { protocol, protocolRpc, store } = this.options;
         const reader = this.#preparationCapture?.reader(this.options.reader) ?? this.options.reader;
@@ -291,8 +300,8 @@ export class PublicHistory {
         await protocol.validateDeployment(reader);
         const original = await this.snapshot();
         let snapshot = await this.reconcile();
-        const status = await protocolRpc.getStatus(protocol.context);
-        await this.observeHead(status);
+        const status = observation ?? (await protocolRpc.getStatus(protocol.context));
+        if (!observation) await this.observeHead(status);
         if (!status.indexedHead) throw Error("Protocol RPC has not indexed history");
         const target = settings.toBlock ?? status.indexedHead.number;
         let cursor =
@@ -339,18 +348,21 @@ export class PublicHistory {
             if (next && next.fromBlock <= end) end = next.fromBlock - 1n;
             this.report("download", "processing", target, snapshot.through);
             const range = { fromBlock: cursor, toBlock: end };
-            const [notes, credits] = await Promise.all([
-                protocolRpc.getNoteUpdates(protocol.context, range),
-                protocolRpc.getCreditTransitions(protocol.context, range),
-            ]);
+            const { notes, credits } = protocolRpc.getHistoryUpdates
+                ? await protocolRpc.getHistoryUpdates(protocol.context, range)
+                : await Promise.all([
+                      protocolRpc.getNoteUpdates(protocol.context, range),
+                      protocolRpc.getCreditTransitions(protocol.context, range),
+                  ]).then(([notes, credits]) => ({ notes, credits }));
             const headers: CanonicalBlock[] = [];
-            for (let start = cursor; start <= end; start += 8n) {
-                const count = Number(end - start + 1n < 8n ? end - start + 1n : 8n);
-                const batch = await Promise.all(
-                    Array.from({ length: count }, (_, index) =>
-                        reader.getBlock(start + BigInt(index))
-                    )
-                );
+            const width = reader.getBlocks ? 20n : 8n;
+            for (let start = cursor; start <= end; start += width) {
+                const count = Number(end - start + 1n < width ? end - start + 1n : width);
+                const numbers = Array.from({ length: count }, (_, index) => start + BigInt(index));
+                const batch = reader.getBlocks
+                    ? await reader.getBlocks(numbers)
+                    : await Promise.all(numbers.map((n) => reader.getBlock(n)));
+                if (batch.length !== count) throw Error("incomplete public history headers");
                 for (let index = 0; index < batch.length; index++) {
                     const header = batch[index]!;
                     if (

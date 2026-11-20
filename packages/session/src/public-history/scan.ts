@@ -165,7 +165,7 @@ export async function scanAccount(
         lower;
     const capture = settings.offline ? undefined : createPreparationCapture();
     const normalReader = localReader(history, options.chainReader!, !!settings.offline);
-    const reader = capture?.reader(normalReader) ?? normalReader;
+    const reader = capture?.reader(normalReader, true, false) ?? normalReader;
     const receiving = options.wallet.getReceivingAddress();
     const active = authenticatedDecryptor(
         options.wallet.ownerAddress,
@@ -350,7 +350,8 @@ async function replayCredits(
         ? state.creditReplayThrough.number + 1n
         : state.creditReplayFrom;
     if (start > target) return 0;
-    const reader = localReader(history, options.chainReader!, false),
+    const sourceReader = localReader(history, options.chainReader!, false);
+    const reader = capture?.reader(sourceReader, true, false) ?? sourceReader,
         block = await reader.getBlock(target),
         receiving = options.wallet.getReceivingAddress();
     const updater = new WalletUpdater({
@@ -383,6 +384,14 @@ async function replayCredits(
             : {}),
     })) {
         settings.signal?.throwIfAborted();
+        // Every page was authenticated by PublicHistory. Empty Credit ranges carry no
+        // private transitions: defer their cursor write until a Credit page or the end.
+        // Interruption can replay this empty gap but cannot skip an uncommitted transition.
+        if (
+            page.block.number < target &&
+            !page.logs.some((log) => log.eventName.startsWith("Credit"))
+        )
+            continue;
         const batch: CandidatePage = {
             context: options.protocol.context,
             block,

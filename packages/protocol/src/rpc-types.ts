@@ -36,6 +36,11 @@ export interface ProtocolCreditUpdates {
     transitions: readonly ProtocolCreditTransition[];
 }
 export interface ProtocolDataProvider {
+    /** Optional combined discovery under one authenticated deployment/indexed observation. */
+    getHistoryUpdates?(
+        context: DeploymentContext,
+        range: ProtocolUpdateRange
+    ): Promise<{ notes: ProtocolNoteUpdates; credits: ProtocolCreditUpdates }>;
     getMembership(
         context: DeploymentContext,
         input: { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex },

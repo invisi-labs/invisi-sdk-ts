@@ -68,3 +68,98 @@ it("rejects a broken parent link across concurrent batches without committing co
     expect((await history.snapshot()).coverage).toEqual([]);
     expect((await history.snapshot()).pages).toEqual([]);
 });
+
+it("pins one validated indexed status per synchronization while keeping fresh canonical fences", async () => {
+    const { history } = fixture();
+    const rpc = history.options.protocolRpc;
+    const getStatus = vi.spyOn(rpc, "getStatus");
+    rpc.getNoteUpdates = async (_context, range) => ({ block: block(range.toBlock), notes: [] });
+    rpc.getCreditTransitions = async (_context, range) => ({
+        block: block(range.toBlock),
+        transitions: [],
+    });
+    await history.synchronize({ pageSize: 1 });
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    expect((await history.snapshot()).coverage?.[0]?.block.number).toBe(115n);
+    await history.synchronize({ pageSize: 1 });
+    expect(getStatus).toHaveBeenCalledTimes(2);
+});
+it("uses optional batch headers and rejects partial or out-of-order results before committing", async () => {
+    const { history } = fixture();
+    const getBlocks = vi.fn(async (numbers: readonly bigint[]) => numbers.map(block));
+    history.options.reader.getBlocks = getBlocks;
+    await history.synchronize({ fromBlock: 100n, toBlock: 115n });
+    expect(getBlocks).toHaveBeenCalledTimes(1);
+    expect(getBlocks.mock.calls[0]![0]).toHaveLength(16);
+    for (const bad of ["partial", "reordered", "broken-parent"] as const) {
+        const f = fixture();
+        f.history.options.reader.getBlocks = async (numbers) => {
+            const blocks = numbers.map(block);
+            if (bad === "partial") return blocks.slice(1);
+            if (bad === "reordered") return blocks.reverse();
+            blocks[8] = { ...blocks[8]!, parentHash: hex(999n) };
+            return blocks;
+        };
+        await expect(f.history.synchronize({ fromBlock: 100n, toBlock: 115n })).rejects.toThrow(
+            /public history headers/
+        );
+        expect((await f.history.snapshot()).coverage).toEqual([]);
+    }
+});
+
+it.runIf(!!process.env.WALLET_PERF)(
+    "benchmarks cold and warm full-header history acquisition",
+    async () => {
+        for (const batched of [false, true]) {
+            let headerRequests = 0;
+            const pause = () => new Promise((resolve) => setTimeout(resolve, 10));
+            const { history } = fixture();
+            const reader = history.options.reader;
+            reader.getBlock = async (n) => {
+                headerRequests++;
+                await pause();
+                return block(n);
+            };
+            if (batched)
+                reader.getBlocks = async (numbers) => {
+                    headerRequests++;
+                    await pause();
+                    return numbers.map(block);
+                };
+            const rpc = history.options.protocolRpc;
+            rpc.getStatus = async () => ({ indexedHead: block(355n) });
+            rpc.getNoteUpdates = async (_context, range) => ({
+                block: block(range.toBlock),
+                notes: [],
+            });
+            rpc.getCreditTransitions = async (_context, range) => ({
+                block: block(range.toBlock),
+                transitions: [],
+            });
+            let started = performance.now();
+            await history.synchronize({ fromBlock: 100n, toBlock: 355n, pageSize: 256 });
+            console.log(
+                JSON.stringify({
+                    scenario: "cold-public-256",
+                    batched,
+                    elapsedMs: performance.now() - started,
+                    headerRequests,
+                    latencyMs: 10,
+                })
+            );
+            headerRequests = 0;
+            started = performance.now();
+            await history.synchronize({ fromBlock: 100n, toBlock: 355n, pageSize: 256 });
+            console.log(
+                JSON.stringify({
+                    scenario: "warm-public-256",
+                    batched,
+                    elapsedMs: performance.now() - started,
+                    headerRequests,
+                    latencyMs: 10,
+                })
+            );
+            expect((await history.snapshot()).coverage?.[0]?.block.number).toBe(355n);
+        }
+    }
+);

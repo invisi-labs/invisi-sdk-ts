@@ -78,24 +78,45 @@ export class PreparationCapture {
                             CanonicalBlock,
                         ];
                         const keys = nullifiers.map((n) => key(method, [context, [n], block]));
-                        if (reuse && keys.every((k) => this.#values.has(k)))
-                            return keys.map((k) => this.#values.get(k));
-                        const values = (await fn.apply(object, args)) as boolean[];
-                        if (
-                            values.length !== nullifiers.length ||
-                            values.some((v) => typeof v !== "boolean")
-                        )
-                            throw Error("invalid spent capture response");
-                        if (!reuse)
-                            nullifiers.forEach((n, i) =>
+                        const retained = new Map(
+                            keys
+                                .filter((k) => this.#values.has(k))
+                                .map((k) => [k, this.#values.get(k) as boolean])
+                        );
+                        const missing = new Map<string, Hex>();
+                        nullifiers.forEach((n, index) => {
+                            if (!reuse || !this.#values.has(keys[index]!))
+                                missing.set(keys[index]!, n);
+                        });
+                        if (missing.size) {
+                            const words = [...missing.values()];
+                            const values = (await fn.apply(object, [
+                                context,
+                                words,
+                                block,
+                            ])) as boolean[];
+                            if (
+                                values.length !== words.length ||
+                                values.some((v) => typeof v !== "boolean")
+                            )
+                                throw Error("invalid spent capture response");
+                            words.forEach((n, i) =>
                                 this.remember(method, [context, [n], block], values[i])
                             );
-                        return values;
+                            // Build from the complete response, even when it exceeds retention limits.
+                            const resolved = new Map(
+                                [...missing.keys()].map((k, i) => [k, values[i]!])
+                            );
+                            return keys.map((k) =>
+                                resolved.has(k) ? resolved.get(k)! : retained.get(k)!
+                            );
+                        }
+                        return keys.map((k) => this.#values.get(k) as boolean);
                     }
                     const id = key(method, args);
                     if (reuse && this.#values.has(id)) return structuredClone(this.#values.get(id));
                     const result = await fn.apply(object, args);
-                    if (!reuse) this.remember(method, args, result);
+                    this.remember(method, args, result);
                     return result;
                 };
             },

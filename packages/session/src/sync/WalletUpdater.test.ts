@@ -615,6 +615,66 @@ it.each([
             );
             expect(replayed.credits[p.draw.stateCommitment + ":owner"]?.spent).toBe("unspent");
             expect(replayed.creditReplayFrom).toBeUndefined();
+            const repeatProgress: string[] = [];
+            await session.scanHistory(testDecryptor, {
+                pageSize: 1,
+                onProgress: (progress) => {
+                    if (progress.direction) repeatProgress.push(progress.direction);
+                },
+            });
+            expect(repeatProgress).not.toContain("credit-recovery");
+            if (!validChild) {
+                const forwardStore = new MemoryWalletStore();
+                const forward = new WalletSession(
+                    sessionOptions({
+                        ...h.options,
+                        protocol,
+                        store: forwardStore,
+                        protocolRpc:
+                            rpc as unknown as import("@invisi-labs/protocol").ProtocolDataProvider,
+                    })
+                );
+                await (
+                    await forward.refresh({ fromBlock: 12n, toBlock: 12n, pageSize: 1 })
+                ).decrypt(testDecryptor);
+                await (
+                    await forward.refresh({ fromBlock: 13n, toBlock: 13n, pageSize: 1 })
+                ).decrypt(testDecryptor);
+                expect(
+                    (await forwardStore.readSnapshot(forward.scope)).credits[
+                        p.draw.stateCommitment + ":owner"
+                    ]?.state.note.totalSpent
+                ).toBe(30n);
+            }
+            const foreignStore = new MemoryWalletStore();
+            const foreign = new WalletSession(
+                sessionOptions({
+                    ...h.options,
+                    protocol,
+                    store: foreignStore,
+                    wallet: Wallet.fromAddress(
+                        (await TestWallet.fromPrivateKey(new Uint8Array(32).fill(3))).getAddress()
+                    ),
+                    protocolRpc:
+                        rpc as unknown as import("@invisi-labs/protocol").ProtocolDataProvider,
+                })
+            );
+            const foreignProgress: string[] = [];
+            await (
+                await foreign.refresh({
+                    fromBlock: 12n,
+                    toBlock: 13n,
+                    pageSize: 1,
+                    onProgress: (progress) => {
+                        if (progress.direction) foreignProgress.push(progress.direction);
+                    },
+                })
+            ).decrypt({
+                decryptNote: async () => ({ status: "authentication-failed" as const }),
+                decryptCredit: async () => ({ status: "authentication-failed" as const }),
+            });
+            expect((await foreignStore.readSnapshot(foreign.scope)).credits).toEqual({});
+            expect(foreignProgress).not.toContain("credit-recovery");
             if (!validChild) {
                 const retryStore = new MemoryWalletStore({ recentRecords: 0 });
                 const retrySession = new WalletSession(
@@ -1313,4 +1373,83 @@ it("retains normal-sync authenticated memberships without querying their paths o
     // Deployment code authenticated during this canonical public sync is reused privately.
     expect(code.mock.calls.slice(codeReads).map(([address]) => address)).toEqual([token]);
     expect((await h.store.readSnapshot(h.a.scope)).preparationSnapshot).toBeDefined();
+});
+
+it("deduplicates fixed-block state reads across a real multi-page account scan", async () => {
+    const h = await sharedHarness();
+    h.head(76n);
+    await h.history.synchronize({ fromBlock: 12n, toBlock: 76n, pageSize: 1 });
+    // Seed the Note before scanning the empty tail: every page must retain its spent check.
+    await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 12n, pageSize: 1 });
+    vi.mocked(h.reader.isSpent).mockClear();
+    if (process.env.WALLET_PERF) {
+        const original = vi.mocked(h.reader.isSpent).getMockImplementation()!;
+        vi.mocked(h.reader.isSpent).mockImplementation(async (...args) => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            return original(...args);
+        });
+    }
+    const started = performance.now();
+    await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n, pageSize: 1 });
+    const elapsedMs = performance.now() - started;
+    const calls = vi.mocked(h.reader.isSpent).mock.calls.length;
+    if (process.env.WALLET_PERF)
+        console.log(
+            JSON.stringify({
+                scenario: "warm-account-64-empty-pages",
+                elapsedMs,
+                spentRequests: calls,
+            })
+        );
+    expect(calls).toBe(1);
+    expect((await h.store.readSnapshot(h.a.scope)).discoveryThrough?.number).toBe(76n);
+    // A new invocation must freshly observe a spend at the same height.
+    h.spent();
+    await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n });
+    expect((await h.a.balance(token)).availableKnown).toBe(0n);
+});
+
+it("coalesces empty Credit replay checkpoints without advancing an interrupted private cursor", async () => {
+    const h = await sharedHarness();
+    h.head(76n);
+    await h.history.synchronize({ fromBlock: 12n, toBlock: 76n, pageSize: 1 });
+    await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n, pageSize: 1 });
+    await h.store.transaction(h.a.scope, (draft) => {
+        draft.creditReplayFrom = 13n;
+        draft.creditReplayTarget = { number: 76n, hash: hex(76n) };
+    });
+    const transactions = vi.spyOn(h.store, "transaction");
+    const replayStarted = performance.now();
+    await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n, pageSize: 1 });
+    if (process.env.WALLET_PERF)
+        console.log(
+            JSON.stringify({
+                scenario: "empty-credit-replay-64-pages",
+                elapsedMs: performance.now() - replayStarted,
+                privateTransactions: transactions.mock.calls.length,
+            })
+        );
+    expect(transactions).toHaveBeenCalledTimes(2);
+    expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBeUndefined();
+    await h.store.transaction(h.a.scope, (draft) => {
+        draft.creditReplayFrom = 13n;
+        draft.creditReplayTarget = { number: 76n, hash: hex(76n) };
+    });
+    const pages = h.history.pages.bind(h.history);
+    h.history.pages = async function* (...args) {
+        let count = 0;
+        for await (const page of pages(...args)) {
+            if (++count === 3) throw Error("pause empty replay");
+            yield page;
+        }
+    };
+    await expect(
+        h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n, pageSize: 1 })
+    ).rejects.toThrow("pause empty replay");
+    const pending = await h.store.readSnapshot(h.a.scope);
+    expect(pending.creditReplayFrom).toBe(13n);
+    expect(pending.creditReplayThrough).toBeUndefined();
+    h.history.pages = pages;
+    await h.a.scanHistory(testDecryptor, { fromBlock: 12n, toBlock: 76n, pageSize: 1 });
+    expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBeUndefined();
 });

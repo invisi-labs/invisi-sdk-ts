@@ -48,6 +48,8 @@ export interface ChainReader {
     getProtocolAddressRegistry?(address: Address): Promise<Address>;
     getCode(address: Address): Promise<Hex>;
     getBlock(number: bigint): Promise<CanonicalBlock>;
+    /** Optional bounded full-header acquisition; callers still verify ordering and canonical anchors. */
+    getBlocks?(numbers: readonly bigint[]): Promise<readonly CanonicalBlock[]>;
     getBlockByTag?(tag: import("./finality").FinalityTag): Promise<CanonicalBlock | null>;
     getLatestBlockNumber(): Promise<bigint>;
     getFundingNonce(
