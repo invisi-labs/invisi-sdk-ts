@@ -177,7 +177,9 @@ try {
         manifestSha256: config.manifestSha256,
         signingKeys: { [config.signingKeyId]: getBytes(config.signingPublicKey) },
     });
-    const manifestBytes = await readFile(join(config.sourceAssetRoot, "manifest.json"));
+    const manifestBytes = await readFile(
+        join(config.sourceAssetRoot, "circuits/provenance/manifest.json")
+    );
     const manifest = authenticateManifest(manifestBytes, config.manifestSha256);
     const localSource = new LocalProvenanceProver({
         trustedManifestSha256: config.manifestSha256,

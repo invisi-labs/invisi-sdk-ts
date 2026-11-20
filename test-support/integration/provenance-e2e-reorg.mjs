@@ -6,8 +6,8 @@ import {
     scopeHash,
     recognizedLeaf,
     RecognizedTree,
-} from "../../../invisi-core/scripts/provenance-client.mjs";
-import { proveWitness } from "../../../invisi-core/scripts/provenance-proof.mjs";
+} from "../../../invisi-periphery/scripts/provenance-client.mjs";
+import { proveWitness } from "../../../invisi-periphery/scripts/provenance-proof.mjs";
 export async function reorgScenario({
     runtime,
     directory,

@@ -1,4 +1,4 @@
-// Public ABI snapshots from invisi-payment-router b246f29; no implementation bytecode.
+// Public ABI snapshots from invisi-periphery b246f29; no implementation bytecode.
 export const paymentRouterAbi = [
     {
         "type": "constructor",

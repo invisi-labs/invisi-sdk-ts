@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Transaction, keccak256 } from "ethers";
@@ -49,7 +50,7 @@ export async function rejectRecoveryProof({
 
 export async function recoveryFixture({
     runtime,
-    root,
+    peripheryRoot,
     directory,
     privateReceipt,
     data,
@@ -60,6 +61,13 @@ export async function recoveryFixture({
     trackingId,
     save,
 }) {
+    assert(peripheryRoot, "Periphery resource root required");
+    const manifest = readFileSync(join(peripheryRoot, "circuits/provenance/manifest.json"));
+    assert.equal(
+        createHash("sha256").update(manifest).digest("hex"),
+        sourceBundle.manifestSha256,
+        "recovery manifest mismatch"
+    );
     const [transaction, receipt, chainID] = await Promise.all([
         runtime.rpc("eth_getTransactionByHash", [privateReceipt.transactionHash]),
         runtime.rpc("eth_getTransactionReceipt", [privateReceipt.transactionHash]),
@@ -109,7 +117,7 @@ export async function recoveryFixture({
     const fixture = {
         trackingId,
         primaryRPC: JSON.parse(readFileSync(join(directory, "chain/node.json"))).url,
-        protocolRoot: root,
+        protocolRoot: peripheryRoot,
         transactionHash: transaction.hash,
         blockHash: receipt.blockHash,
         blockNumber: String(BigInt(receipt.blockNumber)),

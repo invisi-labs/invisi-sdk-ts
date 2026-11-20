@@ -4,6 +4,7 @@
  * Runs real Protocol/RPC/Provenance/BB/Broadcaster services on owned Anvil with host time.
  * Local ERC20, public wallets and explicit StaticPrices ratios are test assets.
  */
+import { provisionOwnedScreeningFixture } from "./provenance-owned-fixtures.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, mkdirSync, openSync, closeSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -13,7 +14,12 @@ import { createServer } from "node:net";
 import { createServer as createHTTPSServer } from "node:https";
 import { createPublicKey } from "node:crypto";
 import { AbiCoder, Wallet, ZeroAddress, ZeroHash, keccak256, verifyTypedData } from "ethers";
-import { root, json, sha } from "../../../invisi-core/scripts/provenance-build.mjs";
+import {
+    root as peripheryRoot,
+    json,
+    sha,
+} from "../../../invisi-periphery/scripts/provenance-build.mjs";
+const root = resolve(peripheryRoot, "../invisi-core");
 import { createSettlementRuntime } from "../../../invisi-core/scripts/settlement-fixtures/runtime.mjs";
 import {
     prepareSettlementShield,
@@ -31,8 +37,11 @@ import {
     RecognizedTree,
     operationDigest,
     verifyRootCertificate,
-} from "../../../invisi-core/scripts/provenance-client.mjs";
-import { proveWitness, trustedManifest } from "../../../invisi-core/scripts/provenance-proof.mjs";
+} from "../../../invisi-periphery/scripts/provenance-client.mjs";
+import {
+    proveWitness,
+    trustedManifest,
+} from "../../../invisi-periphery/scripts/provenance-proof.mjs";
 import {
     assertTracking,
     preflightTracking,
@@ -361,6 +370,7 @@ try {
         const servicePort = await port(options["service-port"]),
             serviceDir = join(directory, "provenance");
         run(join(bin, "provenance"), ["-dir", serviceDir, "init"], serviceRoot);
+        provisionOwnedScreeningFixture(serviceDir);
         const cfg = JSON.parse(readFileSync(join(serviceDir, "config.json"))),
             riskID = "0x" + sha("owned-real-e2e-address-list"),
             rules = {
@@ -369,10 +379,10 @@ try {
                 finality: "finalized",
             };
         const manifest = trustedManifest();
-        const crsPath = join(root, ".tools/provenance-verifier-crs");
+        const crsPath = join(peripheryRoot, ".tools/provenance-verifier-crs");
         assert(
             existsSync(join(crsPath, "pins.json")),
-            "preprovisioned CRS missing: run node ../invisi-core/scripts/provenance-crs.mjs"
+            "preprovisioned CRS missing: run node ../invisi-periphery/scripts/provenance-crs.mjs"
         );
         const pins = JSON.parse(readFileSync(join(crsPath, "pins.json"))).files;
         Object.assign(cfg, {
@@ -406,9 +416,9 @@ try {
                 },
             ],
             verifier: {
-                manifestPath: join(root, "circuits/provenance/manifest.json"),
+                manifestPath: join(peripheryRoot, "circuits/provenance/manifest.json"),
                 trustedManifestSha256: manifest.manifestSha256,
-                releaseRoot: root,
+                releaseRoot: peripheryRoot,
                 bbPath: join(root, ".tools/bb/bb"),
                 bbSha256: fingerprint(join(root, ".tools/bb/bb")),
                 crsPath,
@@ -640,7 +650,7 @@ try {
                 signingKeyId: keyID,
                 signingPublicKey: cfg.signingPublicKey,
                 manifestSha256: manifest.manifestSha256,
-                sourceAssetRoot: join(repoRoot, "invisi-sdk-ts/packages/prover/provenance"),
+                sourceAssetRoot: peripheryRoot,
                 crsPath,
                 bbPath: join(root, ".tools/bb/bb"),
                 broadcaster: {

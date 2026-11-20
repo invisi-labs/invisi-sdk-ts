@@ -9,13 +9,13 @@ from pathlib import Path
 PIN = "6107789c5c0d24c4130bff05da6d389336feb5ccb247c4030eae5198ab05d762"
 RESOURCE_ROOT = Path(__file__).resolve().parents[1] / "packages/prover/src/resources"
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("protocol_root", type=Path, nargs="?")
+parser.add_argument("periphery_root", type=Path, nargs="?")
 parser.add_argument("--check-package", type=Path, help="Check the tiny source resource metadata directory")
 parser.add_argument("--output", type=Path, default=RESOURCE_ROOT)
 args = parser.parse_args()
-if (args.protocol_root is None) == (args.check_package is None):
-    parser.error("Select a protocol checkout or --check-package, but not both")
-source = args.check_package or args.protocol_root
+if (args.periphery_root is None) == (args.check_package is None):
+    parser.error("Select a Periphery checkout or --check-package, but not both")
+source = args.check_package or args.periphery_root
 manifest_path = source / ("provenance-manifest.json" if args.check_package else "circuits/provenance/manifest.json")
 manifest_bytes = manifest_path.read_bytes()
 if hashlib.sha256(manifest_bytes).hexdigest() != PIN:

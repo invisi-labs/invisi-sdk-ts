@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 
 const root = process.cwd();
-const temporary = mkdtempSync(join(tmpdir(), "invisi-payment-router-package-"));
+const temporary = mkdtempSync(join(tmpdir(), "invisi-periphery-package-"));
 const pnpm = (...args) =>
     execFileSync("pnpm", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
 try {

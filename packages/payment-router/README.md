@@ -1,6 +1,6 @@
 # @invisi-labs/payment-router
 
-Optional atomic native-ETH swap payments for Invisi. Supports original Uniswap V3 exact-output routes and compatible native 0x Settler / AllowanceHolder payloads. Requires separately deployed `invisi-payment-router` contracts; this package does not deploy, sign or broadcast transactions.
+Optional atomic native-ETH swap payments for Invisi. Supports original Uniswap V3 exact-output routes and compatible native 0x Settler / AllowanceHolder payloads. Requires separately deployed `invisi-periphery` contracts; this package does not deploy, sign or broadcast transactions.
 
 ```sh
 pnpm add @invisi-labs/payment-router ethers
@@ -23,4 +23,4 @@ Quotes may be refreshed without regenerating the core proof when the target toke
 
 ERC20 sell input, WETH output, private-input swaps, cross-chain settlement, Permit2 and asynchronous orders are outside this release. The host retains signing, proof execution, transaction submission and confirmation tracking.
 
-See the workspace `examples/08-payment-router/` scenarios. Public ABI snapshots match `invisi-payment-router` revision `b246f29`. Run `pnpm sync:payment-router-abis --check` from the workspace with the sibling contracts built to verify ABI identity. Optional Anvil contract tests use external liquidity and proof-verification doubles; live API quotes and genuine ZK proving require separate integration acceptance.
+See the workspace `examples/08-payment-router/` scenarios. Public ABI snapshots match `invisi-periphery` revision `b246f29`. Run `pnpm sync:payment-router-abis --check` from the workspace with the sibling contracts built to verify ABI identity. Optional Anvil contract tests use external liquidity and proof-verification doubles; live API quotes and genuine ZK proving require separate integration acceptance.

@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { format, resolveConfig } from "prettier";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repository = resolve(
-    process.env.INVISI_PAYMENT_ROUTER_REPO ?? resolve(root, "../invisi-payment-router")
+    process.env.INVISI_PERIPHERY_REPO ?? resolve(root, "../invisi-periphery")
 );
 const revision = execFileSync("git", ["-C", repository, "rev-parse", "--short", "HEAD"], {
     encoding: "utf8",
@@ -15,7 +15,7 @@ const exports = [
     ["ZeroExPaymentRouter", "zeroExPaymentRouterAbi"],
 ];
 const source =
-    `// Public ABI snapshots from invisi-payment-router ${revision}; no implementation bytecode.\n` +
+    `// Public ABI snapshots from invisi-periphery ${revision}; no implementation bytecode.\n` +
     exports
         .map(([name, binding]) => {
             const artifact = JSON.parse(
@@ -27,7 +27,11 @@ const source =
 const target = resolve(root, "packages/payment-router/src/abi.ts");
 const formatted = await format(source, { ...(await resolveConfig(target)), filepath: target });
 if (process.argv.includes("--check")) {
-    if (readFileSync(target, "utf8") !== formatted)
+    // The source revision is provenance metadata, not ABI identity.
+    if (
+        readFileSync(target, "utf8").split("\n").slice(1).join("\n") !==
+        formatted.split("\n").slice(1).join("\n")
+    )
         throw new Error(
             "Payment Router ABI snapshot differs from compiled contracts; run pnpm sync:payment-router-abis"
         );

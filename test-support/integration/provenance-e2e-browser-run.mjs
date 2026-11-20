@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { root, json } from "../../../invisi-core/scripts/provenance-build.mjs";
+import {
+    root as peripheryRoot,
+    json,
+} from "../../../invisi-periphery/scripts/provenance-build.mjs";
+const root = resolve(peripheryRoot, "../invisi-core");
 import { browserScenario } from "./provenance-e2e-browser.mjs";
 // Recheck retained owned services without rebuilding the chain or replacing HTTP data.
 const args = process.argv.slice(2),

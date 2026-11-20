@@ -16,7 +16,7 @@ it("loads authenticated local assets without network or a proving runtime", asyn
         transport.mockRestore();
     }
 });
-const root = process.env.INVISI_PROTOCOL_ROOT;
+const root = process.env.INVISI_PERIPHERY_ROOT;
 it.skipIf(!root || !process.env.INVISI_TEST_NATIVE_SOURCE)(
     "uses the same native BB configuration for genuine K10 source proving and independent verification",
     async () => {

@@ -217,7 +217,7 @@ Open a focused GitHub issue or pull request describing the problem, scope, and v
 
 ## Optional atomic swap payments
 
-`@invisi-labs/payment-router` composes the existing stateless SDK with the separately deployed `PaymentRouter` / `ZeroExPaymentRouter` contracts. Dependency direction is payment-router -> sdk/protocol/primitives; installing the core SDK alone does not install this extension. It exports ESM, CommonJS, types and public Router ABI snapshots from `invisi-payment-router` revision `b246f29`.
+`@invisi-labs/payment-router` composes the existing stateless SDK with the separately deployed `PaymentRouter` / `ZeroExPaymentRouter` contracts. Dependency direction is payment-router -> sdk/protocol/primitives; installing the core SDK alone does not install this extension. It exports ESM, CommonJS, types and public Router ABI snapshots from `invisi-periphery` revision `b246f29`.
 
 `PaymentRouterClient` takes explicit trusted deployment addresses and an ethers Provider. `preparePayment` binds the Router as direct funding payer and uses only explicitly requested Note outputs, without wallet inventory or private inputs. Pure funding currently requires at least two Notes. Funding covers all output amounts plus the optional same-token core fee. The host runs the returned PreparedTransaction's existing proving lifecycle.
 
@@ -230,7 +230,11 @@ Examples are in [08-payment-router](examples/08-payment-router/01-uniswap-v3.ts)
 Compiled-contract integration is optional and runs on a fresh local Anvil using the sibling Router project's built artifacts:
 
 ```sh
-INVISI_PAYMENT_ROUTER_REPO=/absolute/path/to/invisi-payment-router pnpm --filter @invisi-labs/payment-router exec vitest run src/contracts.integration.test.ts --maxWorkers=1 --minWorkers=1
+INVISI_PERIPHERY_REPO=/absolute/path/to/invisi-periphery pnpm --filter @invisi-labs/payment-router exec vitest run src/contracts.integration.test.ts --maxWorkers=1 --minWorkers=1
 ```
 
 Supply an absolute repository path when running from a package directory. The tests exercise real Router/native/ERC20 settlement with external liquidity and proof-verification boundary doubles; they do not claim genuine ZK proving or live API routing.
+
+## Periphery resource ownership
+
+Independent Provenance circuits and `scripts/provenance-*` tools now live in `invisi-periphery`, alongside Payment Router contracts. Core continues to own protocol contracts and Transact/Credit circuits. SDK packages stay in this workspace. Use the Periphery checkout as the positional source for `scripts/sync-provenance.py`. Historical resource URLs and production pins are unchanged. New unified catalogs require explicitly pinned Core and Periphery inputs via Periphery's `scripts/combine-prover-assets.mjs`; do not point a unified SDK loader at a Core-only or Provenance-only catalog.

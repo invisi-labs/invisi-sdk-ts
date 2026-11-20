@@ -100,7 +100,7 @@ The account controls the default database (`examples/accounts/<account>-session.
 
 ## Provenance
 
-Before running native Source proof examples from this checkout, run `python3 scripts/sync-provenance.py ../invisi-core` from the SDK repository root. This provisions `packages/prover/provenance`, which `NativeProver` loads by default. If you use `--output <asset-root>`, supply the same root as `provenanceAssetsPath` in `NativeProver`; the authenticated manifest and all seven circuit tiers must match the current protocol release.
+Provenance circuits and proof tools live in `../invisi-periphery`. `python3 scripts/sync-provenance.py ../invisi-periphery` synchronizes only the tiny reviewed manifest metadata. `NativeProver` loads circuit objects from the independently authenticated SDK-pinned resource catalog and configured cache/mirror. For offline execution, provision a compatible combined Core + Periphery catalog via the documented prover resource options; manifest synchronization does not provision circuit artifacts or verification keys.
 
 [Broadcaster and independent Provenance examples](07-broadcaster/) demonstrate relay fees/submission and direct source submission separately. A Note input requires source proof even without a Note output; Credit state inputs do not require a Note source proof.
 
@@ -126,7 +126,7 @@ See the [contribution guidelines](../README.md#contributing) for issues, pull re
 
 ## Native input Payment Router
 
-`08-payment-router/01-uniswap-v3.ts` and `02-zeroex.ts` prepare public ETH-to-token payments through the separately deployed contracts in `invisi-payment-router`. Configure verified Router/WETH/V3 addresses and the same chain/deployment in `08-payment-router/settings.ts`. V3 also needs QuoterV2 and a liquid configured route. The 0x example requires a `ZeroExPaymentRouter` deployment, its AllowanceHolder/registry, and an explicitly supplied backend `ZEROX_API_KEY`; browser applications should inject a backend quote proxy instead.
+`08-payment-router/01-uniswap-v3.ts` and `02-zeroex.ts` prepare public ETH-to-token payments through the separately deployed contracts in `invisi-periphery`. Configure verified Router/WETH/V3 addresses and the same chain/deployment in `08-payment-router/settings.ts`. V3 also needs QuoterV2 and a liquid configured route. The 0x example requires a `ZeroExPaymentRouter` deployment, its AllowanceHolder/registry, and an explicitly supplied backend `ZEROX_API_KEY`; browser applications should inject a backend quote proxy instead.
 
 Both examples explicitly create two Note outputs, matching the current pure-funding circuit shape. They bind the Router as payer before proving, refresh the quote after proving, simulate the whole payable call with Alice as sender, and export the unsigned transaction. They do not approve ERC20s from Alice or submit transactions. The native budget excludes network gas. Current 0x execution accepts only the reviewed native execute/exec/NATIVE_CHECK payload subset; an API route outside that subset is rejected.
 

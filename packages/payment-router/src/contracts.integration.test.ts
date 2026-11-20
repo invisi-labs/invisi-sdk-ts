@@ -22,7 +22,7 @@ import {
     type SwapQuote,
 } from "./index";
 import { zeroExInterface } from "./codecs";
-const repository = process.env.INVISI_PAYMENT_ROUTER_REPO;
+const repository = process.env.INVISI_PERIPHERY_REPO;
 describe.skipIf(!repository)("compiled Solidity Router execution on an isolated Anvil", () => {
     let anvil: ChildProcess, provider: JsonRpcProvider, runner: ContractRunner, player: Address;
     async function deploy(name: string, args: unknown[] = []): Promise<BaseContract> {

@@ -5,6 +5,7 @@
  * --replicas requires PROVENANCE_TEST_PG_DSN and uses an isolated temporary schema.
  * --keep retains owned processes until SIGINT; otherwise only owned processes are cleaned up.
  */
+import { provisionOwnedScreeningFixture } from "./provenance-owned-fixtures.mjs";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, mkdirSync, openSync, closeSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -12,7 +13,12 @@ import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import { createPublicKey } from "node:crypto";
 import { ZeroAddress, ZeroHash, keccak256 } from "ethers";
-import { root, json, sha } from "../../../invisi-core/scripts/provenance-build.mjs";
+import {
+    root as peripheryRoot,
+    json,
+    sha,
+} from "../../../invisi-periphery/scripts/provenance-build.mjs";
+const root = resolve(peripheryRoot, "../invisi-core");
 import { createSettlementRuntime } from "../../../invisi-core/scripts/settlement-fixtures/runtime.mjs";
 import {
     prepareSettlementShield,
@@ -30,13 +36,16 @@ import {
     RecognizedTree,
     operationDigest,
     verifyRootCertificate,
-} from "../../../invisi-core/scripts/provenance-client.mjs";
+} from "../../../invisi-periphery/scripts/provenance-client.mjs";
 import { rejectRecoveryProof, recoveryFixture } from "./provenance-e2e-recovery.mjs";
 import { startReplicas } from "./provenance-e2e-replicas.mjs";
 import { reorgScenario } from "./provenance-e2e-reorg.mjs";
 import { browserScenario } from "./provenance-e2e-browser.mjs";
 import { creditScenario } from "./provenance-e2e-credit.mjs";
-import { proveWitness, trustedManifest } from "../../../invisi-core/scripts/provenance-proof.mjs";
+import {
+    proveWitness,
+    trustedManifest,
+} from "../../../invisi-periphery/scripts/provenance-proof.mjs";
 import { preflightTracking, trackedRecognition } from "./provenance-e2e-tracking.mjs";
 
 const options = {};
@@ -70,6 +79,8 @@ mkdirSync(bin, { recursive: true });
 const save = (name, value) => writeFileSync(join(directory, name), json(value), { mode: 0o600 });
 const children = [];
 let runtime;
+let finalityMining;
+let miningBlock = false;
 let replicas;
 let invalidRecoveryJob;
 let successful = false;
@@ -367,10 +378,23 @@ try {
                 ? status
                 : null;
         });
+        // Advance the owned Anvil head so native finalized can cover the synthetic Shield.
+        finalityMining = setInterval(async () => {
+            if (miningBlock) return;
+            miningBlock = true;
+            try {
+                await runtime.rpc("anvil_mine", ["0x4", "0x0"]);
+            } catch {
+                /* Normal readiness checks surface owned-node failures. */
+            } finally {
+                miningBlock = false;
+            }
+        }, 250);
         step("start-real-provenance-with-pinned-native-verifier");
         const servicePort = await port(options["service-port"]),
             serviceDir = join(directory, "provenance");
         run(join(bin, "provenance"), ["-dir", serviceDir, "init"], serviceRoot);
+        provisionOwnedScreeningFixture(serviceDir);
         const cfg = JSON.parse(readFileSync(join(serviceDir, "config.json"))),
             riskID = "0x" + sha("owned-real-e2e-address-list"),
             rules = {
@@ -379,10 +403,10 @@ try {
                 finality: "finalized",
             };
         const manifest = trustedManifest();
-        const crsPath = join(root, ".tools/provenance-verifier-crs");
+        const crsPath = join(peripheryRoot, ".tools/provenance-verifier-crs");
         assert(
             existsSync(join(crsPath, "pins.json")),
-            "preprovisioned CRS missing: run node ../invisi-core/scripts/provenance-crs.mjs"
+            "preprovisioned CRS missing: run node ../invisi-periphery/scripts/provenance-crs.mjs"
         );
         const pins = JSON.parse(readFileSync(join(crsPath, "pins.json"))).files;
         Object.assign(cfg, {
@@ -416,9 +440,9 @@ try {
                 },
             ],
             verifier: {
-                manifestPath: join(root, "circuits/provenance/manifest.json"),
+                manifestPath: join(peripheryRoot, "circuits/provenance/manifest.json"),
                 trustedManifestSha256: manifest.manifestSha256,
-                releaseRoot: root,
+                releaseRoot: peripheryRoot,
                 bbPath: join(root, ".tools/bb/bb"),
                 bbSha256: fingerprint(join(root, ".tools/bb/bb")),
                 crsPath,
@@ -742,7 +766,7 @@ try {
                 ? {
                       recovery: await recoveryFixture({
                           runtime,
-                          root,
+                          peripheryRoot,
                           directory,
                           privateReceipt,
                           data,
@@ -889,6 +913,7 @@ try {
             process.once("SIGTERM", resolve);
         });
     }
+    clearInterval(finalityMining);
     for (const child of children.reverse()) await stop(child);
     await runtime?.stop();
     await replicas?.cleanup();
