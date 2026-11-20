@@ -1,7 +1,30 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { validateRelease } from "./check-release.mjs";
+
+test("an explicit release tag takes precedence over the CI branch name", () => {
+    const root = fileURLToPath(new URL("../", import.meta.url));
+    const script = fileURLToPath(new URL("./check-release.mjs", import.meta.url));
+    const version = JSON.parse(
+        readFileSync(new URL("../packages/sdk/package.json", import.meta.url), "utf8")
+    ).version;
+    const output = execFileSync(process.execPath, [script, `v${version}`], {
+        cwd: root,
+        env: { ...process.env, GITHUB_REF_NAME: "develop" },
+        encoding: "utf8",
+    });
+    assert.match(output, /Release check passed: 10 packages/);
+    assert.throws(() =>
+        execFileSync(process.execPath, [script, "v999.0.0"], {
+            cwd: root,
+            env: { ...process.env, GITHUB_REF_NAME: `v${version}` },
+            stdio: "pipe",
+        })
+    );
+});
 
 function manifests() {
     return [

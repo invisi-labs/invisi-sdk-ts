@@ -42,7 +42,7 @@ export function validateRelease(tag, packages, { packed = false } = {}) {
 
 function main() {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-    const tag = process.env.GITHUB_REF_NAME ?? process.argv[2];
+    const tag = process.argv[2] ?? process.env.GITHUB_REF_NAME;
     const packages = readdirSync(resolve(root, "packages"), { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .map((entry) =>
