@@ -1,5 +1,7 @@
 import { runInitialPaymentProofs } from "../testing/resource-options";
-import { poseidonHash } from "@invisi-labs/primitives";
+import { loadRecursiveVerificationKey } from "./recursive-key";
+import { loadVerificationKeyBrowser } from "./circuits-browser";
+import { recursiveKeyResources } from "../testing/recursive-key-resources";
 import { AGGREGATE_ROUTES } from "@invisi-labs/protocol";
 import { describe, it, expect } from "vitest";
 import { getCircuitKey, getCircuitMetadata } from "../proofs/proof-data";
@@ -24,13 +26,12 @@ describe("current authenticated release", () => {
     it("authenticates each C1..C10 native key and dedicated outer pin", async () => {
         for (let c = 1; c <= 10; c++) {
             const key = getCircuitKey(`transact_user_slots${c}` as any, "noir-recursive");
-            expect(key.vkFields).toHaveLength(115);
-            expect(key.vkFields!.join("").replaceAll("0x", "")).toBe(key.vkHex.slice(2));
-            const pin = await poseidonHash([
-                0x494e564953495f5245435552534956455f564b31n,
-                ...key.vkFields!.map(BigInt),
-                BigInt(key.vkHash!),
-            ]);
+            const decoded = await loadRecursiveVerificationKey(
+                `transact_user_slots${c}` as any,
+                (name, target) => loadVerificationKeyBrowser(name, target, recursiveKeyResources)
+            );
+            expect(decoded.fields).toHaveLength(115);
+            const pin = decoded.commitment;
             expect(pin).toBe(key.innerVkCommitment);
             for (const count of [1, 2, 5])
                 expect(

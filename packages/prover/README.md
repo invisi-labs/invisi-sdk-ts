@@ -47,3 +47,41 @@ Generate each source directory with that producer's `scripts/prover-assets.mjs` 
 For historical combined catalogs, set `resources.release = "legacy"` and provision with `--set legacy` and `--set legacy-initial-payment`. Legacy mode is explicit and never an automatic retry. The historical extra set is needed only for legacy initial-payment.
 
 The new split sets are locally verified and must be independently published before SDK release. CI provisions Core and Provenance separately and fails if either required release is missing.
+
+
+## Verification keys and aggregation
+
+Circuit metadata contains reviewed key identities and recursive commitments. Full
+`vkHex` and `vkFields` payloads are no longer bundled. Native and WASM backends
+load verification key binaries from the authenticated resource catalog on demand;
+constructing a prover or aggregator performs no resource I/O. Existing Core assets
+already contain these binaries. Periphery continues to publish the independent
+Provenance resource set; neither producer requires a circuit or resource-format change.
+
+```ts
+import { NativeProver } from "@invisi-labs/prover/native";
+import { Aggregator } from "@invisi-labs/prover/aggregate";
+
+const prover = new NativeProver({
+    resources: { directory: coreCatalog, offline: true },
+});
+const aggregator = new Aggregator({ prover });
+const aggregate = await aggregator.aggregate(members, { signal });
+```
+
+Aggregation uses the backend's optional `loadVerificationKey(name, target, options)`
+capability, retaining its configured resource locations, cache, offline policy and
+explicit legacy selection. For custom provers without this capability, pass
+`new Aggregator({ prover, resources })` to configure the browser-compatible asset
+loader fallback. The backend capability takes precedence over that fallback.
+
+Each required recursive key is loaded once per aggregation call. The binary's
+SHA-256 identity, 115 canonical field words and Poseidon recursive commitment are
+checked before witness assembly. Member proofs and the resulting aggregate still
+undergo independent cryptographic verification. Calls support cancellation through
+`ProverOptions.signal`; cached assets remain subject to integrity checks.
+
+Consumers previously reading `getCircuitKey(...).vkHex` or `.vkFields` must use
+asynchronous key loading instead. `getCircuitKey` now returns metadata only;
+`prover.loadVerificationKey` returns binary bytes, not decoded witness fields.
+New producer releases do not change the SDK's reviewed resource pins automatically.

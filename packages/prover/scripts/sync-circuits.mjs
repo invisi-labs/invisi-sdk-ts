@@ -121,7 +121,7 @@ try {
                         key.innerVkCommitment,
                         "recursive VK commitment mismatch"
                     );
-                    recursiveMetadata = { vkFields, vkHash };
+                    recursiveMetadata = { vkHash };
                 }
                 const filename = entry.name + "." + key.target + ".vk";
                 assert.equal(
@@ -133,7 +133,6 @@ try {
                     target: key.target,
                     vkSha256: key.vkSha256,
                     vk: filename,
-                    vkHex: "0x" + bytes.toString("hex"),
                     ...(key.innerVkCommitment ? { innerVkCommitment: key.innerVkCommitment } : {}),
                     ...recursiveMetadata,
                 };

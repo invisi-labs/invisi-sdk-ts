@@ -51,7 +51,7 @@ jobs:
         run: python3 scripts/sync-provenance.py --check-package packages/prover/src/resources
 
       - name: Test release validation
-        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs scripts/release-archive.test.mjs
+        run: node --test scripts/check-release.test.mjs scripts/publish-release.test.mjs scripts/provenance-assets.test.mjs scripts/release-archive.test.mjs scripts/vk-metadata.test.mjs
 
       - name: Test CI reuse safety
         run: python3 scripts/test_ci_reuse.py
@@ -82,6 +82,8 @@ jobs:
           test -x "$SDK_BB_BIN"
           "$SDK_BB_BIN" --version
           BB_BINARY_PATH="$SDK_BB_BIN" INVISI_TEST_WASM=1 pnpm --filter @invisi-labs/prover exec vitest run src/backends/backend-bb.test.ts src/backends/backend-wasm.test.ts src/backends/backend-service.test.ts -t "real BB6|real WASM/native interoperability|runs explicit native and WASM services" --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+
+          BB_BINARY_PATH="$SDK_BB_BIN" pnpm --filter @invisi-labs/prover exec vitest run src/aggregation/recursive-assets.native.test.ts --maxWorkers=1 --minWorkers=1 --no-file-parallelism
 
       - name: Run SDK prepared owner proofs with native and browser WASM
         run: |

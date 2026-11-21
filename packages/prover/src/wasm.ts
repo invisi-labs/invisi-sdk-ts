@@ -1,6 +1,6 @@
 import { proveWithWasm, verifyWithWasm, type WasmOptions } from "./backends/backend-wasm";
 import type { CircuitName, Hex, ProofBundle, ProofTarget } from "./circuits/circuit-types";
-import { loadCircuitBrowser } from "./circuits/circuits-browser";
+import { loadCircuitBrowser, loadVerificationKeyBrowser } from "./circuits/circuits-browser";
 import { getCircuitKey } from "./proofs/proof-data";
 import { generateWitness } from "./witness/witness";
 export interface ProveBrowserParams extends WasmOptions {
@@ -50,6 +50,14 @@ export class WasmProver extends BackendProver {
     constructor(options: WasmOptions = {}) {
         super();
         this.#options = Object.freeze({ ...options });
+    }
+    loadVerificationKey(name: CircuitName, target: ProofTarget, options: ProverOptions = {}) {
+        return loadVerificationKeyBrowser(
+            name,
+            target,
+            this.#options.resources,
+            options.signal ?? this.#options.signal
+        );
     }
     protected execute(request: ProvingRequest, options: ProverOptions): Promise<ProofBundle> {
         options.signal?.throwIfAborted();

@@ -98,9 +98,8 @@ export interface CircuitKey {
     target: ProofTarget;
     vkSha256: string;
     vk: string;
-    vkHex: Hex;
     innerVkCommitment?: Hex;
-    /** Authenticated recursive Noir VK fields and key hash. */ vkFields?: Hex[];
+    /** Authenticated key hash used to reconstruct recursive Noir VK inputs. */
     vkHash?: Hex;
 }
 export interface CircuitMetadata {

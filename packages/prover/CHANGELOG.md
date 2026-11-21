@@ -1,5 +1,10 @@
 # @invisi-labs/prover
 
+## Unreleased
+
+- Load verification key bytes from authenticated assets instead of bundling duplicate `vkHex`/`vkFields` payloads. Reconstruct and validate recursive key fields on demand while preserving recursive aggregation, offline caches and explicit legacy resources.
+- Add optional `Prover.loadVerificationKey` support; aggregation uses the selected backend resource policy or an explicit resource fallback for custom provers.
+
 ## 1.3.2
 
 - Load Core and Provenance from independently authenticated resource catalogs, with separate source options, shared content-addressed caching and explicit legacy compatibility. Require both resource sets to be published before installing the new defaults.

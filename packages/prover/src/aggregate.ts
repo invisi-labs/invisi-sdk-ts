@@ -1,5 +1,8 @@
 import { selectAggregateRoute } from "@invisi-labs/protocol";
 import { MissingCapabilityError } from "@invisi-labs/primitives";
+import { loadVerificationKeyBrowser } from "./circuits/circuits-browser";
+import { loadRecursiveVerificationKey, type VerificationKeyLoader } from "./circuits/recursive-key";
+import type { ResourceOptions } from "./resources/loader";
 import { assertExpectedProof } from "./backends/backend-service";
 import type { CircuitName, ProofBundle } from "./circuits/circuit-types";
 import {
@@ -32,9 +35,15 @@ function copy(bundle: ProofBundle): ProofBundle {
 /** Explicit aggregation service. Runtime and backend selection belong to the caller. */
 export class Aggregator implements AggregatorCapability {
     readonly #prover: Prover;
-    constructor(options: { prover: Prover }) {
+    readonly #loadKey: VerificationKeyLoader;
+    constructor(options: { prover: Prover; resources?: ResourceOptions }) {
         if (!options.prover) throw new MissingCapabilityError("aggregation prover");
         this.#prover = options.prover;
+        const resources = options.resources;
+        this.#loadKey = options.prover.loadVerificationKey
+            ? options.prover.loadVerificationKey.bind(options.prover)
+            : (name, target, selected) =>
+                  loadVerificationKeyBrowser(name, target, resources, selected?.signal);
         Object.freeze(this);
     }
     async aggregate(
@@ -80,15 +89,23 @@ export class Aggregator implements AggregatorCapability {
         const circuitName = route.name as CircuitName,
             metadata = getCircuitMetadata(circuitName),
             key = getCircuitKey(circuitName, "evm");
-        const inner = (capacity: number) => {
-            const key = getCircuitKey(
-                `transact_user_slots${capacity}` as CircuitName,
-                "noir-recursive"
-            );
-            if (!key.vkFields || !key.vkHash)
-                throw Error("authenticated recursive verification key is missing");
-            return key;
-        };
+        // A dedicated route needs one key; mixed circuits bind the complete C1..C5 key set.
+        const capacities = route.kind === "dedicated" ? [route.capacity] : [1, 2, 3, 4, 5];
+        const loaded = await Promise.all(
+            capacities.map(
+                async (capacity) =>
+                    [
+                        capacity,
+                        await loadRecursiveVerificationKey(
+                            `transact_user_slots${capacity}` as CircuitName,
+                            this.#loadKey,
+                            options
+                        ),
+                    ] as const
+            )
+        );
+        const keys = new Map(loaded);
+        const inner = (capacity: number) => keys.get(capacity)!;
         const expected: ProofStatement = {
             circuitName,
             target: "evm",
@@ -105,15 +122,15 @@ export class Aggregator implements AggregatorCapability {
         const witness = new LocalWitness(
             route.kind === "dedicated"
                 ? {
-                      verification_key: [...inner(route.capacity).vkFields!],
-                      key_hash: inner(route.capacity).vkHash!,
+                      verification_key: [...inner(route.capacity).fields],
+                      key_hash: inner(route.capacity).hash,
                       proofs,
                       statements: frozen.map((m) => [...m.bundle.publicInputs]),
                       inner_vk_commitment: words.at(-1)!,
                   }
                 : {
-                      verification_keys: [1, 2, 3, 4, 5].map((c) => [...inner(c).vkFields!]),
-                      key_hashes: [1, 2, 3, 4, 5].map((c) => inner(c).vkHash!),
+                      verification_keys: [1, 2, 3, 4, 5].map((c) => [...inner(c).fields]),
+                      key_hashes: [1, 2, 3, 4, 5].map((c) => inner(c).hash),
                       proofs,
                       capacities: frozen.map((m) =>
                           BigInt(getCircuitMetadata(m.bundle.circuitName).capacity!)

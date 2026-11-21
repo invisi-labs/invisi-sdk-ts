@@ -36,7 +36,12 @@ import {
 } from "./backends/provenance-native";
 import type { NativeOptions as NativeConfiguration } from "./backends/backend-bb";
 import { BackendProver } from "./backends/backend-service";
-import type { ProofBundle as NativeBundle } from "./circuits/circuit-types";
+import type {
+    CircuitName,
+    ProofBundle as NativeBundle,
+    ProofTarget,
+} from "./circuits/circuit-types";
+import { loadVerificationKeyAsync } from "./circuits/circuits";
 import type { ProverOptions, ProvingRequest } from "./interfaces";
 import {
     generateProofBundle as proveNative,
@@ -54,6 +59,14 @@ export class NativeProver extends BackendProver implements ProvenanceProvider {
     }
     async getProvenanceCapability() {
         return { manifest: await this.#sourceBackend.manifest(), prover: this.#sourceBackend };
+    }
+    loadVerificationKey(name: CircuitName, target: ProofTarget, options: ProverOptions = {}) {
+        return loadVerificationKeyAsync(
+            name,
+            target,
+            this.#options.resources,
+            options.signal ?? this.#options.signal
+        );
     }
     protected execute(request: ProvingRequest, options: ProverOptions): Promise<NativeBundle> {
         options.signal?.throwIfAborted();

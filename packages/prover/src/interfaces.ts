@@ -50,6 +50,12 @@ export interface ProverOptions {
     onProgress?: (progress: ProverProgress) => void;
 }
 export interface Prover {
+    /** Optional authenticated asset loading bound to this prover's resource configuration. */
+    loadVerificationKey?(
+        name: CircuitName,
+        target: ProofTarget,
+        options?: ProverOptions
+    ): Promise<Uint8Array>;
     prove(request: ProvingRequest, options?: ProverOptions): Promise<ProofBundle>;
     verify(
         bundle: ProofBundle,

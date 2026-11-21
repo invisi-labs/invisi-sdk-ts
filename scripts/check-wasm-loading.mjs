@@ -2,12 +2,25 @@
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+
+// Keep full key material in authenticated assets, never in an eagerly imported manifest.
+const metadata = JSON.parse(
+    await readFile("packages/prover/src/resources/circuits-metadata.json", "utf8")
+);
+for (const circuit of metadata.entries) {
+    for (const key of Object.values(circuit.keys ?? {})) {
+        assert(!("vkHex" in key), "Inline verification key binary returned to metadata");
+        assert(!("vkFields" in key), "Inline recursive fields returned to metadata");
+    }
+}
 
 const result = await build({
     entryPoints: [
         "packages/prover/dist/index.js",
         "packages/prover/dist/wasm.js",
         "packages/prover/dist/provenance.js",
+        "packages/prover/dist/aggregate.js",
     ],
     bundle: true,
     platform: "browser",
@@ -25,6 +38,7 @@ for (const entry of [
     "packages/prover/dist/index.js",
     "packages/prover/dist/wasm.js",
     "packages/prover/dist/provenance.js",
+    "packages/prover/dist/aggregate.js",
 ]) {
     const path = Object.keys(outputs).find((path) => outputs[path].entryPoint === entry);
     assert(path, `Missing browser entry: ${entry}`);
