@@ -14,15 +14,15 @@ const quote = await client.quote(adapter, {
 });
 const payment = await client.prepareRouterPayment({
   payment: ready, payer, tokenIn, mode: PaymentMode.RelayedToken,
-  refundRecipient: payer, relayer, deadline, amountInMaximum: quote.maxInput, quote,
+  refundRecipient: payer, relayer, deadline: quote.deadline, amountInMaximum: quote.maxInput, quote,
 });
 payment.signature = await signPaymentIntent(signer, deployment.chainId, deployment.routerAddress, payment.intent);
 const outer = client.buildRouterTransaction(payment);
 await client.simulateRouterPayment(outer, { from: relayer });
 const rpcFields = relayEnvelope((await ready.exportTransaction()).data, outer);
 const quoteHash = hashRelayEnvelope(deployment.chainId, deployment.coreAddress, outer);
-// Pass rpcFields beside normal fee fields to Broadcaster estimate/quote/submit.
-// Compare its hash under PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT before submission.
+// Estimate/getQuote send rpcFields; submit additionally sends quote and signature.
+// PaymentRouterRelayClient verifies quoteHash and the envelope format automatically.
 ```
 
 For direct submission, select `PaymentMode.DirectNative` or `PaymentMode.DirectToken`, omit `relayer` and signature, simulate from `payer`, and send the returned call from that wallet. Native `value` is the maximum input; token calls have zero value. Omit `quote` for same-token input or native-to-WETH wrapping; `noSwapRoute` is selected automatically. Low-level `buildPaymentIntent`, `hashCoreRequest`, `hashRoute`, `intentTypedData`, `hashPaymentIntent` and `buildRouterPayment` support detached integrations. The typed intent binds the exact proof, Core request, route, payer, Router nonce, budget, deadline and fixed relayer.
