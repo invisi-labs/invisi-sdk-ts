@@ -51,6 +51,8 @@ export {
     computeCreditSharedKeyHash,
     creditPeriods,
     deriveCreditStateNonce,
+    normalizeCreditGrantId,
+    generateCreditGrantId,
     normalizeCreditPolicy,
     normalizeCreditUsage,
     normalizeCreditState,

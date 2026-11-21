@@ -1,4 +1,3 @@
-import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
 import { it, expect } from "vitest";
@@ -15,7 +14,7 @@ import { fixture } from "../../../../test-support/operation-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
 import { backend } from "../../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
 import { WalletSession } from "../wallet/WalletSession";
-const iface = new Interface([...invisiCoreAbi, ...legacyCreateCreditAbi]);
+const iface = new Interface(invisiCoreAbi);
 async function creditFixture(
     changes: Partial<
         Pick<
@@ -32,8 +31,7 @@ async function creditFixture(
                 tokenAddress: BigInt(h.context.tokenAddress),
                 ownerWalletIdentity: h.wallet.ownerAddress,
                 spenderWalletIdentity: h.bob.ownerAddress,
-                revocationShard: 1n,
-                revocationSlot: 0n,
+                grantId: 1n,
                 nonce: 456n,
                 expiry: 2000003600n,
                 creditSharedKey: 789n,
@@ -46,7 +44,6 @@ async function creditFixture(
             spenderReceivingKeys: h.bob.getReceivingAddress().getReceivingKeys(),
         },
         commitment = await computeCreditCommitment(state.note);
-    h.reader.getCreditAllocation = async () => ({ shard: 1n, slot: 100 });
     await h.tree.insert(BigInt(commitment));
     for (const [wallet, role] of [
         [h.wallet, "owner"],
@@ -115,7 +112,7 @@ it("reserves consumed Credit state for an owner update while preserving grant us
         saved = snapshot.operations[operation.id]!.payload as SavedOperation;
     expect(snapshot.reservations["credit:" + h.commitment]).toBe(operation.id);
     expect(saved.plan.credit!.outputs[0]!.state.note.totalSpent).toBe(h.state.note.totalSpent);
-    expect(saved.plan.credit!.outputs[0]!.state.note.revocationSlot).toBe(0n);
+    expect(saved.plan.credit!.outputs[0]!.state.note.grantId).toBe(1n);
     const ready = await (await authorizeOperation(operation)).prove();
     expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe("updateCredit");
 });
@@ -154,8 +151,7 @@ it("allows proofless owner revocation without latest merchant state", async () =
     const h = await creditFixture(),
         operation = await h.ownerSession.prepareRevokeCredit({
             tokenAddress: h.context.tokenAddress,
-            shard: 1n,
-            slot: 99n,
+            grantId: 1n,
             caller: h.wallet.ownerAddress,
         }),
         ready = await operation.ready();
@@ -167,8 +163,7 @@ it("verifies detached public revocation EIP712 signatures before encoding", asyn
     const h = await creditFixture(),
         operation = await h.ownerSession.prepareRevokeCredit({
             tokenAddress: h.context.tokenAddress,
-            shard: 1n,
-            slot: 0n,
+            grantId: 1n,
         }),
         request = await operation.exportRevocationAuthorization(),
         signature = await new EvmWallet(`0x${"01".repeat(32)}`).signTypedData(
@@ -181,7 +176,7 @@ it("verifies detached public revocation EIP712 signatures before encoding", asyn
 });
 it("rechecks canonical revocation bits and deadline-covering expiry before private updates", async () => {
     const h = await creditFixture();
-    h.reader.getCreditRevocationBitmap = async () => 1n;
+    h.reader.getCreditStatus = async () => 2;
     await expect(
         h.ownerSession.prepareUpdateCredit({
             tokenAddress: h.context.tokenAddress,
@@ -253,8 +248,7 @@ it.each(["create", "update", "draw", "revoke"] as const)(
             case "revoke":
                 operation = await h.ownerSession.prepareRevokeCredit({
                     tokenAddress: h.context.tokenAddress,
-                    shard: 1n,
-                    slot: 99n,
+                    grantId: 1n,
                     caller: h.wallet.ownerAddress,
                 });
                 break;
@@ -339,8 +333,7 @@ it.each(["create", "update", "draw", "revoke"] as const)(
                       })
                     : await h.ownerSession.prepareRevokeCredit({
                           tokenAddress,
-                          shard: 1n,
-                          slot: 0n,
+                          grantId: 1n,
                       });
         const quoted = await client.quote(prepared, {
             maxFeeAmount: 3n,

@@ -3,6 +3,7 @@ import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { bytesToHex, concatBytes, hexToBytes, utf8ToBytes } from "@noble/hashes/utils";
+import { normalizeCreditGrantId } from "../credit/state";
 import { FIELD_MODULUS } from "../crypto/random";
 import { deriveClueKey } from "../fmd/fmd";
 import type { ProtocolContext } from "../types";
@@ -162,6 +163,27 @@ export function walletAuthorizationTypedData(request: WalletAuthorizationRequest
     for (const value of words)
         if (typeof value !== "bigint" || value < 0n || value >= FIELD_MODULUS)
             throw new RangeError("noncanonical public field");
+    if (operation !== "transact") {
+        const expected =
+            operation === "create-credit"
+                ? 11
+                : operation === "update-credit"
+                  ? 14
+                  : operation === "credit-draw"
+                    ? 15 + 9 * capacity
+                    : 15;
+        if (words.length !== expected) throw new Error("invalid Credit statement width");
+        const start =
+            operation === "update-credit" ? 8 : operation === "credit-draw" ? 6 + 5 * capacity : 4;
+        const count = operation === "credit-draw" ? capacity : 1;
+        const actual = operation === "credit-draw" ? Number(words[3]) : 1;
+        if (!Number.isSafeInteger(actual) || actual <= 0 || actual > count)
+            throw new Error("invalid grant count");
+        for (let i = 0; i < count; i++) {
+            if (i < actual) normalizeCreditGrantId(words[start + i]);
+            else if (words[start + i] !== 0n) throw new Error("grantId padding must be zero");
+        }
+    }
     const { chainId, protocolAddress } = context;
     if (typeof chainId !== "bigint" || chainId < 0n || chainId >= 1n << 64n)
         throw new RangeError("invalid chain id");
@@ -193,7 +215,7 @@ export function walletAuthorizationTypedData(request: WalletAuthorizationRequest
             operation: hex(
                 keccak_256(
                     utf8ToBytes(
-                        `Invisi.${OPERATIONS[operation]}.${operation === "transact" ? "v1" : "v4"}`
+                        `Invisi.${OPERATIONS[operation]}.${operation === "transact" ? "v1" : "GrantId.Uint128.v1"}`
                     )
                 )
             ),

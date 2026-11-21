@@ -6,6 +6,17 @@ const root = resolve(process.argv[2] ?? "../invisi-core");
 const json = (path) => JSON.parse(readFileSync(resolve(root, path), "utf8"));
 const sha = (data) => createHash("sha256").update(data).digest("hex");
 const layouts = {};
+// Intern repeated ABI entries and private schemas across capacity variants. Keep
+// authenticated layouts small enough for the neutral browser witness builders.
+const publicEntries = [];
+const privateSchemas = [];
+function intern(values, value) {
+    const encoded = JSON.stringify(value);
+    const existing = values.findIndex((item) => JSON.stringify(item) === encoded);
+    if (existing !== -1) return existing;
+    values.push(value);
+    return values.length - 1;
+}
 for (const path of ["circuits/transact/manifest.json", "circuits/credit/manifest.json"]) {
     const manifest = json(path);
     if (!manifest.complete) throw new Error("incomplete circuit release");
@@ -35,19 +46,22 @@ for (const path of ["circuits/transact/manifest.json", "circuits/credit/manifest
             publicInputCount: entry.publicInputCount,
             public: artifact.abi.parameters
                 .filter((p) => p.visibility === "public")
-                .map((p) => ({
-                    name: p.name,
-                    count: p.type.kind === "array" ? p.type.length : 1,
-                    ...(p.type.kind === "array" ? { array: true } : {}),
-                })),
-            private: artifact.abi.parameters
-                .filter((p) => p.visibility !== "public")
-                .map((p) => p.name),
+                .map((p) =>
+                    intern(publicEntries, {
+                        name: p.name,
+                        count: p.type.kind === "array" ? p.type.length : 1,
+                        ...(p.type.kind === "array" ? { array: true } : {}),
+                    })
+                ),
+            private: intern(
+                privateSchemas,
+                artifact.abi.parameters.filter((p) => p.visibility !== "public").map((p) => p.name)
+            ),
         };
     }
 }
 writeFileSync(
     new URL("../../prover/src/witness-layouts.json", import.meta.url),
-    JSON.stringify(layouts, null, 2) + "\n"
+    JSON.stringify({ publicEntries, privateSchemas, circuits: layouts }, null, 2) + "\n"
 );
 console.log("Generated " + Object.keys(layouts).length + " authenticated witness layouts");

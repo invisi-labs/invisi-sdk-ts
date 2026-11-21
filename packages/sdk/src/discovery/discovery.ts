@@ -316,8 +316,8 @@ export function extractDeliveryCandidates(
                 const ref = object(value);
                 check(
                     integer(ref.payerIndex) < BigInt(payers.length) &&
-                        integer(ref.shard) > 0n &&
-                        integer(ref.slot) < 65536n,
+                        integer(ref.grantId) > 0n &&
+                        integer(ref.grantId) < 1n << 128n,
                     "invalid Credit grant reference"
                 );
             });

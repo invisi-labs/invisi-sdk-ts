@@ -23,10 +23,21 @@ describe("EVM owner receipt and authorization", () => {
             ["credit-draw", 80],
         ];
         for (const [operation, capacity] of operations) {
-            for (const length of [2, 127, 128, 129, 585, 815]) {
+            const lengths =
+                operation === "transact"
+                    ? [2, 127, 128, 129, 585, 815]
+                    : [
+                          operation === "create-credit"
+                              ? 11
+                              : operation === "update-credit"
+                                ? 14
+                                : 15 + 9 * capacity,
+                      ];
+            for (const length of lengths) {
                 const words = Array.from({ length }, (_, i) => BigInt(i + 100));
                 words[0] = context.chainId;
                 words[1] = context.protocolAddress;
+                if (operation === "credit-draw") words[3] = BigInt(capacity);
                 const request = { context, operation, capacity, words };
                 const typed = walletAuthorizationTypedData(request);
                 expect(typed.message.statementHash).toBe(
@@ -47,9 +58,15 @@ describe("EVM owner receipt and authorization", () => {
                         typed.message
                     )
                 );
-                expect(
-                    computeWalletAuthorizationDigest({ ...request, words: [...words, 0n] })
-                ).not.toBe(computeWalletAuthorizationDigest(request));
+                if (operation === "transact") {
+                    expect(
+                        computeWalletAuthorizationDigest({ ...request, words: [...words, 0n] })
+                    ).not.toBe(computeWalletAuthorizationDigest(request));
+                } else {
+                    expect(() =>
+                        computeWalletAuthorizationDigest({ ...request, words: [...words, 0n] })
+                    ).toThrow(/width/);
+                }
             }
         }
     });

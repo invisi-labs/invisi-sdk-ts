@@ -32,7 +32,7 @@ try {
         prover: new NativeProver({ bbBin: settings.bbBin }),
     });
 
-    // 2. Current authenticated state determines remaining authority and revocation location.
+    // 2. Current authenticated state determines remaining authority and grant ID.
     const selected = await discoverCredits({
         provider,
         protocolRpc,

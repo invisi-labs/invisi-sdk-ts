@@ -139,63 +139,15 @@ export const invisiCoreFactoryAbi = [
     },
     {
         "type": "function",
-        "name": "emergencyPauseInstance",
-        "inputs": [
-            {
-                "name": "instance",
-                "type": "address",
-                "internalType": "address",
-            },
-        ],
+        "name": "emergencyPauseAll",
+        "inputs": [],
         "outputs": [],
         "stateMutability": "nonpayable",
     },
     {
         "type": "function",
-        "name": "emergencyPauseRange",
-        "inputs": [
-            {
-                "name": "start",
-                "type": "uint256",
-                "internalType": "uint256",
-            },
-            {
-                "name": "end",
-                "type": "uint256",
-                "internalType": "uint256",
-            },
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable",
-    },
-    {
-        "type": "function",
-        "name": "emergencyUnpauseInstance",
-        "inputs": [
-            {
-                "name": "instance",
-                "type": "address",
-                "internalType": "address",
-            },
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable",
-    },
-    {
-        "type": "function",
-        "name": "emergencyUnpauseRange",
-        "inputs": [
-            {
-                "name": "start",
-                "type": "uint256",
-                "internalType": "uint256",
-            },
-            {
-                "name": "end",
-                "type": "uint256",
-                "internalType": "uint256",
-            },
-        ],
+        "name": "emergencyUnpauseAll",
+        "inputs": [],
         "outputs": [],
         "stateMutability": "nonpayable",
     },
@@ -214,6 +166,19 @@ export const invisiCoreFactoryAbi = [
                 "name": "instance",
                 "type": "address",
                 "internalType": "address",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "globalCircuitPaused",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bool",
+                "internalType": "bool",
             },
         ],
         "stateMutability": "view",
@@ -324,64 +289,13 @@ export const invisiCoreFactoryAbi = [
     },
     {
         "type": "event",
-        "name": "EmergencyPauseInstance",
+        "name": "GlobalCircuitPauseUpdated",
         "inputs": [
             {
-                "name": "instance",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "EmergencyPauseRange",
-        "inputs": [
-            {
-                "name": "start",
-                "type": "uint256",
+                "name": "paused",
+                "type": "bool",
                 "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "end",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "EmergencyUnpauseInstance",
-        "inputs": [
-            {
-                "name": "instance",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address",
-            },
-        ],
-        "anonymous": false,
-    },
-    {
-        "type": "event",
-        "name": "EmergencyUnpauseRange",
-        "inputs": [
-            {
-                "name": "start",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
-            },
-            {
-                "name": "end",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256",
+                "internalType": "bool",
             },
         ],
         "anonymous": false,
@@ -464,17 +378,6 @@ export const invisiCoreFactoryAbi = [
         "type": "error",
         "name": "InvalidCreationCode",
         "inputs": [],
-    },
-    {
-        "type": "error",
-        "name": "NotAnInstance",
-        "inputs": [
-            {
-                "name": "addr",
-                "type": "address",
-                "internalType": "address",
-            },
-        ],
     },
     {
         "type": "error",

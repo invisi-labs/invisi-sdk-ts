@@ -37,7 +37,7 @@ describe("deferred Credit independent protocol vectors", () => {
             expect(
                 build({
                     context,
-                    params: key === "create" ? { ...f.params, creationAbi: "legacy" } : f.params,
+                    params: f.params,
                     deliveries: f.deliveries,
                     proof: "0x1234",
                 }).data
@@ -52,7 +52,7 @@ describe("deferred Credit independent protocol vectors", () => {
             expect(api.creditDrawPublicInputs(context, f.params, f.deliveries)).toEqual(
                 f.publicInputs
             );
-            expect(f.publicInputs).toHaveLength(17 + 10 * api.selectCreditDrawCircuit(n).capacity);
+            expect(f.publicInputs).toHaveLength(17 + 9 * api.selectCreditDrawCircuit(n).capacity);
             expect(api.encodeCreditDrawTypedData(context, f.params, f.deliveries)).toEqual(
                 f.typedData
             );
@@ -105,8 +105,7 @@ describe("deferred Credit independent protocol vectors", () => {
         const p = {
             token: context.tokenAddress,
             owner: fixtures.create.params.owner,
-            shard: 1n,
-            slot: 0n,
+            grantId: 1n,
             deadline: 900n,
         };
         const typed = api.encodeRevokeCreditTypedData(context, p);
@@ -114,8 +113,7 @@ describe("deferred Credit independent protocol vectors", () => {
         expect(typed.types.RevokeCredit.map((x) => x.name)).toEqual([
             "token",
             "owner",
-            "shard",
-            "slot",
+            "grantId",
             "deadline",
             "feeRecipient",
             "feeAmount",
@@ -138,4 +136,152 @@ describe("deferred Credit independent protocol vectors", () => {
         expect(api.CREDIT_DRAW_CAPACITIES).toEqual([1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80]);
         for (const n of [0, 81, 1.1]) expect(() => api.selectCreditDrawCircuit(n)).toThrow();
     });
+});
+
+it("requires positive uint128 grant IDs in every Credit codec and rejects old namespaces", () => {
+    const create = fixtures.create;
+    const update = fixtures.update;
+    const draw = fixtures.draw1;
+    const revoke = {
+        token: context.tokenAddress,
+        owner: create.params.owner,
+        grantId: 1n,
+        deadline: create.params.deadline,
+    };
+    for (const grantId of [0n, -1n, 1n << 128n, 1, "01", "0", "+1", "1.0"]) {
+        expect(() =>
+            api.createCreditPublicInputs(context, { ...create.params, grantId }, create.deliveries)
+        ).toThrow();
+        expect(() =>
+            api.updateCreditPublicInputs(context, { ...update.params, grantId }, update.deliveries)
+        ).toThrow();
+        expect(() =>
+            api.creditDrawPublicInputs(
+                context,
+                {
+                    ...draw.params,
+                    grantRefs: [{ payerIndex: 0n, grantId }],
+                },
+                draw.deliveries
+            )
+        ).toThrow();
+        expect(() =>
+            api.encodeRevokeCreditTypedData(context, { ...revoke, grantId } as never)
+        ).toThrow();
+    }
+    for (const grantId of [1n, (1n << 128n) - 1n]) {
+        expect(() =>
+            api.createCreditPublicInputs(context, { ...create.params, grantId }, create.deliveries)
+        ).not.toThrow();
+        expect(() =>
+            api.updateCreditPublicInputs(context, { ...update.params, grantId }, update.deliveries)
+        ).not.toThrow();
+        expect(
+            api.encodeRevokeCreditTypedData(context, { ...revoke, grantId }).message.grantId
+        ).toBe(grantId);
+    }
+    expect(() =>
+        api.createCreditPublicInputs(
+            context,
+            {
+                ...create.params,
+                revocationShard: 1n,
+                revocationSlot: 0n,
+            },
+            create.deliveries
+        )
+    ).toThrow(/unsupported/);
+    expect(() =>
+        api.updateCreditPublicInputs(
+            context,
+            {
+                ...update.params,
+                revocationShard: 1n,
+                revocationSlot: 0n,
+            },
+            update.deliveries
+        )
+    ).toThrow(/unsupported/);
+    expect(() =>
+        api.creditDrawPublicInputs(
+            context,
+            {
+                ...draw.params,
+                grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
+            },
+            draw.deliveries
+        )
+    ).toThrow(/unsupported/);
+    expect(() =>
+        api.encodeRevokeCreditTypedData(context, {
+            ...revoke,
+            shard: 1n,
+            slot: 0n,
+        } as never)
+    ).toThrow(/unsupported/);
+});
+
+it("scopes equal grant IDs by payer and requires sorted unique refs within each payer", () => {
+    const draw = fixtures.draw2;
+    const payers = [
+        { payer: "0x1111111111111111111111111111111111111111", amount: 1n },
+        {
+            payer: "0x2222222222222222222222222222222222222222",
+            amount: draw.params.totalAmount - 1n,
+        },
+    ];
+    const params = {
+        ...draw.params,
+        payers,
+        grantRefs: [
+            { payerIndex: 0n, grantId: 7n },
+            { payerIndex: 1n, grantId: 7n },
+        ],
+    };
+    expect(() => api.creditDrawPublicInputs(context, params, draw.deliveries)).not.toThrow();
+    expect(() =>
+        api.creditDrawPublicInputs(
+            context,
+            {
+                ...params,
+                grantRefs: [...params.grantRefs].reverse(),
+            },
+            draw.deliveries
+        )
+    ).toThrow(/sorted unique/);
+    expect(() =>
+        api.creditDrawPublicInputs(
+            context,
+            {
+                ...params,
+                grantRefs: [params.grantRefs[0], params.grantRefs[0]],
+            },
+            draw.deliveries
+        )
+    ).toThrow(/sorted unique/);
+});
+
+it("encodes pre-revocation with the same uint128 owner authorization as active revocation", () => {
+    const params = {
+        token: context.tokenAddress,
+        owner: fixtures.create.params.owner,
+        grantId: (1n << 128n) - 1n,
+        deadline: fixtures.create.params.deadline,
+    };
+    const typed = api.encodeRevokeCreditTypedData(context, params);
+    expect(typed.types.RevokeCredit.find((field) => field.name === "grantId")?.type).toBe(
+        "uint128"
+    );
+    const signed = api.buildRevokeCreditCalldata({ context, params, signature: "0x1234" });
+    const direct = api.buildRevokeCreditCalldata({
+        context,
+        params,
+        signature: "0x",
+        caller: params.owner,
+    });
+    expect(iface.decodeFunctionData("revokeCredit", signed.data)[2]).toBe(params.grantId);
+    expect(iface.decodeFunctionData("revokeCredit", direct.data)[2]).toBe(params.grantId);
+    expect(TypedDataEncoder.hash(typed.domain, typed.types, typed.message)).toMatch(
+        /^0x[0-9a-f]{64}$/
+    );
 });

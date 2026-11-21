@@ -53,8 +53,7 @@ export function exportBroadcasterIntent(plan: OperationPlan) {
         args = [
             p.token,
             p.owner,
-            p.shard,
-            p.slot,
+            p.grantId,
             p.deadline,
             p.feeRecipient ?? "0x0000000000000000000000000000000000000000",
             p.feeAmount ?? 0n,

@@ -269,7 +269,7 @@ export async function scanAccount(
         });
     }
     const block = await reader.getBlock(target);
-    // A completely empty/new range still refreshes existing nullifiers and Credit bitmaps.
+    // A completely empty/new range still refreshes existing nullifiers and Credit grant statuses.
     if (first && !settings.offline && settings.refreshState !== false) {
         const page = {
             fromBlock: target,

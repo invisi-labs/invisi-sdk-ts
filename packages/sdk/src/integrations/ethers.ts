@@ -155,40 +155,29 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
             await new Contract(instance, invisiCoreAbi, this.client).getFunction("factory")()
         );
     }
-    async getCreditAllocation(
-        context: import("@invisi-labs/protocol").DeploymentContext,
+    async getCreditStatus(
+        context: DeploymentContext,
         owner: Address,
         token: Address,
+        grantId: bigint,
         block: CanonicalBlock
-    ): Promise<{ shard: bigint; slot: number }> {
-        const result = (await this.read(
-            context,
-            context.protocolAddress,
-            invisiCoreAbi,
-            "creditAllocation",
-            [owner, token],
-            block
-        )) as readonly bigint[];
-        return { shard: BigInt(result[0]!), slot: Number(result[1]!) };
-    }
-    async getCreditRevocationBitmap(
-        context: import("@invisi-labs/protocol").DeploymentContext,
-        owner: Address,
-        token: Address,
-        shard: bigint,
-        wordIndex: number,
-        block: CanonicalBlock
-    ): Promise<bigint> {
-        return BigInt(
-            (await this.read(
+    ): Promise<import("@invisi-labs/protocol").CreditGrantStatus> {
+        check(
+            typeof grantId === "bigint" && grantId > 0n && grantId < 1n << 128n,
+            "invalid Credit grant ID"
+        );
+        const status = Number(
+            await this.read(
                 context,
                 context.protocolAddress,
                 invisiCoreAbi,
-                "creditRevocationBitmap",
-                [owner, token, shard, wordIndex],
+                "creditStatus",
+                [owner, token, grantId],
                 block
-            )) as bigint
+            )
         );
+        check(status === 0 || status === 1 || status === 2, "invalid Credit grant status");
+        return status;
     }
     async getLatestBlockNumber() {
         return BigInt(await this.client.getBlockNumber());

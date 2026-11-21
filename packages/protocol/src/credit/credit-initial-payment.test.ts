@@ -4,7 +4,7 @@ import { invisiCoreAbi, type CreditCreationParams, type Delivery } from "../cont
 import { expect, it } from "vitest";
 import { buildCreateCreditCalldata, createCreditPublicInputs } from "./credit-create";
 
-it("rejects initial-payment fields on the legacy create selector", () => {
+it("rejects unflagged initial-payment fields", () => {
     const base = {
         chainId: 1n,
         protocolAddress: "0x1111111111111111111111111111111111111111",
@@ -13,8 +13,7 @@ it("rejects initial-payment fields on the legacy create selector", () => {
     const params = {
         token: base.tokenAddress,
         owner: base.protocolAddress,
-        revocationShard: 1n,
-        revocationSlot: 0n,
+        grantId: 1n,
         creditCommitment: `0x${"01".repeat(32)}` as const,
         deadline: 100n,
         totalAmount: 1n,
@@ -25,7 +24,7 @@ it("rejects initial-payment fields on the legacy create selector", () => {
     ).toThrow(/initial payment/i);
 });
 
-it("matches the Core proof statement and preserves legacy pure creation calldata", () => {
+it("matches the Core proof statement and uses the canonical tuple for pure creation", () => {
     const { context: c, params: v } = fixture;
     const context = {
         ...c,
@@ -34,8 +33,7 @@ it("matches the Core proof statement and preserves legacy pure creation calldata
     } as Parameters<typeof createCreditPublicInputs>[0];
     const params = {
         ...v,
-        revocationShard: BigInt(v.revocationShard),
-        revocationSlot: BigInt(v.revocationSlot),
+        grantId: BigInt(v.grantId),
         deadline: BigInt(v.deadline),
         feeAmount: BigInt(v.feeAmount),
         totalAmount: BigInt(v.totalAmount),
@@ -55,14 +53,14 @@ it("matches the Core proof statement and preserves legacy pure creation calldata
         ...pure,
         params: { ...legacy, hasInitialPayment: false },
     });
-    const old = buildCreateCreditCalldata({
-        ...pure,
-        params: { ...legacy, creationAbi: "legacy" },
-    });
     expect(iface.parseTransaction({ data: current.data })!.args[1].hasInitialPayment).toBe(false);
-    expect(current.data.slice(0, 10)).toBe("0x00b6fa56");
     expect(buildCreateCreditCalldata({ ...pure, params: legacy }).data).toBe(current.data);
-    expect(current.data.slice(0, 10)).not.toEqual(old.data.slice(0, 10));
+    expect(() =>
+        buildCreateCreditCalldata({
+            ...pure,
+            params: { ...legacy, creationAbi: "legacy" } as unknown as CreditCreationParams,
+        })
+    ).toThrow(/unsupported/);
     expect(
         createCreditPublicInputs(context, { ...legacy, hasInitialPayment: false }, pure.deliveries)
     ).toEqual(createCreditPublicInputs(context, legacy, pure.deliveries));

@@ -1,4 +1,3 @@
-import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { provenanceIntentHash } from "@invisi-labs/primitives";
 import type { ProofSidecar } from "@invisi-labs/protocol/provenance";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
@@ -106,7 +105,7 @@ const intentAbi = invisiCoreAbi.filter(
         supportedMethods.includes(item.name) &&
         (item.name !== "transact" || item.inputs[1]?.type === "tuple")
 );
-export const broadcasterTransactInterface = new Interface([...intentAbi, ...legacyCreateCreditAbi]);
+export const broadcasterTransactInterface = new Interface(intentAbi);
 /** Decode a canonical supported direct public intent. Registry and aggregates are excluded. */
 export function decodeBroadcasterIntent(data: string) {
     const parsed = broadcasterTransactInterface.parseTransaction({ data });
@@ -130,11 +129,10 @@ export function decodeBroadcasterIntent(data: string) {
               ? {
                     token: decoded[0],
                     owner: decoded[1],
-                    shard: decoded[2],
-                    slot: decoded[3],
-                    deadline: decoded[4],
-                    feeRecipient: decoded[5],
-                    feeAmount: decoded[6],
+                    grantId: decoded[2],
+                    deadline: decoded[3],
+                    feeRecipient: decoded[4],
+                    feeAmount: decoded[5],
                 }
               : decoded[1]);
     const funding = raw?.funding ?? (method === "shield" ? decoded[3] : undefined);
@@ -156,7 +154,7 @@ export function broadcasterRequestHash(data: string): string {
     const copy = (value: unknown): unknown => (Array.isArray(value) ? value.map(copy) : value);
     const canonical = copy(args) as unknown[];
     if (method !== "shield" && method !== "revokeCredit") canonical[0] = "0x";
-    if (method === "revokeCredit") canonical[7] = "0x";
+    if (method === "revokeCredit") canonical[6] = "0x";
     if (method === "transact") ((canonical[1] as unknown[])[2] as unknown[])[4] = "0x";
     else if (method === "shield") (canonical[3] as unknown[])[4] = "0x";
     const calldata = broadcasterTransactInterface.encodeFunctionData(fragment, canonical);

@@ -47,6 +47,11 @@ export class TransactionPreparation<Result> {
                         resolvedOutputSnapshot(payment, businessOutputs[index]!)
                     );
                 }
+                if (intent?.kind === "create-credit") {
+                    const note = plan.credit!.outputs[0]!.state.note;
+                    intent.options.grantId = note.grantId;
+                    intent.options.creditSharedKey = note.creditSharedKey;
+                }
                 return complete({ ...plan, ...(intent ? { intent } : {}) });
             },
         };

@@ -257,8 +257,7 @@ it.each(["create", "update", "draw", "revoke"])(
                 tokenAddress: BigInt(h.context.tokenAddress),
                 ownerWalletIdentity: h.wallet.ownerAddress,
                 spenderWalletIdentity: h.wallet.ownerAddress,
-                revocationShard: 1n,
-                revocationSlot: 0n,
+                grantId: 1n,
                 nonce: 456n,
                 expiry: 2000003600n,
                 creditSharedKey: 789n,
@@ -286,6 +285,20 @@ it.each(["create", "update", "draw", "revoke"])(
                 };
         });
         await h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n });
+        if (kind === "create") {
+            const { preparationSnapshotAdapter } = await import("@invisi-labs/sdk/session-support");
+            const snapshot = (await h.store.readSnapshot(h.scope)).preparationSnapshot!;
+            await preparationSnapshotAdapter(h.reader, snapshot, true).getCreditStatus!(
+                h.context,
+                h.wallet.ownerAddress,
+                h.context.tokenAddress,
+                999n,
+                snapshot.block
+            );
+            await h.store.transaction(h.scope, (draft) => {
+                draft.preparationSnapshot = snapshot;
+            });
+        }
         const network = vi.fn(async () => {
             throw Error("offline");
         });
@@ -308,6 +321,7 @@ it.each(["create", "update", "draw", "revoke"])(
             kind === "create"
                 ? await session.prepareCreateCredit({
                       tokenAddress,
+                      grantId: 999n,
                       spender: h.bob.getAddress(),
                       expiry: 2000003600n,
                       availableCredit: 100n,
@@ -324,16 +338,17 @@ it.each(["create", "update", "draw", "revoke"])(
                           credits: [{ credit: commitment, amount: 10n }],
                           recipient: h.bob.getAddress(),
                       })
-                    : await session.prepareRevokeCredit({ tokenAddress, shard: 1n, slot: 0n });
+                    : await session.prepareRevokeCredit({ tokenAddress, grantId: 1n });
         expect(prepared.preview().submissionValidation).toBe("required");
         if (kind === "revoke") await prepared.exportRevocationAuthorization();
         else await prepared.exportWalletAuthorization();
         expect(network).not.toHaveBeenCalled();
         if (kind === "draw" || kind === "update") {
             h.reader.getTokenBalanceAllowance = async () => ({ balance: 1000n, allowance: 1000n });
+            h.reader.getCreditStatus = async () => 0;
             const unallocated = await h.session.resume(prepared.id);
-            await expect(unallocated.validateSubmission()).rejects.toThrow(/not allocated/);
-            h.reader.getCreditRevocationBitmap = async () => 1n;
+            await expect(unallocated.validateSubmission()).rejects.toThrow(/not active/);
+            h.reader.getCreditStatus = async () => 2;
             // The live gate uses the original reader; the offline session's adapter deliberately cannot send.
             const restored = await h.session.resume(prepared.id);
             await expect(restored.validateSubmission()).rejects.toThrow(/revoked/);
@@ -548,19 +563,16 @@ it("does not commit captured facts if the public generation changes during reten
     expect((await h.store.readSnapshot(h.scope)).preparationSnapshot).toBeUndefined();
 });
 
-it("checks current revocation state and allocation before submitting a cached revoke", async () => {
+it("checks current status before submitting a cached revoke and allows pre-revocation", async () => {
     const h = await synchronized();
     const prepared = await h.session.prepareRevokeCredit({
         tokenAddress: h.context.tokenAddress,
-        shard: 1n,
-        slot: 0n,
+        grantId: 1n,
     });
-    h.reader.getCreditAllocation = async () => ({ shard: 1n, slot: 1 });
-    h.reader.getCreditRevocationBitmap = async () => 1n;
+    h.reader.getCreditStatus = async () => 2;
     await expect(prepared.validateSubmission()).rejects.toThrow(/revoked/);
-    h.reader.getCreditRevocationBitmap = async () => 0n;
-    h.reader.getCreditAllocation = async () => ({ shard: 1n, slot: 0 });
-    await expect(prepared.validateSubmission()).rejects.toThrow(/not allocated/);
+    h.reader.getCreditStatus = async () => 0;
+    await expect(prepared.validateSubmission()).resolves.toBeUndefined();
 });
 
 it("rechecks cached contract-wallet revoke authorization with the live verifier", async () => {
@@ -571,11 +583,9 @@ it("rechecks cached contract-wallet revoke authorization with the live verifier"
     );
     const prepared = await session.prepareRevokeCredit({
         tokenAddress: h.context.tokenAddress,
-        shard: 1n,
-        slot: 0n,
+        grantId: 1n,
     });
     const signed = await prepared.withRevocationSignature("0x1234");
-    h.reader.getCreditAllocation = async () => ({ shard: 1n, slot: 1 });
     verifyTypedData.mockResolvedValue(false);
     await expect(signed.validateSubmission()).rejects.toThrow(/invalid owner revocation signature/);
 });
@@ -639,4 +649,40 @@ it("checks the complete owner gross debit for atomic creation rather than only i
     await expect(prepared.validateSubmission()).rejects.toThrow(/allowance/);
     h.reader.getTokenBalanceAllowance = async () => ({ balance: 10n, allowance: 10n });
     await expect(prepared.validateSubmission()).resolves.toBeUndefined();
+});
+
+it("requires an unused creation ID again before managed submission", async () => {
+    const h = await fixture();
+    const prepared = await h.session.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+        grantId: 999n,
+    });
+    await expect(prepared.validateSubmission()).resolves.toBeUndefined();
+    for (const status of [1, 2, 3]) {
+        h.reader.getCreditStatus = async () => status as 0 | 1 | 2;
+        await expect(prepared.validateSubmission()).rejects.toThrow(
+            /already active, revoked or has invalid status/
+        );
+    }
+});
+it("preserves the generated creation ID when a snapshot miss retries with live facts", async () => {
+    const h = await synchronized();
+    const ids: bigint[] = [];
+    h.reader.getCreditStatus = async (_context, _owner, _token, grantId) => {
+        ids.push(grantId);
+        return 0;
+    };
+    const prepared = await h.session.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+    });
+    const saved = (await h.store.readSnapshot(h.scope)).operations[prepared.id]!
+        .payload as import("../operations/operation-types").SavedOperation;
+    expect(ids).toEqual([saved.plan.credit!.creation!.grantId]);
+    expect(saved.plan.intent!.kind).toBe("create-credit");
+    if (saved.plan.intent!.kind === "create-credit")
+        expect(saved.plan.intent!.options.grantId).toBe(ids[0]);
 });

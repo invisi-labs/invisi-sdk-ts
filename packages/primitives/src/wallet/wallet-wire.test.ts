@@ -211,8 +211,8 @@ it("binds native Credit receiving snapshots to the resolved public Wallet", asyn
     );
     const response = await local.execute(prepared.request);
     const plain = Uint8Array.from(Buffer.from((response.result as any).plaintext.slice(2), "hex"));
-    plain.set(other.viewingPublicKey, 275);
-    plain.set(other.clueKey, 308);
+    plain.set(other.viewingPublicKey, 281);
+    plain.set(other.clueKey, 314);
     const forged = {
         ...response,
         result: { plaintext: "0x" + Buffer.from(plain).toString("hex") },

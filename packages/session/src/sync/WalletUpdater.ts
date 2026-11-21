@@ -290,19 +290,22 @@ export class WalletUpdater extends InventoryProcessor {
             signal?.throwIfAborted();
             if ((await reader.getBlock(block.number)).hash !== block.hash)
                 throw new CanonicalConflict("Canonical block changed during update");
-            const revocations = new Map<string, boolean>();
-            if (options.refreshState !== false && reader.getCreditRevocationBitmap) {
+            const statuses = new Map<string, import("@invisi-labs/protocol").CreditGrantStatus>();
+            if (options.refreshState !== false && reader.getCreditStatus) {
                 for (const [id, record] of Object.entries(allCredits)) {
                     const note = record.state.note;
-                    const bitmap = await reader.getCreditRevocationBitmap(
+                    const status = await reader.getCreditStatus(
                         context,
                         note.ownerWalletIdentity,
                         `0x${note.tokenAddress.toString(16).padStart(40, "0")}`,
-                        note.revocationShard,
-                        Number(note.revocationSlot / 256n),
+                        note.grantId,
                         observation
                     );
-                    revocations.set(id, (bitmap & (1n << (note.revocationSlot % 256n))) !== 0n);
+                    check(
+                        status === 0 || status === 1 || status === 2,
+                        "invalid Credit grant status"
+                    );
+                    statuses.set(id, status);
                 }
             }
             if ((await reader.getBlock(observation.number)).hash !== observation.hash)
@@ -340,13 +343,15 @@ export class WalletUpdater extends InventoryProcessor {
                             });
                         }
                     });
-                for (const [id, revoked] of revocations)
+                for (const [id, status] of statuses)
                     if (
                         draft.credits[id] &&
                         (!draft.credits[id]!.checkedThrough ||
-                            draft.credits[id]!.checkedThrough!.number <= block.number)
-                    )
-                        draft.credits[id]!.revoked = revoked;
+                            draft.credits[id]!.checkedThrough!.number <= observation.number)
+                    ) {
+                        draft.credits[id]!.grantStatus = status;
+                        draft.credits[id]!.revoked = status === 2;
+                    }
                 const deliveries = extractDeliveryCandidates(logs, context, block.number);
                 const unresolved = draft.unresolvedDeliveries ?? {};
                 const key = (c: (typeof deliveries)[number]) =>

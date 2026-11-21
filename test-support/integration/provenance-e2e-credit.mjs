@@ -26,15 +26,10 @@ export async function creditScenario({
         spender = await testWallet(6),
         recipient = await testWallet(90);
     const ownerAddress = getAddress(toBeHex(owner.ownerAddress, 20));
-    const allocation = proto.decodeFunctionResult(
-        "creditAllocation",
-        await runtime.rpc("eth_call", [
-            {
-                to: protocol,
-                data: proto.encodeFunctionData("creditAllocation", [ownerAddress, tokens[0]]),
-            },
-            "latest",
-        ])
+    const grantId = 1001n;
+    assert.equal(
+        BigInt(await call(proto, protocol, "creditStatus", [ownerAddress, tokens[0], grantId])),
+        0n
     );
     step("prove-and-settle-real-credit-create");
     await tx(
@@ -64,7 +59,7 @@ export async function creditScenario({
         context,
         owner,
         spender,
-        credit: { revocationShard: allocation[0], revocationSlot: allocation[1] },
+        credit: { grantId },
         deadline: context.timestamp + 86400n,
         previousLeaves: leaves,
     });
@@ -136,18 +131,52 @@ export async function creditScenario({
         "3",
         "Credit outputs never enter the ordinary recognized tree"
     );
+    step("pre-revoke-an-uncreated-credit-grant");
+    const blockedGrantId = 1002n;
+    assert.equal(
+        BigInt(
+            await call(proto, protocol, "creditStatus", [ownerAddress, tokens[0], blockedGrantId])
+        ),
+        0n
+    );
+    const preRevocationReceipt = await (
+        await signer.sendTransaction({
+            to: protocol,
+            data: proto.encodeFunctionData("revokeCredit", [
+                tokens[0],
+                ownerAddress,
+                blockedGrantId,
+                context.timestamp + 86400n,
+                "0x0000000000000000000000000000000000000000",
+                0n,
+                "0x",
+            ]),
+            gasLimit: 200000n,
+        })
+    ).wait();
+    assert.equal(
+        BigInt(
+            await call(proto, protocol, "creditStatus", [ownerAddress, tokens[0], blockedGrantId])
+        ),
+        2n
+    );
+    assert.equal(
+        BigInt(await call(proto, protocol, "creditStatus", [ownerAddress, tokens[0], grantId])),
+        1n
+    );
     const result = {
         ownerGasReceipt,
         ownerApprovalReceipt: approvalReceipt.toJSON(),
         creationReceipt,
         drawReceipt,
+        preRevocationReceipt: preRevocationReceipt.toJSON(),
+        preRevokedGrantId: blockedGrantId.toString(),
         creationRecognition,
         recognition,
         creditCommitment: create.params.creditCommitment,
         noteCommitment: draw.params.noteCommitment,
         owner: ownerAddress,
-        shard: String(allocation[0]),
-        slot: String(allocation[1]),
+        grantId: String(grantId),
         token: tokens[0],
     };
     const base = serviceURL.replace("/v1/chains/31337", ""),
@@ -164,19 +193,12 @@ export async function creditScenario({
         BigInt(await call(proto, protocol, "getNoteTreeRoot", [1]))
     );
     assert.equal(publicTree.leafCount, "5");
-    const grantID = [
-        "31337",
-        protocol,
-        tokens[0],
-        ownerAddress,
-        String(allocation[0]),
-        String(allocation[1]),
-    ]
+    const grantID = ["31337", protocol, tokens[0], ownerAddress, String(grantId)]
         .map((x) => x.toLowerCase())
         .join(":");
     const publicGrant = await (await fetch(base + "/api/v1/grants/" + grantID)).json();
     assert.equal(publicGrant.revoked, false);
-    assert.equal(publicGrant.chainState.allocated, true);
+    assert.equal(publicGrant.chainState.status, 1);
     assert.equal(publicGrant.drawRecords[0].noteCommitment, draw.params.noteCommitment);
     save("public-tree.json", publicTree);
     save("public-grant.json", publicGrant);

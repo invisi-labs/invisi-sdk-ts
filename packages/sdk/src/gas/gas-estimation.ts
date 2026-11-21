@@ -18,9 +18,7 @@ export function estimateOperationGas(plan: OperationPlan, execution?: "direct" |
     if (credit?.creation?.hasInitialPayment) {
         query = { kind: "create-credit-initial-payment" };
     } else if (credit?.creation?.hasInitialPayment === false) {
-        query = { kind: "create-credit", creationAbi: "initial-payment" };
-    } else if (credit?.creation?.creationAbi === "legacy") {
-        query = { kind: "create-credit", creationAbi: "legacy" };
+        query = { kind: "create-credit" };
     } else if (credit?.draw) {
         query = {
             kind: "draw-credit",
@@ -64,7 +62,7 @@ export function estimateOperationGas(plan: OperationPlan, execution?: "direct" |
                 o.deliveries.reduce(
                     (bytes, d) =>
                         bytes +
-                        Math.max(0, (d.ciphertext.length - 2) / 2 - 485) +
+                        Math.max(0, (d.ciphertext.length - 2) / 2 - 491) +
                         Math.max(0, (d.clue.length - 2) / 2 - 68),
                     0
                 ),

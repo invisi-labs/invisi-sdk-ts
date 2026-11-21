@@ -58,16 +58,15 @@ function result(gas: number, exact: boolean, id: string): GasEstimate {
 }
 /** Local receipt-calibrated preview. Valid direct shapes always return nonzero gas units. */
 export function estimateGas(query: GasShape): GasEstimate {
+    for (const field of ["creationAbi", "bitmapWord"])
+        if (Object.hasOwn(query, field)) throw new Error(`Retired gas shape field: ${field}`);
     const kind = query.kind;
-    if (
-        kind === "create-credit-initial-payment" ||
-        (kind === "create-credit" && query.creationAbi !== "legacy")
-    ) {
+    if (kind === "create-credit-initial-payment" || kind === "create-credit") {
         const fee = flag(query, "feeEnabled", flag(query, "fee"));
         const row = initialPayment.rows.find((r) => r.kind === kind && r.feeEnabled === fee)!;
         const extras =
             count(query, "extraDeliveryBytes", 0) +
-            2 * Math.max(0, count(query, "creditCiphertextBytes", 485) - 485) +
+            2 * Math.max(0, count(query, "creditCiphertextBytes", 491) - 491) +
             (kind === "create-credit-initial-payment"
                 ? Math.max(0, count(query, "noteCiphertextBytes", 160) - 160)
                 : 0) +
@@ -188,17 +187,15 @@ export function estimateGas(query: GasShape): GasEstimate {
             shape = {
                 ...shape,
                 authorization: query.authorization ?? "unknown",
-                bitmapWord: query.bitmapWord ?? "empty",
             };
         const row = measured.rows.find((r) =>
             Object.entries(shape).every(([key, value]) => (r.shape as GasShape)[key] === value)
         );
-        // Creation/update measurements use the costlier first-allocation/used-state paths.
+        // Historical receipt rows retain their source schema; current queries omit retired storage selectors.
         if (row) gas = row.gasUnits;
         else if (
             kind === "revoke-credit" &&
-            ["direct", "eoa", "erc1271", "unknown"].includes(String(shape.authorization)) &&
-            ["empty", "nonempty"].includes(String(shape.bitmapWord))
+            ["direct", "eoa", "erc1271", "unknown"].includes(String(shape.authorization))
         ) {
             const fallback = measured.rows.find(
                 (r) =>
@@ -226,7 +223,7 @@ export function estimateGas(query: GasShape): GasEstimate {
     const extraBytes =
         count(query, "extraDeliveryBytes", 0) +
         noteDeliveries * Math.max(0, count(query, "noteCiphertextBytes", 160) - 160) +
-        creditDeliveries * Math.max(0, count(query, "creditCiphertextBytes", 485) - 485) +
+        creditDeliveries * Math.max(0, count(query, "creditCiphertextBytes", 491) - 491) +
         (noteDeliveries + creditDeliveries) * Math.max(0, count(query, "clueBytes", 68) - 68);
     const extra =
         extraBytes * 32 +

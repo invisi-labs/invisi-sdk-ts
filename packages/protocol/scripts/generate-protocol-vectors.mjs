@@ -29,7 +29,7 @@ const context = {
     payer = "0x4444444444444444444444444444444444444444";
 const clue = "0x" + "22".repeat(64) + "18" + "33".repeat(3),
     delivery = { ciphertext: "0x01" + "11".repeat(160), clue },
-    creditDelivery = { ciphertext: "0x82" + "22".repeat(484), clue },
+    creditDelivery = { ciphertext: "0x84" + "22".repeat(490), clue },
     empty = { ciphertext: "0x", clue: "0x" };
 const funding = { payer, amount: 100n, sigNonce: 7n, deadline: 1000n },
     fund = { ...funding, signature: "0xabcd", permit: { deadline: 0n, v: 0, r: w(0), s: w(0) } },
@@ -70,8 +70,10 @@ for (const count of [1, 15, 57, 113]) {
 const creation = {
         token: context.tokenAddress,
         owner,
-        revocationShard: 1n,
-        revocationSlot: 0n,
+        grantId: 1001n,
+        hasInitialPayment: false,
+        totalAmount: 0n,
+        noteCommitment: w(0),
         creditCommitment: w(5),
         deadline: 900n,
         feeRecipient: zeroFunding.payer,
@@ -91,8 +93,7 @@ const update = {
     source: { treeId: 1n, merkleRoot: w(1) },
     nullifier: w(2),
     creditCommitment: w(5),
-    revocationShard: 1n,
-    revocationSlot: 0n,
+    grantId: 1001n,
     deadline: 900n,
     feeRecipient: zeroFunding.payer,
     feeAmount: 0n,
@@ -110,8 +111,7 @@ for (const count of [1, 2, 6, 11, 21, 31, 41, 51, 61, 71, 80]) {
             payers: [{ payer: owner, amount: BigInt(count) * 7n }],
             grantRefs: Array.from({ length: count }, (_, i) => ({
                 payerIndex: 0n,
-                shard: 1n,
-                slot: BigInt(i),
+                grantId: 1001n + BigInt(i),
             })),
             nullifiers: Array.from({ length: count }, (_, i) => w(i + 2)),
             creditCommitments: Array.from({ length: count }, (_, i) => w(i + 1000)),
@@ -245,8 +245,7 @@ const { encodeRevokeCreditTypedData } = await from("scripts/credit-revocation-cl
 const revoke = {
     token: context.tokenAddress,
     owner,
-    shard: 1n,
-    slot: 0n,
+    grantId: 1001n,
     deadline: 900n,
     feeRecipient,
     feeAmount,
@@ -257,8 +256,7 @@ fixtures.revokeFee = {
     calldata: iface.encodeFunctionData("revokeCredit", [
         revoke.token,
         revoke.owner,
-        revoke.shard,
-        revoke.slot,
+        revoke.grantId,
         revoke.deadline,
         feeRecipient,
         feeAmount,
@@ -320,6 +318,20 @@ const read = (p) => JSON.parse(readFileSync(resolve(root, p))),
     create = read("circuits/credit/create/target/creation-fixture.json"),
     draw = read("circuits/credit/draw/slots1/target/draw-fixture.json"),
     updateFixture = read("circuits/credit/update/target/update-fixture.json");
+const initialPaymentFixture = read(
+    "circuits/credit/create-initial-payment/target/initial-payment-integration.json"
+).initialPayment;
+writeFileSync(
+    new URL("../../prover/src/testing/initial-payment-fixture.json", import.meta.url),
+    stringify(
+        Object.fromEntries(
+            ["context", "params", "deliveries", "publicInputs", "witness"].map((key) => [
+                key,
+                initialPaymentFixture[key],
+            ])
+        )
+    )
+);
 const { deriveWallet } = await from("scripts/wallet-client.mjs"),
     { createWalletTransactFixture } = await from("scripts/wallet-transact-fixtures.mjs"),
     sweepWallet = await deriveWallet(w(1)),

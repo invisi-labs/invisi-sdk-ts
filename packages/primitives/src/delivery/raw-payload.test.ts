@@ -91,14 +91,14 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
                     ? state.note.ownerWalletIdentity
                     : state.note.spenderWalletIdentity,
         };
-        const payload = new Uint8Array(3611).fill(255);
+        const payload = new Uint8Array(3605).fill(255);
         const envelope = await core.encryptCreditState(
             publicKey,
             { ...state, note: { ...state.note, payload } },
             scope
         );
         expect(envelope.length).toBe(4096);
-        expect(envelope[0]).toBe(130);
+        expect(envelope[0]).toBe(132);
         const decoded = await core.decryptCreditState(secret, envelope, scope);
         expect(decoded.note.payload).toEqual(payload);
         const viewer = new core.ViewingCapability(scope.ownerAddress, secret);
@@ -109,7 +109,7 @@ it("restores and discloses Credit raw payloads for both roles without applicatio
         await expect(
             core.encryptCreditState(
                 publicKey,
-                { ...state, note: { ...state.note, payload: new Uint8Array(3612) } },
+                { ...state, note: { ...state.note, payload: new Uint8Array(3606) } },
                 scope
             )
         ).rejects.toThrow(/length/);

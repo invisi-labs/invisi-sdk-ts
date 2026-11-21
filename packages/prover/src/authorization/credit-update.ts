@@ -16,8 +16,7 @@ export async function updateCredit(w: WitnessContext, p: UpdateCreditWitnessPara
         words = updateCreditPublicInputs(w.protocol.context, p.params, p.deliveries);
     check(
         n.ownerWalletIdentity === p.params.owner &&
-            n.revocationShard === p.params.revocationShard &&
-            n.revocationSlot === p.params.revocationSlot &&
+            n.grantId === p.params.grantId &&
             derived.nullifier === p.params.nullifier &&
             derived.stateCommitment === p.params.creditCommitment &&
             (await w.creditLeaf(next)) === p.params.creditCommitment,

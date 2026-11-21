@@ -1,6 +1,7 @@
 import { createDecipheriv, createECDH, hkdfSync } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import * as core from "../index";
+import legacyCredit from "./testdata/previous-credit-envelope.json";
 import vectors from "../wallet/testdata/wallet-note-vectors.json";
 const bytes = (s: string) => Uint8Array.from(Buffer.from(s.slice(2), "hex"));
 const address = (s: string) => `0x${BigInt(s).toString(16).padStart(40, "0")}` as `0x${string}`;
@@ -24,8 +25,7 @@ const credit: core.CreditState = {
                 [
                     "spenderWalletIdentity",
                     "ownerWalletIdentity",
-                    "revocationShard",
-                    "revocationSlot",
+                    "grantId",
                     "nonce",
                     "expiry",
                     "creditSharedKey",
@@ -78,7 +78,7 @@ function independentlyOpen(envelope: Uint8Array, role: "owner" | "spender") {
     const ecdh = createECDH("secp256k1");
     ecdh.setPrivateKey(bytes(vectors[role].viewingPrivateKey));
     const header = envelope.subarray(0, 62),
-        domain = Buffer.from("Invisi.CreditDelivery.v2");
+        domain = Buffer.from("Invisi.CreditDelivery.v4.GrantId.Uint128");
     const key = hkdfSync(
         "sha256",
         ecdh.computeSecret(envelope.subarray(1, 34)),
@@ -128,17 +128,19 @@ describe("current authenticated delivery envelopes", () => {
         }
     );
     it.each(["owner", "spender"] as const)(
-        "creates independently decryptable Credit v2 for %s",
+        "creates independently decryptable Credit v4 for %s",
         async (role) => {
             const envelope = await core.encryptCreditState(
                 keys(role).viewingPublicKey,
                 state,
                 cc(role)
             );
-            expect(envelope[0]).toBe(0x82);
-            expect(envelope).toHaveLength(485);
+            expect(envelope[0]).toBe(0x84);
+            expect(envelope).toHaveLength(491);
             const plain = independentlyOpen(envelope, role);
-            expect(plain).toHaveLength(407);
+            expect(plain).toHaveLength(413);
+            expect(plain.subarray(64, 80)).toEqual(word(credit.grantId, 16));
+            expect(envelope.subarray(475)).toHaveLength(16);
             expect(plain.subarray(-2)).toEqual(Buffer.alloc(2));
             expect(
                 await core.decryptCreditState(
@@ -205,6 +207,25 @@ describe("current authenticated delivery envelopes", () => {
             )
         ).rejects.toThrow();
     });
+    it.each(["owner", "spender"] as const)(
+        "rejects prior Credit envelopes for %s",
+        async (role) => {
+            for (const header of [0x82, 0x83]) {
+                const old = bytes(vectors.credit[`${role}Ciphertext`]);
+                old[0] = header;
+                await expect(
+                    core.decryptCreditState(bytes(vectors[role].viewingPrivateKey), old, cc(role))
+                ).rejects.toThrow(/version/);
+            }
+            await expect(
+                core.decryptCreditState(
+                    bytes(vectors[role].viewingPrivateKey),
+                    legacyCredit.envelope as `0x${string}`,
+                    cc(role)
+                )
+            ).rejects.toThrow(/version/);
+        }
+    );
     it("rejects unsupported Credit envelope versions and unexpected state fields", async () => {
         const malformed = bytes(vectors.credit.ownerCiphertext);
         malformed[0] = 0xff;
@@ -254,9 +275,36 @@ describe("current authenticated delivery envelopes", () => {
         await expect(
             core.encryptCreditState(
                 keys("owner").viewingPublicKey,
-                { ...state, note: { ...credit, revocationSlot: 1n } },
+                { ...state, note: { ...credit, grantId: 2n } },
                 cc("owner")
             )
         ).rejects.toThrow(/commitment/);
     });
 });
+
+it.each(["owner", "spender"] as const)(
+    "round-trips the maximum uint128 grant ID for %s",
+    async (role) => {
+        const maximal = { ...state, note: { ...credit, grantId: (1n << 128n) - 1n } };
+        const scoped = {
+            ...cc(role),
+            outputCommitment: await core.computeCreditCommitment(maximal.note),
+        };
+        const envelope = await core.encryptCreditState(
+            keys(role).viewingPublicKey,
+            maximal,
+            scoped
+        );
+        expect(
+            await core.decryptCreditState(bytes(vectors[role].viewingPrivateKey), envelope, scoped)
+        ).toEqual(maximal);
+        for (const grantId of [0n, 1n << 128n])
+            await expect(
+                core.encryptCreditState(
+                    keys(role).viewingPublicKey,
+                    { ...maximal, note: { ...maximal.note, grantId } },
+                    scoped
+                )
+            ).rejects.toThrow(/grantId/);
+    }
+);

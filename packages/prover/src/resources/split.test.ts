@@ -15,7 +15,7 @@ import { browserProvenanceResources } from "./browser";
 const fixtures = resolve(import.meta.dirname, "../../../../test-support/prover-resources");
 it("routes every Core circuit and Provenance to distinct immutable pins with explicit legacy", () => {
     expect(PROVER_ASSET_INDEX_SHA256).toBe(
-        "36f58bac1a0f70c6f8422b47f7cc35a30416a20f8a0f30038d23db0832e2bc93"
+        "85a5d1dffe40fc965ab4345a28b632f463c3ad861c44d5845850fbc7447fd8f6"
     );
     expect(PROVENANCE_ASSET_INDEX_SHA256).toBe(
         "8d5a3e60e3e5cbe315150511207d7aff67f4e2924148d396b67d82017ecd1f1c"

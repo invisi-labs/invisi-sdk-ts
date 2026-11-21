@@ -126,14 +126,11 @@ export type ProtocolTransactionCreditUpdates = Availability<{
     states: readonly IndexedCreditState[];
     transitions: readonly ProtocolCreditTransition[];
 }>;
-export interface IndexedCreditAllocation {
+/** 0: unknown, 1: active, 2: revoked (including pre-revoked grants). */
+export type CreditGrantStatus = 0 | 1 | 2;
+export interface IndexedCreditStatus {
     block: CanonicalBlock;
-    shard: bigint;
-    slot: number;
-}
-export interface IndexedCreditRevocationBitmap {
-    block: CanonicalBlock;
-    bitmap: bigint;
+    status: CreditGrantStatus;
 }
 
 /** Public operator metadata from the selected registry's indexed state; not an endorsement. */

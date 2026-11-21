@@ -42,8 +42,7 @@ function validateInheritance(state: WalletState, record: StoredCredit): boolean 
         "tokenAddress",
         "spenderWalletIdentity",
         "ownerWalletIdentity",
-        "revocationShard",
-        "revocationSlot",
+        "grantId",
         "creditSharedKey",
     ] as const;
     if (

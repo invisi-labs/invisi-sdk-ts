@@ -190,14 +190,9 @@ export const invisiCoreAbi = [
                         "internalType": "address",
                     },
                     {
-                        "name": "revocationShard",
-                        "type": "uint64",
-                        "internalType": "uint64",
-                    },
-                    {
-                        "name": "revocationSlot",
-                        "type": "uint16",
-                        "internalType": "uint16",
+                        "name": "grantId",
+                        "type": "uint128",
+                        "internalType": "uint128",
                     },
                     {
                         "name": "creditCommitment",
@@ -256,35 +251,6 @@ export const invisiCoreAbi = [
         ],
         "outputs": [],
         "stateMutability": "nonpayable",
-    },
-    {
-        "type": "function",
-        "name": "creditAllocation",
-        "inputs": [
-            {
-                "name": "owner",
-                "type": "address",
-                "internalType": "address",
-            },
-            {
-                "name": "token",
-                "type": "address",
-                "internalType": "address",
-            },
-        ],
-        "outputs": [
-            {
-                "name": "shard",
-                "type": "uint64",
-                "internalType": "uint64",
-            },
-            {
-                "name": "slot",
-                "type": "uint16",
-                "internalType": "uint16",
-            },
-        ],
-        "stateMutability": "view",
     },
     {
         "type": "function",
@@ -350,14 +316,9 @@ export const invisiCoreAbi = [
                                 "internalType": "uint256",
                             },
                             {
-                                "name": "shard",
-                                "type": "uint64",
-                                "internalType": "uint64",
-                            },
-                            {
-                                "name": "slot",
-                                "type": "uint16",
-                                "internalType": "uint16",
+                                "name": "grantId",
+                                "type": "uint128",
+                                "internalType": "uint128",
                             },
                         ],
                     },
@@ -426,7 +387,7 @@ export const invisiCoreAbi = [
     },
     {
         "type": "function",
-        "name": "creditRevocationBitmap",
+        "name": "creditStatus",
         "inputs": [
             {
                 "name": "owner",
@@ -439,14 +400,9 @@ export const invisiCoreAbi = [
                 "internalType": "address",
             },
             {
-                "name": "shard",
-                "type": "uint64",
-                "internalType": "uint64",
-            },
-            {
-                "name": "word",
-                "type": "uint8",
-                "internalType": "uint8",
+                "name": "grantId",
+                "type": "uint128",
+                "internalType": "uint128",
             },
         ],
         "outputs": [
@@ -587,6 +543,19 @@ export const invisiCoreAbi = [
                 "name": "",
                 "type": "address",
                 "internalType": "address",
+            },
+        ],
+        "stateMutability": "view",
+    },
+    {
+        "type": "function",
+        "name": "instanceCircuitPaused",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bool",
+                "internalType": "bool",
             },
         ],
         "stateMutability": "view",
@@ -749,14 +718,9 @@ export const invisiCoreAbi = [
                 "internalType": "address",
             },
             {
-                "name": "shard",
-                "type": "uint64",
-                "internalType": "uint64",
-            },
-            {
-                "name": "slot",
-                "type": "uint16",
-                "internalType": "uint16",
+                "name": "grantId",
+                "type": "uint128",
+                "internalType": "uint128",
             },
             {
                 "name": "deadline",
@@ -1338,14 +1302,9 @@ export const invisiCoreAbi = [
                         "internalType": "bytes32",
                     },
                     {
-                        "name": "revocationShard",
-                        "type": "uint64",
-                        "internalType": "uint64",
-                    },
-                    {
-                        "name": "revocationSlot",
-                        "type": "uint16",
-                        "internalType": "uint16",
+                        "name": "grantId",
+                        "type": "uint128",
+                        "internalType": "uint128",
                     },
                     {
                         "name": "deadline",
@@ -1533,16 +1492,10 @@ export const invisiCoreAbi = [
                 "internalType": "uint256",
             },
             {
-                "name": "revocationShard",
-                "type": "uint64",
+                "name": "grantId",
+                "type": "uint128",
                 "indexed": false,
-                "internalType": "uint64",
-            },
-            {
-                "name": "revocationSlot",
-                "type": "uint16",
-                "indexed": false,
-                "internalType": "uint16",
+                "internalType": "uint128",
             },
             {
                 "name": "creditCommitment",
@@ -1685,16 +1638,10 @@ export const invisiCoreAbi = [
                 "internalType": "address",
             },
             {
-                "name": "shard",
-                "type": "uint64",
+                "name": "grantId",
+                "type": "uint128",
                 "indexed": true,
-                "internalType": "uint64",
-            },
-            {
-                "name": "slot",
-                "type": "uint16",
-                "indexed": false,
-                "internalType": "uint16",
+                "internalType": "uint128",
             },
             {
                 "name": "feeRecipient",
@@ -1778,14 +1725,9 @@ export const invisiCoreAbi = [
                                 "internalType": "uint256",
                             },
                             {
-                                "name": "shard",
-                                "type": "uint64",
-                                "internalType": "uint64",
-                            },
-                            {
-                                "name": "slot",
-                                "type": "uint16",
-                                "internalType": "uint16",
+                                "name": "grantId",
+                                "type": "uint128",
+                                "internalType": "uint128",
                             },
                         ],
                     },
@@ -1893,14 +1835,9 @@ export const invisiCoreAbi = [
                         "internalType": "bytes32",
                     },
                     {
-                        "name": "revocationShard",
-                        "type": "uint64",
-                        "internalType": "uint64",
-                    },
-                    {
-                        "name": "revocationSlot",
-                        "type": "uint16",
-                        "internalType": "uint16",
+                        "name": "grantId",
+                        "type": "uint128",
+                        "internalType": "uint128",
                     },
                     {
                         "name": "deadline",

@@ -24,8 +24,7 @@ const creditState = {
                 [
                     "spenderWalletIdentity",
                     "ownerWalletIdentity",
-                    "revocationShard",
-                    "revocationSlot",
+                    "grantId",
                     "nonce",
                     "expiry",
                     "creditSharedKey",
@@ -89,8 +88,7 @@ describe("verifyCreditCommitment", () => {
         expect(await verifyCreditCommitment(credit)).toBe(true);
         for (const field of [
             "nonce",
-            "revocationShard",
-            "revocationSlot",
+            "grantId",
             "availableCredit",
             "totalSpent",
             "protocolAddress",

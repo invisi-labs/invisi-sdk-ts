@@ -14,8 +14,7 @@ const context = {
 const note = {
     spenderWalletIdentity: 3n,
     ownerWalletIdentity: 4n,
-    revocationShard: 1n,
-    revocationSlot: 0n,
+    grantId: 1001n,
     nonce: 5n,
     expiry: 2050000000n,
     creditSharedKey: 6n,

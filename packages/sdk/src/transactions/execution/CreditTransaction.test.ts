@@ -1,4 +1,3 @@
-import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import {
     Wallet,
     computeCreditCommitment,
@@ -10,7 +9,7 @@ import { Interface, Wallet as EvmWallet } from "ethers";
 import { it, expect, vi } from "vitest";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
-const iface = new Interface([...invisiCoreAbi, ...legacyCreateCreditAbi]);
+const iface = new Interface(invisiCoreAbi);
 async function creditSetup(
     policy: Partial<
         import("@invisi-labs/primitives").CreditPolicy &
@@ -26,8 +25,7 @@ async function creditSetup(
                 tokenAddress: BigInt(h.context.tokenAddress),
                 ownerWalletIdentity: h.wallet.ownerAddress,
                 spenderWalletIdentity: h.bob.ownerAddress,
-                revocationShard: 1n,
-                revocationSlot: 0n,
+                grantId: 1n,
                 nonce: 456n,
                 expiry: 2000003600n,
                 creditSharedKey: 789n,
@@ -78,7 +76,7 @@ it("creates Credit authority without notes, cash, change or funding authorizatio
     expect(decoded.name).toBe("createCredit");
     expect(decoded.args).toHaveLength(3);
     expect(decoded.args[2]).toHaveLength(2);
-    expect(decoded.args[2][0].ciphertext.slice(0, 4)).toBe("0x82");
+    expect(decoded.args[2][0].ciphertext.slice(0, 4)).toBe("0x84");
     await expect(ready.exportFundingAuthorization()).rejects.toThrow();
 });
 it("updates private limits and expiry while preserving usage and grant identity", async () => {
@@ -121,8 +119,7 @@ it("revokes a public grant reference without its latest private state or a prove
             wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
-            shard: 1n,
-            slot: 9n,
+            grantId: 1n,
             caller: h.wallet.ownerAddress,
         });
     expect(prepared.preview().permissions).toMatchObject({
@@ -139,8 +136,7 @@ it("attaches an EOA owner revocation signature and rejects altered owners", asyn
             wallet: Wallet.fromAddress(h.wallet.getAddress()),
             protocol: h.protocol,
             tokenAddress: h.context.tokenAddress,
-            shard: 1n,
-            slot: 0n,
+            grantId: 1n,
         },
         prepared = await h.invisi.prepareRevokeCredit(options),
         request = await prepared.exportRevocationAuthorization(),
@@ -155,7 +151,7 @@ it("attaches an EOA owner revocation signature and rejects altered owners", asyn
 });
 it("checks public revocation bits before private draw or update", async () => {
     const h = await creditSetup();
-    h.reader.getCreditRevocationBitmap = async () => 1n;
+    h.reader.getCreditStatus = async () => 2;
     await expect(
         h.invisi.prepareUpdateCredit({
             ...h.identity,
@@ -230,8 +226,7 @@ it("binds public owner revocation fees before accepting an EOA signature", async
     const h = await creditSetup(),
         prepared = await h.invisi.prepareRevokeCredit({
             ...h.identity,
-            shard: 1n,
-            slot: 0n,
+            grantId: 1n,
             fee: { recipient: h.bob.ownerAddress, amount: 3n },
         }),
         request = await prepared.exportRevocationAuthorization();
@@ -243,11 +238,10 @@ it("binds public owner revocation fees before accepting an EOA signature", async
         ),
         ready = await prepared.withRevocationSignature(signature as `0x${string}`),
         decoded = iface.parseTransaction(await ready.exportTransaction())!;
-    expect(decoded.args[6]).toBe(3n);
+    expect(decoded.args[5]).toBe(3n);
     const changed = await h.invisi.prepareRevokeCredit({
         ...h.identity,
-        shard: 1n,
-        slot: 0n,
+        grantId: 1n,
         fee: { recipient: h.bob.ownerAddress, amount: 4n },
     });
     await expect(changed.withRevocationSignature(signature as `0x${string}`)).rejects.toThrow();
@@ -276,8 +270,7 @@ it("accepts an explicit ERC1271 public revocation verifier without calling a pro
         }),
         prepared = await invisi.prepareRevokeCredit({
             ...h.identity,
-            shard: 1n,
-            slot: 0n,
+            grantId: 1n,
             fee: { recipient: h.bob.ownerAddress, amount: 3n },
         }),
         ready = await prepared.withRevocationSignature("0x1234");
@@ -310,7 +303,7 @@ async function broadcasterCreditPreparations(h: Awaited<ReturnType<typeof credit
             credits: [{ credit: h.commitment, amount: 30n }],
             recipient: h.wallet.getAddress(),
         }),
-        await h.invisi.prepareRevokeCredit({ ...h.identity, shard: 1n, slot: 0n }),
+        await h.invisi.prepareRevokeCredit({ ...h.identity, grantId: 1n }),
     ];
 }
 it("freezes paid broadcaster fees for all Credit operations before authorization", async () => {
@@ -546,7 +539,7 @@ it("prepares an atomic initial payment and requires only the owner signature", a
         initialPayment: { amount: 7n },
         fee: { recipient: h.wallet.ownerAddress, amount: 1n },
     });
-    expect(prepared.estimateGas()).toMatchObject({ available: true, sampleCount: 3 });
+    expect(prepared.estimateGas()).toMatchObject({ available: true });
     expect(prepared.preview()).toMatchObject({
         creditInitialPayment: { grossAmount: 7n, netAmount: 6n, feeAmount: 1n },
         creditOutputs: [{ availableCredit: 3n, dailySpent: 7n, monthlySpent: 7n, totalSpent: 7n }],
@@ -586,24 +579,17 @@ it("rejects a separate initial payment recipient before preparing a transaction"
     ).rejects.toThrow(/unsupported initial payment option/);
 });
 
-it("defaults pure creation to the current selector and keeps explicit legacy opt-in", async () => {
+it("uses the canonical grant-ID creation selector", async () => {
     const h = await creditSetup();
-    for (const creationAbi of [undefined, "initial-payment", "legacy"] as const) {
-        const prepared = await h.invisi.prepareCreateCredit({
-            ...h.identity,
-            spender: h.bob.getAddress(),
-            expiry: 2000003600n,
-            ...(creationAbi ? { creationAbi } : {}),
-        });
-        const intent = await prepared.exportBroadcasterIntent();
-        expect(intent.data.slice(0, 10)).toBe(
-            creationAbi === "legacy"
-                ? new Interface(legacyCreateCreditAbi).getFunction("createCredit")!.selector
-                : "0x00b6fa56"
-        );
-        const ready = await (await externallyAuthorize(prepared)).prove();
-        expect((await ready.exportTransaction()).data.slice(0, 10)).toBe(intent.data.slice(0, 10));
-    }
+    const prepared = await h.invisi.prepareCreateCredit({
+        ...h.identity,
+        spender: h.bob.getAddress(),
+        expiry: 2000003600n,
+    });
+    const intent = await prepared.exportBroadcasterIntent();
+    expect(iface.parseTransaction({ data: intent.data })!.name).toBe("createCredit");
+    const ready = await (await externallyAuthorize(prepared)).prove();
+    expect((await ready.exportTransaction()).data.slice(0, 10)).toBe(intent.data.slice(0, 10));
 });
 
 it("preserves a pinned merchant net while rebuilding gross usage and authorization on quotes", async () => {
@@ -621,6 +607,9 @@ it("preserves a pinned merchant net while rebuilding gross usage and authorizati
     const quoted = await quoteClient(h.context, () => (++calls === 1 ? 2n : 3n)).quote(prepared, {
         maxFeeAmount: 4n,
     });
+    expect(quoted.preview().creditOutputs![0]!.grantId).toBe(
+        prepared.preview().creditOutputs![0]!.grantId
+    );
     expect(quoted.preview().outputs[0]!.amount).toBe(7n);
     expect(quoted.preview().creditOutputs![0]).toMatchObject({
         availableCredit: 10n,
@@ -654,3 +643,58 @@ it("preserves a pinned merchant net while rebuilding gross usage and authorizati
         })
     ).rejects.toThrow(/net|gross/);
 });
+
+it("generates independent grant IDs and freezes caller-selected IDs before authorization", async () => {
+    const h = await creditSetup();
+    const options = { ...h.identity, spender: h.bob.getAddress(), expiry: 2000003600n };
+    const first = await h.invisi.prepareCreateCredit(options);
+    const second = await h.invisi.prepareCreateCredit(options);
+    const id = first.preview().creditOutputs![0]!.grantId;
+    expect(id).toBeGreaterThan(0n);
+    expect(id).toBeLessThan(1n << 128n);
+    expect(second.preview().creditOutputs![0]!.grantId).not.toBe(id);
+    const explicit = await h.invisi.prepareCreateCredit({ ...options, grantId: (1n << 127n) + 7n });
+    expect(explicit.preview().creditOutputs![0]!.grantId).toBe((1n << 127n) + 7n);
+    const ready = await (await externallyAuthorize(explicit)).prove();
+    expect(iface.parseTransaction(await ready.exportTransaction())!.args[1].grantId).toBe(
+        (1n << 127n) + 7n
+    );
+    for (const grantId of [0n, 1n << 128n])
+        await expect(h.invisi.prepareCreateCredit({ ...options, grantId })).rejects.toThrow();
+});
+it("fails closed on unknown grants for draws and allows unknown-grant pre-revocation", async () => {
+    const h = await creditSetup();
+    h.reader.getCreditStatus = async () => 0;
+    await expect(
+        h.invisi.prepareDrawCredit({
+            ...h.identity,
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
+            creditInputs: [{ ...h.input, role: "spender" }],
+            credits: [{ credit: h.commitment, amount: 10n }],
+            recipient: h.wallet.getAddress(),
+        })
+    ).rejects.toThrow(/not active/);
+    await expect(
+        h.invisi.prepareRevokeCredit({ ...h.identity, grantId: 99n })
+    ).resolves.toBeDefined();
+    h.reader.getCreditStatus = async () => 2;
+    await expect(h.invisi.prepareRevokeCredit({ ...h.identity, grantId: 99n })).rejects.toThrow(
+        /revoked/
+    );
+});
+
+it.each([1, 2, 3])(
+    "rejects creation when its canonical grant status is %s before proving",
+    async (status) => {
+        const h = await creditSetup();
+        h.reader.getCreditStatus = vi.fn(async () => status as 0 | 1 | 2);
+        const options = { ...h.identity, spender: h.bob.getAddress(), expiry: 2000003600n };
+        await expect(h.invisi.prepareCreateCredit({ ...options, grantId: 999n })).rejects.toThrow(
+            /already active, revoked or has invalid status/
+        );
+        await expect(h.invisi.prepareCreateCredit(options)).rejects.toThrow(
+            /already active, revoked or has invalid status/
+        );
+        expect(h.prover.prove).not.toHaveBeenCalled();
+    }
+);

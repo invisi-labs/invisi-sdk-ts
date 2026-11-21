@@ -4,11 +4,12 @@ import validation from "./data/model-validation.json";
 import { estimateGas } from "./estimate";
 describe("current-release local gas previews", () => {
     it("retains receipt provenance and exact medians for measured shapes", () => {
-        for (const row of measured.rows) {
+        for (const row of measured.rows.filter((r) => r.shape.kind !== "create-credit")) {
             expect(
                 estimateGas({
-                    ...row.shape,
-                    ...(row.shape.kind === "create-credit" ? { creationAbi: "legacy" } : {}),
+                    ...Object.fromEntries(
+                        Object.entries(row.shape).filter(([key]) => key !== "bitmapWord")
+                    ),
                 } as never)
             ).toMatchObject({
                 available: true,
@@ -78,11 +79,11 @@ describe("current-release local gas previews", () => {
 
 it("estimates both new Credit creation modes with fee and delivery-size accounting", () => {
     for (const kind of ["create-credit", "create-credit-initial-payment"]) {
-        const base = estimateGas({ kind, creationAbi: "initial-payment", feeEnabled: false });
-        const fee = estimateGas({ kind, creationAbi: "initial-payment", feeEnabled: true });
+        const base = estimateGas({ kind, feeEnabled: false });
+        const fee = estimateGas({ kind, feeEnabled: true });
         const payload = estimateGas({
             kind,
-            creationAbi: "initial-payment",
+
             feeEnabled: true,
             extraDeliveryBytes: 100,
         });
@@ -114,5 +115,14 @@ it("uses the refreshed draw calibration for every measured draw grouping", () =>
             sampleCount: 3,
             gasUnits: BigInt(row.gasUnits),
             sourceSha256: measured.creditDrawMeasurement.sourceSha256,
+        });
+});
+
+it("rejects retired creation selectors and bitmap storage hints", () => {
+    expect(() => estimateGas({ kind: "create-credit", creationAbi: "legacy" })).toThrow(/Retired/);
+    expect(() => estimateGas({ kind: "revoke-credit", bitmapWord: "empty" })).toThrow(/Retired/);
+    for (const authorization of ["direct", "eoa", "erc1271", "unknown"])
+        expect(estimateGas({ kind: "revoke-credit", authorization })).toMatchObject({
+            available: true,
         });
 });

@@ -13,8 +13,6 @@ export interface InvisiPreparationTarget<T> {
 }
 export interface InvisiPreparationOptions {
     now?: () => number;
-    /** Select the new deployed selector for pure grants; initial payments always use it. */
-    creationAbi?: CreateCreditPreparation["creationAbi"];
     /** Actual token fee for initial payment; omit for direct owner submission with no token fee. */
     initialPaymentFee?: { recipient: `0x${string}`; amount: bigint };
 }
@@ -84,7 +82,6 @@ export async function prepareInvisiRequest<T>(
     )
         throw new IppError("execution_not_allowed", "Invalid local initial payment fee.");
     return target.prepareCreateCredit({
-        ...(options.creationAbi !== undefined ? { creationAbi: options.creationAbi } : {}),
         ...(initialPayment
             ? {
                   initialPayment: {

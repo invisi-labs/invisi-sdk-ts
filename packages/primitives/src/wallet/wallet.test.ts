@@ -58,11 +58,7 @@ describe("private wallet authorization", () => {
                 request
             )
         ).toBe(false);
-        for (const patch of [
-            { capacity: 20 },
-            { words: [...request.words, 1n] },
-            { operation: "credit-draw" as const, capacity: 1 },
-        ]) {
+        for (const patch of [{ capacity: 20 }, { words: [...request.words, 1n] }]) {
             expect(
                 await verifyWalletAuthorization(
                     wallet.ownerAddress,

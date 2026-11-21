@@ -60,18 +60,15 @@ export interface TransactRequest {
     funding: FundingParams;
 }
 export interface CreateCreditParams {
-    /** Current ABI by default; legacy deployments require explicit opt-in. */
-    creationAbi?: "legacy" | "initial-payment";
     token: Address;
     owner: Address;
-    revocationShard: bigint;
-    revocationSlot: bigint;
+    grantId: bigint;
     creditCommitment: Hex;
     deadline: bigint;
     feeRecipient?: Address;
     feeAmount?: bigint;
 }
-/** Pure creation uses the current ABI unless creationAbi is explicitly legacy. */
+/** All creation modes use the canonical full createCredit tuple. */
 export type CreditCreationParams = CreateCreditParams &
     (
         | { hasInitialPayment?: undefined; totalAmount?: never; noteCommitment?: never }
@@ -84,8 +81,7 @@ export interface CreditPayer {
 }
 export interface CreditGrantRef {
     payerIndex: bigint;
-    shard: bigint;
-    slot: bigint;
+    grantId: bigint;
 }
 /** Actual consumed Credit and successor recovery fields emitted by CreditStateTransition. */
 export interface CreditDrawState {
@@ -110,8 +106,7 @@ export interface UpdateCreditParams {
     source: InputSource;
     nullifier: Hex;
     creditCommitment: Hex;
-    revocationShard: bigint;
-    revocationSlot: bigint;
+    grantId: bigint;
     deadline: bigint;
     feeRecipient?: Address;
     feeAmount?: bigint;
@@ -119,8 +114,7 @@ export interface UpdateCreditParams {
 export interface RevokeCreditParams {
     token: Address;
     owner: Address;
-    shard: bigint;
-    slot: bigint;
+    grantId: bigint;
     deadline: bigint;
     feeRecipient?: Address;
     feeAmount?: bigint;

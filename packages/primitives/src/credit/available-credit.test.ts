@@ -7,8 +7,7 @@ const state = (values: Partial<CreditState> = {}): CreditState => ({
     tokenAddress: 2n,
     ownerWalletIdentity: `0x${"11".repeat(20)}`,
     spenderWalletIdentity: `0x${"22".repeat(20)}`,
-    revocationShard: 1n,
-    revocationSlot: 0n,
+    grantId: 1n,
     nonce: 3n,
     expiry: 2000003600n,
     creditSharedKey: 4n,
@@ -103,8 +102,8 @@ it("separates the three immutable limit names from mutable balance and usage", a
     ).rejects.toThrow();
 });
 
-it("uses one canonical boolean byte and an exact405-byte fixed prefix", async () => {
-    const { creditEnvelopeV2 } = await import("../delivery/note-payload");
+it("uses one canonical boolean byte and an exact 411-byte fixed prefix", async () => {
+    const { creditEnvelopeV4 } = await import("../delivery/note-payload");
     const vectors = (await import("../wallet/testdata/wallet-note-vectors.json")).default;
     const keys = (role: "owner" | "spender") => ({
         viewingPublicKey: Uint8Array.from(
@@ -119,19 +118,19 @@ it("uses one canonical boolean byte and an exact405-byte fixed prefix", async ()
         ownerReceivingKeys: keys("owner"),
         spenderReceivingKeys: keys("spender"),
     };
-    const plain = creditEnvelopeV2.encode(delivery);
-    expect(plain).toHaveLength(407);
-    expect(plain[210]).toBe(0);
+    const plain = creditEnvelopeV4.encode(delivery);
+    expect(plain).toHaveLength(413);
+    expect(plain[216]).toBe(0);
     expect(
-        creditEnvelopeV2.encode({
+        creditEnvelopeV4.encode({
             ...delivery,
             note: state({ availableCredit: 0n, unlimited: true }),
-        })[210]
+        })[216]
     ).toBe(1);
     for (const byte of [2, 255]) {
         const malformed = Uint8Array.from(plain);
-        malformed[210] = byte;
-        expect(() => creditEnvelopeV2.decode(malformed, delivery.note as never)).toThrow(
+        malformed[216] = byte;
+        expect(() => creditEnvelopeV4.decode(malformed, delivery.note as never)).toThrow(
             /unlimited/
         );
     }

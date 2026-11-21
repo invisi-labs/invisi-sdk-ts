@@ -441,8 +441,7 @@ it.each([
                         token,
                         owner: ownerHex(p.ownerWalletIdentity),
                         outputTreeId: 1n,
-                        revocationShard: 1n,
-                        revocationSlot: 0n,
+                        grantId: 1n,
                         creditCommitment: p.commitment,
                         leafIndex: parentIndex,
                         deliveries: [
@@ -481,7 +480,7 @@ it.each([
                         state: {
                             sources: [{ treeId: 1n, merkleRoot: hex(inputTree.getRoot()) }],
                             payers: [{ payer: ownerHex(p.ownerWalletIdentity), amount: 30n }],
-                            grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
+                            grantRefs: [{ payerIndex: 0n, grantId: 1n }],
                             nullifiers: [p.nullifier],
                             creditCommitments: [p.draw.stateCommitment],
                             recoveryAmounts: [p.draw.recoveryAmount],
@@ -1488,5 +1487,69 @@ it.each([false, true])(
             await replay;
             expect((await h.store.readSnapshot(h.a.scope)).creditReplayFrom).toBeUndefined();
         }
+    }
+);
+
+it.each([12n, 13n])(
+    "refreshes identical grant IDs for each owner and token from page12 at observation%s",
+    async (observationNumber) => {
+        const h = await harness();
+        const viewing = new ViewingCapability(
+            ownerHex(BigInt(vectors.owner.ownerAddress)),
+            vectors.owner.viewingPrivateKey as Hex
+        );
+        const state = await viewing.decryptCredit(vectors.credit.ownerCiphertext as Hex, {
+            ...context,
+            protocolAddress: BigInt(context.protocolAddress),
+            tokenAddress: BigInt(token),
+            outputCommitment: vectors.credit.commitment as Hex,
+            role: "owner",
+        });
+        const otherOwner = "0x1111111111111111111111111111111111111111" as Hex;
+        const otherToken = "0x2222222222222222222222222222222222222222" as Hex;
+        await h.store.transaction(h.session.scope, (draft) => {
+            for (const [index, owner, asset] of [
+                [1n, state.note.ownerWalletIdentity, token],
+                [2n, otherOwner, token],
+                [3n, state.note.ownerWalletIdentity, otherToken],
+            ] as const) {
+                const commitment = hex(index + 1000n);
+                draft.credits[commitment + ":spender"] = {
+                    commitment,
+                    role: "spender",
+                    treeId: 1n,
+                    leafIndex: Number(index),
+                    blockNumber: 12n,
+                    blockHash: block().hash,
+                    state: {
+                        ...state,
+                        note: {
+                            ...state.note,
+                            ownerWalletIdentity: owner,
+                            spenderWalletIdentity: h.session.scope.ownerAddress,
+                            tokenAddress: BigInt(asset),
+                        },
+                    },
+                    spent: "unspent",
+                };
+            }
+        });
+        h.reader.getCreditStatus = vi.fn(async (_context, owner, asset, grantId, anchor) => {
+            expect(grantId).toBe(state.note.grantId);
+            expect(anchor).toEqual(block(observationNumber));
+            return owner === otherOwner ? 2 : asset === otherToken ? 0 : 1;
+        });
+        await h.updater.applyUpdates(
+            { ...h.batch, transactionHashes: [] },
+            { observationBlock: block(observationNumber) }
+        );
+        const credits = Object.values((await h.store.readSnapshot(h.session.scope)).credits);
+        credits.sort((a, b) => a.leafIndex - b.leafIndex);
+        expect(credits.map((credit) => credit.grantStatus)).toEqual([1, 2, 0]);
+        expect(credits.map((credit) => credit.revoked)).toEqual([false, true, false]);
+        expect(credits.map((credit) => credit.checkedThrough)).toEqual(
+            Array(3).fill({ number: observationNumber, hash: hex(observationNumber) })
+        );
+        expect(h.reader.getCreditStatus).toHaveBeenCalledTimes(3);
     }
 );

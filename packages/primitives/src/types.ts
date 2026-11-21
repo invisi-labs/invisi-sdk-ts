@@ -39,8 +39,7 @@ export interface CreditState extends ProtocolContext, Partial<CreditPolicy>, Par
     unlimited: boolean;
     spenderWalletIdentity: `0x${string}`;
     ownerWalletIdentity: `0x${string}`;
-    revocationShard: bigint;
-    revocationSlot: bigint;
+    grantId: bigint;
     tokenAddress: bigint;
     nonce: bigint;
     /** Opaque application bytes. Decryption returns a copy without interpreting the application schema. */

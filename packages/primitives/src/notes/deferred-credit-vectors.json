@@ -9,8 +9,7 @@
   "note": {
     "spenderWalletIdentity": "3",
     "ownerWalletIdentity": "4",
-    "revocationShard": "1",
-    "revocationSlot": "0",
+    "grantId": "1001",
     "nonce": "5",
     "expiry": "2050000000",
     "creditSharedKey": "6",
@@ -25,15 +24,14 @@
     "monthlySpent": "0",
     "totalSpent": "0"
   },
-  "commitment": "0x007a3615026a785fdb5bd0eb0933241b79d219304e80884f45938dcccce5351f",
+  "commitment": "0x14a1b01001cdf942bd3991605a5b7a1983d04bff143a6d19236c4d7123d73768",
   "draw": {
-    "nullifier": "0x15afc336e279a093e3b00dd851b4864c7375bdf9c75350a279314364ba1f629f",
+    "nullifier": "0x07a54942956cb707e76011dbad11c64e34f077d7d571a3437710df3b59db25cb",
     "state": {
       "spenderWalletIdentity": "3",
       "ownerWalletIdentity": "4",
-      "revocationShard": "1",
-      "revocationSlot": "0",
-      "nonce": "20970324702834800332788802131568401604010771199458148323683486072662111177544",
+      "grantId": "1001",
+      "nonce": "9023775691648027911972526511043443223549347952035157193048580590464253053799",
       "expiry": "2050000000",
       "creditSharedKey": "6",
       "singleLimit": "1000",
@@ -47,17 +45,16 @@
       "totalSpent": "7",
       "unlimited": false
     },
-    "stateCommitment": "0x27c1bf052097ec9076885455d8c9fb059d99917d4b585d93643e4e25afa4b85c",
-    "recoveryAmount": "0x1de36787682437a2d10b65351416e27e8eb6d5be28aa50ded3298dd663676307"
+    "stateCommitment": "0x1b5fc4f0b8cdff93e6a8899f87ae4caf7e9ff594d522435450b298dfa5e419d9",
+    "recoveryAmount": "0x2c6b7d3027bc9df77e99cd337823784d892ad463328a9abb0881a813baa6acdb"
   },
   "update": {
-    "nullifier": "0x280e3c296c5f4bb9cb0fea41bafdfd139fd265133e301304e8279047cffb4dea",
+    "nullifier": "0x2204895daa68a35095ac837481030e62b2c3e759ab212ca496be163144a3d752",
     "state": {
       "spenderWalletIdentity": "3",
       "ownerWalletIdentity": "4",
-      "revocationShard": "1",
-      "revocationSlot": "0",
-      "nonce": "11753051414193055736063549418898057585192857641622594679528236153668632619210",
+      "grantId": "1001",
+      "nonce": "4845261742276200235042106583631335851661963957700865182955678464101260810609",
       "expiry": "2060000000",
       "creditSharedKey": "6",
       "singleLimit": "10",
@@ -71,6 +68,6 @@
       "totalSpent": "7",
       "unlimited": false
     },
-    "stateCommitment": "0x2831e75cd8aabdc7bc76523e2571895ca2399291f567a95182426b1b1d303ba9"
+    "stateCommitment": "0x1f641fbeeeb93c33aa6f4866c3327ea14c96c83d6ad06e19146677d20ee37e1c"
   }
 }

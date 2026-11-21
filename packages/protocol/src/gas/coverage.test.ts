@@ -73,8 +73,7 @@ describe("complete pre-proof local gas previews", () => {
             fundingSignature: true,
         });
         for (const authorization of ["direct", "eoa", "erc1271"])
-            for (const bitmapWord of ["empty", "nonempty"])
-                positive({ kind: "revoke-credit", authorization, bitmapWord });
+            positive({ kind: "revoke-credit", authorization });
     });
     it("covers all legal draw batch sizes and payer groupings", () => {
         const tiers = [1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80];

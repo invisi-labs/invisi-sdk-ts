@@ -33,8 +33,7 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
             ...(p.credit?.inputs ?? []).map((input) => ({
                 kind: "credits" as const,
                 commitment: input.commitment,
-                revocationShard: input.state.note.revocationShard,
-                revocationSlot: input.state.note.revocationSlot,
+                grantId: input.state.note.grantId,
                 owner: input.state.note.ownerWalletIdentity,
                 spender: input.state.note.spenderWalletIdentity,
                 expiry: input.state.note.expiry,
@@ -55,8 +54,7 @@ export function operationPreview(plan: OperationPlan, status: OperationStatus) {
         },
         creditOutputs: p.credit?.outputs.map((output) => ({
             commitment: output.commitment,
-            revocationShard: output.state.note.revocationShard,
-            revocationSlot: output.state.note.revocationSlot,
+            grantId: output.state.note.grantId,
             expiry: output.state.note.expiry,
             owner: output.state.note.ownerWalletIdentity,
             spender: output.state.note.spenderWalletIdentity,

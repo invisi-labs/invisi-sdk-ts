@@ -7,8 +7,9 @@ import { getAccounts } from "../accounts.js";
 import { json } from "../example-io.js";
 import { decryptor } from "../app-decryptor.js";
 
-// Charlie discovers a current grant and revokes its public shard/slot as owner caller.
+// Charlie discovers a current grant and revokes its public grant ID as owner caller.
 // Owner revocation requires neither a private spend proof nor a separate signature.
+// The same call can pre-revoke a chosen ID with status 0 before grant creation; status 2 is terminal.
 if (!process.argv.includes("--execute")) {
     console.log("Review this scenario, then pass --execute");
     process.exit(0);
@@ -41,18 +42,17 @@ try {
         role: "owner",
     });
 
-    // 2. Current authenticated state determines remaining authority and revocation location.
+    // 2. Current authenticated state determines remaining authority and grant ID.
     const selected = credits[0];
     if (!selected) {
         throw Error("No current Charlie-owned Credit found; run the grant-creation example first");
     }
-    const { revocationShard: shard, revocationSlot: slot } = selected.state.note;
+    const { grantId } = selected.state.note;
     const prepared = await invisi.prepareRevokeCredit({
         wallet: charlie.publicWallet,
         protocol,
         tokenAddress,
-        shard,
-        slot,
+        grantId,
         caller: charlie.address,
     });
     console.log("Local gas estimate:", prepared.estimateGas());

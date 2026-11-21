@@ -1,5 +1,4 @@
 import { testResourceOptions } from "../../../../prover/src/testing/resource-options";
-import { legacyCreateCreditAbi } from "@invisi-labs/protocol";
 import { it, expect } from "vitest";
 import {
     Wallet,
@@ -32,8 +31,7 @@ real(
                     tokenAddress: BigInt(h.context.tokenAddress),
                     ownerWalletIdentity: h.wallet.ownerAddress,
                     spenderWalletIdentity: h.bob.ownerAddress,
-                    revocationShard: 1n,
-                    revocationSlot: 0n,
+                    grantId: 1n,
                     nonce: 456n,
                     expiry: 2000003600n,
                     creditSharedKey: 789n,
@@ -112,10 +110,9 @@ real(
                 ),
                 ready = await (await externallyAuthorize(prepared, signer)).prove(prover);
             expect(ready.exportProof().proofHex.length).toBeGreaterThan(1000);
-            const decoded = new Interface([
-                ...invisiCoreAbi,
-                ...legacyCreateCreditAbi,
-            ]).parseTransaction(await ready.exportTransaction())!;
+            const decoded = new Interface([...invisiCoreAbi]).parseTransaction(
+                await ready.exportTransaction()
+            )!;
             expect(decoded.args[1].feeAmount).toBe(3n);
             if (prepared === update)
                 expect(ready.preview().creditOutputs![0]!.availableCredit).toBe(110n);

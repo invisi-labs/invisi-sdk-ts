@@ -342,3 +342,24 @@ it("accepts the maximum canonical safe scheduling second", async () => {
         })
     ).resolves.toEqual(estimate);
 });
+
+it("omits revoke authorization bytes while binding the uint128 grant ID", () => {
+    const args = [
+        trust.protocol,
+        signer.address,
+        (1n << 127n) + 1n,
+        2000003600n,
+        ZeroAddress,
+        0n,
+        "0x",
+    ];
+    const encode = (values: unknown[]) =>
+        broadcasterTransactInterface.encodeFunctionData("revokeCredit", values);
+    const unsigned = encode(args);
+    expect(broadcasterRequestHash(encode([...args.slice(0, 6), "0x123456"]))).toBe(
+        broadcasterRequestHash(unsigned)
+    );
+    expect(broadcasterRequestHash(encode([args[0], args[1], 2n, ...args.slice(3)]))).not.toBe(
+        broadcasterRequestHash(unsigned)
+    );
+});

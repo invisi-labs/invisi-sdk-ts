@@ -51,8 +51,7 @@ export interface CreditReceipt extends PaymentReceipt {
         feeRecipient: string;
     };
     owner: string;
-    revocationShard: string;
-    revocationSlot: number;
+    grantId: string;
     verificationBlock: { number: string; hash: string; timestamp: string };
     expiresAt: string;
 }
@@ -103,7 +102,6 @@ export interface Credential {
         transactionHash: string;
         commitment: string;
         owner?: string;
-        revocationShard?: string;
-        revocationSlot?: number;
+        grantId?: string;
     };
 }

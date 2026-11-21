@@ -6,7 +6,7 @@ const reusable = new Set([
     "getCode",
     "getProtocolVersion",
     "getProtocolAddressRegistry",
-    "getCreditRevocationBitmap",
+    "getCreditStatus",
     "isKnownRoot",
     "isSpent",
 ]);
@@ -20,8 +20,8 @@ function canonical(value: unknown): unknown {
     return value;
 }
 function key(method: string, args: unknown[]) {
-    // Tree roots, nullifiers and revocation maps belong to the deployment, not a token context.
-    if (["getMembership", "isSpent", "isKnownRoot", "getCreditRevocationBitmap"].includes(method)) {
+    // Tree roots, nullifiers and grant statuses belong to the deployment, not a token context.
+    if (["getMembership", "isSpent", "isKnownRoot", "getCreditStatus"].includes(method)) {
         const context = args[0] as { chainId: bigint; protocolAddress: Hex };
         args = [
             { chainId: context.chainId, protocolAddress: context.protocolAddress },
@@ -116,6 +116,13 @@ export class PreparationCapture {
                     const id = key(method, args);
                     if (reuse && this.#values.has(id)) return structuredClone(this.#values.get(id));
                     const result = await fn.apply(object, args);
+                    if (
+                        method === "getCreditStatus" &&
+                        result !== 0 &&
+                        result !== 1 &&
+                        result !== 2
+                    )
+                        throw Error("invalid Credit status capture response");
                     this.remember(method, args, result);
                     return result;
                 };

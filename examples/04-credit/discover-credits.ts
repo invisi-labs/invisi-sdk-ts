@@ -144,15 +144,14 @@ export async function discoverCredits({
             if (await rpc.isCreditConsumed(protocol.context, nullifier, status.indexedHead)) {
                 continue;
             }
-            const bitmap = await rpc.getCreditRevocationBitmap(
+            const grantStatus = await rpc.getCreditStatus(
                 protocol.context,
                 state.note.ownerWalletIdentity,
                 tokenAddress,
-                state.note.revocationShard,
-                Number(state.note.revocationSlot >> 8n),
+                state.note.grantId,
                 status.indexedHead
             );
-            if (bitmap.bitmap & (1n << (state.note.revocationSlot & 255n))) {
+            if (grantStatus.status !== 1) {
                 continue;
             }
         }

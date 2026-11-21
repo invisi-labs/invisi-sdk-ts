@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { parseIndex } from "../../../scripts/sync-prover-assets.mjs";
 import { createHash } from "node:crypto";
+import { format, resolveConfig } from "prettier";
 import { readFileSync, writeFileSync, mkdirSync, rmSync, mkdtempSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,16 +28,14 @@ const manifestPaths = ["circuits/transact/manifest.json", "circuits/credit/manif
 const manifests = manifestPaths.map(json);
 for (const [i, version, format] of [
     [0, 4, 7],
-    [1, 7, 8],
+    [1, 8, 9],
 ]) {
     assert.equal(manifests[i].version, version, "retired manifest version");
     assert.equal(manifests[i].formatVersion, format, "retired proof format");
 }
 function reviewedCircuitPin() {
     const source = readFileSync(join(packageRoot, "src/resources/pin.ts"), "utf8");
-    const pin = source.match(
-        /INITIAL_PAYMENT_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/
-    )?.[1];
+    const pin = source.match(/PROVER_ASSET_INDEX_SHA256\s*=\s*["']([a-f0-9]{64})["']/)?.[1];
     assert(pin, "Missing reviewed circuit resource pin");
     return pin;
 }
@@ -182,6 +181,35 @@ try {
             "Circuit metadata differs from reviewed resource release"
         );
     else writeFileSync(destination, metadata);
+    const releaseIdentityPath = join(packageRoot, "../protocol/src/release-identity.ts");
+    const releaseIdentity = await format(
+        "// Generated from authenticated protocol manifests.\nexport const CIRCUIT_RELEASE = " +
+            JSON.stringify(
+                {
+                    note: {
+                        version: manifests[0].version,
+                        formatVersion: manifests[0].formatVersion,
+                        aggregateFormatVersion: manifests[0].aggregateFormatVersion,
+                    },
+                    credit: {
+                        version: manifests[1].version,
+                        formatVersion: manifests[1].formatVersion,
+                        manifestSha256: release.manifests[1].sha256,
+                    },
+                },
+                null,
+                2
+            ) +
+            " as const;\n",
+        { ...(await resolveConfig(releaseIdentityPath)), parser: "typescript" }
+    );
+    if (process.argv.includes("--check"))
+        assert.equal(
+            readFileSync(releaseIdentityPath, "utf8"),
+            releaseIdentity,
+            "Protocol release identity differs from authenticated manifests"
+        );
+    else writeFileSync(releaseIdentityPath, releaseIdentity);
     rmSync(stage, { recursive: true, force: true });
     console.log(
         `Synced ${entries.length} authenticated circuit metadata entries without packaged artifacts`

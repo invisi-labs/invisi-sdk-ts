@@ -10,7 +10,8 @@ import { getAccounts } from "../accounts.js";
 import { json } from "../example-io.js";
 import { decryptor } from "../app-decryptor.js";
 
-// Bob cancels an existing grant using its public revocation reference.
+// Bob cancels an existing grant using its public grant ID.
+// A chosen grantId can also be pre-revoked while status is 0, before creation.
 // Revocation has no ZK proof and does not reclaim previously issued Notes.
 if (!process.argv.includes("--execute")) {
     console.log("Review this scenario, then pass --execute");
@@ -95,11 +96,10 @@ try {
     if (!selected) {
         throw Error("No available owner grant; create and submit one before revoking");
     }
-    const { revocationShard: shard, revocationSlot: slot } = selected.state.note;
+    const { grantId } = selected.state.note;
     const operation = await session.prepareRevokeCredit({
         tokenAddress: settings.tokenAddress,
-        shard,
-        slot,
+        grantId,
         caller: account.address,
         deadline,
     });

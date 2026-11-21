@@ -19,6 +19,8 @@ import {
     deriveCreditStateNonce,
     encryptCreditState,
     generateCreditSharedKey,
+    generateCreditGrantId,
+    normalizeCreditGrantId,
     generateNonce,
     normalizeCreditDeliveryState,
     normalizeCreditPolicy,
@@ -128,17 +130,16 @@ export class CreditPreparation<Result> {
         ) {
             throw new Error("Credit role, commitment or deployment mismatch");
         }
-        if (!this.runtime.reader.getCreditRevocationBitmap)
-            throw Error("Credit revocation reader required");
-        const bitmap = await this.runtime.reader.getCreditRevocationBitmap(
+        if (!this.runtime.reader.getCreditStatus) throw Error("Credit status reader required");
+        const status = await this.runtime.reader.getCreditStatus(
             frame.context,
             n.ownerWalletIdentity,
             frame.context.tokenAddress,
-            n.revocationShard,
-            Number(n.revocationSlot >> 8n),
+            n.grantId,
             frame.block
         );
-        if (bitmap & (1n << (n.revocationSlot & 255n))) throw Error("Credit grant is revoked");
+        if (status !== 1)
+            throw Error(status === 2 ? "Credit grant is revoked" : "Credit grant is not active");
         const proof = await this.#prepare.membership(stored, frame);
         const path = [...proof.path];
         const nullifier = await computeCreditNullifier(n.chainId, n.creditSharedKey, commitment);
@@ -193,8 +194,8 @@ export class CreditPreparation<Result> {
                     "dailyLimit",
                     "monthlyLimit",
                     "creditSharedKey",
+                    "grantId",
                     "initialPayment",
-                    "creationAbi",
                     "availableCredit",
                     "unlimited",
                     "tokenAddress",
@@ -207,15 +208,18 @@ export class CreditPreparation<Result> {
         const frame = await this.#prepare.frame(options.deadline),
             expiry = this.expiry(options.expiry, frame);
         if (expiry < frame.deadline) throw Error("expiry before request deadline");
-        if (!this.runtime.reader.getCreditAllocation)
-            throw Error("Credit allocation reader required");
-        const [allocation, spender, owner] = await Promise.all([
-            this.runtime.reader.getCreditAllocation(
-                frame.context,
-                this.runtime.scope.ownerAddress,
-                frame.context.tokenAddress,
-                frame.block
-            ),
+        const grantId = normalizeCreditGrantId(options.grantId ?? generateCreditGrantId());
+        if (!this.runtime.reader.getCreditStatus) throw Error("Credit status reader required");
+        const status = await this.runtime.reader.getCreditStatus(
+            frame.context,
+            this.runtime.scope.ownerAddress,
+            frame.context.tokenAddress,
+            grantId,
+            frame.block
+        );
+        if (status !== 0)
+            throw Error("Credit grant ID is already active, revoked or has invalid status");
+        const [spender, owner] = await Promise.all([
             resolveRecipient(options.spender, recipientLookup(this.runtime.options), {
                 field: "spender",
             }),
@@ -225,13 +229,6 @@ export class CreditPreparation<Result> {
                 { field: "wallet" }
             ),
         ]);
-        if (
-            options.creationAbi !== undefined &&
-            !["legacy", "initial-payment"].includes(options.creationAbi)
-        )
-            throw Error("unsupported Credit creation ABI");
-        if (options.initialPayment && options.creationAbi === "legacy")
-            throw Error("initial payment requires the new Credit creation ABI");
         const fee = this.fee(options);
         const initialAvailableCredit = options.availableCredit ?? 0n;
         const initial: CreditDeliveryState["note"] = {
@@ -240,8 +237,7 @@ export class CreditPreparation<Result> {
             tokenAddress: BigInt(frame.context.tokenAddress),
             ownerWalletIdentity: this.runtime.scope.ownerAddress,
             spenderWalletIdentity: spender.ownerAddress,
-            revocationShard: allocation.shard,
-            revocationSlot: BigInt(allocation.slot),
+            grantId,
             ...normalizeCreditPolicy(options),
             availableCredit: options.availableCredit === undefined ? 0n : options.availableCredit,
             unlimited: options.unlimited === undefined ? false : options.unlimited,
@@ -296,8 +292,7 @@ export class CreditPreparation<Result> {
             params: CreditCreationParams = {
                 token: frame.context.tokenAddress,
                 owner: this.runtime.scope.ownerAddress,
-                revocationShard: allocation.shard,
-                revocationSlot: BigInt(allocation.slot),
+                grantId,
                 creditCommitment: output.commitment,
                 deadline: frame.deadline,
                 ...fee,
@@ -307,9 +302,7 @@ export class CreditPreparation<Result> {
                           totalAmount,
                           noteCommitment: ordinary.commitment,
                       }
-                    : options.creationAbi === "legacy"
-                      ? { creationAbi: "legacy" as const }
-                      : { hasInitialPayment: false as const }),
+                    : { hasInitialPayment: false as const }),
             };
         const deliveries = ordinary ? [...output.deliveries, ordinary.delivery] : output.deliveries;
         plan.capacity = 1;
@@ -387,8 +380,7 @@ export class CreditPreparation<Result> {
                 source: previous.source,
                 nullifier: next.nullifier,
                 creditCommitment: output.commitment,
-                revocationShard: n.revocationShard,
-                revocationSlot: n.revocationSlot,
+                grantId: n.grantId,
                 deadline: frame.deadline,
                 ...this.fee(options),
             },
@@ -422,8 +414,7 @@ export class CreditPreparation<Result> {
                 y = b.input.state.note;
             for (const [u, v] of [
                 [BigInt(x.ownerWalletIdentity), BigInt(y.ownerWalletIdentity)],
-                [x.revocationShard, y.revocationShard],
-                [x.revocationSlot, y.revocationSlot],
+                [x.grantId, y.grantId],
             ]) {
                 if (u! < v!) return -1;
                 if (u! > v!) return 1;
@@ -434,7 +425,7 @@ export class CreditPreparation<Result> {
             sources = new Map<bigint, Hex>(),
             outputs: PreparedCreditOutput[] = [],
             recoveryAmounts: Hex[] = [],
-            grantRefs: { payerIndex: bigint; shard: bigint; slot: bigint }[] = [],
+            grantRefs: { payerIndex: bigint; grantId: bigint }[] = [],
             amounts: bigint[] = [];
         for (const member of members) {
             const n = member.input.state.note,
@@ -448,8 +439,7 @@ export class CreditPreparation<Result> {
             payers[pi]!.amount += amount;
             grantRefs.push({
                 payerIndex: BigInt(pi),
-                shard: n.revocationShard,
-                slot: n.revocationSlot,
+                grantId: n.grantId,
             });
             if (
                 sources.has(member.source.treeId) &&
@@ -530,11 +520,20 @@ export class CreditPreparation<Result> {
             params = {
                 token: frame.context.tokenAddress,
                 owner: options.owner ?? this.runtime.scope.ownerAddress,
-                shard: options.shard,
-                slot: options.slot,
+                grantId: normalizeCreditGrantId(options.grantId),
                 deadline: frame.deadline,
                 ...this.fee(options),
             };
+        if (!this.runtime.reader.getCreditStatus) throw Error("Credit status reader required");
+        const status = await this.runtime.reader.getCreditStatus(
+            frame.context,
+            params.owner,
+            params.token,
+            params.grantId,
+            frame.block
+        );
+        if (status !== 0 && status !== 1)
+            throw Error("Credit grant is revoked or has invalid status");
         encodeRevokeCreditTypedData(frame.context, params);
         const plan = this.base(frame, "revoke-credit");
         plan.credit = {

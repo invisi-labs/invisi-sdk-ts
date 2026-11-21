@@ -29,8 +29,7 @@ export async function drawCredit(w: WitnessContext, p: DrawCreditWitnessParams) 
                     n.expiry >= p.params.deadline &&
                     pi >= 0 &&
                     r.payerIndex === BigInt(pi) &&
-                    r.shard === n.revocationShard &&
-                    r.slot === n.revocationSlot,
+                    r.grantId === n.grantId,
                 "Credit private group binding mismatch"
             );
             const next = await deriveCreditState(n, p.amounts[i]!, p.timestamp);

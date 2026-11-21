@@ -63,8 +63,12 @@ export async function fixture() {
         isKnownRoot: async () => true,
         isSpent: async (_: unknown, words: readonly Hex[]) => words.map(() => false),
         getFundingNonce: async () => 0n,
-        getCreditAllocation: async () => ({ shard: 1n, slot: 0 }),
-        getCreditRevocationBitmap: async () => 0n,
+        getCreditStatus: async (
+            _context: unknown,
+            _owner: unknown,
+            _token: unknown,
+            grantId: bigint
+        ) => (grantId === 1n ? 1 : 0),
     } as unknown as ChainReader;
     const membership: ProtocolDataProvider = {
         getStatus: async () => ({ indexedHead: block }),

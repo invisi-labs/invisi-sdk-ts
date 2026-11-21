@@ -87,7 +87,7 @@ function matchCreditRecipient(
         throw new Error("recipient receiving key mismatch");
 }
 
-/** SDK v1 Credit envelope with a fixed recovery prefix and opaque application bytes. */
+/** Grant-ID v4 Credit envelope with fixed recovery fields and opaque application bytes. */
 export async function encryptCreditState(
     viewingKey: NoteBytes,
     state: CreditDeliveryState,

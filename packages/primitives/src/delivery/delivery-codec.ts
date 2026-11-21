@@ -1,12 +1,12 @@
 import { getBytes, type BytesLike } from "ethers";
-import { creditEnvelopeV2, fundsEnvelopeV1 } from "./note-payload";
+import { creditEnvelopeV4, fundsEnvelopeV1 } from "./note-payload";
 
 /** Stable transport resource bound; applications do not select the SDK envelope version. */
 export const MAX_CIPHERTEXT_BYTES = 4096;
 export type DeliveryKind = "funds" | "credit";
 export function deliveryHeader(kind: DeliveryKind): number {
     if (kind !== "funds" && kind !== "credit") throw new Error("unsupported delivery kind");
-    return kind === "credit" ? 0x82 : 0x01;
+    return kind === "credit" ? 0x84 : 0x01;
 }
 export function decodeDeliveryHeader(header: number): { kind: DeliveryKind; version: number } {
     if (!Number.isInteger(header) || header < 0 || header > 255)
@@ -19,12 +19,15 @@ export function decodeDeliveryHeader(header: number): { kind: DeliveryKind; vers
 /** Dispatch only SDK-owned envelope implementations. Future versions are added here. */
 export function deliveryCodec(header: number) {
     const { kind, version } = decodeDeliveryHeader(header);
-    if (version !== (kind === "credit" ? 2 : 1))
+    if (version !== (kind === "credit" ? 4 : 1))
         throw new Error(`unsupported envelope version ${version}`);
-    const codec = kind === "funds" ? fundsEnvelopeV1 : creditEnvelopeV2;
+    const codec = kind === "funds" ? fundsEnvelopeV1 : creditEnvelopeV4;
     return {
         ...codec,
-        domain: `Invisi.${kind === "funds" ? "Note" : "Credit"}Delivery.v${kind === "credit" ? 2 : 1}`,
+        domain:
+            kind === "credit"
+                ? "Invisi.CreditDelivery.v4.GrantId.Uint128"
+                : "Invisi.NoteDelivery.v1",
     };
 }
 export function validateDeliveryCiphertext(value: BytesLike, kind?: DeliveryKind): Uint8Array {

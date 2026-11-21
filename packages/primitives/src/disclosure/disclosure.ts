@@ -14,6 +14,7 @@ import { computeNoteCommitment, computeNoteIdentity } from "../notes/commitment"
 import {
     computeCreditCommitment,
     computeCreditSharedKeyHash,
+    normalizeCreditGrantId,
     normalizeCreditPolicy,
     normalizeCreditUsage,
 } from "../credit/state";
@@ -60,8 +61,7 @@ const NOTE_FIELDS = ["ownerAddress", "amount", "nonce"] as const;
 const CREDIT_FIELDS = [
     "spenderWalletIdentity",
     "ownerWalletIdentity",
-    "revocationShard",
-    "revocationSlot",
+    "grantId",
     "nonce",
     "expiry",
     "creditSharedKeyHash",
@@ -143,8 +143,7 @@ async function creditOpening(note: CreditState): Promise<CreditOpening> {
         unlimited: copied.unlimited,
         spenderWalletIdentity: owner(copied.spenderWalletIdentity, "spender identity"),
         ownerWalletIdentity: owner(copied.ownerWalletIdentity, "owner identity"),
-        revocationShard: number(copied.revocationShard, 64, "revocation shard"),
-        revocationSlot: number(copied.revocationSlot, 16, "revocation slot"),
+        grantId: normalizeCreditGrantId(copied.grantId),
         nonce: nonce(copied.nonce),
         expiry: number(copied.expiry, 64, "expiry"),
         creditSharedKeyHash: await computeCreditSharedKeyHash(copied.creditSharedKey),
@@ -337,7 +336,7 @@ export class Disclosure {
                 data[key] = raw[key] as string;
             } else {
                 const bits =
-                    key === "availableCredit"
+                    key === "availableCredit" || key === "grantId"
                         ? 128
                         : key.endsWith("Payout")
                           ? 160
@@ -466,8 +465,7 @@ export class Disclosure {
             ...scoped,
             spenderWalletIdentity: data.spenderWalletIdentity as `0x${string}`,
             ownerWalletIdentity: data.ownerWalletIdentity as `0x${string}`,
-            revocationShard: BigInt(data.revocationShard!),
-            revocationSlot: BigInt(data.revocationSlot!),
+            grantId: normalizeCreditGrantId(data.grantId!),
             nonce: BigInt(data.nonce!),
             expiry: BigInt(data.expiry!),
             ...normalizeCreditPolicy(

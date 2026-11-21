@@ -1,7 +1,8 @@
-import type { CanonicalBlock } from "./rpc-types";
+import type { CanonicalBlock, CreditGrantStatus } from "./rpc-types";
 import type { Address, Hex } from "./contracts/index";
 export type {
     CanonicalBlock,
+    CreditGrantStatus,
     Membership,
     ProtocolDataProvider,
     ProtocolDataStatus,
@@ -29,20 +30,13 @@ export interface ChainReader {
         token: Address,
         block: CanonicalBlock
     ): Promise<{ balance: bigint; allowance: bigint }>;
-    getCreditAllocation?(
+    getCreditStatus?(
         context: DeploymentContext,
         owner: Address,
         token: Address,
+        grantId: bigint,
         block: CanonicalBlock
-    ): Promise<{ shard: bigint; slot: number }>;
-    getCreditRevocationBitmap?(
-        context: DeploymentContext,
-        owner: Address,
-        token: Address,
-        shard: bigint,
-        word: number,
-        block: CanonicalBlock
-    ): Promise<bigint>;
+    ): Promise<CreditGrantStatus>;
     getChainId(): Promise<bigint>;
     /** Required when a selected deployment includes a receiving-key registry. */
     getProtocolAddressRegistry?(address: Address): Promise<Address>;

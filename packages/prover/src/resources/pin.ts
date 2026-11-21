@@ -1,6 +1,6 @@
 /** Independent authenticated Core and Periphery catalogs; host selection never changes trust. */
 export const PROVER_ASSET_INDEX_SHA256 =
-    "36f58bac1a0f70c6f8422b47f7cc35a30416a20f8a0f30038d23db0832e2bc93";
+    "85a5d1dffe40fc965ab4345a28b632f463c3ad861c44d5845850fbc7447fd8f6";
 export const CORE_ASSET_INDEX_SHA256 = PROVER_ASSET_INDEX_SHA256;
 export const PROVENANCE_ASSET_INDEX_SHA256 =
     "8d5a3e60e3e5cbe315150511207d7aff67f4e2924148d396b67d82017ecd1f1c";

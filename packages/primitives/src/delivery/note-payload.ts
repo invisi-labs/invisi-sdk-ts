@@ -59,8 +59,7 @@ export function normalizeCreditDeliveryState(state: CreditDeliveryState): Credit
         "tokenAddress",
         "spenderWalletIdentity",
         "ownerWalletIdentity",
-        "revocationShard",
-        "revocationSlot",
+        "grantId",
         "nonce",
         "expiry",
         "creditSharedKey",
@@ -131,8 +130,7 @@ export const fundsEnvelopeV1 = {
 const creditWireFields = [
     ["spenderWalletIdentity", 32],
     ["ownerWalletIdentity", 32],
-    ["revocationShard", 8],
-    ["revocationSlot", 2],
+    ["grantId", 16],
     ["nonce", 32],
     ["expiry", 8],
     ["creditSharedKey", 32],
@@ -147,10 +145,10 @@ const creditWireFields = [
     ["monthlySpent", 16],
     ["totalSpent", 16],
 ] as const;
-export const creditEnvelopeV2 = {
+export const creditEnvelopeV4 = {
     kind: "credit" as const,
-    version: 2,
-    minimum: 485,
+    version: 4,
+    minimum: 491,
     maximum: 4096,
     encode(input: CreditDeliveryState) {
         const state = normalizeCreditDeliveryState(input);

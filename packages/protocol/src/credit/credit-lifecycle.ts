@@ -1,6 +1,10 @@
 import { normalizeFee } from "../fees/fee";
 import { Interface, getAddress } from "ethers";
-import { creditPeriods, walletAuthorizationTypedData } from "@invisi-labs/primitives";
+import {
+    creditPeriods,
+    walletAuthorizationTypedData,
+    normalizeCreditGrantId,
+} from "@invisi-labs/primitives";
 import {
     invisiCoreAbi,
     type Hex,
@@ -34,7 +38,7 @@ export function selectCreditDrawCircuit(count: number) {
     return {
         name: `credit_draw_slots${capacity}`,
         capacity,
-        publicInputCount: 17 + 10 * capacity,
+        publicInputCount: 17 + 9 * capacity,
     };
 }
 const nonzero = (v: Hex) => {
@@ -89,22 +93,19 @@ export function validateCreditDrawRequest(
         throw Error("grant reference count mismatch");
     let previous: CreditGrantRef | undefined;
     const grantRefs = p.grantRefs.map((ref) => {
-        known(ref, ["payerIndex", "shard", "slot"]);
+        known(ref, ["payerIndex", "grantId"]);
         const r = {
             payerIndex: uint(ref.payerIndex, 32),
-            shard: uint(ref.shard, 64),
-            slot: uint(ref.slot, 16),
+            grantId: normalizeCreditGrantId(ref.grantId),
         };
-        if (r.payerIndex >= BigInt(payers.length) || !r.shard)
+        if (r.payerIndex >= BigInt(payers.length) || !r.grantId)
             throw Error("invalid grant namespace");
         if (
             previous &&
             (r.payerIndex < previous.payerIndex ||
-                (r.payerIndex === previous.payerIndex &&
-                    (r.shard < previous.shard ||
-                        (r.shard === previous.shard && r.slot <= previous.slot))))
+                (r.payerIndex === previous.payerIndex && r.grantId <= previous.grantId))
         )
-            throw Error("grant references must be sorted unique payer/shard/slot");
+            throw Error("grant references must be sorted unique payer/grantId");
         previous = r;
         return r;
     });
@@ -171,11 +172,7 @@ export function creditDrawBaseInputs(
             n
         ),
         ...pad(
-            r.grantRefs.map((s) => s.shard),
-            n
-        ),
-        ...pad(
-            r.grantRefs.map((s) => s.slot),
+            r.grantRefs.map((s) => s.grantId),
             n
         ),
         ...pad(r.nullifiers.map(BigInt), n),
@@ -227,16 +224,15 @@ export function validateUpdateCreditRequest(
         "source",
         "nullifier",
         "creditCommitment",
-        "revocationShard",
-        "revocationSlot",
+        "grantId",
         "deadline",
         "feeRecipient",
         "feeAmount",
     ]);
     const ctx = normalizeContext(c),
         owner = getAddress(p.owner) as Hex,
-        revocationShard = uint(p.revocationShard, 64);
-    if (getAddress(p.token) !== ctx.tokenAddress || !BigInt(owner) || !revocationShard)
+        grantId = normalizeCreditGrantId(p.grantId);
+    if (getAddress(p.token) !== ctx.tokenAddress || !BigInt(owner) || !grantId)
         throw Error("invalid update authority or token");
     if (dense(d, "deliveries").length !== 2) throw Error("deliveries count mismatch");
     return {
@@ -246,8 +242,7 @@ export function validateUpdateCreditRequest(
         source: normalizeSources([p.source], 1, 1)[0]!,
         nullifier: nonzero(p.nullifier),
         creditCommitment: nonzero(p.creditCommitment),
-        revocationShard,
-        revocationSlot: uint(p.revocationSlot, 16),
+        grantId,
         deadline: checkDeadline(c, p.deadline),
         deliveries: d.map((v) => normalizeOpaqueDelivery(v, {})),
     };
@@ -268,8 +263,7 @@ export function updateCreditBaseInputs(
         BigInt(r.source.merkleRoot),
         BigInt(r.nullifier),
         BigInt(r.creditCommitment),
-        r.revocationShard,
-        r.revocationSlot,
+        r.grantId,
         r.deadline,
         h >> 128n,
         h & ((1n << 128n) - 1n),
@@ -342,19 +336,18 @@ export const REVOKE_CREDIT_TYPES = {
     RevokeCredit: [
         { name: "token", type: "address" },
         { name: "owner", type: "address" },
-        { name: "shard", type: "uint64" },
-        { name: "slot", type: "uint16" },
+        { name: "grantId", type: "uint128" },
         { name: "deadline", type: "uint256" },
         { name: "feeRecipient", type: "address" },
         { name: "feeAmount", type: "uint256" },
     ],
 };
 export function encodeRevokeCreditTypedData(c: TransactionContext, p: RevokeCreditParams) {
-    known(p, ["token", "owner", "shard", "slot", "deadline", "feeRecipient", "feeAmount"]);
+    known(p, ["token", "owner", "grantId", "deadline", "feeRecipient", "feeAmount"]);
     if (
         getAddress(p.token) !== getAddress(c.tokenAddress) ||
         !BigInt(p.owner) ||
-        !uint(p.shard, 64)
+        !normalizeCreditGrantId(p.grantId)
     )
         throw Error("invalid revocation authority");
     return {
@@ -369,8 +362,7 @@ export function encodeRevokeCreditTypedData(c: TransactionContext, p: RevokeCred
         message: {
             token: getAddress(p.token),
             owner: getAddress(p.owner),
-            shard: uint(p.shard, 64),
-            slot: uint(p.slot, 16),
+            grantId: normalizeCreditGrantId(p.grantId),
             deadline: checkDeadline(c, p.deadline),
             ...normalizeFee(p),
         },
@@ -390,8 +382,7 @@ export function buildRevokeCreditCalldata(p: BuildRevokeCreditCalldataParams) {
         data: new Interface(invisiCoreAbi).encodeFunctionData("revokeCredit", [
             p.params.token,
             p.params.owner,
-            p.params.shard,
-            p.params.slot,
+            p.params.grantId,
             p.params.deadline,
             normalizeFee(p.params).feeRecipient,
             normalizeFee(p.params).feeAmount,

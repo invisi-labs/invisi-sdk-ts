@@ -25,7 +25,7 @@ const event = (name = "CreditCreated") => ({
     name,
     transactionHash: h(22),
     logIndex: 4,
-    data: { revocationShard: "18446744073709551615", revocationSlot: 65535 },
+    data: { grantId: "340282366920938463463374607431768211455" },
 });
 it("does not classify Credit states as Notes from an envelope header", async () => {
     const { client } = setup((m) =>
@@ -37,11 +37,11 @@ it("does not classify Credit states as Notes from an envelope header", async () 
         "Credit state cannot appear"
     );
 });
-it("validates canonical Credit event names and retains public shard precision", async () => {
+it("validates canonical Credit event names and retains public grant ID precision", async () => {
     const { client } = setup((m) => (m === "invisi_getStatus" ? status() : [event(), event()]));
     const page = await client.getCreditTransitions(context, range);
     expect(page.transitions).toHaveLength(1);
-    expect(page.transitions[0]?.data.revocationShard).toBe("18446744073709551615");
+    expect(page.transitions[0]?.data.grantId).toBe("340282366920938463463374607431768211455");
     expect("notes" in page).toBe(false);
 });
 it.each(["CreditCancelled", "CreditToppedUp", "Transact"])(
@@ -63,28 +63,30 @@ it("queries Credit consumption independently from Note spent state", async () =>
     ]);
     expect(requests.map((r) => r.params[1])).toEqual([10, 10]);
 });
-it("validates grant query anchors, bitmap bounds and uint64 shard precision", async () => {
+it("validates grant status anchors, uint128 IDs and terminal status", async () => {
     const owner = "0x1111111111111111111111111111111111111111",
         token = "0x2222222222222222222222222222222222222222";
-    const { client, requests } = setup((m) =>
-        m === "invisi_getCreditAllocation"
-            ? { block: wireBlock, shard: "18446744073709551615", slot: 65535 }
-            : { block: wireBlock, bitmap: (1n << 255n).toString() }
+    for (const status of [0, 1, 2] as const) {
+        const { client, requests } = setup(() => ({ block: wireBlock, status }));
+        expect(
+            await client.getCreditStatus(context, owner, token, (1n << 128n) - 1n, block)
+        ).toMatchObject({ status });
+        expect(requests[0]?.params).toEqual([owner, token, ((1n << 128n) - 1n).toString(), 10]);
+        await expect(client.getCreditStatus(context, owner, token, 0n, block)).rejects.toThrow(
+            /grant ID/
+        );
+        await expect(
+            client.getCreditStatus(context, owner, token, 1n << 128n, block)
+        ).rejects.toThrow(/grant ID/);
+    }
+    const invalid = setup(() => ({ block: wireBlock, status: 3 }));
+    await expect(invalid.client.getCreditStatus(context, owner, token, 1n, block)).rejects.toThrow(
+        /status/
     );
-    expect(await client.getCreditAllocation(context, owner, token, block)).toMatchObject({
-        shard: (1n << 64n) - 1n,
-        slot: 65535,
-    });
-    expect(
-        await client.getCreditRevocationBitmap(context, owner, token, 1n, 255, block)
-    ).toMatchObject({ bitmap: 1n << 255n });
-    expect(requests[1]?.params).toEqual([owner, token, "1", 255, 10]);
+    const mismatch = setup(() => ({ block: { ...wireBlock, hash: h(99) }, status: 1 }));
     await expect(
-        client.getCreditRevocationBitmap(context, owner, token, 0n, 0, block)
-    ).rejects.toThrow("location");
-    await expect(
-        client.getCreditRevocationBitmap(context, owner, token, 1n, 256, block)
-    ).rejects.toThrow("location");
+        mismatch.client.getCreditStatus(context, owner, token, 1n, block)
+    ).rejects.toThrow();
 });
 it("authenticates Credit state membership and preserves both deliveries", async () => {
     const siblings = Array.from({ length: TREE_DEPTH }, () => h(0));

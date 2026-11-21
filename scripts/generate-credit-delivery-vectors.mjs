@@ -1,6 +1,6 @@
 /** Refresh public-test funds and Credit envelopes using the actual protocol Node implementation. */
 import { readFileSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, createECDH, createDecipheriv, hkdfSync } from "node:crypto";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -14,8 +14,7 @@ const clueKey = "0xc69480518ea88f8cb925fbcd8f5100b1ebc46cc4d8cbe19e0478936567e6b
 const fields = [
     "spenderWalletIdentity",
     "ownerWalletIdentity",
-    "revocationShard",
-    "revocationSlot",
+    "grantId",
     "nonce",
     "expiry",
     "creditSharedKey",
@@ -29,7 +28,14 @@ const fields = [
     "totalSpent",
 ];
 const note = {
-    ...Object.fromEntries(fields.map((field) => [field, BigInt(vectors.credit[field])])),
+    ...Object.fromEntries(
+        fields.map((field) => [
+            field,
+            BigInt(
+                field === "grantId" ? (vectors.credit.grantId ?? "1001") : vectors.credit[field]
+            ),
+        ])
+    ),
     availableCredit: 1000000n,
     unlimited: false,
 };
@@ -97,8 +103,8 @@ vectors.credit.ownerReceivingKeys = state.ownerReceivingKeys;
 vectors.credit.spenderReceivingKeys = state.spenderReceivingKeys;
 vectors.credit.deliverySource = {
     envelopeType: 1,
-    envelopeVersion: 2,
-    header: 130,
+    envelopeVersion: 4,
+    header: 132,
     ciphertextBytes: (vectors.credit.ownerCiphertext.length - 2) / 2,
     protocolClientSha256: createHash("sha256").update(readFileSync(source)).digest("hex"),
     purpose:
@@ -190,3 +196,52 @@ writeFileSync(
     JSON.stringify(vectors, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2) + "\n"
 );
 console.log("Refreshed funds and Credit payloadLength envelopes from the protocol implementation.");
+
+// Portable native-wallet fixtures carry the same independently generated authenticated plaintext.
+const wireFile = join(sdk, "packages/primitives/src/wallet/testdata/wallet-wire-vectors.json");
+const wire = JSON.parse(readFileSync(wireFile, "utf8"));
+for (const row of wire.cases) {
+    if (row.request.method !== "wallet.decryptCredit") continue;
+    const role = row.request.params.context.role;
+    const envelope = Buffer.from(vectors.credit[role + "Ciphertext"].slice(2), "hex");
+    const ecdh = createECDH("secp256k1");
+    ecdh.setPrivateKey(Buffer.from(vectors[role].viewingPrivateKey.slice(2), "hex"));
+    const domain = Buffer.from("Invisi.CreditDelivery.v4.GrantId.Uint128");
+    const key = hkdfSync(
+        "sha256",
+        ecdh.computeSecret(envelope.subarray(1, 34)),
+        envelope.subarray(34, 50),
+        Buffer.concat([
+            domain,
+            envelope.subarray(1, 34),
+            ecdh.getPublicKey(undefined, "compressed"),
+        ]),
+        32
+    );
+    const cipher = createDecipheriv("aes-256-gcm", Buffer.from(key), envelope.subarray(50, 62));
+    const word = (n, size) =>
+        Buffer.from(
+            BigInt(n)
+                .toString(16)
+                .padStart(size * 2, "0"),
+            "hex"
+        );
+    cipher.setAAD(
+        Buffer.concat([
+            domain,
+            envelope.subarray(0, 62),
+            Buffer.from([role === "owner" ? 1 : 2]),
+            word(context.chainId, 8),
+            word(context.protocolAddress, 20),
+            word(context.tokenAddress, 20),
+            Buffer.from(vectors.credit.commitment.slice(2), "hex"),
+        ])
+    );
+    cipher.setAuthTag(envelope.subarray(-16));
+    row.request.params.envelope = vectors.credit[role + "Ciphertext"];
+    row.request.params.context.outputCommitment = vectors.credit.commitment;
+    row.response.result.plaintext =
+        "0x" +
+        Buffer.concat([cipher.update(envelope.subarray(62, -16)), cipher.final()]).toString("hex");
+}
+writeFileSync(wireFile, JSON.stringify(wire, null, 2) + "\n");

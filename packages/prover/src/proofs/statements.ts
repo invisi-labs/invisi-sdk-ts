@@ -145,16 +145,16 @@ export function assertCreditStatement(values: readonly string[], name: string): 
     const capacity =
         operation === "credit-draw" ? Number(name.slice("credit_draw_slots".length)) : 1;
     const initialPayment = operation === "create-credit-initial-payment";
-    const feeRecipient = uint(initialPayment ? w[10]! : w.at(-4)!, 160),
-        feeAmount = uint(initialPayment ? w[11]! : w.at(-3)!, 128);
+    const feeRecipient = uint(initialPayment ? w[9]! : w.at(-4)!, 160),
+        feeAmount = uint(initialPayment ? w[10]! : w.at(-3)!, 128);
     if (initialPayment) {
-        check(w[12] !== 0n && w[12] !== w[6], "Invalid initial payment Note commitment");
-        check(uint(w[13]!, 126) > feeAmount, "First draw fee must leave a positive Note");
-        check(uint(w[14]!, 64) > 0n && uint(w[15]!, 64) > 0n, "Invalid initial payment periods");
+        check(w[11] !== 0n && w[11] !== w[5], "Invalid initial payment Note commitment");
+        check(uint(w[12]!, 126) > feeAmount, "First draw fee must leave a positive Note");
+        check(uint(w[13]!, 64) > 0n && uint(w[14]!, 64) > 0n, "Invalid initial payment periods");
     }
     check((feeRecipient === 0n) === (feeAmount === 0n), "Invalid Credit fee context");
     if (operation === "credit-draw")
-        check(feeAmount < w[7 + 10 * capacity]!, "Credit draw fee must leave a positive Note");
+        check(feeAmount < w[7 + 9 * capacity]!, "Credit draw fee must leave a positive Note");
     const digest = BigInt(
         computeWalletAuthorizationDigest({
             context: { chainId: w[0]!, protocolAddress: w[1]! },

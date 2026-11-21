@@ -22,7 +22,7 @@ it("matches independently encoded positive owner fees and gross draw deductions"
         expect(encode(context, f.params, f.deliveries)).toEqual(f.publicInputs);
         const call = build({
             context,
-            params: key === "createFee" ? { ...f.params, creationAbi: "legacy" } : f.params,
+            params: f.params,
             deliveries: f.deliveries,
             proof: "0x1234",
         });
@@ -34,7 +34,7 @@ it("matches independently encoded positive owner fees and gross draw deductions"
         );
     }
 });
-it("binds public revocation feeRecipient and feeAmount in EIP712 and eight-argument calldata", () => {
+it("binds public revocation feeRecipient and feeAmount in EIP712 and seven-argument calldata", () => {
     const f = fixtures.revokeFee;
     expect(api.encodeRevokeCreditTypedData(context, f.params)).toEqual(f.typedData);
     const call = api.buildRevokeCreditCalldata({ context, params: f.params, signature: "0x1234" });

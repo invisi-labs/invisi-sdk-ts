@@ -103,8 +103,6 @@ export interface PreparedOutput {
     change: boolean;
 }
 export interface CreateCreditPreparation {
-    /** Current ABI by default; select legacy only for an older deployment. */
-    creationAbi?: "legacy" | "initial-payment";
     /** Gross debit includes the optional broadcaster fee; amount is in token base units. */
     initialPayment?: {
         /** Gross owner debit, including the fee. */
@@ -115,6 +113,7 @@ export interface CreateCreditPreparation {
     };
     /** Explicit grant correlation key; canonical nonzero field, preserved without derivation. */
     creditSharedKey?: bigint;
+    grantId?: bigint;
     fee?: { recipient: Address; amount: bigint };
     payload?: Uint8Array;
     singleLimit?: bigint;
@@ -153,8 +152,7 @@ export interface RevokeCreditPreparation {
     fee?: { recipient: Address; amount: bigint };
     tokenAddress: Address;
     owner?: Address;
-    shard: bigint;
-    slot: bigint;
+    grantId: bigint;
     caller?: Address;
     deadline?: bigint;
 }

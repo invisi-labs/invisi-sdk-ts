@@ -133,6 +133,7 @@ export function validateState(state: WalletState, scope: WalletScope, revision: 
                 ? note.ownerWalletIdentity
                 : note.spenderWalletIdentity
             ).toLowerCase() !== scope.ownerAddress.toLowerCase() ||
+            (record.grantStatus !== undefined && ![0, 1, 2].includes(record.grantStatus)) ||
             !["unspent", "unknown", "spent"].includes(record.spent)
         )
             throw new Error("invalid stored Credit context or role");

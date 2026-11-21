@@ -90,8 +90,7 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
             tokenAddress: context.tokenAddress,
             spenderWalletIdentity: address(vectors.credit.spenderWalletIdentity),
             ownerWalletIdentity: address(vectors.credit.ownerWalletIdentity),
-            revocationShard: BigInt(vectors.credit.revocationShard),
-            revocationSlot: BigInt(vectors.credit.revocationSlot),
+            grantId: BigInt(vectors.credit.grantId),
             nonce: BigInt(vectors.credit.nonce),
             expiry: BigInt(vectors.credit.expiry),
             creditSharedKey: BigInt(vectors.credit.creditSharedKey),
@@ -146,8 +145,8 @@ it("roundtrips copied Credit memos for both recipient roles and scoped disclosur
         );
         memo.fill(0);
         const envelope = await pending;
-        expect(envelope[0]).toBe(130);
-        expect(envelope).toHaveLength(742);
+        expect(envelope[0]).toBe(132);
+        expect(envelope).toHaveLength(748);
         const decoded = await core.decryptCreditState(privateKey, envelope, scoped);
         expect(core.creditV1.decode(decoded.note.payload!).memo).toEqual(
             new Uint8Array(256).fill(255)

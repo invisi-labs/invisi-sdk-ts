@@ -121,15 +121,7 @@ function receipt(value: unknown, mode: Mode): void {
             "blockHash",
             "completedAt",
             ...(credit
-                ? [
-                      "creditId",
-                      "creditStatus",
-                      "owner",
-                      "revocationShard",
-                      "revocationSlot",
-                      "verificationBlock",
-                      "expiresAt",
-                  ]
+                ? ["creditId", "creditStatus", "owner", "grantId", "verificationBlock", "expiresAt"]
                 : []),
         ],
         credit ? ["initialPayment"] : []
@@ -165,8 +157,7 @@ function receipt(value: unknown, mode: Mode): void {
                 return invalid();
         }
         hex(r.owner, 20, true);
-        integer(r.revocationShard, 64);
-        number(r.revocationSlot, 65535);
+        integer(r.grantId, 128, true);
         timestamp(r.expiresAt);
         const b = object(r.verificationBlock, ["number", "hash", "timestamp"]);
         integer(b.number, 64);
@@ -196,14 +187,13 @@ function credential(c: ObjectValue): void {
     const p = object(
         c.proof,
         ["type", "transactionHash", "commitment"],
-        c.mode === "credit" ? ["owner", "revocationShard", "revocationSlot"] : []
+        c.mode === "credit" ? ["owner", "grantId"] : []
     );
     if (p.type !== (c.mode === "payment" ? "note" : "credit_created")) return invalid();
     hex(p.transactionHash, 32, true);
     field(p.commitment);
     if (p.owner !== undefined) hex(p.owner, 20, true);
-    if (p.revocationShard !== undefined) integer(p.revocationShard, 64);
-    if (p.revocationSlot !== undefined) number(p.revocationSlot, 65535);
+    if (p.grantId !== undefined) integer(p.grantId, 128, true);
 }
 
 function matchReceipt(value: PaymentReceipt | CreditReceipt, request: Request): void {

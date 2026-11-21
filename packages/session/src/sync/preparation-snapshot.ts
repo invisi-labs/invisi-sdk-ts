@@ -69,8 +69,6 @@ export async function retainPreparationSnapshot(
         const context = options.protocol.forToken(token).context;
         await options.protocol.forToken(token).validateDeployment(reader);
         await reader.getFundingNonce(context, scope.ownerAddress, block);
-        if (reader.getCreditAllocation)
-            await reader.getCreditAllocation(context, scope.ownerAddress, token, block);
     }
     // Pin each tree's first root before issuing bounded concurrent path reads.
     const roots = new Map<bigint, Hex>();
@@ -146,15 +144,8 @@ export async function retainPreparationSnapshot(
         await reader.isSpent(context, [nullifier], block);
         if ("state" in record) {
             const n = record.state.note;
-            if (!reader.getCreditRevocationBitmap) throw Error("Credit revocation reader required");
-            await reader.getCreditRevocationBitmap(
-                context,
-                n.ownerWalletIdentity,
-                token,
-                n.revocationShard,
-                Number(n.revocationSlot >> 8n),
-                block
-            );
+            if (!reader.getCreditStatus) throw Error("Credit status reader required");
+            await reader.getCreditStatus(context, n.ownerWalletIdentity, token, n.grantId, block);
         }
     };
     const first = new Map<bigint, (typeof records)[number]>(),

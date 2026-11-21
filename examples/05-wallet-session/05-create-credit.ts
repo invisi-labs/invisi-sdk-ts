@@ -71,7 +71,7 @@ try {
     // A malformed batch or operational error must not advance the persisted checkpoint.
     await pending.decrypt(decryptor);
 
-    // 3. Grant quota, not prepaid principal. The Session obtains allocation and persists the intent.
+    // 3. Grant quota, not prepaid principal. The Session generates a grant ID and persists the intent.
     const block = await provider.getBlock("latest");
     if (!block) {
         throw Error("Missing latest block");

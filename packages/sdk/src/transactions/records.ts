@@ -37,6 +37,7 @@ export interface NoteRecord extends ReceiptPosition {
 export interface CreditRecord extends ReceiptPosition {
     receivingKeySource?: { kind: "draw" | "update"; commitment: Hex };
     revoked?: boolean;
+    grantStatus?: import("@invisi-labs/protocol").CreditGrantStatus;
     state: CreditDeliveryState;
     role: "owner" | "spender";
     spent: SpentState;

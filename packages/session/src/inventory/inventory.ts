@@ -230,8 +230,7 @@ export abstract class InventoryProcessor {
                             "tokenAddress",
                             "spenderWalletIdentity",
                             "ownerWalletIdentity",
-                            "revocationShard",
-                            "revocationSlot",
+                            "grantId",
                             "creditSharedKey",
                         ].some(
                             (field) =>

@@ -37,7 +37,7 @@ export function provingRequest(
     expectedPublicInputs: readonly Hex[],
     target: ProofTarget = "evm"
 ): ProvingRequest {
-    const schema = layouts[circuitName],
+    const schema = layouts.circuits[circuitName],
         key = schema.keys[target as keyof typeof schema.keys];
     check(typeof key === "string", "unpublished proof target");
     check(
@@ -45,13 +45,16 @@ export function provingRequest(
         "public input order/width mismatch"
     );
     check(
-        Object.keys(privateInputs).length === schema.private.length &&
-            schema.private.every((name) => Object.hasOwn(privateInputs, name)),
+        Object.keys(privateInputs).length === layouts.privateSchemas[schema.private]!.length &&
+            layouts.privateSchemas[schema.private]!.every((name) =>
+                Object.hasOwn(privateInputs, name)
+            ),
         "private witness schema mismatch"
     );
     let offset = 0;
     const publicInputs: Record<string, unknown> = {};
-    for (const entry of schema.public) {
+    for (const index of schema.public) {
+        const entry = layouts.publicEntries[index]!;
         const values = expectedPublicInputs.slice(offset, offset + entry.count).map((value) => {
             const n = BigInt(value);
             check(n >= 0n && n < FIELD_MODULUS, "noncanonical public input");
@@ -75,7 +78,7 @@ export function witnessStatement(
     expectedPublicInputs: readonly Hex[],
     target: ProofTarget = "evm"
 ): ProofStatement {
-    const schema = layouts[circuitName],
+    const schema = layouts.circuits[circuitName],
         key = schema.keys[target as keyof typeof schema.keys];
     check(
         typeof key === "string" && expectedPublicInputs.length === schema.publicInputCount,

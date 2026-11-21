@@ -347,8 +347,7 @@ enabled(
             await timer.phase("prepared.ready", () => caller.ready());
             const revoke = await invisi.prepareRevokeCredit({
                 ...identity,
-                shard: 1n,
-                slot: 0n,
+                grantId: 1n,
                 caller: h.bob.ownerAddress,
             });
             const revocation = await timer.phase("prepared.exportRevocationAuthorization", () =>
@@ -408,8 +407,7 @@ enabled(
                     tokenAddress: BigInt(h.context.tokenAddress),
                     ownerWalletIdentity: h.wallet.ownerAddress,
                     spenderWalletIdentity: h.bob.ownerAddress,
-                    revocationShard: 1n,
-                    revocationSlot: 0n,
+                    grantId: 1n,
                     nonce: 456n,
                     expiry: 2000003600n,
                     creditSharedKey: 789n,
@@ -456,7 +454,7 @@ enabled(
                 })
             );
             await timer.phase("credit.prepareRevoke", () =>
-                invisi.prepareRevokeCredit({ ...identity, shard: 1n, slot: 0n })
+                invisi.prepareRevokeCredit({ ...identity, grantId: 1n })
             );
             writeFileSync(
                 join(directory, "prepared-methods.json"),
@@ -541,8 +539,7 @@ enabled(
             );
             const revocation = await managed.prepareRevokeCredit({
                 tokenAddress: managedHost.context.tokenAddress,
-                shard: 1n,
-                slot: 0n,
+                grantId: 1n,
                 caller: managedHost.bob.ownerAddress,
             });
             const request = await managedTimer.phase("managed.exportRevocationAuthorization", () =>

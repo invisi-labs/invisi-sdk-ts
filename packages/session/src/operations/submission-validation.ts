@@ -56,69 +56,31 @@ export async function validateOperationSubmission(
     }
     for (const input of plan.credit?.inputs ?? []) {
         const n = input.state.note;
-        check(reader.getCreditRevocationBitmap, "Credit revocation reader required");
-        const bitmap = await reader.getCreditRevocationBitmap(
+        check(reader.getCreditStatus, "Credit status reader required");
+        const status = await reader.getCreditStatus(
             plan.context,
             n.ownerWalletIdentity,
             plan.context.tokenAddress,
-            n.revocationShard,
-            Number(n.revocationSlot >> 8n),
+            n.grantId,
             head
         );
-        check(!(bitmap & (1n << (n.revocationSlot & 255n))), "Credit grant is revoked");
+        check(
+            status === 1,
+            status === 2 ? "Credit grant is revoked" : "Credit grant is not active"
+        );
         check(head.timestamp <= n.expiry, "Credit grant has expired");
     }
     const revoke = plan.credit?.revocation;
     if (revoke) {
-        check(reader.getCreditRevocationBitmap, "Credit revocation reader required");
-        const bitmap = await reader.getCreditRevocationBitmap(
+        check(reader.getCreditStatus, "Credit status reader required");
+        const status = await reader.getCreditStatus(
             plan.context,
             revoke.owner,
             plan.context.tokenAddress,
-            revoke.shard,
-            Number(revoke.slot >> 8n),
+            revoke.grantId,
             head
         );
-        check(!(bitmap & (1n << (revoke.slot & 255n))), "Credit grant is revoked");
-    }
-    const refs = [
-        ...(plan.credit?.inputs ?? []).map(({ state }) => ({
-            owner: state.note.ownerWalletIdentity,
-            shard: state.note.revocationShard,
-            slot: state.note.revocationSlot,
-        })),
-        ...(revoke ? [{ owner: revoke.owner, shard: revoke.shard, slot: revoke.slot }] : []),
-    ];
-    const allocations = new Map<string, bigint>();
-    for (const ref of refs) {
-        check(
-            ref.shard > 0n && ref.slot >= 0n && ref.slot < 65536n,
-            "invalid Credit grant reference"
-        );
-        const owner = ref.owner.toLowerCase();
-        let count = allocations.get(owner);
-        if (count === undefined) {
-            check(reader.getCreditAllocation, "Credit allocation reader required");
-            const next = await reader.getCreditAllocation(
-                plan.context,
-                ref.owner,
-                plan.context.tokenAddress,
-                head
-            );
-            check(
-                next.shard > 0n &&
-                    Number.isInteger(next.slot) &&
-                    next.slot >= 0 &&
-                    next.slot < 65536,
-                "invalid current Credit allocation"
-            );
-            count = (next.shard - 1n) * 65536n + BigInt(next.slot);
-            allocations.set(owner, count);
-        }
-        check(
-            (ref.shard - 1n) * 65536n + ref.slot < count,
-            "Credit grant reference is not allocated"
-        );
+        check(status === 0 || status === 1, "Credit grant is revoked or has invalid status");
     }
     if (revoke && plan.credit?.revocationSignature) {
         const livePlan = { ...plan };
@@ -128,20 +90,17 @@ export async function validateOperationSubmission(
             options: runtimeOptions,
         });
     }
-    if (plan.credit?.creation) {
-        check(reader.getCreditAllocation, "Credit allocation reader required");
-        const allocation = await reader.getCreditAllocation(
+    const creation = plan.credit?.creation;
+    if (creation) {
+        check(reader.getCreditStatus, "Credit status reader required");
+        const status = await reader.getCreditStatus(
             plan.context,
-            plan.credit.creation.owner,
+            creation.owner,
             plan.context.tokenAddress,
+            creation.grantId,
             head
         );
-        const created = plan.credit.outputs[0]!.state.note;
-        check(
-            allocation.shard === created.revocationShard &&
-                BigInt(allocation.slot) === created.revocationSlot,
-            "Credit allocation changed; prepare again"
-        );
+        check(status === 0, "Credit grant ID is already active, revoked or has invalid status");
     }
     const debits = new Map<string, { owner: Hex; amount: bigint; permit: boolean }>();
     const debit = (owner: Hex, amount: bigint, permit = false) => {

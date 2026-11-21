@@ -3,6 +3,7 @@ import { AbiCoder, Interface, getAddress, isHexString, dataLength } from "ethers
 import {
     computeWalletAuthorizationDigest,
     creditPeriods,
+    normalizeCreditGrantId,
     walletAuthorizationTypedData,
 } from "@invisi-labs/primitives";
 import {
@@ -24,11 +25,9 @@ import {
     type TransactionContext,
 } from "../validation";
 export const CREATE_CREDIT_FIELDS = [
-    "creationAbi",
     "token",
     "owner",
-    "revocationShard",
-    "revocationSlot",
+    "grantId",
     "creditCommitment",
     "deadline",
     "feeRecipient",
@@ -43,19 +42,14 @@ export function validateCreateCreditRequest(
     deliveries: readonly Delivery[]
 ) {
     known(p, CREATE_CREDIT_FIELDS);
-    if (p.creationAbi !== undefined && !["legacy", "initial-payment"].includes(p.creationAbi))
-        throw Error("unsupported Credit creation ABI");
-    if (p.creationAbi === "legacy" && p.hasInitialPayment !== undefined)
-        throw Error("initial payment fields are not valid for legacy creation");
     const ctx = normalizeContext(c),
         owner = getAddress(p.owner) as Hex,
-        revocationShard = uint(p.revocationShard, 64, "revocationShard"),
-        revocationSlot = uint(p.revocationSlot, 16, "revocationSlot"),
+        grantId = normalizeCreditGrantId(p.grantId),
         creditCommitment = word(field(p.creditCommitment));
     if (
         getAddress(p.token) !== ctx.tokenAddress ||
         !BigInt(owner) ||
-        !revocationShard ||
+        !grantId ||
         !BigInt(creditCommitment)
     )
         throw Error("invalid Credit authority, token or commitment");
@@ -72,7 +66,7 @@ export function validateCreateCreditRequest(
             (p.hasInitialPayment === undefined &&
                 (p.totalAmount !== undefined || p.noteCommitment !== undefined)))
     )
-        throw Error("initial payment fields are not valid for pure or legacy creation");
+        throw Error("initial payment fields are not valid for pure creation");
     if (
         initialPayment &&
         (totalAmount <= fee.feeAmount || !BigInt(noteCommitment) || c.timestamp === undefined)
@@ -90,8 +84,7 @@ export function validateCreateCreditRequest(
         totalAmount,
         noteCommitment,
         owner,
-        revocationShard,
-        revocationSlot,
+        grantId,
         creditCommitment,
         deadline: checkDeadline(c, p.deadline),
         deliveries: deliveries.map((d) => normalizeOpaqueDelivery(d, {})),
@@ -109,8 +102,7 @@ export function createCreditBaseInputs(
         BigInt(r.protocolAddress),
         BigInt(r.tokenAddress),
         BigInt(r.owner),
-        r.revocationShard,
-        r.revocationSlot,
+        r.grantId,
         BigInt(r.creditCommitment),
         r.deadline,
         h >> 128n,
@@ -175,31 +167,23 @@ export interface BuildCreateCreditCalldataParams {
     params: CreditCreationParams;
     deliveries: readonly Delivery[];
 }
-export const legacyCreateCreditAbi = [
-    "function createCredit(bytes proof,(address token,address owner,uint64 revocationShard,uint16 revocationSlot,bytes32 creditCommitment,uint256 deadline,address feeRecipient,uint256 feeAmount) p,(bytes ciphertext,bytes clue)[] deliveries)",
-] as const;
-const legacyCreateCredit = new Interface(legacyCreateCreditAbi);
 const currentCreateCredit = new Interface(invisiCoreAbi);
 export function encodeCreateCreditCall(
     p: CreditCreationParams,
     encodedProof: Hex,
     d: readonly Delivery[]
 ) {
-    if (p.creationAbi === "legacy" && p.hasInitialPayment !== undefined)
-        throw Error("initial payment fields are not valid for legacy creation");
-    const args = { ...p, ...normalizeFee(p) };
-    return (
-        p.creationAbi === "legacy" ? legacyCreateCredit : currentCreateCredit
-    ).encodeFunctionData("createCredit", [
+    known(p, CREATE_CREDIT_FIELDS);
+    normalizeCreditGrantId(p.grantId);
+    return currentCreateCredit.encodeFunctionData("createCredit", [
         encodedProof,
-        p.creationAbi === "legacy"
-            ? args
-            : {
-                  ...args,
-                  hasInitialPayment: p.hasInitialPayment ?? false,
-                  totalAmount: p.totalAmount ?? 0n,
-                  noteCommitment: p.noteCommitment ?? word(0n),
-              },
+        {
+            ...p,
+            ...normalizeFee(p),
+            hasInitialPayment: p.hasInitialPayment ?? false,
+            totalAmount: p.totalAmount ?? 0n,
+            noteCommitment: p.noteCommitment ?? word(0n),
+        },
         d,
     ]) as Hex;
 }

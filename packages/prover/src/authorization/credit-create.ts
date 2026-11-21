@@ -14,8 +14,7 @@ export async function createCredit(w: WitnessContext, p: CreateCreditWitnessPara
         words = createCreditPublicInputs(w.protocol.context, p.params, p.deliveries);
     check(
         n.ownerWalletIdentity === p.params.owner &&
-            n.revocationShard === p.params.revocationShard &&
-            n.revocationSlot === p.params.revocationSlot &&
+            n.grantId === p.params.grantId &&
             n.expiry >= p.params.deadline &&
             (await w.creditLeaf(n)) === p.params.creditCommitment,
         "Credit creation mismatch"

@@ -676,67 +676,31 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
     ) {
         return this.consumed(context, nullifier, block, true, options);
     }
-    async getCreditAllocation(
+    async getCreditStatus(
         context: DeploymentContext,
         owner: Address,
         token: Address,
+        grantId: bigint,
         block: CanonicalBlock,
         options: { signal?: AbortSignal } = {}
-    ) {
+    ): Promise<import("@invisi-labs/protocol").IndexedCreditStatus> {
         this.context(context);
+        if (typeof grantId !== "bigint" || grantId <= 0n || grantId >= 1n << 128n)
+            invalid("Invalid Credit grant ID");
         const result = object(
             await this.rpc(
-                "invisi_getCreditAllocation",
-                [getAddress(owner), getAddress(token), numeric(block.number)],
+                "invisi_getCreditStatus",
+                [getAddress(owner), getAddress(token), grantId.toString(), numeric(block.number)],
                 options.signal
             )
         );
         const anchor = await this.canonical(result.block);
         if (anchor.number !== block.number || hash(anchor.hash) !== hash(block.hash))
             invalid("RPC grant block mismatch");
-        const shard = integer(result.shard);
-        if (shard === 0n) invalid("Invalid grant shard");
-        const slot = Number(integer(result.slot, 16));
+        const status = result.status;
+        if (status !== 0 && status !== 1 && status !== 2) invalid("Invalid Credit grant status");
         await this.recheck(block);
-        return { block: anchor, shard, slot };
-    }
-    async getCreditRevocationBitmap(
-        context: DeploymentContext,
-        owner: Address,
-        token: Address,
-        shard: bigint,
-        word: number,
-        block: CanonicalBlock,
-        options: { signal?: AbortSignal } = {}
-    ) {
-        this.context(context);
-        if (
-            shard <= 0n ||
-            shard >= 1n << 64n ||
-            !Number.isSafeInteger(word) ||
-            word < 0 ||
-            word > 255
-        )
-            invalid("Invalid grant location");
-        const result = object(
-            await this.rpc(
-                "invisi_getCreditRevocationBitmap",
-                [
-                    getAddress(owner),
-                    getAddress(token),
-                    shard.toString(),
-                    word,
-                    numeric(block.number),
-                ],
-                options.signal
-            )
-        );
-        const anchor = await this.canonical(result.block);
-        if (anchor.number !== block.number || hash(anchor.hash) !== hash(block.hash))
-            invalid("RPC grant block mismatch");
-        const bitmap = integer(result.bitmap, 256);
-        await this.recheck(block);
-        return { block: anchor, bitmap };
+        return { block: anchor, status: status as 0 | 1 | 2 };
     }
 
     /** Trust the selected RPC for receipt/canonicality/finality; locally verify pins and proof. */

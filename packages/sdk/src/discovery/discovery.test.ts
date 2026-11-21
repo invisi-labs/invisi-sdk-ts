@@ -78,8 +78,7 @@ it("maps two Credit role envelopes to one physical state leaf", async () => {
                 token,
                 owner: vectors.credit.ownerWalletIdentity,
                 outputTreeId: 1n,
-                revocationShard: 1n,
-                revocationSlot: 0,
+                grantId: 1n,
                 creditCommitment: vectors.credit.commitment,
                 leafIndex: 0,
                 deliveries: [owner, spender],
@@ -92,7 +91,7 @@ it("maps two Credit role envelopes to one physical state leaf", async () => {
     expect(result.credits).toHaveLength(1);
     expect(result.credits[0]).toMatchObject({
         role: "owner",
-        state: { note: { revocationShard: 1n, revocationSlot: 0n, totalSpent: 0n } },
+        state: { note: { grantId: BigInt(vectors.credit.grantId), totalSpent: 0n } },
     });
     expect(extractDeliveryCandidates(logs, context, 12n).map((x) => x.role)).toEqual([
         "owner",
@@ -112,7 +111,7 @@ function drawLogs(): DeliveryEventLog[] {
                 state: {
                     sources: [{ treeId: 1n, merkleRoot: hex(9n) }],
                     payers: [{ payer: token, amount: 70n }],
-                    grantRefs: [{ payerIndex: 0n, shard: 1n, slot: 0n }],
+                    grantRefs: [{ payerIndex: 0n, grantId: 1n }],
                     nullifiers: [hex(99n)],
                     creditCommitments: [vectors.credit.commitment],
                     recoveryAmounts: [hex(1n)],
@@ -222,7 +221,7 @@ it("routes updates to dual envelopes and ignores proofless revocation as a deliv
     ).toHaveLength(2);
     expect(
         extractDeliveryCandidates(
-            [{ ...meta, eventName: "CreditRevoked", args: { token, shard: 1n, slot: 0 } }],
+            [{ ...meta, eventName: "CreditRevoked", args: { token, grantId: 1n } }],
             context,
             12n
         )

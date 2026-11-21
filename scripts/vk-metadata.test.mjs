@@ -37,10 +37,10 @@ test("published metadata retains all reviewed identities without inline VK paylo
     const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
     assertMetadataOnly(metadata);
     assert.equal(metadata.entries.flatMap((entry) => Object.values(entry.keys)).length, 88);
-    // Reviewed metadata from the preceding release, omitting only vkHex and vkFields.
+    // Reviewed uint128 grant-ID release, with verification keys loaded from assets.
     assert.equal(
         digest(JSON.stringify(metadata)),
-        "ecd78b855e3fcc3292d1a0745acb0b63812d0017b73658ec439bf0afe8a8b63f"
+        "df14ac911050775b5ad3c8b64b744390f15b70c909d45c78763b6f1e2e33bed2"
     );
 });
 
@@ -84,6 +84,7 @@ test("sync generator authenticates VK payloads but publishes only metadata", asy
     try {
         mkdirSync(join(prover, "scripts"), { recursive: true });
         mkdirSync(join(sdk, "scripts"), { recursive: true });
+        mkdirSync(join(sdk, "packages/protocol/src"), { recursive: true });
         copyFileSync(
             join(packageRoot, "scripts/sync-circuits.mjs"),
             join(prover, "scripts/sync-circuits.mjs")
@@ -94,6 +95,7 @@ test("sync generator authenticates VK payloads but publishes only metadata", asy
         );
         writeJson(join(sdk, "package.json"), { type: "module" });
         symlinkSync(join(packageRoot, "node_modules"), join(prover, "node_modules"), "dir");
+        symlinkSync(join(repository, "node_modules"), join(sdk, "node_modules"), "dir");
         write(
             join(core, "scripts/prover-assets.mjs"),
             `import { copyFileSync, mkdirSync } from 'node:fs';
@@ -154,7 +156,7 @@ copyFileSync(join(process.cwd(), 'index.json'), join(process.argv[2], 'index.jso
             writeJson(join(core, entry.artifact), artifact);
             for (const [path, version, formatVersion, entries] of [
                 ["transact", 4, 7, [entry]],
-                ["credit", 7, 8, []],
+                ["credit", 8, 9, []],
             ])
                 writeJson(join(core, `circuits/${path}/manifest.json`), {
                     version,
@@ -180,7 +182,7 @@ copyFileSync(join(process.cwd(), 'index.json'), join(process.argv[2], 'index.jso
             write(join(core, "index.json"), indexBytes);
             write(
                 join(prover, "src/resources/pin.ts"),
-                `export const INITIAL_PAYMENT_ASSET_INDEX_SHA256 = "${digest(indexBytes)}";\n`
+                `export const PROVER_ASSET_INDEX_SHA256 = "${digest(indexBytes)}";\n`
             );
         };
         reset();

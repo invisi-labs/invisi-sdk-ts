@@ -1,3 +1,4 @@
+import { generateCreditGrantId, normalizeCreditGrantId } from "@invisi-labs/primitives";
 import { importSessionNotes } from "./collection";
 import type { NoteInput } from "@invisi-labs/sdk";
 import { scanStatus, fundsStatus } from "../sync/status";
@@ -625,9 +626,13 @@ export class WalletSession {
     }
     async prepareCreateCredit(options: CreateCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareCreateCredit", async () => {
+            const copied = {
+                ...structuredClone(options),
+                grantId: normalizeCreditGrantId(options.grantId ?? generateCreditGrantId()),
+            };
             await this.ready();
             return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareCreateCredit(options)
+                preparation.prepareCreateCredit(copied)
             );
         });
     }

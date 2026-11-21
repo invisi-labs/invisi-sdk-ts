@@ -1,3 +1,4 @@
+declare const crypto: { getRandomValues<T extends ArrayBufferView>(array: T): T };
 import {
     D_CNULL,
     D_CREDIT,
@@ -15,6 +16,25 @@ import type {
     ProtocolContext,
 } from "../types";
 import { assertNoteContext } from "../notes/noteContext";
+
+/** A grant identifier is a positive uint128; decimal text must be canonical and lossless. */
+export function normalizeCreditGrantId(value: unknown): bigint {
+    if (typeof value === "string" && /^[1-9][0-9]*$/.test(value)) value = BigInt(value);
+    if (typeof value !== "bigint" || value <= 0n || value >= 1n << 128n)
+        throw new RangeError("grantId must be a canonical positive uint128");
+    return value;
+}
+
+/** Generate independently before proving, with browser/Node Web Crypto. */
+export function generateCreditGrantId(value?: unknown): bigint {
+    if (value !== undefined) return normalizeCreditGrantId(value);
+    const bytes = new Uint8Array(16);
+    for (;;) {
+        crypto.getRandomValues(bytes);
+        const candidate = bytes.reduce((result, byte) => (result << 8n) | BigInt(byte), 0n);
+        if (candidate !== 0n) return candidate;
+    }
+}
 
 export const CREDIT_POLICY_FIELDS = ["singleLimit", "dailyLimit", "monthlyLimit"] as const;
 export const CREDIT_USAGE_FIELDS = [
@@ -121,8 +141,7 @@ export function normalizeCreditState(state: CreditState): CreditState {
         "tokenAddress",
         "spenderWalletIdentity",
         "ownerWalletIdentity",
-        "revocationShard",
-        "revocationSlot",
+        "grantId",
         "nonce",
         "expiry",
         "creditSharedKey",
@@ -138,16 +157,16 @@ export function normalizeCreditState(state: CreditState): CreditState {
         ["chainId", 64],
         ["protocolAddress", 160],
         ["tokenAddress", 160],
-        ["revocationShard", 64],
-        ["revocationSlot", 16],
+        ["grantId", 128],
         ["expiry", 64],
     ] as const)
         uint(state[name], bits, name);
+    normalizeCreditGrantId(state.grantId);
     for (const id of [state.spenderWalletIdentity, state.ownerWalletIdentity])
         if (!/^0x[0-9a-fA-F]{40}$/.test(id) || BigInt(id) === 0n)
             throw Error("invalid Credit identity");
-    if (!state.protocolAddress || !state.tokenAddress || !state.revocationShard || !state.expiry)
-        throw Error("Credit deployment, token, shard and expiry must be positive");
+    if (!state.protocolAddress || !state.tokenAddress || !state.grantId || !state.expiry)
+        throw Error("Credit deployment, token, grantId and expiry must be positive");
     field(state.nonce, "nonce");
     field(state.creditSharedKey, "creditSharedKey");
     if (!state.creditSharedKey) throw Error("Credit shared key must be positive");
@@ -170,16 +189,16 @@ export async function computeCreditCommitment(
         ["chainId", 64],
         ["protocolAddress", 160],
         ["tokenAddress", 160],
-        ["revocationShard", 64],
-        ["revocationSlot", 16],
+        ["grantId", 128],
         ["expiry", 64],
     ] as const)
         uint(state[name], bits, name);
+    normalizeCreditGrantId(state.grantId);
     for (const identity of [state.spenderWalletIdentity, state.ownerWalletIdentity])
         if (!/^0x[0-9a-fA-F]{40}$/.test(identity) || BigInt(identity) === 0n)
             throw new Error("invalid Credit identity");
-    if (state.revocationShard === 0n || state.expiry === 0n)
-        throw new Error("Credit shard and expiry must be positive");
+    if (state.grantId === 0n || state.expiry === 0n)
+        throw new Error("Credit grantId and expiry must be positive");
     field(state.nonce, "nonce");
     const hash = keyHash ?? (await computeCreditSharedKeyHash(state.creditSharedKey));
     field(BigInt(hash), "Credit shared key hash");
@@ -190,8 +209,7 @@ export async function computeCreditCommitment(
         BigInt(state.spenderWalletIdentity),
         BigInt(state.ownerWalletIdentity),
         state.tokenAddress,
-        state.revocationShard,
-        state.revocationSlot,
+        state.grantId,
         state.nonce,
         state.expiry,
         BigInt(hash),

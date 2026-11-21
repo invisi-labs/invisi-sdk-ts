@@ -124,7 +124,7 @@ test("explicit Node provisioning tries the browser CDN before the verified GitHu
 test("resource provisioning selects independent capabilities and explicit legacy pins", () => {
     assert.equal(
         reviewedPin("core"),
-        "36f58bac1a0f70c6f8422b47f7cc35a30416a20f8a0f30038d23db0832e2bc93"
+        "85a5d1dffe40fc965ab4345a28b632f463c3ad861c44d5845850fbc7447fd8f6"
     );
     assert.equal(
         reviewedPin("provenance"),
