@@ -1,4 +1,4 @@
-// Unreleased source-workspace example. Import from a host application; no top-level execution.
+// SDK 1.3.3 example. Import from a host application; no top-level execution.
 // Host owns keys, allowance transactions, budgets, persistence and explicit relay submission.
 import { ZeroAddress, type Authorization, type Provider, type Signer } from "ethers";
 import type { TransactionCall } from "@invisi-labs/protocol";

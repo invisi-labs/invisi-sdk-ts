@@ -1,9 +1,12 @@
 # @invisi-labs/rpc
 
-## Unreleased
+## 1.3.3
 
-- Read consecutive historical headers through `invisi_getBlockHeaders` in ranges of up to 256, checking full-header hashes, deployment pins, range anchors and parent continuity, including all fork fields through `slotNumber` and rejecting missing fork-field gaps. Public history uses this path automatically.
-- Fall back to live batched reads only when the server explicitly reports missing method or missing stored history; malformed responses fail closed. Missing later chunks discard partial history and restart the entire live batch, including through independent CommonJS package entrypoints. Nonconsecutive heights and heights above JavaScript's safe integer range retain exact live hexadecimal reads. Single-block, finality and canonical reorg checks stay live.
+- Read consecutive historical headers through `invisi_getBlockHeaders` in ranges of up to 256. Verify full-header hashes, deployment pins, range anchors, parent continuity and all fork fields through `slotNumber`; reject missing fork-field gaps.
+- Fall back to live batched reads only when the server explicitly reports unsupported methods or missing stored history. Discard partial history before restarting live reads when a later chunk is unavailable. Keep single-block, finality, reorg and unsafe-integer height handling live and exact, including CommonJS entrypoints.
+- Batch and share verified membership and historical update reads for wallet refresh and Credit replay while retaining canonical validation and rejecting inconsistent responses.
+- Use uint128 grant identifiers and indexed Credit status instead of allocation/bitmap queries. Validate optional machine-readable broadcaster status reason codes for recoverable submission handling.
+- Document canonical Router draft/quote/submission ordering. Migration: custom RPC providers must support the current Credit status schema; historical header batching remains optional with the explicit compatibility fallback.
 
 ## 1.3.2
 

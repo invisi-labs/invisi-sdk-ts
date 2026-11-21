@@ -1,5 +1,9 @@
 # @invisi-labs/react
 
+## 1.3.3
+
+- Release with the fixed SDK 1.3.3 package group and exact sibling dependencies. The React adapter implementation is unchanged; consumers inherit the updated session refresh, submission recovery and Credit grant schema from SDK/session dependencies. Migrate Credit state and custom integrations as described in those package entries.
+
 ## 1.3.2
 
 - Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.

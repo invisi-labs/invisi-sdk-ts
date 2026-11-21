@@ -1,6 +1,6 @@
 # @invisi-labs/payment-router
 
-The canonical Router/account and relay APIs described here are unreleased source-workspace APIs planned for 1.3.3. Package manifests remain at 1.3.2; this guide does not imply npm 1.3.2 contains them.
+The canonical Router/account and relay APIs described here are included in SDK 1.3.3.
 
 Atomic native/ERC20 payments for the canonical `invisi-periphery` PaymentRouter (unified Router/account ABI; legacy snapshots are separately exported). Supports direct native, direct ERC20, signed relayed ERC20 and delegated-account sponsored native payments. Core proofs and settlement remain unchanged. Wallet keys and transaction submission remain host-provided.
 

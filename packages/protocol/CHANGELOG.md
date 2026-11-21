@@ -1,9 +1,11 @@
 # @invisi-labs/protocol
 
-## Unreleased (planned v1.3.3)
+## 1.3.3
 
-- Synchronize Core and Factory ABIs with Core `9f61a55`: deploy Core with `(params, addressRegistry)` and call Factory `deploy` / `computeInstanceAddress` with `(creationCode, salt, initialOwner, emergencyAdmin, addressRegistry)`.
-- Remove the Core screening getter, setter, event and error from exported ABIs; refresh ABI identity hashes. Settlement calls, events, proofs and circuit resources remain compatible.
+- Align Core and Factory ABIs with canonical Core `4940be2`: Core construction uses `(params, addressRegistry)` and Factory `deploy` / `computeInstanceAddress` use `(creationCode, salt, initialOwner, emergencyAdmin, addressRegistry)`. Remove the retired Core screening getter, setter, event and error; refresh ABI identity hashes.
+- Replace Credit allocation and revocation bitmap interfaces with grant-status reads keyed by owner, token and uint128 `grantId`; use status 0 (unknown), 1 (active) and 2 (revoked). Update Credit creation, update, revoke, calldata, statement and gas shapes plus shared protocol vectors.
+- Expose batched authenticated history and membership capabilities used by RPC and wallet synchronization, while preserving live canonical fences.
+- Migration: custom chain readers and data providers must implement the new Credit status interfaces; update deployment calls and Credit wire fields together with the matching Core contracts and SDK package group.
 
 ## 1.3.2
 

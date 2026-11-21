@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 const manifest = (name) => JSON.parse(readFileSync(`packages/${name}/package.json`, "utf8"));
 assert(existsSync("packages/session/package.json"), "session must be a separate package");
-assert.equal(manifest("session").dependencies["@invisi-labs/sdk"], "workspace:*");
+assert.equal(
+    manifest("session").dependencies["@invisi-labs/sdk"],
+    `workspace:${manifest("session").version}`
+);
 assert(!manifest("sdk").dependencies["@invisi-labs/session"], "sdk must not depend on session");
 for (const key of ["./memory", "./sqlite", "./indexeddb"]) {
     assert(!manifest("sdk").exports[key], `store adapter remains in sdk: ${key}`);

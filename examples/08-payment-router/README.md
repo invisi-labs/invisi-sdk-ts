@@ -1,6 +1,6 @@
 # Canonical Router scenarios
 
-These standalone examples use the unreleased SDK workspace APIs. `04` through `08` run real Core proofs, simulate the final transaction, and explicitly submit with `--execute`. Their default invocation exits before accounts, environment keys, local prover checks or network access. With `--execute`, unconfigured deployment placeholders still fail before network access. The existing `01`/`02` legacy examples and importable `03-canonical-host.ts` retain their existing behavior.
+These standalone examples use the SDK 1.3.3 APIs. `04` through `08` run real Core proofs, simulate the final transaction, and explicitly submit with `--execute`. Their default invocation exits before accounts, environment keys, local prover checks or network access. With `--execute`, unconfigured deployment placeholders still fail before network access. The existing `01`/`02` legacy examples and importable `03-canonical-host.ts` retain their existing behavior.
 
 Use the [common setup](../README.md#setup): public account profiles in `accounts/accounts.json`, `settings.ts` for chain ID/RPCs/Barretenberg, and an externally supplied `ALICE_PRIVATE_KEY` matching Alice's public payer address. No private key belongs in account JSON. Configure each script's deployment addresses from independently reviewed records. The Protocol RPC's Core address must match the pinned Core address. The configured default chain is 97; choose a chain with the required deployments and wallet/RPC capabilities before execution. A placeholder is not a deployment claim.
 

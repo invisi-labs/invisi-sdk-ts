@@ -46,7 +46,7 @@ Generate each source directory with that producer's `scripts/prover-assets.mjs` 
 
 For historical combined catalogs, set `resources.release = "legacy"` and provision with `--set legacy` and `--set legacy-initial-payment`. Legacy mode is explicit and never an automatic retry. The historical extra set is needed only for legacy initial-payment.
 
-The current grant-ID Core set is locally verified and must be published before SDK release. Generate it from the matching Core checkout and provision with `--source` during development; historical combined catalogs cannot prove current Credit statements. CI provisions Core and Provenance separately and fails if either required release is missing.
+The current grant-ID Core set is published independently from the matching canonical Core release. Provision it from the authenticated public catalog, or use `--source` with a matching resource directory during development; historical combined catalogs cannot prove current Credit statements. CI provisions Core and Provenance separately and fails if either required release is missing.
 
 ## Verification keys and aggregation
 

@@ -1,9 +1,12 @@
 # @invisi-labs/prover
 
-## Unreleased
+## 1.3.3
 
-- Load verification key bytes from authenticated assets instead of bundling duplicate `vkHex`/`vkFields` payloads. Reconstruct and validate recursive key fields on demand while preserving recursive aggregation, offline caches and explicit legacy resources.
-- Add optional `Prover.loadVerificationKey` support; aggregation uses the selected backend resource policy or an explicit resource fallback for custom provers.
+- Load verification key bytes from authenticated assets instead of bundling duplicate `vkHex` / `vkFields` payloads. Reconstruct recursive fields on demand and validate binary width, field bounds, key hash and recursive commitment before aggregation.
+- Add optional `Prover.loadVerificationKey`; native and WASM aggregation follow the selected backend resource policy. Custom provers can supply the loader or explicit resource fallback. Preserve authenticated local directories, offline caches and explicit legacy resources.
+- Refresh Credit circuit metadata, witness layouts and authorization/proof statements for uint128 grant identifiers; retain manifest versions and proof formats from the authenticated upstream release.
+- Pin Core catalog `85a5d1dffe40fc965ab4345a28b632f463c3ad861c44d5845850fbc7447fd8f6` from Core `4940be2`; retain independent Provenance catalog `8d5a3e60e3e5cbe315150511207d7aff67f4e2924148d396b67d82017ecd1f1c` from Periphery `33ba458`. Resources remain external authenticated downloads; historical legacy pins remain unchanged.
+- Migration: code reading embedded verification key payloads must use the authenticated loader. Deploy the matching current Credit contracts and assets together; legacy resource selection does not convert historical Credit records to the new grant schema.
 
 ## 1.3.2
 

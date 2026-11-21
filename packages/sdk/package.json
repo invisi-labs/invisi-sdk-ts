@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/sdk",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Stateless Invisi transaction preparation, signing requests and protocol integration",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -45,11 +45,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi-labs/primitives": "workspace:*",
-    "@invisi-labs/protocol": "workspace:*",
-    "@invisi-labs/prover": "workspace:*",
+    "@invisi-labs/primitives": "workspace:1.3.3",
+    "@invisi-labs/protocol": "workspace:1.3.3",
+    "@invisi-labs/prover": "workspace:1.3.3",
     "ethers": "^6.17.0",
-    "@invisi-labs/rpc": "workspace:*",
+    "@invisi-labs/rpc": "workspace:1.3.3",
     "@noble/hashes": "1.8.0"
   },
   "devDependencies": {

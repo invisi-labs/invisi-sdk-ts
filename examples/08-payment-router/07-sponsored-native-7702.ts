@@ -1,4 +1,4 @@
-// Unreleased workspace API. This standalone script can submit transactions with --execute.
+// SDK 1.3.3 API. This standalone script can submit transactions with --execute.
 import {
     Contract,
     JsonRpcProvider,

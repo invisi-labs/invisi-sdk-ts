@@ -1,6 +1,6 @@
 # Invisi TypeScript SDK
 
-Workspace manifests currently use `1.3.2`. The Payment Router package follows the same fixed release group; see [local package verification](RELEASE.md).
+Workspace manifests currently use `1.3.3`. The Payment Router package follows the same fixed release group; see [local package verification](RELEASE.md).
 
 A capability SDK for ordinary private Notes and deferred Credit grants. Workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
 
@@ -221,7 +221,7 @@ Open a focused GitHub issue or pull request describing the problem, scope, and v
 
 ## Optional atomic swap payments
 
-The canonical Router/account and relay APIs described here are unreleased source-workspace APIs planned for 1.3.3. Package manifests remain at 1.3.2; this guide does not imply npm 1.3.2 contains them.
+The canonical Router/account and relay APIs described here are included in SDK 1.3.3.
 
 `@invisi-labs/payment-router` composes the stateless SDK with the canonical `invisi-periphery` PaymentRouter and constrained PaymentRouterAccount. Dependency direction is payment-router -> sdk/protocol/primitives. The four modes are `DirectNative`, `DirectToken`, `RelayedToken` and `SponsoredNative`. The host supplies trusted deployment addresses, wallet signing, approval, balances, proof execution and submission.
 

@@ -1,5 +1,11 @@
 # @invisi-labs/primitives
 
+## 1.3.3
+
+- Replace Credit revocation shard/slot pairs with a positive uint128 `grantId` throughout Credit state, commitments, disclosures, delivery encryption and wallet serialization. Add `generateCreditGrantId` and `normalizeCreditGrantId`; generate identifiers with Web Crypto and reject zero, out-of-range and noncanonical decimal values.
+- Encode Credit deliveries with envelope version 4 and a 16-byte grant identifier; refresh authorization, delivery and wallet interoperability vectors.
+- Migration: update persisted Credit records and callers to the new `grantId` schema and matching Core deployment. Historical shard/slot Credit state, commitments and delivery envelopes are not interchangeable with the new schema; do not reinterpret an old identifier as a grant ID.
+
 ## 1.3.2
 
 - Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.

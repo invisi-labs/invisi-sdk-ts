@@ -1,5 +1,14 @@
 # @invisi-labs/sdk
 
+## 1.3.3
+
+- Generate and preserve positive uint128 Credit `grantId` values before proving; replace shard/slot fields in create, update, revoke, discovery, records, previews, signing statements and the ethers chain reader. Use matching Core grant-status reads and refreshed Credit gas baselines.
+- Validate Credit UTC day/month bindings against the live submission head, including owner-authorized initial payments, so a proof cannot silently cross its authorized accounting period.
+- Recognize only the structured broadcaster refusals `CREDIT_PERIOD_CHANGED`, `INSUFFICIENT_EXECUTION_SLACK` and `CREDIT_PERIOD_ENDING` as definitive non-submission. Recover the operation without marking it ambiguously sent; acknowledgement cannot authorize resubmitting the refused statement, and a fresh operation must be prepared, authorized and proved.
+- Share verified membership reads during preparation and defer transaction prewarming after inventory refresh; continue validating reused snapshots against their captured context.
+- Document canonical Router/7702 host preparation and generic Provenance output recognition, private Note spending, browser WASM and capability recovery examples. Keep host signing/submission explicit and Provenance capability metadata separate from Router semantic identity.
+- Migration: replace Credit shard/slot inputs, saved state and custom reader hooks with `grantId` and grant status; upgrade all SDK packages alongside the matching Core deployment. The prior Credit wire schema cannot be used as current grant state.
+
 ## 1.3.2
 
 - Support detached Router-funded payment preparation with no private inputs; preserve the host-managed proof lifecycle and exact funding amount. Release with the independent Core and Provenance resource catalogs.

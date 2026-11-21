@@ -185,7 +185,7 @@ functions(
 );
 const rpcManifest = JSON.parse(readFileSync("packages/rpc/package.json", "utf8"));
 assert(
-    rpcManifest.dependencies["@invisi-labs/protocol"] === "workspace:*",
+    rpcManifest.dependencies["@invisi-labs/protocol"] === `workspace:${rpcManifest.version}`,
     "RPC must share pure public protocol contracts"
 );
 console.log("Current public surface PASS: explicit package entries and capability boundaries");

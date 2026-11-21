@@ -1,5 +1,10 @@
 # @invisi-labs/ipp
 
+## 1.3.3
+
+- Replace `revocationShard` / `revocationSlot` with canonical positive uint128 decimal `grantId` in Credit receipts and optional credential proof metadata; update preparation output and strict receipt/credential validation.
+- Migration: receipt producers and consumers must exchange the current `grantId` schema. Old shard/slot fields are rejected by the strict validator; use the matching Core deployment and fixed SDK 1.3.3 package group.
+
 ## 1.3.2
 
 - Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.

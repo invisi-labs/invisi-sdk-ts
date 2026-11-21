@@ -1,5 +1,13 @@
 # @invisi-labs/session
 
+## 1.3.3
+
+- Batch authenticated public-history reads and coalesce Credit replay across empty ranges, preserving replay checkpoints until private transitions are committed and retaining live canonical fences.
+- Share membership verification and captured preparation reads across refresh work. Add `inventoryOnly` scans that skip transaction prewarming and invalidate an older preparation snapshot; normal preparation continues to validate fresh captured state.
+- Fence private observations before inventory commits: recheck history generation, chain identity, deployment and canonical block so a stale or reorged refresh cannot overwrite newer wallet state. Keep these checks live during Credit replay and unresolved retries.
+- Migrate wallet inventory, receipts and managed Credit operations to uint128 grant identifiers and grant-status reconciliation. Validate UTC accounting periods at submission and recover definitive broadcaster refusals while requiring a newly prepared/authorized/proved statement before retry.
+- Migration: update stored Credit records and custom storage/provider integrations to the current grant schema. An inventory-only refresh does not certify a transaction preparation snapshot.
+
 ## 1.3.2
 
 - Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.
