@@ -1,4 +1,5 @@
 import { creditPeriods, type WalletOperation } from "@invisi-labs/primitives";
+import { InvisiError } from "../../errors";
 import { WitnessBuilder } from "@invisi-labs/prover";
 import {
     createCreditPublicInputs,
@@ -88,6 +89,11 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
 
     const credit = plan.credit;
     if (credit?.inputs.some((i) => now > i.state.note.expiry)) return true;
+    return creditPeriodChanged(plan, now);
+}
+
+export function creditPeriodChanged(plan: OperationPlan, now: bigint): boolean {
+    const credit = plan.credit;
     if (credit?.draw || credit?.creation?.hasInitialPayment) {
         const prepared = creditPeriods(plan.context.now ?? plan.preparedAt.timestamp),
             current = creditPeriods(now);
@@ -98,4 +104,14 @@ export function operationExpired(plan: OperationPlan, now: bigint): boolean {
             return true;
     }
     return false;
+}
+
+/** Keep period invalidation distinct from request and grant expiry. */
+export function assertCreditPeriodCurrent(plan: OperationPlan, now: bigint): void {
+    if (creditPeriodChanged(plan, now))
+        throw new InvisiError(
+            "CREDIT_PERIOD_CHANGED",
+            "Credit period changed; reauthorize and regenerate the proof.",
+            { operation: plan.kind }
+        );
 }

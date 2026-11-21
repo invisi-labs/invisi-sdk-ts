@@ -10,6 +10,7 @@ import {
 import {
     authorizationRequest,
     assertCreditUpdatePlan,
+    assertCreditPeriodCurrent,
     revocationSigningRequest,
     acceptRevocationSignature,
 } from "@invisi-labs/sdk/session-support";
@@ -575,6 +576,13 @@ export class Operation {
             }
             await this.validateExport();
             await validatePreparedBroadcast(durable, client, this.#runtime);
+            const credit = durable.plan.credit;
+            if (credit?.draw || credit?.creation?.hasInitialPayment) {
+                const head = await this.#runtime.reader.getBlock(
+                    await this.#runtime.reader.getLatestBlockNumber()
+                );
+                assertCreditPeriodCurrent(durable.plan, head.timestamp);
+            }
         }
         const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const record = state.operations[this.id];

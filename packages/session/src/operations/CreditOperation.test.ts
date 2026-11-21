@@ -1,6 +1,6 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
-import { it, expect } from "vitest";
+import { it, expect, vi, afterEach } from "vitest";
 import { AbiCoder, Interface, Wallet as EvmWallet } from "ethers";
 import {
     computeCreditCommitment,
@@ -15,6 +15,9 @@ import { sessionOptions } from "../../../../test-support/session-options";
 import { backend } from "../../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
 import { WalletSession } from "../wallet/WalletSession";
 const iface = new Interface(invisiCoreAbi);
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 async function creditFixture(
     changes: Partial<
         Pick<
@@ -292,6 +295,7 @@ it("compares Credit calldata against the encoded proof envelope and rejects raw 
 it.each(["create", "update", "draw", "revoke"] as const)(
     "schedules and cancels managed Credit %s through the client with durable acknowledgement",
     async (kind) => {
+        vi.spyOn(Date, "now").mockReturnValue(1999999820000);
         const h = await creditFixture();
         const { BroadcasterClient } = await import("@invisi-labs/sdk");
         const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
@@ -360,3 +364,60 @@ it.each(["create", "update", "draw", "revoke"] as const)(
         ).toBe(`managed-credit-${kind}`);
     }
 );
+
+it("checks the current chain period when resuming a proved initial payment", async () => {
+    const h = await creditFixture();
+    const prepared = await h.ownerSession.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000100000n,
+        deadline: 2000100000n,
+        availableCredit: 100n,
+        initialPayment: { amount: 10n },
+    });
+    const ready = await (await authorizeOperation(prepared)).prove();
+    const before = (await h.store.readSnapshot(h.scope)).operations[ready.id]!
+        .payload as SavedOperation;
+    const getBlock = h.reader.getBlock.bind(h.reader);
+    h.reader.getBlock = async (number) => ({ ...(await getBlock(number)), timestamp: 2000073600n });
+    const resumed = await h.ownerSession.resume(ready.id);
+    await expect(resumed.validateSubmission()).rejects.toMatchObject({
+        code: "CREDIT_PERIOD_CHANGED",
+    });
+    const after = (await h.store.readSnapshot(h.scope)).operations[ready.id]!
+        .payload as SavedOperation;
+    expect(after.call).toEqual(before.call);
+    expect(after.proof).toEqual(before.proof);
+    expect(after.plan.statement).toEqual(before.plan.statement);
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
+});
+
+it("rechecks Credit time after asynchronous managed validation before recording an attempt", async () => {
+    const h = await creditFixture();
+    const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+    const client = quoteClient(h.context, () => 3n);
+    const submit = vi.spyOn(client, "submitTransaction");
+    const prepared = await h.ownerSession.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000100000n,
+        deadline: 2000100000n,
+        availableCredit: 100n,
+        initialPayment: { amount: 10n },
+    });
+    const quoted = await client.quote(prepared, { maxFeeAmount: 3n });
+    const ready = await (await authorizeOperation(quoted)).prove();
+    const getBlock = h.reader.getBlock.bind(h.reader);
+    h.reader.getCreditStatus = async () => {
+        h.reader.getBlock = async (number) => ({
+            ...(await getBlock(number)),
+            timestamp: 2000073600n,
+        });
+        return 0;
+    };
+    await expect(client.submit(ready)).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
+    expect(submit).not.toHaveBeenCalled();
+    const saved = (await h.store.readSnapshot(h.scope)).operations[ready.id]!
+        .payload as SavedOperation;
+    expect(saved.broadcasterAttempted).not.toBe(true);
+});

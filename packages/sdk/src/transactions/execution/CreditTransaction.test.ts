@@ -6,15 +6,21 @@ import {
     type CreditDeliveryState,
 } from "@invisi-labs/primitives";
 import { Interface, Wallet as EvmWallet } from "ethers";
-import { it, expect, vi } from "vitest";
+import { it, expect, vi, afterEach } from "vitest";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
 const iface = new Interface(invisiCoreAbi);
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 async function creditSetup(
     policy: Partial<
         import("@invisi-labs/primitives").CreditPolicy &
             import("@invisi-labs/primitives").CreditUsage &
-            Pick<import("@invisi-labs/primitives").CreditState, "availableCredit" | "unlimited">
+            Pick<
+                import("@invisi-labs/primitives").CreditState,
+                "availableCredit" | "unlimited" | "expiry"
+            >
     > = {}
 ) {
     const h = await setup(),
@@ -27,7 +33,7 @@ async function creditSetup(
                 spenderWalletIdentity: h.bob.ownerAddress,
                 grantId: 1n,
                 nonce: 456n,
-                expiry: 2000003600n,
+                expiry: policy.expiry ?? 2000003600n,
                 creditSharedKey: 789n,
                 availableCredit: policy.availableCredit ?? 100n,
                 unlimited: policy.unlimited ?? false,
@@ -484,6 +490,7 @@ it("encodes Credit mode flags as canonical Noir fields while keeping state boole
 });
 
 it("schedules, submits and cancels all four detached Credit operations through one client", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1999999820000);
     const h = await creditSetup();
     const { BroadcasterClient } = await import("../../broadcaster");
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
@@ -698,3 +705,133 @@ it.each([1, 2, 3])(
         expect(h.prover.prove).not.toHaveBeenCalled();
     }
 );
+
+it.each(["create", "draw"] as const)(
+    "rejects a detached broadcaster %s after the chain Credit period changes",
+    async (kind) => {
+        const h = await creditSetup({ expiry: 2000200000n });
+        const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+        const client = quoteClient(h.context, () => 3n);
+        const submit = vi.spyOn(client, "submitTransaction");
+        const prepared =
+            kind === "create"
+                ? await h.invisi.prepareCreateCredit({
+                      ...h.identity,
+                      spender: h.bob.getAddress(),
+                      expiry: 2000200000n,
+                      availableCredit: 100n,
+                      deadline: 2000100000n,
+                      initialPayment: { amount: 10n },
+                  })
+                : await h.invisi.prepareDrawCredit({
+                      ...h.identity,
+                      wallet: Wallet.fromAddress(h.bob.getAddress()),
+                      creditInputs: [{ ...h.input, role: "spender" }],
+                      credits: [{ credit: h.commitment, amount: 10n }],
+                      deadline: 2000100000n,
+                      recipient: h.wallet.getAddress(),
+                  });
+        const quoted = await client.quote(prepared, { maxFeeAmount: 3n });
+        const ready = await (
+            await externallyAuthorize(
+                quoted,
+                new EvmWallet(`0x${(kind === "draw" ? "02" : "01").repeat(32)}`)
+            )
+        ).prove();
+        await expect(ready.validateSubmission()).resolves.toBeUndefined();
+        const getBlock = h.reader.getBlock.bind(h.reader);
+        const requirements = client.submissionRequirements.bind(client);
+        vi.spyOn(client, "submissionRequirements").mockImplementationOnce(async (quote) => {
+            const result = await requirements(quote);
+            h.reader.getBlock = async (number) => ({
+                ...(await getBlock(number)),
+                timestamp: 2000073600n,
+            });
+            return result;
+        });
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
+        expect(submit).not.toHaveBeenCalled();
+        h.reader.getBlock = async (number) => ({
+            ...(await getBlock(number)),
+            timestamp: 2000073600n,
+        });
+        await expect(ready.validateSubmission()).rejects.toMatchObject({
+            code: "CREDIT_PERIOD_CHANGED",
+        });
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
+        expect(submit).not.toHaveBeenCalled();
+        h.reader.getBlock = getBlock;
+        submit.mockRejectedValueOnce(new Error("lost response"));
+        await expect(client.submit(ready)).rejects.toThrow("lost response");
+        const frozenRequest = structuredClone(submit.mock.calls[0]);
+        h.reader.getBlock = async (number) => ({
+            ...(await getBlock(number)),
+            timestamp: 2000073600n,
+        });
+        submit.mockResolvedValueOnce({ id: "recovered-credit", state: "queued" });
+        await expect(client.submit(ready)).resolves.toMatchObject({ id: "recovered-credit" });
+        expect(submit.mock.calls[1]).toEqual(frozenRequest);
+    }
+);
+
+it.each(["create", "draw"] as const)(
+    "rejects quoting a Credit %s for a different UTC day",
+    async (kind) => {
+        const h = await creditSetup();
+        const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+        const client = quoteClient(h.context, () => 3n);
+        const prepared =
+            kind === "create"
+                ? await h.invisi.prepareCreateCredit({
+                      ...h.identity,
+                      spender: h.bob.getAddress(),
+                      expiry: 2000003600n,
+                      availableCredit: 100n,
+                      initialPayment: { amount: 10n },
+                  })
+                : await h.invisi.prepareDrawCredit({
+                      ...h.identity,
+                      wallet: Wallet.fromAddress(h.bob.getAddress()),
+                      creditInputs: [{ ...h.input, role: "spender" }],
+                      credits: [{ credit: h.commitment, amount: 10n }],
+                      recipient: h.wallet.getAddress(),
+                  });
+        await expect(
+            client.quote(prepared, {
+                maxFeeAmount: 3n,
+                schedule: { publishAfter: 2000073600n, executeBefore: 2000073660n },
+                persistSchedule: async () => {},
+            })
+        ).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
+    }
+);
+
+it("allows the exclusive scheduled Credit end at UTC midnight and rejects crossing it", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(2000000000000);
+    const h = await creditSetup();
+    const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+    const client = quoteClient(h.context, () => 3n);
+    const prepare = () =>
+        h.invisi.prepareCreateCredit({
+            ...h.identity,
+            spender: h.bob.getAddress(),
+            expiry: 2000200000n,
+            deadline: 2000100000n,
+            availableCredit: 100n,
+            initialPayment: { amount: 10n },
+        });
+    await expect(
+        client.quote(await prepare(), {
+            maxFeeAmount: 3n,
+            schedule: { publishAfter: 2000073540n, executeBefore: 2000073600n },
+            persistSchedule: async () => {},
+        })
+    ).resolves.toBeDefined();
+    await expect(
+        client.quote(await prepare(), {
+            maxFeeAmount: 3n,
+            schedule: { publishAfter: 2000073540n, executeBefore: 2000073601n },
+            persistSchedule: async () => {},
+        })
+    ).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
+});

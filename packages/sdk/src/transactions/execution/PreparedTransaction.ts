@@ -26,7 +26,13 @@ import type {
 import { publicProof } from "../proving/proof";
 import { sameStatement } from "../proving/proof-integrity";
 import type { OperationStatus } from "../records";
-import { authorizationRequest, requiresAuthorization, statement } from "../signing/statement";
+import {
+    assertCreditPeriodCurrent,
+    operationExpired,
+    authorizationRequest,
+    requiresAuthorization,
+    statement,
+} from "../signing/statement";
 import { encodeOperation } from "./calldata";
 import {
     acceptFundingSignature,
@@ -183,6 +189,10 @@ export class PreparedTransaction {
         }
         // A lost first response has no ID yet. Resend the retained request; only the relay can deduplicate it.
         if (!this.#saved.broadcasterAttempted) {
+            const credit = this.#saved.plan.credit;
+            if (credit?.draw || credit?.creation?.hasInitialPayment) {
+                await this.validateSubmission();
+            }
             const requirements = await client.submissionRequirements(this.#saved.broadcasterQuote!);
             if (
                 requirements.provenanceRequired &&
@@ -206,6 +216,12 @@ export class PreparedTransaction {
             await this.#lifecycle.persistSchedule!(structuredClone(pending));
             this.#saved.broadcasterBinding!.scheduleHandle = pending;
         }
+        const credit = this.#saved.plan.credit;
+        if (
+            !this.#saved.broadcasterAttempted &&
+            (credit?.draw || credit?.creation?.hasInitialPayment)
+        )
+            await this.validateSubmission();
         this.#saved.broadcasterAttempted = true;
         const request = this.#saved.broadcasterRequest;
         const result = await client.submitTransaction(
@@ -538,6 +554,18 @@ export class PreparedTransaction {
             saved.call = await this.encode(saved);
             return { status: "ready" };
         });
+    }
+
+    /** Validate fresh chain time immediately before submitting an exported call. */
+    async validateSubmission(): Promise<void> {
+        this.current();
+        check(this.status === "ready", "transaction is not ready");
+        const head = await this.#runtime.reader.getBlock(
+            await this.#runtime.reader.getLatestBlockNumber()
+        );
+        check(head.timestamp <= this.#saved.plan.deadline, "operation has expired");
+        assertCreditPeriodCurrent(this.#saved.plan, head.timestamp);
+        check(!operationExpired(this.#saved.plan, head.timestamp), "operation has expired");
     }
 
     async exportTransaction(): Promise<TransactionCall> {

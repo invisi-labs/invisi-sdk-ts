@@ -1,3 +1,4 @@
+import { assertCreditPeriodCurrent } from "../transactions/signing/statement";
 import { broadcasterRequestHash } from "./index";
 import type { SavedOperation } from "../transactions/operation-types";
 import { assertCreditUpdatePlan } from "../credit/state";
@@ -68,6 +69,7 @@ export async function prepareBroadcasterPlan(
     quote: SignedBroadcasterQuote;
     broadcasterBinding: NonNullable<SavedOperation["broadcasterBinding"]>;
 }> {
+    if (options.schedule) assertCreditPeriodCurrent(plan, options.schedule.publishAfter);
     const capabilities = options.schedule
         ? await client.scheduling({
               chainId: plan.context.chainId,
@@ -113,6 +115,10 @@ export async function prepareBroadcasterPlan(
     const estimate = (data: string) =>
         client.estimateQuote(requestedSchedule ? { data, schedule: requestedSchedule } : data);
     const finalize = async (final: OperationPlan) => {
+        if (options.schedule) {
+            assertCreditPeriodCurrent(final, options.schedule.publishAfter);
+            assertCreditPeriodCurrent(final, end! - 1n);
+        }
         const data = exportBroadcasterIntent(final).data;
         const quote = await client.getQuote(
             requestedSchedule ? { data, schedule: requestedSchedule } : data,

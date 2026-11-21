@@ -1,12 +1,14 @@
 import { MissingCapabilityError } from "@invisi-labs/primitives";
 
-/** Stable codes returned by public SDK prepare* methods; inspect details instead of matching messages. */
+/** Stable codes returned by public SDK operations; inspect details instead of matching messages. */
 export type InvisiErrorCode =
     /**
      * Other preparation failure, such as invalid amounts, expired deadlines,
      * or conflicting registration state. Inspect message and cause.
      */
     | "PREPARATION_FAILED"
+    /** Credit UTC period changed. Reauthorize and regenerate the proof before submitting. */
+    | "CREDIT_PERIOD_CHANGED"
     /**
      * Required infrastructure or permissions were not supplied.
      * The capability field identifies what is missing.
@@ -39,7 +41,7 @@ export interface InvisiErrorDetails {
     cause?: unknown;
 }
 
-/** Stable application-facing preparation failure with the original cause. */
+/** Stable application-facing operation failure with the original cause. */
 export class InvisiError extends Error {
     readonly code: InvisiErrorCode;
     readonly operation: string | undefined;

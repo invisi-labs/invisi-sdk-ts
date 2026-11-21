@@ -3,6 +3,7 @@ import {
     acceptRevocationSignature,
     inputFacts,
     operationExpired,
+    assertCreditPeriodCurrent,
     operationSources,
 } from "@invisi-labs/sdk/session-support";
 import type { Hex } from "@invisi-labs/protocol/contracts";
@@ -23,6 +24,8 @@ export async function validateOperationSubmission(
     await runtimeOptions.protocol.validateDeployment(reader);
     const head = await reader.getBlock(await reader.getLatestBlockNumber());
     const plan = saved.plan;
+    check(head.timestamp <= plan.deadline, "operation has expired");
+    assertCreditPeriodCurrent(plan, head.timestamp);
     check(!operationExpired(plan, head.timestamp), "operation has expired");
     if (plan.fundingMode === "signature") {
         check(head.timestamp <= (plan.funding.deadline ?? 0n), "funding authorization expired");

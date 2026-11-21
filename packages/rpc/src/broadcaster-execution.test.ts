@@ -363,3 +363,32 @@ it("omits revoke authorization bytes while binding the uint128 grant ID", () => 
         broadcasterRequestHash(unsigned)
     );
 });
+
+describe.each(["status", "submit"] as const)("%s rejection reason", (method) => {
+    const rejection = {
+        id: "scheduled-credit",
+        state: "rejected",
+        reasonCode: "CREDIT_PERIOD_CHANGED",
+        publishAfter: "2000000000",
+        executeBefore: "2000000300",
+    };
+    const receive = async (result: unknown) => {
+        const relay = client(result);
+        return method === "status"
+            ? relay.status(rejection.id)
+            : relay.submitTransaction(data(), await signed());
+    };
+    it("preserves the machine reason and scheduled execution window", async () => {
+        const status = await receive(rejection);
+        expect(status.reasonCode).toBe("CREDIT_PERIOD_CHANGED");
+        expect(status).toEqual(rejection);
+    });
+    it.each([null, 42, {}, [], "", "x".repeat(257)])(
+        "rejects invalid reasonCode %j",
+        async (reasonCode) => {
+            await expect(receive({ ...rejection, reasonCode })).rejects.toThrow(
+                "invalid broadcaster status"
+            );
+        }
+    );
+});

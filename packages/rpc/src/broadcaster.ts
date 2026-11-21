@@ -311,6 +311,8 @@ export interface BroadcasterConfirmation {
     block: { number: string; hash: string; timestamp: number } | null;
 }
 export interface BroadcasterStatus {
+    /** Optional machine-readable rejection reason, including CREDIT_PERIOD_CHANGED. */
+    reasonCode?: string;
     publishAfter?: string;
     executeBefore?: string;
     confirmation?: BroadcasterConfirmation;
@@ -338,6 +340,10 @@ function checkedStatus(value: unknown, id?: string): BroadcasterStatus {
         !status.id.length ||
         status.id.length > 256 ||
         (id !== undefined && status.id !== id) ||
+        (status.reasonCode !== undefined &&
+            (typeof status.reasonCode !== "string" ||
+                !status.reasonCode.length ||
+                status.reasonCode.length > 256)) ||
         ![
             "scheduled",
             "preparing",
