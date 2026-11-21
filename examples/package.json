@@ -44,7 +44,14 @@
     "example:broadcaster:2": "tsx 07-broadcaster/02-pre-submit-provenance.ts",
     "example:broadcaster:3": "tsx 07-broadcaster/03-recover-and-submit-provenance.ts",
     "example:payment-router:v3": "tsx 08-payment-router/01-uniswap-v3.ts",
-    "example:payment-router:zeroex": "tsx 08-payment-router/02-zeroex.ts"
+    "example:payment-router:zeroex": "tsx 08-payment-router/02-zeroex.ts",
+    "example:payment-router:self-token": "tsx 08-payment-router/04-self-token.ts",
+    "example:payment-router:self-native": "tsx 08-payment-router/05-self-native-v3.ts",
+    "example:payment-router:relayed-token": "tsx 08-payment-router/06-relayed-token.ts",
+    "example:payment-router:7702": "tsx 08-payment-router/07-sponsored-native-7702.ts",
+    "example:payment-router:zeroex-token": "tsx 08-payment-router/08-self-token-zeroex.ts",
+    "example:router-provenance:recognition": "tsx 09-router-provenance/01-output-recognition.ts",
+    "example:router-provenance:spend": "tsx 09-router-provenance/02-private-note-spend.ts"
   },
   "dependencies": {
     "@invisi-labs/protocol": "workspace:*",

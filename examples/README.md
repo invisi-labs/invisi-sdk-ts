@@ -1,6 +1,6 @@
 # TypeScript examples
 
-Each named scenario is a flat, independent script. Authorization signatures use ethers EIP-712 signing. Supply the corresponding account key through `ALICE_PRIVATE_KEY`, `BOB_PRIVATE_KEY`, or `CHARLIE_PRIVATE_KEY`; Session examples use `<SESSION_ACCOUNT in uppercase>_PRIVATE_KEY`. Each signer is checked against the required owner or payer. Keep private keys out of `accounts/accounts.json`. Viewing keys, detection keys, and Note/Credit decryption belong to the App. Configure its explicit callbacks in `app-decryptor.ts` before running decryption examples. The offline Note output example runs without `--execute`; canonical Router host integration functions have no top-level execution. The Broadcaster and self-provenance submission examples submit as part of their `--execute` flow.
+Each named scenario is a flat, independent script. Authorization signatures use ethers EIP-712 signing. Supply the corresponding account key through `ALICE_PRIVATE_KEY`, `BOB_PRIVATE_KEY`, or `CHARLIE_PRIVATE_KEY`; Session examples use `<SESSION_ACCOUNT in uppercase>_PRIVATE_KEY`. Each signer is checked against the required owner or payer. Keep private keys out of `accounts/accounts.json`. Viewing keys, detection keys, and Note/Credit decryption belong to the App. Configure its explicit callbacks in `app-decryptor.ts` before running decryption examples. The offline Note output example runs without `--execute`; canonical Router host integration functions have no top-level execution. The Broadcaster, self-provenance submission, and standalone canonical Router examples submit as part of their `--execute` flow.
 
 ## Setup
 
@@ -43,7 +43,7 @@ Decryption is explicitly injected through `DeliveryDecryptor`. Implement the two
 
 Funding and address registration use separate EIP-712 authorizations, also signed directly with ethers. Funding signatures bind the finalized funding request; hidden-amount transactions are proved before exporting that request. The SDK checks signatures when attaching them. Caller-funded transactions require submission by their specified payer. Token balances, ERC20 allowance, gas, and normal transaction submission remain application responsibilities.
 
-The normal payment examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, relay submission and independent offchain source submission. With `--execute`, example01 relays the main transaction; example02 submits its source proof and queries recognition. Example02 `--resume` reuses a saved proof without preparing another transaction.
+The ordinary Note/Credit examples export unsigned transactions for host review/submission. `07-broadcaster` separately demonstrates fee queries, signed final quotes, relay submission and independent offchain source submission. With `--execute`, example01 relays the main transaction; example02 submits its source proof and queries recognition. Example02 `--resume` reuses a saved proof without preparing another transaction.
 
 The App decryptor must authenticate the ciphertext (including the AEAD tag) before returning plaintext. Commitment checks validate financial contents; they do not independently authenticate opaque memo bytes.
 
@@ -143,3 +143,10 @@ pnpm --filter @invisi-examples/scenarios example:payment-router:v3 --execute
 pnpm --filter @invisi-examples/scenarios example:payment-router:zeroex --execute
 pnpm --filter @invisi-examples/scenarios lint
 ```
+
+
+## Standalone canonical Router and source scenarios
+
+[`08-payment-router/README.md`](08-payment-router/README.md) covers direct ERC20, direct native V3, relayed ERC20, sponsored EIP-7702 native-to-token (100.2 target tokens), and ERC20 0x swaps. Each new numbered script uses public SDK account profiles, an external verified ethers signer and an explicit `--execute` submission guard. Legacy `01`/`02` and importable host `03` remain available.
+
+[`09-router-provenance/README.md`](09-router-provenance/README.md) contains the source-recognition scenario matrix, a read-only Router transaction/Note query, and later spending of a recognized Note with real Core and Provenance proofs. Its private spend reuses authenticated App decryption and canonical candidate discovery. All trust identities are configured independently; missing placeholders stop before connecting.

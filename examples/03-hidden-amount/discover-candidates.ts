@@ -18,6 +18,7 @@ export async function discoverCandidates({
     decryptor,
     tokenAddress,
     includeSpent = false,
+    toBlock,
 }: {
     provider: Provider;
     protocolRpc: ProtocolRpcClient;
@@ -26,6 +27,8 @@ export async function discoverCandidates({
     decryptor: DeliveryDecryptor;
     tokenAddress: `0x${string}`;
     includeSpent?: boolean;
+    // Optional history bound; canonical finalized receipt verification still applies.
+    toBlock?: bigint;
 }): Promise<
     (NoteInput & {
         reference: DisclosureReference;
@@ -41,6 +44,13 @@ export async function discoverCandidates({
     if (!status.indexedHead) {
         throw Error("Protocol RPC has no indexed head");
     }
+    if (toBlock !== undefined && toBlock < 0n) {
+        throw Error("Discovery block bound must be nonnegative");
+    }
+    const scanToBlock =
+        toBlock !== undefined && toBlock < status.indexedHead.number
+            ? toBlock
+            : status.indexedHead.number;
     const verifier = new DisclosureVerifier({
         protocol: protocol.forToken(tokenAddress),
         reader: new EthersChainReader(provider),
@@ -53,14 +63,14 @@ export async function discoverCandidates({
         positions = new Map<string, string>();
     for (
         let fromBlock = protocol.deployment.protocol.fromBlock;
-        fromBlock <= status.indexedHead.number;
+        fromBlock <= scanToBlock;
         fromBlock += 100n
     ) {
-        const toBlock =
-            fromBlock + 99n < status.indexedHead.number
-                ? fromBlock + 99n
-                : status.indexedHead.number;
-        const page = await rpc.getNoteUpdates(protocol.context, { fromBlock, toBlock });
+        const pageToBlock = fromBlock + 99n < scanToBlock ? fromBlock + 99n : scanToBlock;
+        const page = await rpc.getNoteUpdates(protocol.context, {
+            fromBlock,
+            toBlock: pageToBlock,
+        });
         const outputs = page.notes.filter((output) => {
             const fingerprint = JSON.stringify(output, (_, value) =>
                 typeof value === "bigint" ? value.toString() : value
