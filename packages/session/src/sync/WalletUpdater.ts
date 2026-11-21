@@ -348,6 +348,19 @@ export class WalletUpdater extends InventoryProcessor {
             if ((await reader.getBlock(observation.number)).hash !== observation.hash)
                 throw new CanonicalConflict("spent observation block changed");
             await options.beforeCommit?.();
+            signal?.throwIfAborted();
+            // Inventory-only omits prewarming's prior-observation fence. A private
+            // anchor outside public coverage must still be canonical after live reads.
+            const prior = base.observedThrough;
+            if (
+                options.inventoryOnly &&
+                options.refreshState !== false &&
+                !reset &&
+                prior &&
+                (prior.number !== observation.number || prior.hash !== observation.hash) &&
+                (await reader.getBlock(prior.number)).hash !== prior.hash
+            )
+                throw new CanonicalConflict("Canonical private observation changed during refresh");
             await store.transaction(scope, (draft) => {
                 signal?.throwIfAborted();
                 check(draft.revision === base.revision, "wallet changed during update; retry");

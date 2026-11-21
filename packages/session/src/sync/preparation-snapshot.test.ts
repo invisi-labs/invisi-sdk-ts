@@ -863,3 +863,45 @@ it("rejects a same-block valid cached path when live root acceptance disappeared
     expect(known).toHaveBeenCalledTimes(1);
     expect((await h.store.readSnapshot(h.scope)).preparationSnapshot).toEqual(previous);
 });
+
+it("invalidates inventory-only refresh when an uncovered private anchor reorgs during live reads", async () => {
+    const h = await fixture();
+    const target = await h.reader.getBlock(12n);
+    const privateAnchor = {
+        ...target,
+        number: 20n,
+        hash: `0x${"20".repeat(32)}` as const,
+        parentHash: `0x${"19".repeat(32)}` as const,
+    };
+    await h.store.transaction(h.scope, (draft) => {
+        draft.observedThrough = { number: 20n, hash: privateAnchor.hash };
+    });
+    const history = h.session.publicHistory;
+    const publicSnapshot = history.snapshot.bind(history);
+    vi.spyOn(history, "snapshot").mockImplementation(async () => ({
+        ...(await publicSnapshot()),
+        knownHead: target,
+        indexedHead: target,
+    }));
+    let forked = false;
+    const headers = vi.spyOn(h.reader, "getBlock").mockImplementation(async (number) =>
+        number === 20n
+            ? {
+                  ...privateAnchor,
+                  hash: forked ? (`0x${"ff".repeat(32)}` as const) : privateAnchor.hash,
+              }
+            : target
+    );
+    h.reader.isSpent = async (_, words) => {
+        forked = true;
+        return words.map(() => false);
+    };
+    await expect(h.session.refreshState({ inventoryOnly: true })).rejects.toThrow(
+        /canonical|reorg/i
+    );
+    expect(headers.mock.calls.filter(([number]) => number === 20n)).toHaveLength(2);
+    const state = await h.store.readSnapshot(h.scope);
+    expect(state.invalidated).toBeTruthy();
+    expect(state.notes[h.leaf]!.spent).toBe("unknown");
+    expect(state.preparationSnapshot).toBeUndefined();
+});
