@@ -216,3 +216,39 @@ it("reads token balance and protocol allowance together at the canonical submiss
     ]);
     expect(call.mock.calls.every(([request]) => request.blockTag === block.number)).toBe(true);
 });
+
+it("pins deployment code, version and registry reads to the requested block", async () => {
+    const abi = new Interface(invisiCoreAbi);
+    const call = vi.fn(async (request: { data: string; blockTag?: bigint }) =>
+        request.data === abi.encodeFunctionData("VERSION")
+            ? abi.encodeFunctionResult("VERSION", [1n])
+            : abi.encodeFunctionResult("addressRegistry", [token])
+    );
+    const getCode = vi.fn(async (_address: string, _block?: bigint) => "0x6000");
+    const reader = new EthersChainReader(provider({ call, getCode }));
+    await reader.getCode(address, block);
+    await reader.getProtocolVersion(address, block);
+    await reader.getProtocolAddressRegistry(address, block);
+    expect(getCode.mock.calls[0]).toEqual([address, block.number]);
+    expect(call.mock.calls.map((args) => args[0].blockTag)).toEqual([block.number, block.number]);
+});
+
+it("limits actual nullifier contract calls to four while preserving vector order", async () => {
+    const abi = new Interface(invisiCoreAbi);
+    let active = 0,
+        peak = 0;
+    const call = vi.fn(async (request: { data: string }) => {
+        peak = Math.max(peak, ++active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active--;
+        const [nf] = abi.decodeFunctionData("isNullifierSpent", request.data);
+        return abi.encodeFunctionResult("isNullifierSpent", [BigInt(nf) % 2n === 1n]);
+    });
+    const reader = new EthersChainReader(provider({ getBlock: async () => block, call }));
+    const words = Array.from({ length: 40 }, (_, index) => word(BigInt(index)));
+    expect(await reader.isSpent(context, words, block)).toEqual(
+        words.map((_, index) => index % 2 === 1)
+    );
+    expect(call).toHaveBeenCalledTimes(40);
+    expect(peak).toBe(4);
+});

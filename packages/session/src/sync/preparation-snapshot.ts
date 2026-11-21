@@ -1,6 +1,6 @@
 import { computeCreditNullifier, computeNoteNullifier } from "@invisi-labs/primitives";
 import { getAddress } from "ethers";
-import type { CanonicalBlock } from "@invisi-labs/protocol";
+import type { CanonicalBlock, Membership } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import {
     preparationDeployment,
@@ -40,12 +40,45 @@ export async function retainPreparationSnapshot(
     };
     const publicReader =
         publicCapture?.reader(live, true, publicCapture.anchor?.hash === block.hash) ?? live;
+    const sourceReader = capture?.reader(publicReader, true) ?? publicReader;
+    const acceptedRoots = new Map<string, Promise<boolean>>();
     const reader = preparationSnapshotAdapter(
-        capture?.reader(publicReader, true) ?? publicReader,
+        new Proxy(sourceReader, {
+            get(target, method) {
+                const value = Reflect.get(target, method, target);
+                if (method !== "isKnownRoot")
+                    return typeof value === "function" ? value.bind(target) : value;
+                return (...args: Parameters<typeof sourceReader.isKnownRoot>) => {
+                    const [context, treeId, root, anchor] = args;
+                    const key = `${context.chainId}:${context.protocolAddress.toLowerCase()}:${treeId}:${root.toLowerCase()}:${anchor.number}:${anchor.hash.toLowerCase()}`;
+                    let pending = acceptedRoots.get(key);
+                    if (!pending) {
+                        // Root acceptance is live state: never replay a prior public or persisted capture.
+                        pending = live.isKnownRoot(...args);
+                        acceptedRoots.set(key, pending);
+                    }
+                    return pending;
+                };
+            },
+        }),
         snapshot,
         true
     );
-    const provider = preparationSnapshotAdapter(rpc, snapshot, true);
+    const prefetched = new Map<string, Membership>();
+    const membershipKey = (input: {
+        treeId: bigint;
+        leafIndex: number;
+        commitment: Hex;
+        root?: Hex;
+    }) => `${input.treeId}:${input.leafIndex}:${input.commitment}:${input.root ?? ""}`;
+    const provider = preparationSnapshotAdapter(
+        {
+            getMembership: async (...args: Parameters<typeof rpc.getMembership>) =>
+                prefetched.get(membershipKey(args[1])) ?? rpc.getMembership(...args),
+        },
+        snapshot,
+        true
+    );
     await options.protocol.validateDeployment(reader);
     await reader.getBlock(block.number);
     if (state.observedThrough) {
@@ -162,7 +195,62 @@ export async function retainPreparationSnapshot(
             })
         );
     };
+    const prefetch = async (batch: typeof records) => {
+        if (!rpc.getMemberships) return;
+        const missing: Parameters<NonNullable<typeof rpc.getMemberships>>[1][number][] = [];
+        for (const record of batch) {
+            signal?.throwIfAborted();
+            const root = roots.get(record.treeId);
+            const note = "note" in record ? record.note : record.state.note;
+            const token = getAddress(
+                `0x${note.tokenAddress.toString(16).padStart(40, "0")}`
+            ) as Hex;
+            const context = options.protocol.forToken(token).context;
+            const input = {
+                treeId: record.treeId,
+                leafIndex: record.leafIndex,
+                commitment: record.commitment,
+                ...(root ? { root } : {}),
+            };
+            let retained = capture?.membership(input) ?? publicCapture?.membership(input);
+            const previous = state.preparationSnapshot;
+            if (
+                !retained &&
+                previous?.deployment === snapshot.deployment &&
+                previous.generation === snapshot.generation
+            ) {
+                try {
+                    retained = await preparationSnapshotAdapter(rpc, previous).getMembership(
+                        context,
+                        {
+                            treeId: input.treeId,
+                            leafIndex: input.leafIndex,
+                            commitment: input.commitment,
+                        },
+                        previous.block
+                    );
+                } catch {
+                    /* Fetch missing snapshot paths below. */
+                }
+            }
+            if (
+                retained &&
+                !(await reader.isKnownRoot(context, input.treeId, retained.root, block))
+            )
+                retained = undefined;
+            if (!retained || (root && retained.root !== root)) missing.push(input);
+        }
+        for (let offset = 0; offset < missing.length; offset += 256) {
+            signal?.throwIfAborted();
+            const inputs = missing.slice(offset, offset + 256);
+            const proofs = await rpc.getMemberships(options.protocol.context, inputs, block);
+            if (proofs.length !== inputs.length) throw Error("invalid membership batch length");
+            proofs.forEach((proof, index) => prefetched.set(membershipKey(inputs[index]!), proof));
+        }
+    };
+    await prefetch([...first.values()]);
     await parallel([...first.values()]);
+    await prefetch(rest);
     await parallel(rest);
     signal?.throwIfAborted();
     if (preparationDeployment(options.protocol.deployment) !== snapshot.deployment)

@@ -150,3 +150,40 @@ it("authenticates the Protocol's immutable registry against its selected deploym
         })
     ).rejects.toThrow(/registry runtime/);
 });
+
+it("validates deployment code, version and registry at a fixed observation block", async () => {
+    const p = new Protocol({
+        deployment: {
+            ...deployment,
+            registry: {
+                address: a,
+                runtimeCodeHash: deployment.protocol.runtimeCodeHash,
+                fromBlock: 0n,
+            },
+        },
+    });
+    const block = {
+        number: 5n,
+        hash: `0x${"05".repeat(32)}`,
+        parentHash: `0x${"04".repeat(32)}`,
+        timestamp: 10n,
+    } as const;
+    const observed: unknown[] = [];
+    const reader = {
+        getChainId: async () => 31337n,
+        getCode: async (_address: string, at?: unknown) => {
+            observed.push(at);
+            return "0x6000" as Hex;
+        },
+        getProtocolVersion: async (_address: string, at?: unknown) => {
+            observed.push(at);
+            return at ? 1n : 2n;
+        },
+        getProtocolAddressRegistry: async (_address: string, at?: unknown) => {
+            observed.push(at);
+            return a;
+        },
+    };
+    await p.validateDeployment(reader, block);
+    expect(observed).toEqual([block, block, block, block]);
+});

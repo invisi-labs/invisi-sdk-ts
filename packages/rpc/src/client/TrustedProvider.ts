@@ -205,9 +205,20 @@ export class TrustedProvider implements ChainReader {
         await this.getLatestBlockNumber();
         return this.#scope.chainId;
     }
-    async getCode(address: Address): Promise<Hex> {
+    async getCode(address: Address, block?: CanonicalBlock): Promise<Hex> {
+        if (block)
+            check(
+                (await this.getBlock(block.number)).hash === block.hash,
+                "trusted code block mismatch"
+            );
         return bytes(
-            (await this.#read({ kind: "code", block: "latest", address: getAddress(address) })).data
+            (
+                await this.#read({
+                    kind: "code",
+                    block: blockTag(block?.number ?? "latest"),
+                    address: getAddress(address),
+                })
+            ).data
         );
     }
     async callContract(
@@ -256,13 +267,13 @@ export class TrustedProvider implements ChainReader {
         );
         return iface.decodeFunctionResult(name, data);
     }
-    async getProtocolAddressRegistry(address: Address): Promise<Address> {
+    async getProtocolAddressRegistry(address: Address, block?: CanonicalBlock): Promise<Address> {
         return getAddress(
-            (await this.contract(this.#scope, address, abi, "addressRegistry", []))[0]
+            (await this.contract(this.#scope, address, abi, "addressRegistry", [], block))[0]
         ) as Address;
     }
-    async getProtocolVersion(address: Address): Promise<bigint> {
-        return BigInt((await this.contract(this.#scope, address, abi, "VERSION", []))[0]);
+    async getProtocolVersion(address: Address, block?: CanonicalBlock): Promise<bigint> {
+        return BigInt((await this.contract(this.#scope, address, abi, "VERSION", [], block))[0]);
     }
     async getFundingNonce(scope: DeploymentContext, payer: Address, block: CanonicalBlock) {
         return BigInt(
@@ -282,22 +293,32 @@ export class TrustedProvider implements ChainReader {
         )[0] as boolean;
     }
     async isSpent(scope: DeploymentContext, nullifiers: readonly Hex[], block: CanonicalBlock) {
-        return Promise.all(
-            nullifiers.map(
-                async (n) =>
-                    (
-                        await this.contract(
-                            scope,
-                            scope.protocolAddress,
-                            abi,
-                            "isNullifierSpent",
-                            [n],
-                            block
+        const copied = nullifiers.map(word);
+        const result: boolean[] = [];
+        for (let offset = 0; offset < copied.length; offset += 4) {
+            result.push(
+                ...(await Promise.all(
+                    copied
+                        .slice(offset, offset + 4)
+                        .map(
+                            async (n) =>
+                                (
+                                    await this.contract(
+                                        scope,
+                                        scope.protocolAddress,
+                                        abi,
+                                        "isNullifierSpent",
+                                        [n],
+                                        block
+                                    )
+                                )[0] as boolean
                         )
-                    )[0] as boolean
-            )
-        );
+                ))
+            );
+        }
+        return result;
     }
+
     async getTokenBalanceAllowance(
         scope: DeploymentContext,
         owner: Address,

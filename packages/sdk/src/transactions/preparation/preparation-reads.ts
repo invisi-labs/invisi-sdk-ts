@@ -10,6 +10,7 @@ const reusable = new Set([
     "isKnownRoot",
     "isSpent",
     "getMembership",
+    "getMemberships",
 ]);
 class RefreshPreparationSnapshot extends Error {}
 export function preparationReadKey(method: string, args: readonly unknown[]): string {
@@ -100,7 +101,8 @@ export class PreparationReads {
                     if (entry && performance.now() - entry.at < ttl)
                         return structuredClone(await entry.value);
                     // A new input requires a fresh frame, not a path queried before that input existed.
-                    if (name === "getMembership" && pinned) throw new RefreshPreparationSnapshot();
+                    if ((name === "getMembership" || name === "getMemberships") && pinned)
+                        throw new RefreshPreparationSnapshot();
                     const value = Promise.resolve()
                         .then(() => fn.apply(object, args))
                         .then((result) => structuredClone(result));

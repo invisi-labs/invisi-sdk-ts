@@ -6,7 +6,7 @@ import {
     buildTransactAggregateCalldata,
     type BuildTransactAggregateCalldataParams,
 } from "@invisi-labs/protocol";
-import type { ChainReader } from "@invisi-labs/protocol";
+import type { CanonicalBlock, ChainReader } from "@invisi-labs/protocol";
 import { known, type DeploymentContext } from "@invisi-labs/protocol";
 import { TokenProtocol } from "./TokenProtocol";
 
@@ -52,37 +52,43 @@ export class Protocol {
         connection:
             | Provider
             | (Pick<ChainReader, "getChainId" | "getCode"> & {
-                  getProtocolVersion?(address: Address): Promise<bigint>;
-                  getProtocolAddressRegistry?(address: Address): Promise<Address>;
-              })
+                  getProtocolVersion?(address: Address, block?: CanonicalBlock): Promise<bigint>;
+                  getProtocolAddressRegistry?(
+                      address: Address,
+                      block?: CanonicalBlock
+                  ): Promise<Address>;
+              }),
+        block?: CanonicalBlock
     ): Promise<void> {
         const reader =
             "getNetwork" in connection
                 ? {
                       getChainId: async () => (await connection.getNetwork()).chainId,
-                      getCode: async (address: Address) =>
-                          (await connection.getCode(address)) as Hex,
-                      getProtocolAddressRegistry: async (address: Address) =>
+                      getCode: async (address: Address, at?: CanonicalBlock) =>
+                          (await connection.getCode(address, at?.number)) as Hex,
+                      getProtocolAddressRegistry: async (address: Address, at?: CanonicalBlock) =>
                           getAddress(
                               await new Contract(
                                   address,
                                   ["function addressRegistry() view returns (address)"],
                                   connection
-                              ).getFunction("addressRegistry")()
+                              ).getFunction("addressRegistry")(
+                                  ...(at ? [{ blockTag: at.number }] : [])
+                              )
                           ) as Address,
-                      getProtocolVersion: async (address: Address) =>
+                      getProtocolVersion: async (address: Address, at?: CanonicalBlock) =>
                           BigInt(
                               await new Contract(
                                   address,
                                   ["function VERSION() view returns (uint256)"],
                                   connection
-                              ).getFunction("VERSION")()
+                              ).getFunction("VERSION")(...(at ? [{ blockTag: at.number }] : []))
                           ),
                   }
                 : connection;
         const [chainId, code] = await Promise.all([
             reader.getChainId(),
-            reader.getCode(this.context.protocolAddress),
+            reader.getCode(this.context.protocolAddress, ...(block ? [block] : [])),
         ]);
         if (chainId !== this.context.chainId) throw new Error("deployment chain mismatch");
         if (
@@ -94,9 +100,14 @@ export class Protocol {
         if (registry && !reader.getProtocolAddressRegistry)
             throw new Error("registry binding reader capability is missing");
         const [version, binding, registryCode] = await Promise.all([
-            reader.getProtocolVersion?.(this.context.protocolAddress),
-            registry ? reader.getProtocolAddressRegistry!(this.context.protocolAddress) : undefined,
-            registry ? reader.getCode(registry.address) : undefined,
+            reader.getProtocolVersion?.(this.context.protocolAddress, ...(block ? [block] : [])),
+            registry
+                ? reader.getProtocolAddressRegistry!(
+                      this.context.protocolAddress,
+                      ...(block ? [block] : [])
+                  )
+                : undefined,
+            registry ? reader.getCode(registry.address, ...(block ? [block] : [])) : undefined,
         ]);
         if (reader.getProtocolVersion && version !== 1n)
             throw new Error("unsupported onchain protocol version");

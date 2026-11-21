@@ -102,6 +102,7 @@ async function harness() {
         isKnownRoot: async (_context: unknown, treeId: bigint, root: Hex) =>
             root === treeRoots.get(treeId),
         isSpent: vi.fn(async (_context, words: readonly Hex[]) => words.map(() => spent)),
+        getCreditStatus: async () => 1 as const,
     } as unknown as ChainReader;
     const identity = ownerHex(BigInt(vectors.owner.ownerAddress));
     const viewing = new ViewingCapability(identity, vectors.owner.viewingPrivateKey as Hex);
@@ -1553,3 +1554,160 @@ it.each([12n, 13n])(
         expect(h.reader.getCreditStatus).toHaveBeenCalledTimes(3);
     }
 );
+
+it("deduplicates Credit roles and scoped grant statuses per refresh with at most four concurrent reads", async () => {
+    const h = await harness();
+    const credit = await new ViewingCapability(
+        ownerHex(BigInt(vectors.owner.ownerAddress)),
+        vectors.owner.viewingPrivateKey as Hex
+    ).decryptCredit(vectors.credit.ownerCiphertext as Hex, {
+        ...context,
+        protocolAddress: BigInt(context.protocolAddress),
+        tokenAddress: BigInt(token),
+        outputCommitment: vectors.credit.commitment as Hex,
+        role: "owner",
+    });
+    await h.store.transaction(h.session.scope, (draft) => {
+        for (let word = 0; word < 8; word++)
+            for (const role of ["owner", "spender"] as const) {
+                const commitment = hex(BigInt(1000 + word));
+                draft.credits[commitment + ":" + role] = {
+                    state: {
+                        ...credit,
+                        note: {
+                            ...credit.note,
+                            spenderWalletIdentity: credit.note.ownerWalletIdentity,
+                            grantId: BigInt(word + 1),
+                        },
+                    },
+                    commitment,
+                    role,
+                    treeId: 1n,
+                    leafIndex: word,
+                    blockNumber: 12n,
+                    blockHash: block().hash,
+                    spent: word === 0 ? "spent" : "unspent",
+                };
+            }
+    });
+    let active = 0,
+        maximum = 0,
+        revoked = false;
+    const bitmap = vi.fn(async () => {
+        maximum = Math.max(maximum, ++active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active--;
+        return revoked ? (2 as const) : (1 as const);
+    });
+    h.reader.getCreditStatus = bitmap;
+    h.spent();
+    const empty = { ...h.batch, transactionHashes: [] };
+    await h.updater.applyUpdates(empty);
+    expect(bitmap).toHaveBeenCalledTimes(8);
+    expect(maximum).toBe(4);
+    expect(vi.mocked(h.reader.isSpent).mock.calls.at(-1)![1]).toHaveLength(8);
+    revoked = true;
+    await h.updater.applyUpdates(empty);
+    expect(bitmap).toHaveBeenCalledTimes(16);
+    expect(
+        Object.values((await h.store.readSnapshot(h.session.scope)).credits).every(
+            (record) => record.revoked
+        )
+    ).toBe(true);
+});
+
+it("fails closed when known Credit inventory has no grant status reader", async () => {
+    const h = await harness();
+    const credit = await new ViewingCapability(
+        ownerHex(BigInt(vectors.owner.ownerAddress)),
+        vectors.owner.viewingPrivateKey as Hex
+    ).decryptCredit(vectors.credit.ownerCiphertext as Hex, {
+        ...context,
+        protocolAddress: BigInt(context.protocolAddress),
+        tokenAddress: BigInt(token),
+        outputCommitment: vectors.credit.commitment as Hex,
+        role: "owner",
+    });
+    await h.store.transaction(h.session.scope, (draft) => {
+        draft.credits[vectors.credit.commitment + ":owner"] = {
+            state: credit,
+            commitment: vectors.credit.commitment as Hex,
+            role: "owner",
+            treeId: 1n,
+            leafIndex: 0,
+            blockNumber: 12n,
+            blockHash: block().hash,
+            spent: "unspent",
+        };
+    });
+    delete h.reader.getCreditStatus;
+    const before = await h.store.readSnapshot(h.session.scope);
+    await expect(h.updater.applyUpdates({ ...h.batch, transactionHashes: [] })).rejects.toThrow(
+        /grant status reader/
+    );
+    expect(await h.store.readSnapshot(h.session.scope)).toEqual(before);
+});
+
+it("keeps actual nullifier RPC concurrency at four across multiple vector chunks", async () => {
+    const h = await harness();
+    await h.updater.applyUpdates(h.batch);
+    const seed = Object.values((await h.store.readSnapshot(h.session.scope)).notes)[0]!;
+    const notes: (typeof seed)[] = [];
+    for (let index = 0; index < 256; index++) {
+        const note = { ...seed.note, nonce: BigInt(1000 + index) };
+        const commitment = await computeNoteCommitment(
+            note.chainId,
+            note.protocolAddress,
+            await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
+            note.tokenAddress,
+            note.amount
+        );
+        notes.push({ ...seed, commitment, note });
+    }
+    await h.store.transaction(h.session.scope, (draft) => {
+        for (const note of notes) draft.notes[note.commitment] = note;
+    });
+    const { EthersChainReader } = await import("@invisi-labs/sdk/ethers");
+    const abi = new Interface(invisiCoreAbi);
+    let active = 0,
+        peak = 0,
+        calls = 0;
+    const reader = new EthersChainReader({
+        getNetwork: async () => ({ chainId: context.chainId }),
+        getBlock: async () => block(),
+        call: async () => {
+            calls++;
+            peak = Math.max(peak, ++active);
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            active--;
+            return abi.encodeFunctionResult("isNullifierSpent", [false]);
+        },
+    } as unknown as import("ethers").Provider);
+    h.reader.isSpent = reader.isSpent.bind(reader);
+    await h.updater.applyUpdates({ ...h.batch, transactionHashes: [] });
+    expect(calls).toBe(257);
+    expect(peak).toBe(4);
+    expect(
+        Object.values((await h.store.readSnapshot(h.session.scope)).notes).every(
+            (note) => note.spent === "unspent"
+        )
+    ).toBe(true);
+});
+
+it("validates inventory-only deployment at the newer observation when discovery targets an older block", async () => {
+    const h = await sharedHarness();
+    await h.history.synchronize({ toBlock: 16n, pageSize: 1 });
+    const before = await h.store.readSnapshot(h.a.scope);
+    const code = vi
+        .spyOn(h.reader, "getCode")
+        .mockImplementation(async (_address, anchor) => (anchor?.number === 16n ? "0x02" : "0x01"));
+    await expect(
+        h.a.scanHistory(testDecryptor, { toBlock: 14n, pageSize: 1, inventoryOnly: true })
+    ).rejects.toThrow(/code profile/);
+    expect(code.mock.calls.filter(([, anchor]) => anchor?.number === 16n)).toHaveLength(1);
+    expect(await h.store.readSnapshot(h.a.scope)).toEqual(before);
+    code.mockClear().mockResolvedValue("0x01");
+    await h.a.scanHistory(testDecryptor, { toBlock: 14n, pageSize: 1, inventoryOnly: true });
+    expect(code.mock.calls.filter(([, anchor]) => anchor?.number === 16n)).toHaveLength(1);
+    expect((await h.store.readSnapshot(h.a.scope)).observedThrough?.number).toBe(16n);
+});

@@ -116,24 +116,27 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
         }
     }
 
-    async getProtocolAddressRegistry(address: Address): Promise<Address> {
+    async getProtocolAddressRegistry(address: Address, block?: CanonicalBlock): Promise<Address> {
         return getAddress(
             await new Contract(getAddress(address), invisiCoreAbi, this.client).getFunction(
                 "addressRegistry"
-            )()
+            )(...(block ? [{ blockTag: block.number }] : []))
         );
     }
 
-    async getProtocolVersion(address: Address): Promise<bigint> {
+    async getProtocolVersion(address: Address, block?: CanonicalBlock): Promise<bigint> {
         return BigInt(
             await new Contract(getAddress(address), invisiCoreAbi, this.client).getFunction(
                 "VERSION"
-            )()
+            )(...(block ? [{ blockTag: block.number }] : []))
         );
     }
 
-    async getCode(address: Address): Promise<Hex> {
-        return (await this.client.getCode(getAddress(address))) as Hex;
+    async getCode(address: Address, block?: CanonicalBlock): Promise<Hex> {
+        return (await this.client.getCode(
+            getAddress(address),
+            ...(block ? [block.number] : [])
+        )) as Hex;
     }
 
     async getFactoryInstanceAddress(factory: Address, salt: Hex): Promise<Address> {
@@ -323,11 +326,11 @@ export class EthersChainReader implements ChainReader, RegistryReader, FactoryRe
     async isSpent(context: DeploymentContext, nullifiers: readonly Hex[], block: CanonicalBlock) {
         const copied = nullifiers.map(word);
         const result: boolean[] = [];
-        for (let offset = 0; offset < copied.length; offset += 32) {
+        for (let offset = 0; offset < copied.length; offset += 4) {
             result.push(
                 ...(await Promise.all(
                     copied
-                        .slice(offset, offset + 32)
+                        .slice(offset, offset + 4)
                         .map((nf) =>
                             this.read(
                                 context,

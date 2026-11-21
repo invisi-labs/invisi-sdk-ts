@@ -39,8 +39,9 @@ export interface ChainReader {
     ): Promise<CreditGrantStatus>;
     getChainId(): Promise<bigint>;
     /** Required when a selected deployment includes a receiving-key registry. */
-    getProtocolAddressRegistry?(address: Address): Promise<Address>;
-    getCode(address: Address): Promise<Hex>;
+    getProtocolAddressRegistry?(address: Address, block?: CanonicalBlock): Promise<Address>;
+    getProtocolVersion?(address: Address, block?: CanonicalBlock): Promise<bigint>;
+    getCode(address: Address, block?: CanonicalBlock): Promise<Hex>;
     getBlock(number: bigint): Promise<CanonicalBlock>;
     /** Optional bounded full-header acquisition; callers still verify ordering and canonical anchors. */
     getBlocks?(numbers: readonly bigint[]): Promise<readonly CanonicalBlock[]>;

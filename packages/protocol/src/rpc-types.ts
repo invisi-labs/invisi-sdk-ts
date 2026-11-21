@@ -41,6 +41,12 @@ export interface ProtocolDataProvider {
         context: DeploymentContext,
         range: ProtocolUpdateRange
     ): Promise<{ notes: ProtocolNoteUpdates; credits: ProtocolCreditUpdates }>;
+    /** Optional bounded batch; every returned proof is authenticated at the same fixed block. */
+    getMemberships?(
+        context: DeploymentContext,
+        inputs: readonly { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex }[],
+        block: CanonicalBlock
+    ): Promise<Membership[]>;
     getMembership(
         context: DeploymentContext,
         input: { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex },

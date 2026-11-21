@@ -273,6 +273,55 @@ export class Preparation<Result> {
         return { ...proof, path: [...proof.path] };
     }
 
+    private async memberships(
+        inputs: readonly { treeId: bigint; leafIndex: number; commitment: Hex }[],
+        frame: PreparationFrame
+    ): Promise<Membership[]> {
+        const { options, reader } = this.runtime;
+        const provider = options.protocolRpc;
+        if (!provider) throw new MissingCapabilityError("Protocol RPC membership provider");
+        if (provider.getMemberships && inputs.length) {
+            const requests = inputs.map((input) => ({
+                ...input,
+                ...(this.#roots.has(input.treeId) ? { root: this.#roots.get(input.treeId)! } : {}),
+            }));
+            const proofs = await provider.getMemberships(frame.context, requests, frame.block);
+            if (proofs.length !== inputs.length)
+                throw Error("membership batch response length mismatch");
+            const roots = new Map(this.#roots);
+            for (let index = 0; index < inputs.length; index++) {
+                const input = inputs[index]!,
+                    proof = proofs[index]!;
+                const root = roots.get(input.treeId);
+                if (root && proof.root !== root)
+                    throw Error("membership provider changed the pinned source root");
+                roots.set(input.treeId, proof.root);
+            }
+            await mapPreparation(inputs, async (input, index) =>
+                verifyMembership(reader, frame.context, frame.block, input, proofs[index]!)
+            );
+            for (const [treeId, root] of roots) this.#roots.set(treeId, root);
+            return proofs.map((proof) => ({ ...proof, path: [...proof.path] }));
+        }
+        // A root that covers the highest selected leaf must seed each tree before older paths.
+        const highest = new Map<bigint, (typeof inputs)[number]>();
+        for (const input of inputs) {
+            if (
+                !highest.has(input.treeId) ||
+                input.leafIndex > highest.get(input.treeId)!.leafIndex
+            )
+                highest.set(input.treeId, input);
+        }
+        const seeded = new Map<string, Membership>();
+        await mapPreparation([...highest.values()], async (input) => {
+            seeded.set(input.commitment, await this.membership(input, frame));
+        });
+        return mapPreparation(
+            inputs,
+            async (input) => seeded.get(input.commitment) ?? this.membership(input, frame)
+        );
+    }
+
     async selectFunds(target: bigint, frame: PreparationFrame, maxInputs = 190) {
         const { scope, options, reader } = this.runtime;
         const state = await this.inventory();
@@ -314,7 +363,8 @@ export class Preparation<Result> {
         const inputs: Array<NoteMembership & { commitment: Hex }> = [];
         const sources = new Map<bigint, Hex>();
         const nullifiers: Hex[] = [];
-        const opened = await mapPreparation(selected, async (input) => {
+        const memberships = await this.memberships(selected, frame);
+        const opened = await mapPreparation(selected, async (input, index) => {
             const note = input.note;
             const c = frame.context;
             if (
@@ -332,7 +382,7 @@ export class Preparation<Result> {
             ) {
                 throw new Error("selected input preimage/context mismatch");
             }
-            const proof = await this.membership(input, frame);
+            const proof = memberships[index]!;
             const path = [...proof.path];
             const root = proof.root;
             if (sources.has(input.treeId) && sources.get(input.treeId) !== root) {

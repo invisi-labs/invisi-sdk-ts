@@ -128,3 +128,118 @@ it("owns cached public responses instead of retaining provider-owned arrays", as
     expect(result).toEqual([false]);
     expect(await reads.reader().isSpent(h.context, [h.leaf], block)).toEqual([false]);
 });
+
+async function selectedPair() {
+    const h = await fixture();
+    const note = { ...h.note, amount: 50n, nonce: 124n };
+    const commitment = await computeNoteCommitment(
+        h.context.chainId,
+        BigInt(h.context.protocolAddress),
+        await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
+        note.tokenAddress,
+        note.amount
+    );
+    await h.tree.insert(BigInt(commitment));
+    await h.store.transaction(h.scope, (state) => {
+        state.notes[commitment] = { ...state.notes[h.leaf]!, note, commitment, leafIndex: 1 };
+    });
+    return { ...h, commitment };
+}
+
+it("batches only selected lazy preparation paths and still checks every selected nullifier", async () => {
+    const h = await selectedPair();
+    const original = h.membership.getMembership;
+    const single = vi.spyOn(h.membership, "getMembership");
+    const batch = (h.membership.getMemberships = vi.fn(async (context, inputs, block) =>
+        Promise.all(inputs.map((input) => original(context, input, block)))
+    ));
+    const spent = vi.spyOn(h.reader, "isSpent");
+    const prepared = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        commitments: [h.leaf, h.commitment],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 140n })],
+    });
+    expect(prepared.preview().inputs).toBe(2);
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(batch.mock.calls[0]![1].map((input) => input.commitment)).toEqual([
+        h.leaf,
+        h.commitment,
+    ]);
+    expect(single).not.toHaveBeenCalled();
+    expect(spent.mock.calls.some((call) => call[1].length === 2)).toBe(true);
+    await prepared.abandon();
+    h.reader.isSpent = async (_, words) => words.map(() => true);
+    await expect(
+        h.session.prepareTransfer({
+            tokenAddress: h.context.tokenAddress,
+            commitments: [h.leaf, h.commitment],
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 140n })],
+        })
+    ).rejects.toThrow(/spent/);
+});
+
+it("seeds a single-provider tree with its highest selected leaf", async () => {
+    const h = await selectedPair();
+    const original = h.membership.getMembership;
+    const order: number[] = [];
+    h.membership.getMembership = async (context, input, block) => {
+        order.push(input.leafIndex);
+        if (input.leafIndex === 0 && input.root === undefined)
+            throw Error("older root omits the highest selected leaf");
+        return original(context, input, block);
+    };
+    const prepared = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        commitments: [h.leaf, h.commitment],
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 140n })],
+    });
+    expect(prepared.preview().inputs).toBe(2);
+    expect(order).toEqual([1, 0]);
+});
+
+it("reuses batch paths for fee repricing without querying live membership again", async () => {
+    const h = await setup();
+    const original = h.membership.getMembership;
+    const batch = (h.membership.getMemberships = vi.fn(async (context, inputs, block) =>
+        Promise.all(inputs.map((input) => original(context, input, block)))
+    ));
+    const prepared = await h.invisi.prepareTransfer({
+        wallet: Wallet.fromAddress(h.wallet.getAddress()),
+        protocol: h.protocol,
+        tokenAddress: h.context.tokenAddress,
+        inputs: h.inputs,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+    });
+    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
+    expect(quoted.preview().outputs.map((output) => output.amount)).toEqual([30n, 60n]);
+    expect(batch).toHaveBeenCalledTimes(1);
+});
+
+it("replays retained individual paths when the live provider also supports batching", async () => {
+    const { preparationSnapshotAdapter, preparationDeployment } = await import("./snapshot");
+    const h = await fixture();
+    const original = h.membership.getMembership;
+    h.membership.getMemberships = async (context, inputs, block) =>
+        Promise.all(inputs.map((input) => original(context, input, block)));
+    const snapshot = {
+        version: 1 as const,
+        deployment: preparationDeployment(h.protocol.deployment),
+        block: await h.reader.getBlock(12n),
+        values: {},
+    };
+    const input = { treeId: 1n, leafIndex: 0, commitment: h.leaf };
+    const recorded = await preparationSnapshotAdapter(h.membership, snapshot, true).getMembership(
+        h.context,
+        input,
+        snapshot.block
+    );
+    h.membership.getMembership = async () => {
+        throw Error("offline");
+    };
+    h.membership.getMemberships = async () => {
+        throw Error("offline batch");
+    };
+    const replay = preparationSnapshotAdapter(h.membership, snapshot);
+    expect(replay.getMemberships).toBeUndefined();
+    expect(await replay.getMembership(h.context, input, snapshot.block)).toEqual(recorded);
+});

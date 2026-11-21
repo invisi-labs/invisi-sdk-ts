@@ -25,6 +25,8 @@ import {
 import type { RefreshResult } from "../sync/refresh";
 
 export interface AccountScanOptions {
+    /** Skip transaction prewarming and invalidate any previous preparation snapshot. */
+    inventoryOnly?: boolean;
     fromBlock?: bigint;
     toBlock?: bigint;
     reset?: boolean;
@@ -118,6 +120,21 @@ function publicProvider(options: WalletSessionInfrastructure, offline: boolean) 
         },
     });
 }
+async function validateInventoryDeployment(
+    options: WalletSessionInfrastructure,
+    settings: AccountScanOptions,
+    block: CanonicalBlock,
+    reads: Map<string, Promise<void>>
+) {
+    if (settings.offline || !settings.inventoryOnly) return;
+    const key = `${block.number}:${block.hash}:${block.parentHash}:${block.timestamp}`;
+    let pending = reads.get(key);
+    if (!pending) {
+        pending = options.protocol.validateDeployment(options.chainReader!, block);
+        reads.set(key, pending);
+    }
+    await pending;
+}
 export async function scanAccount(
     history: PublicHistory,
     options: WalletSessionInfrastructure,
@@ -166,6 +183,7 @@ export async function scanAccount(
     const capture = settings.offline ? undefined : createPreparationCapture();
     const normalReader = localReader(history, options.chainReader!, !!settings.offline);
     const reader = capture?.reader(normalReader, true, false) ?? normalReader;
+    const deploymentReads = new Map<string, Promise<void>>();
     const receiving = options.wallet.getReceivingAddress();
     const active = authenticatedDecryptor(
         options.wallet.ownerAddress,
@@ -202,8 +220,11 @@ export async function scanAccount(
         first = true;
     const beforeCommit = async (block: CanonicalBlock) => {
         settings.signal?.throwIfAborted();
+        await validateInventoryDeployment(options, settings, block, deploymentReads);
         if ((await history.snapshot()).generation !== publicState.generation)
             throw Error("public history generation changed during account scan");
+        if (!settings.offline && (await options.chainReader!.getChainId()) !== scope.chainId)
+            throw Error("account scan chain identity changed");
         if (
             !settings.offline &&
             (await options.chainReader!.getBlock(block.number)).hash !== block.hash
@@ -250,6 +271,7 @@ export async function scanAccount(
             discoveryBlock: { number: page.block.number, hash: page.block.hash },
             queueCreditReplay: direction === "backward" || !base.discoveryThrough,
 
+            ...(settings.inventoryOnly ? { inventoryOnly: true } : {}),
             historyGeneration: publicState.generation,
             beforeCommit: () => beforeCommit(settings.offline ? batch.block : observation),
         });
@@ -287,6 +309,7 @@ export async function scanAccount(
         certifyHistoryBatch(batch, page);
         await updater.applyUpdates(batch, {
             ...(settings.signal ? { signal: settings.signal } : {}),
+            ...(settings.inventoryOnly ? { inventoryOnly: true } : {}),
             historyGeneration: publicState.generation,
             beforeCommit: () => beforeCommit(block),
         });
@@ -299,11 +322,12 @@ export async function scanAccount(
             decryptor,
             target,
             settings,
-            capture
+            capture,
+            deploymentReads
         );
         credits += replay;
     }
-    if (!settings.offline && settings.refreshState !== false) {
+    if (!settings.offline && settings.refreshState !== false && !settings.inventoryOnly) {
         const current = await store.readSnapshot(scope);
         const preparationBlock =
             current.observedThrough && current.observedThrough.number > block.number
@@ -333,7 +357,8 @@ async function replayCredits(
     decryptor: DeliveryDecryptor,
     target: bigint,
     settings: AccountScanOptions,
-    capture?: PreparationCapture
+    capture?: PreparationCapture,
+    deploymentReads = new Map<string, Promise<void>>()
 ): Promise<number> {
     const store = options.store!,
         state = await store.readSnapshot(scope);
@@ -408,8 +433,11 @@ async function replayCredits(
             ...(settings.signal ? { signal: settings.signal } : {}),
             beforeCommit: async () => {
                 settings.signal?.throwIfAborted();
+                await validateInventoryDeployment(options, settings, block, deploymentReads);
                 if ((await history.snapshot()).generation !== generation)
                     throw Error("public history generation changed during Credit recovery");
+                if ((await options.chainReader!.getChainId()) !== scope.chainId)
+                    throw Error("Credit recovery chain identity changed");
                 if ((await options.chainReader!.getBlock(target)).hash !== block.hash)
                     throw Error("canonical history changed during Credit recovery");
             },
@@ -439,6 +467,7 @@ export async function retryUnresolved(
     const target = snapshot.indexedHead ?? snapshot.coverage?.at(-1)?.block ?? snapshot.through;
     if (!target) throw Error("public history has no indexed checkpoint");
     const reader = localReader(history, options.chainReader!, !!settings.offline);
+    const deploymentReads = new Map<string, Promise<void>>();
     const receiving = options.wallet.getReceivingAddress();
     const updater = new WalletUpdater({
         protocol: options.protocol,
@@ -481,8 +510,14 @@ export async function retryUnresolved(
             historyGeneration: snapshot.generation,
             beforeCommit: async () => {
                 settings.signal?.throwIfAborted();
+                await validateInventoryDeployment(options, settings, target, deploymentReads);
                 if ((await history.snapshot()).generation !== snapshot.generation)
                     throw Error("public history generation changed during retry");
+                if (
+                    !settings.offline &&
+                    (await options.chainReader!.getChainId()) !== scope.chainId
+                )
+                    throw Error("account retry chain identity changed");
                 if (
                     !settings.offline &&
                     (await options.chainReader!.getBlock(target.number)).hash !== target.hash
@@ -504,7 +539,16 @@ export async function retryUnresolved(
         });
     }
     if (!settings.offline)
-        credits += await replayCredits(history, options, scope, decryptor, target.number, settings);
+        credits += await replayCredits(
+            history,
+            options,
+            scope,
+            decryptor,
+            target.number,
+            settings,
+            undefined,
+            deploymentReads
+        );
     return {
         block: target,
         notes,

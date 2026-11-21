@@ -28,6 +28,7 @@ export interface CandidatePage {
     transactionHashes: readonly Hex[];
 }
 export interface ApplyPageOptions {
+    inventoryOnly?: boolean;
     signal?: AbortSignal;
     /** Rebuild private inventory from supplied history after a reorg; preserves uncertain operations. */
     reset?: boolean;
@@ -48,6 +49,19 @@ const check: (value: unknown, message: string) => asserts value = (value, messag
     if (!value) throw new Error(message);
 };
 const position = (treeId: bigint, leafIndex: number) => `${treeId}:${leafIndex}`;
+async function bounded<T, R>(items: readonly T[], work: (item: T) => Promise<R>): Promise<R[]> {
+    let next = 0;
+    const results: R[] = new Array(items.length);
+    await Promise.all(
+        Array.from({ length: Math.min(4, items.length) }, async () => {
+            while (next < items.length) {
+                const index = next++;
+                results[index] = await work(items[index]!);
+            }
+        })
+    );
+    return results;
+}
 
 /** Authenticates indexed candidates before updating private wallet state. */
 export class WalletUpdater extends InventoryProcessor {
@@ -274,27 +288,50 @@ export class WalletUpdater extends InventoryProcessor {
                     id,
                     nullifier: await this.creditNullifier(record.state),
                 });
-            const spent =
-                options.refreshState !== false && observations.length
-                    ? await reader.isSpent(
-                          context,
-                          observations.map((item) => item.nullifier),
-                          observation
-                      )
-                    : [];
-            check(
-                (options.refreshState === false || spent.length === observations.length) &&
-                    spent.every((value) => typeof value === "boolean"),
-                "invalid spent-state response"
-            );
+            const spentByNullifier = new Map<Hex, boolean>();
+            if (options.refreshState !== false) {
+                const unique = [...new Set(observations.map((item) => item.nullifier))];
+                const chunks: Hex[][] = [];
+                for (let offset = 0; offset < unique.length; offset += 256)
+                    chunks.push(unique.slice(offset, offset + 256));
+                // Each vector reader owns its four underlying RPC workers; chunks must not overlap.
+                for (const words of chunks) {
+                    signal?.throwIfAborted();
+                    const values = await reader.isSpent(context, words, observation);
+                    check(
+                        values.length === words.length &&
+                            values.every((value) => typeof value === "boolean"),
+                        "invalid spent-state response"
+                    );
+                    words.forEach((word, index) => spentByNullifier.set(word, values[index]!));
+                }
+            }
+            const spent = observations.map((item) => spentByNullifier.get(item.nullifier));
             signal?.throwIfAborted();
             if ((await reader.getBlock(block.number)).hash !== block.hash)
                 throw new CanonicalConflict("Canonical block changed during update");
             const statuses = new Map<string, import("@invisi-labs/protocol").CreditGrantStatus>();
+            check(
+                options.refreshState === false ||
+                    Object.keys(allCredits).length === 0 ||
+                    typeof reader.getCreditStatus === "function",
+                "Credit grant status reader required"
+            );
             if (options.refreshState !== false && reader.getCreditStatus) {
+                const grants = new Map<
+                    string,
+                    { note: (typeof allCredits)[string]["state"]["note"]; ids: string[] }
+                >();
                 for (const [id, record] of Object.entries(allCredits)) {
                     const note = record.state.note;
-                    const status = await reader.getCreditStatus(
+                    const key = `${note.ownerWalletIdentity.toLowerCase()}:${note.tokenAddress}:${note.grantId}`;
+                    const existing = grants.get(key);
+                    if (existing) existing.ids.push(id);
+                    else grants.set(key, { note, ids: [id] });
+                }
+                await bounded([...grants.values()], async ({ note, ids }) => {
+                    signal?.throwIfAborted();
+                    const status = await reader.getCreditStatus!(
                         context,
                         note.ownerWalletIdentity,
                         `0x${note.tokenAddress.toString(16).padStart(40, "0")}`,
@@ -305,8 +342,8 @@ export class WalletUpdater extends InventoryProcessor {
                         status === 0 || status === 1 || status === 2,
                         "invalid Credit grant status"
                     );
-                    statuses.set(id, status);
-                }
+                    for (const id of ids) statuses.set(id, status);
+                });
             }
             if ((await reader.getBlock(observation.number)).hash !== observation.hash)
                 throw new CanonicalConflict("spent observation block changed");
@@ -329,6 +366,7 @@ export class WalletUpdater extends InventoryProcessor {
                     delete draft.invalidated;
                     delete draft.unresolvedDeliveries;
                 }
+                if (options.inventoryOnly) delete draft.preparationSnapshot;
                 mergeReceiptRecords(draft, { notes, credits, checkpoint: block });
                 if (options.refreshState !== false)
                     observations.forEach((item, index) => {

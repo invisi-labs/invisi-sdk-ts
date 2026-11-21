@@ -686,3 +686,180 @@ it("preserves the generated creation ID when a snapshot miss retries with live f
     if (saved.plan.intent!.kind === "create-credit")
         expect(saved.plan.intent!.options.grantId).toBe(ids[0]);
 });
+
+it("refreshes inventory without prewarming transaction materials and lazily prepares online", async () => {
+    const h = await synchronized();
+    expect((await h.store.readSnapshot(h.scope)).preparationSnapshot).toBeDefined();
+    const membership = vi.spyOn(h.membership, "getMembership");
+    const nonce = vi.spyOn(h.reader, "getFundingNonce");
+    const code = vi.spyOn(h.reader, "getCode");
+    await h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n, inventoryOnly: true });
+    expect((await h.store.readSnapshot(h.scope)).preparationSnapshot).toBeUndefined();
+    expect(membership).not.toHaveBeenCalled();
+    expect(nonce).not.toHaveBeenCalled();
+    expect(code.mock.calls.every(([address]) => address !== h.context.tokenAddress)).toBe(true);
+    const operation = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+    });
+    expect(operation.preview().outputs.map((o) => o.amount)).toEqual([30n, 70n]);
+    expect(membership).toHaveBeenCalled();
+});
+
+it("batches missing paths after selecting the highest leaf root and preserves offline construction", async () => {
+    const h = await fixture();
+    const { computeNoteCommitment, computeNoteIdentity } = await import("@invisi-labs/primitives");
+    const seed = (await h.store.readSnapshot(h.scope)).notes[h.leaf]!;
+    for (let i = 1; i < 5; i++) {
+        const note = { ...h.note, nonce: BigInt(123 + i) };
+        const commitment = await computeNoteCommitment(
+            note.chainId,
+            note.protocolAddress,
+            await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
+            note.tokenAddress,
+            note.amount
+        );
+        await h.tree.insert(BigInt(commitment));
+        await h.store.transaction(h.scope, (state) => {
+            state.notes[commitment] = { ...seed, note, commitment, leafIndex: i };
+        });
+    }
+    const single = h.membership.getMembership.bind(h.membership);
+    const batch = vi.fn(
+        async (
+            ...[context, inputs, block]: Parameters<NonNullable<typeof h.membership.getMemberships>>
+        ) => Promise.all(inputs.map((input) => single(context, input, block)))
+    );
+    Object.assign(h.membership, { getMemberships: batch });
+    await h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n });
+    expect(batch.mock.calls.map(([, inputs]) => inputs.length)).toEqual([1, 4]);
+    expect(batch.mock.calls[0]![1][0]!.leafIndex).toBe(4);
+    expect(
+        batch.mock.calls[1]![1].every(
+            (input) => input.root === `0x${h.tree.getRoot().toString(16).padStart(64, "0")}`
+        )
+    ).toBe(true);
+    expect((await h.store.readSnapshot(h.scope)).preparationSnapshot).toBeDefined();
+});
+
+it("authenticates inventory-only deployment at the fixed target and aborts before inventory commits", async () => {
+    const h = await synchronized();
+    const before = await h.store.readSnapshot(h.scope);
+    const code = vi.spyOn(h.reader, "getCode").mockResolvedValue("0x6001");
+    await expect(
+        h.session.scanHistory(noDecrypt, {
+            fromBlock: 13n,
+            toBlock: 12n,
+            inventoryOnly: true,
+        })
+    ).rejects.toThrow(/code profile/);
+    expect(code).toHaveBeenCalledWith(
+        h.context.protocolAddress,
+        expect.objectContaining({ number: 12n })
+    );
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+    code.mockRestore();
+    const controller = new AbortController();
+    h.reader.isSpent = async (_, words) => {
+        controller.abort();
+        return words.map(() => false);
+    };
+    await expect(
+        h.session.scanHistory(noDecrypt, {
+            fromBlock: 13n,
+            toBlock: 12n,
+            inventoryOnly: true,
+            signal: controller.signal,
+        })
+    ).rejects.toThrow();
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+});
+
+it("rejects a chain identity change after inventory reads without committing inventory-only state", async () => {
+    const h = await synchronized();
+    const before = await h.store.readSnapshot(h.scope);
+    let changed = false;
+    h.reader.getChainId = async () => (changed ? h.scope.chainId + 1n : h.scope.chainId);
+    h.reader.isSpent = async (_, words) => {
+        changed = true;
+        return words.map(() => true);
+    };
+    await expect(
+        h.session.scanHistory(noDecrypt, {
+            fromBlock: 13n,
+            toBlock: 12n,
+            inventoryOnly: true,
+        })
+    ).rejects.toThrow(/chain (identity|mismatch)/);
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+});
+
+it("batches cached paths whose root expired instead of issuing individual membership refreshes", async () => {
+    const h = await fixture();
+    const { computeNoteCommitment, computeNoteIdentity } = await import("@invisi-labs/primitives");
+    const seed = (await h.store.readSnapshot(h.scope)).notes[h.leaf]!;
+    for (let i = 1; i < 5; i++) {
+        const note = { ...h.note, nonce: BigInt(123 + i) };
+        const commitment = await computeNoteCommitment(
+            note.chainId,
+            note.protocolAddress,
+            await computeNoteIdentity(BigInt(note.ownerAddress), note.nonce),
+            note.tokenAddress,
+            note.amount
+        );
+        await h.tree.insert(BigInt(commitment));
+        await h.store.transaction(h.scope, (state) => {
+            state.notes[commitment] = { ...seed, note, commitment, leafIndex: i };
+        });
+    }
+    await h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n });
+    const expired = h.tree.getRoot();
+    await h.tree.insert(99n);
+    const raw = h.membership.getMembership.bind(h.membership);
+    const single = vi.spyOn(h.membership, "getMembership");
+    const batch = vi.fn(
+        async (
+            ...[context, inputs, block]: Parameters<NonNullable<typeof h.membership.getMemberships>>
+        ) => Promise.all(inputs.map((input) => raw(context, input, block)))
+    );
+    Object.assign(h.membership, { getMemberships: batch });
+    const known = vi
+        .spyOn(h.reader, "isKnownRoot")
+        .mockImplementation(async (_, __, root) => BigInt(root) !== expired);
+    await h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n });
+    expect(single).not.toHaveBeenCalled();
+    expect(batch.mock.calls.map(([, inputs]) => inputs.length)).toEqual([1, 4]);
+    expect(known.mock.calls.filter(([, , root]) => BigInt(root) === expired)).toHaveLength(1);
+    expect(known).toHaveBeenCalledWith(
+        expect.anything(),
+        1n,
+        `0x${h.tree.getRoot().toString(16).padStart(64, "0")}`,
+        expect.objectContaining({ number: 12n })
+    );
+    expect(known.mock.calls.filter(([, , root]) => BigInt(root) === h.tree.getRoot())).toHaveLength(
+        1
+    );
+    batch.mockClear();
+    known.mockClear();
+    await h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n });
+    expect(batch).not.toHaveBeenCalled();
+    expect(single).not.toHaveBeenCalled();
+    expect(known).toHaveBeenCalledTimes(1);
+});
+
+it("rejects a same-block valid cached path when live root acceptance disappeared", async () => {
+    const h = await synchronized();
+    const previous = (await h.store.readSnapshot(h.scope)).preparationSnapshot;
+    const raw = h.membership.getMembership.bind(h.membership);
+    Object.assign(h.membership, {
+        getMemberships: async (
+            ...[context, inputs, block]: Parameters<NonNullable<typeof h.membership.getMemberships>>
+        ) => Promise.all(inputs.map((input) => raw(context, input, block))),
+    });
+    const known = vi.spyOn(h.reader, "isKnownRoot").mockResolvedValue(false);
+    await expect(
+        h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n })
+    ).rejects.toThrow(/root/);
+    expect(known).toHaveBeenCalledTimes(1);
+    expect((await h.store.readSnapshot(h.scope)).preparationSnapshot).toEqual(previous);
+});

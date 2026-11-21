@@ -481,6 +481,8 @@ export class WalletSession {
     }
     async refreshState(
         options: {
+            /** Refresh inventory without retaining transaction preparation materials. */
+            inventoryOnly?: boolean;
             signal?: AbortSignal;
             onProgress?: import("../public-history/history").HistoryProgressListener;
         } = {}

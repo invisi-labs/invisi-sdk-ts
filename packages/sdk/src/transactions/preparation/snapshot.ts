@@ -44,6 +44,8 @@ export function preparationSnapshotAdapter<T extends object>(
 ): T {
     return new Proxy(target, {
         get(object, property: string) {
+            // Persisted snapshots index individual paths; keep replay on the single-path API.
+            if (property === "getMemberships") return undefined;
             const fn = Reflect.get(object, property, object);
             if (property === "getLatestBlockNumber") return async () => snapshot.block.number;
             if (typeof fn !== "function") return fn;

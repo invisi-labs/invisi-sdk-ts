@@ -1,6 +1,6 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import * as api from "../trusted-provider";
-import { encodeRlp, keccak256, toBeHex } from "ethers";
+import { encodeRlp, keccak256, toBeHex, Interface } from "ethers";
 import { context, deployment, h, setup, status } from "./ProtocolRpcClient-fixtures";
 const header = {
     parentHash: h(1),
@@ -266,4 +266,66 @@ it("binds authorization lists in signed set-code transactions", async () => {
         (await new api.TrustedProvider(f.client, context).getTransaction(tx.hash as `0x${string}`))
             ?.from
     ).toBe(signer.address);
+});
+
+it("pins deployment code, version and registry chain-state requests to a fixed block", async () => {
+    const { Interface } = await import("ethers");
+    const abi = new Interface([
+        "function VERSION() view returns (uint256)",
+        "function addressRegistry() view returns (address)",
+    ]);
+    const f = setup((_method, params) => {
+        const request = params[0] as { kind: string; data?: string };
+        const data =
+            request.kind === "call"
+                ? request.data === abi.encodeFunctionData("VERSION")
+                    ? abi.encodeFunctionResult("VERSION", [1n])
+                    : abi.encodeFunctionResult("addressRegistry", [deployment.protocol.address])
+                : "0x6000";
+        return { ...status(), header, headerHash, data };
+    });
+    const reader = new api.TrustedProvider(f.client, context);
+    const block = {
+        number: 10n,
+        hash: headerHash as `0x${string}`,
+        parentHash: h(1),
+        timestamp: 123n,
+    };
+    await reader.getCode(deployment.protocol.address, block);
+    expect(await reader.getProtocolVersion(deployment.protocol.address, block)).toBe(1n);
+    expect(await reader.getProtocolAddressRegistry(deployment.protocol.address, block)).toBe(
+        deployment.protocol.address
+    );
+    expect(
+        f.requests
+            .filter((r) => ["code", "call"].includes((r.params[0] as { kind: string }).kind))
+            .map((r) => (r.params[0] as { block: string }).block)
+    ).toEqual(["0xa", "0xa", "0xa"]);
+    await expect(
+        reader.getCode(deployment.protocol.address, { ...block, hash: h(99) })
+    ).rejects.toThrow(/block/);
+});
+
+it("limits actual trusted nullifier contract calls to four while preserving vector order", async () => {
+    const f = setup(() => ({ ...status(), header, headerHash }));
+    const reader = new api.TrustedProvider(f.client, context);
+    const block = await reader.getBlock(10n);
+    const abi = new Interface(["function isNullifierSpent(bytes32) view returns (bool)"]);
+    let active = 0,
+        peak = 0;
+    const call = vi.spyOn(reader, "callContract").mockImplementation(async (request) => {
+        peak = Math.max(peak, ++active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active--;
+        const [nf] = abi.decodeFunctionData("isNullifierSpent", request.data);
+        return abi.encodeFunctionResult("isNullifierSpent", [
+            BigInt(nf) % 2n === 1n,
+        ]) as `0x${string}`;
+    });
+    const words = Array.from({ length: 40 }, (_, index) => h(index));
+    expect(await reader.isSpent(context, words, block)).toEqual(
+        words.map((_, index) => index % 2 === 1)
+    );
+    expect(call).toHaveBeenCalledTimes(40);
+    expect(peak).toBe(4);
 });

@@ -854,105 +854,205 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
         input: { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex },
         block: CanonicalBlock
     ): Promise<Membership> {
+        return (await this.getMemberships(context, [input], block))[0]!;
+    }
+
+    /** Authenticate a bounded ordered batch using operation-scoped shared chain evidence. */
+    async getMemberships(
+        context: DeploymentContext,
+        inputs: readonly { treeId: bigint; leafIndex: number; commitment: Hex; root?: Hex }[],
+        block: CanonicalBlock
+    ): Promise<Membership[]> {
         this.context(context);
-        if (
-            input.treeId <= 0n ||
-            !Number.isSafeInteger(input.leafIndex) ||
-            input.leafIndex < 0 ||
-            input.leafIndex >= 2 ** TREE_DEPTH
-        )
-            invalid("Invalid membership index");
-        const leaf = fieldHash(input.commitment);
-        const pinnedRoot = input.root === undefined ? undefined : fieldHash(input.root);
+        if (inputs.length > 256) invalid("Membership batch exceeds 256 inputs");
+        // Detach caller-owned requests before the first asynchronous boundary.
+        const requests = inputs.map((input) => {
+            if (
+                input.treeId <= 0n ||
+                !Number.isSafeInteger(input.leafIndex) ||
+                input.leafIndex < 0 ||
+                input.leafIndex >= 2 ** TREE_DEPTH
+            )
+                invalid("Invalid membership index");
+            return {
+                ...input,
+                commitment: fieldHash(input.commitment),
+                ...(input.root === undefined ? {} : { root: fieldHash(input.root) }),
+            };
+        });
+        const trees = new Map<bigint, { highestLeaf: number; root?: Hex }>();
+        for (const input of requests) {
+            const tree = trees.get(input.treeId) ?? { highestLeaf: input.leafIndex };
+            tree.highestLeaf = Math.max(tree.highestLeaf, input.leafIndex);
+            if (input.root !== undefined) {
+                if (tree.root !== undefined && tree.root !== input.root)
+                    invalid("Conflicting pinned membership roots within one tree");
+                tree.root = input.root;
+            }
+            trees.set(input.treeId, tree);
+        }
+        if (!requests.length) return [];
+        block = structuredClone(block);
         await this.getStatus(context);
         const canonical = await this.reader.getBlock(block.number);
-        if (
-            hash(canonical.hash) !== hash(block.hash) ||
-            hash(canonical.parentHash) !== hash(block.parentHash) ||
-            canonical.timestamp !== block.timestamp
-        )
-            invalid("Requested membership block is not canonical");
-        const roots = list(await this.rpc("invisi_getRoots", [numeric(input.treeId)]))
-            .map((value) => {
-                const anchor = object(value);
-                const count = integer(anchor.leafCount, 32);
-                if (integer(anchor.treeId) !== input.treeId || count > 1n << BigInt(TREE_DEPTH))
-                    invalid("Invalid RPC root metadata");
-                const root = fieldHash(anchor.root);
-                const remoteBlock = object(anchor.block);
-                const number = integer(remoteBlock.number);
-                hash(remoteBlock.hash);
-                hash(remoteBlock.parentHash);
-                integer(remoteBlock.timestamp);
-                return { anchor, count, root, number };
-            })
-            .filter(
-                (candidate) =>
-                    candidate.number <= canonical.number &&
-                    candidate.number >= this.deployment.protocol.fromBlock &&
-                    candidate.count > BigInt(input.leafIndex) &&
-                    (pinnedRoot === undefined || candidate.root === pinnedRoot)
+        const fence = (value: CanonicalBlock) => {
+            if (
+                value.number !== block.number ||
+                hash(value.hash) !== hash(block.hash) ||
+                hash(value.parentHash) !== hash(block.parentHash) ||
+                value.timestamp !== block.timestamp
             )
-            .sort((a, b) =>
-                a.number === b.number ? Number(b.count - a.count) : a.number > b.number ? -1 : 1
-            );
-        let selected: (typeof roots)[number] | undefined;
-        for (const candidate of roots) {
-            await this.canonical(candidate.anchor.block);
-            if (await this.reader.isKnownRoot(context, input.treeId, candidate.root, canonical)) {
-                selected = candidate;
-                break;
-            }
-        }
-        if (!selected) return invalid("No chain-known indexed membership root is available");
-        const root = selected.root;
-        const result = object(
-            await this.rpc("invisi_getMembership", [numeric(input.treeId), input.leafIndex, root])
-        );
-        const anchor = object(result.anchor);
-        if (
-            integer(anchor.treeId) !== input.treeId ||
-            fieldHash(anchor.root) !== root ||
-            integer(result.leafIndex, 32) !== BigInt(input.leafIndex) ||
-            fieldHash(result.commitment) !== leaf
-        )
-            invalid("RPC membership binding mismatch");
-        const count = integer(anchor.leafCount, 32);
-        if (
-            count !== selected.count ||
-            count <= BigInt(input.leafIndex) ||
-            count > 1n << BigInt(TREE_DEPTH)
-        )
-            invalid("Invalid membership leaf count");
-        const anchorBlock = await this.canonical(anchor.block);
-        const selectedBlock = object(selected.anchor.block);
-        if (
-            anchorBlock.number !== selected.number ||
-            hash(anchorBlock.hash) !== hash(selectedBlock.hash) ||
-            hash(anchorBlock.parentHash) !== hash(selectedBlock.parentHash) ||
-            anchorBlock.timestamp !== integer(selectedBlock.timestamp)
-        )
-            invalid("Membership anchor differs from selected root");
-        const path = list(result.siblings).map((v) => BigInt(fieldHash(v)));
-        if (path.length !== TREE_DEPTH) invalid("Invalid membership path depth");
-        let computed = BigInt(leaf);
-        for (let level = 0; level < path.length; level++)
-            computed = BigInt(
-                await poseidonHash(
-                    (input.leafIndex >> level) & 1
-                        ? [path[level]!, computed]
-                        : [computed, path[level]!]
-                )
-            );
-        if (computed !== BigInt(root)) invalid("Invalid membership proof root");
-        return {
-            treeId: input.treeId,
-            leafIndex: input.leafIndex,
-            leaf,
-            root,
-            path,
-            block: canonical,
+                invalid("Requested membership block is not canonical");
         };
+        fence(canonical);
+        const rootReads = new Map<bigint, Promise<unknown[]>>();
+        const rootsFor = (tree: bigint) => {
+            let result = rootReads.get(tree);
+            if (!result) {
+                result = this.rpc("invisi_getRoots", [numeric(tree)]).then(list);
+                rootReads.set(tree, result);
+            }
+            return result;
+        };
+        const usedAnchors = new Map<string, CanonicalBlock>();
+        const anchors = new Map<string, Promise<CanonicalBlock>>();
+        const canonicalAnchor = (value: unknown) => {
+            const remote = object(value);
+            const id = `${integer(remote.number)}:${hash(remote.hash)}:${hash(remote.parentHash)}:${integer(remote.timestamp)}`;
+            let result = anchors.get(id);
+            if (!result) {
+                result = this.canonical(value);
+                anchors.set(id, result);
+            }
+            return result;
+        };
+        const known = new Map<string, Promise<boolean>>();
+        const knownRoot = (tree: bigint, root: Hex) => {
+            const id = `${tree}:${root}`;
+            let result = known.get(id);
+            if (!result) {
+                result = this.reader.isKnownRoot(context, tree, root, canonical);
+                known.set(id, result);
+            }
+            return result;
+        };
+        const read = async (input: (typeof requests)[number]): Promise<Membership> => {
+            const leaf = input.commitment;
+            const tree = trees.get(input.treeId)!;
+            const pinnedRoot = tree.root;
+            const roots = (await rootsFor(input.treeId))
+                .map((value) => {
+                    const anchor = object(value);
+                    const count = integer(anchor.leafCount, 32);
+                    if (integer(anchor.treeId) !== input.treeId || count > 1n << BigInt(TREE_DEPTH))
+                        invalid("Invalid RPC root metadata");
+                    const root = fieldHash(anchor.root);
+                    const remoteBlock = object(anchor.block);
+                    const number = integer(remoteBlock.number);
+                    hash(remoteBlock.hash);
+                    hash(remoteBlock.parentHash);
+                    integer(remoteBlock.timestamp);
+                    return { anchor, count, root, number };
+                })
+                .filter(
+                    (candidate) =>
+                        candidate.number <= canonical.number &&
+                        candidate.number >= this.deployment.protocol.fromBlock &&
+                        candidate.count > BigInt(tree.highestLeaf) &&
+                        (pinnedRoot === undefined || candidate.root === pinnedRoot)
+                )
+                .sort((a, b) =>
+                    a.number === b.number ? Number(b.count - a.count) : a.number > b.number ? -1 : 1
+                );
+            let selected: (typeof roots)[number] | undefined;
+            for (const candidate of roots) {
+                await canonicalAnchor(candidate.anchor.block);
+                if (await knownRoot(input.treeId, candidate.root)) {
+                    selected = candidate;
+                    break;
+                }
+            }
+            if (!selected) return invalid("No chain-known indexed membership root is available");
+            const root = selected.root;
+            const result = object(
+                await this.rpc("invisi_getMembership", [
+                    numeric(input.treeId),
+                    input.leafIndex,
+                    root,
+                ])
+            );
+            const anchor = object(result.anchor);
+            if (
+                integer(anchor.treeId) !== input.treeId ||
+                fieldHash(anchor.root) !== root ||
+                integer(result.leafIndex, 32) !== BigInt(input.leafIndex) ||
+                fieldHash(result.commitment) !== leaf
+            )
+                invalid("RPC membership binding mismatch");
+            const count = integer(anchor.leafCount, 32);
+            if (
+                count !== selected.count ||
+                count <= BigInt(input.leafIndex) ||
+                count > 1n << BigInt(TREE_DEPTH)
+            )
+                invalid("Invalid membership leaf count");
+            const anchorBlock = await canonicalAnchor(anchor.block);
+            const selectedBlock = object(selected.anchor.block);
+            if (
+                anchorBlock.number !== selected.number ||
+                hash(anchorBlock.hash) !== hash(selectedBlock.hash) ||
+                hash(anchorBlock.parentHash) !== hash(selectedBlock.parentHash) ||
+                anchorBlock.timestamp !== integer(selectedBlock.timestamp)
+            )
+                invalid("Membership anchor differs from selected root");
+            usedAnchors.set(`${anchorBlock.number}:${anchorBlock.hash}`, anchorBlock);
+            const path = list(result.siblings).map((v) => BigInt(fieldHash(v)));
+            if (path.length !== TREE_DEPTH) invalid("Invalid membership path depth");
+            let computed = BigInt(leaf);
+            for (let level = 0; level < path.length; level++)
+                computed = BigInt(
+                    await poseidonHash(
+                        (input.leafIndex >> level) & 1
+                            ? [path[level]!, computed]
+                            : [computed, path[level]!]
+                    )
+                );
+            if (computed !== BigInt(root)) invalid("Invalid membership proof root");
+            return {
+                treeId: input.treeId,
+                leafIndex: input.leafIndex,
+                leaf,
+                root,
+                path,
+                block: canonical,
+            };
+        };
+        const results: Membership[] = new Array(requests.length);
+        let next = 0;
+        await Promise.all(
+            Array.from({ length: Math.min(4, requests.length) }, async () => {
+                while (next < requests.length) {
+                    const index = next++;
+                    results[index] = await read(requests[index]!);
+                }
+            })
+        );
+        for (const anchor of usedAnchors.values()) {
+            if (
+                anchor.number !== block.number ||
+                anchor.hash !== block.hash ||
+                anchor.parentHash !== block.parentHash ||
+                anchor.timestamp !== block.timestamp
+            )
+                await this.canonical({
+                    number: anchor.number.toString(),
+                    hash: anchor.hash,
+                    parentHash: anchor.parentHash,
+                    timestamp: anchor.timestamp.toString(),
+                });
+        }
+        fence(await this.reader.getBlock(block.number));
+        return results;
     }
 }
 
