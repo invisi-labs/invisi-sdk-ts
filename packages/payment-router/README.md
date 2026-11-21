@@ -4,84 +4,61 @@ The canonical Router/account and relay APIs described here are unreleased source
 
 Atomic native/ERC20 payments for the canonical `invisi-periphery` PaymentRouter (unified Router/account ABI; legacy snapshots are separately exported). Supports direct native, direct ERC20, signed relayed ERC20 and delegated-account sponsored native payments. Core proofs and settlement remain unchanged. Wallet keys and transaction submission remain host-provided.
 
-## Canonical PaymentRouter
+## Canonical PaymentRouter and pre-proof quotes
 
-Use `paymentRouterAbi` and `paymentRouterAccountAbi` for the unified deployment. `preparePayment` binds the Core funding payer to the Router; prove the returned prepared transaction before quoting. The Core funding amount includes note outputs **and** the Core token fee. Use `tokenIn: ZeroAddress` for native input; ERC20 addresses select token input. Both `UniswapV3Adapter` and `ZeroExAdapter` accept `tokenIn`; V3 paths run from the effective input (WETH for native) to the Core token. ERC20 0x quotes must use the configured AllowanceHolder and current registry Settler. Structural checks do not certify opaque liquidity actions; simulate the complete call.
+Use `paymentRouterAbi` and `paymentRouterAccountAbi` for the unified deployment. `preparePayment` binds Core funding to the Router and includes both Note outputs and the Core token fee. Wallet keys, proof execution and explicit transaction submission remain host-controlled.
 
-```ts
-const quote = await client.quote(adapter, {
-  tokenIn, tokenOut, amountOut: fundingAmount, maxInput, deadline,
-});
-const payment = await client.prepareRouterPayment({
-  payment: ready, payer, tokenIn, mode: PaymentMode.RelayedToken,
-  refundRecipient: payer, relayer, deadline: quote.deadline, amountInMaximum: quote.maxInput, quote,
-});
-payment.signature = await signPaymentIntent(signer, deployment.chainId, deployment.routerAddress, payment.intent);
-const outer = client.buildRouterTransaction(payment);
-await client.simulateRouterPayment(outer, { from: relayer });
-const rpcFields = relayEnvelope((await ready.exportTransaction()).data, outer);
-const quoteHash = hashRelayEnvelope(deployment.chainId, deployment.coreAddress, outer);
-// Estimate/getQuote send rpcFields; submit additionally sends quote and signature.
-// PaymentRouterRelayClient verifies quoteHash and the envelope format automatically.
-```
-
-For direct submission, select `PaymentMode.DirectNative` or `PaymentMode.DirectToken`, omit `relayer` and signature, simulate from `payer`, and send the returned call from that wallet. Native `value` is the maximum input; token calls have zero value. Omit `quote` for same-token input or native-to-WETH wrapping; `noSwapRoute` is selected automatically. Low-level `buildPaymentIntent`, `hashCoreRequest`, `hashRoute`, `intentTypedData`, `hashPaymentIntent` and `buildRouterPayment` support detached integrations. The typed intent binds the exact proof, Core request, route, payer, Router nonce, budget, deadline and fixed relayer.
-
-ERC20 input additionally requires `inputApproval`/`inputAllowance`, or an ERC-2612 permit constructed with `inputPermitTypedData` and `signedInputPermit`. Set `payment.permit` before encoding; no permit is assumed for WETH. Token-domain metadata and token permit nonce come from the host. An allowance or permit does not replace the relayed intent signature.
-
-For sponsored native input, select `PaymentMode.SponsoredNative`, build the inner Router call, then use `prepareNativeAccountPayment(provider, {chainId, implementation, payer, routerCall, deadline, relayer}, {implementationCodeHash?, undelegatedNonce?})`. It checks the implementation's pinned Router/code hash and refuses another installed implementation. When no delegation is installed, explicitly supply the known action nonce (`0n` only for a fresh account); revoking delegation preserves old action storage. Sign `result.authorizationRequest` with a compatible wallet's EIP-7702 authorization method only when `delegationNeeded`, validate it with `validateDelegation`, and separately sign `result.payment` with `signNativePayment`. Use `buildAccountPayment(result.payment, signature)` for the zero-value outer transaction. Call `simulateRouterPayment` with the actual Broadcaster sender and optional signed `authorizationList`, then `relayEnvelope(coreCalldata, outer, authorizationList)` and `hashRelayEnvelope` with that same list.
-
-The Router intent nonce, account action nonce, payer EOA nonce used by EIP-7702 authorization, and Broadcaster outer transaction nonce have distinct roles. An authorization consumes the payer EOA nonce; the host must coordinate it with pending payer transactions. An existing matching delegation needs no new authorization tuple. Chain/wallet EIP-7702 support must be confirmed by the host and the complete type-4 simulation; this package does not submit delegation changes, replace or revoke delegation. A delegation can persist even if payment execution reverts. `prepareNativeAccountPayment` reads state for preparation; repeat simulation immediately before submitting because nonce, registry and chain state can change.
-
-`relayEnvelope` emits `{data: embeddedCoreCalldata, router:{to,data,value:"0",authorizationList?}}`. Signed authorization integers use geth JSON quantities. `hashRelayEnvelope` matches Go's `EnvelopeHash` and binds chain, Core, outer target, zero value, calldata and ordered authorizations under `payment-router-envelope-v1`. Execute the quoted outer transaction unchanged. Relay only accepts `payTokenFor` or a sponsored-native account call.
-
-## Broadcaster RPC
-
-Use the dedicated `PaymentRouterRelayClient` for Router payments. The ordinary Core `BroadcasterClient` verifies a different request hash and must not process Router quotes.
+The relay lifecycle is **prepare draft → local estimate → service fee estimate → rebuild unsigned final fee/route → formal quote → prove → sign actual call → submit**. A formal `payment-router-intent-v1` quote requires the final business fields, including Core fee, outputs/deliveries, input cap, route, deadlines and every nonce. It requires no proof or wallet signature. An approved fee may exceed the service floor; never exceed the host's fee or input caps. If a fee rebuild changes the required output amount, refresh the exact-output swap route before the formal quote. There is no automatic fee increase, broadcast or convergence guarantee.
 
 ```ts
-const relay = new PaymentRouterRelayClient({
-  endpoint: "https://your-broadcaster.example",
-  trust: {
-    chainId: deployment.chainId, core: deployment.coreAddress,
-    quoteSigner: trustedBroadcasterSigner, feeRecipient: trustedFeeRecipient,
-  },
+const prepared = await client.preparePayment(preparation);
+const draft = await client.prepareRouterPaymentDraft({
+  payment: prepared, payer, tokenIn, mode: PaymentMode.RelayedToken,
+  refundRecipient: payer, relayer, deadline, amountInMaximum: maxInput,
+  // quote: exact-output swap quote when input differs from Core token
 });
-const input = {
-  coreCalldata: (await ready.exportTransaction()).data,
-  outer, // signed payTokenFor or signed delegated-account transaction
-  ...(authorizationList ? { authorizationList } : {}),
-};
-// input already includes a real Core proof, player signatures, balance and
-// Router allowance/permit. There is no unsigned pre-proof Router estimate.
-const estimate = await relay.estimateQuote(input);
-// approvedCoreFeeAmount and maxFeeAmount are host-approved Core-token base units.
-if (approvedCoreFeeAmount > maxFeeAmount || BigInt(estimate.feeAmount) > maxFeeAmount)
-  throw new Error("Fee exceeds approved limit");
-if (BigInt(estimate.feeAmount) > approvedCoreFeeAmount)
-  throw new Error("Rebuild Core proof, route and player signatures with an approved higher fee");
-const signedQuote = await relay.getQuote(input);
-// Persist the exact input + signedQuote, then explicitly submit when host authorizes:
+const coreIntent = await prepared.exportBroadcasterIntent();
+const draftInput = {coreCalldata: coreIntent.data, outer: buildRouterPaymentDraft(draft)};
+const baseline = prepared.estimateGas();
+if (!baseline.available) throw new Error("Core preview unavailable");
+const local = estimateRouterPaymentGas(draft, baseline.gasUnits);
+const estimate = await relay.estimateRouterFee(draftInput);
+if (approvedCoreFeeAmount < BigInt(estimate.feeAmount) || approvedCoreFeeAmount > maxFeeAmount)
+  throw new Error("Approve a fee covering the floor within the cap");
+// If the provisional fee differs, call preparePayment with the approved final fee,
+// refresh the swap route and prepareRouterPaymentDraft again. No proving is needed.
+const signedQuote = await relay.getQuote(finalDraftInput);
+const ready = await finalPrepared.prove();
+const coreCall = await ready.exportTransaction();
+const actual = finalizeRouterPayment(finalDraftPayment, coreCall);
+actual.signature = await signPaymentIntent(signer, chainId, routerAddress, actual.intent);
+const input = {coreCalldata: coreCall.data, outer: client.buildRouterTransaction(actual)};
+await client.simulateRouterPayment(input.outer, {from: relayer});
+// Persist input + signedQuote. Explicitly submit only after host review:
 // const submission = await relay.submitTransaction(input, signedQuote);
 ```
 
-Router fee bootstrap is host policy: choose and approve a provisional Core-token fee, prepare/prove it, obtain its route, complete allowance/permit and player/account/delegation signatures, then estimate. The estimate prices the **complete outer transaction**, including signed authorizations. If the estimate exceeds the approved Core fee, rebuild the Core request/proof, refresh the route and all affected signatures, then estimate/quote again within the user's fee/input limits. An already approved fee above the estimate can be retained; the final quote must match that exact Core fee. There is no automatic fee increase or guarantee that repeated estimates converge. A route-only change can reuse an unchanged valid Core proof, but needs fresh Router/account signatures and an envelope quote. Ordinary Core `BroadcasterClient.quote(prepared)` flows may quote before authorization/proving; that lifecycle does not apply to Router estimation.
+`prepareRouterPaymentDraft` accepts an unproved `TransactionCall` or the normal SDK `PreparedTransaction`; it uses that transaction's existing `exportBroadcasterIntent()` without fake proof bytes. `prepareRouterPayment` still requires an actual proof. `buildRouterPaymentDraft` and `buildAccountPaymentDraft` encode quote-only calls. `buildRouterPayment` requires a proof and the relayed-token signature. `finalizeRouterPayment` requires identical Core business fields and rebuilds the actual proof-dependent Router intent hash before signing. The Core fee/route cannot change after the formal quote.
 
-These methods send the standard `broadcaster_estimateQuote`, `broadcaster_getQuote` and `broadcaster_submitTransaction` methods. Each request carries the embedded Core `data` and `router` envelope; submission additionally sends `quote` and `signature`. The client pins the trusted chain/Core, quote signer and fee recipient, computes the request hash from the actual outer transaction and ordered authorizations, verifies the EIP-712 signature, and rechecks the quote before submission. It accepts direct execution only, requires the exact Core settlement token/fee, and bounds quote expiry by the Core request, Router intent and account action. An expired quote cannot be submitted through this client. An optional injected `transport` supports hosts with their own networking; default transport requires HTTPS and limits response size/time.
+`estimateRouterGas` consumes `coreGasUnits`, numeric `mode` (0–3), `channel` (0–2), `hopCount`, `routeBytes`, `permit`, `authorizationCount` and optional `zeroExGasUnits`. `estimateRouterPaymentGas` derives these Router fields from a payment, taking the existing Core gas preview as its baseline. Results use `source: "model"`, `modelId: "payment-router-gas-v1"`, and either `available/gasUnits/breakdown` or an unavailable reason. The shipped shared JSON profile contains conservative engineering allowances, not measured swap benchmarks. The common Core transaction base is counted once. V3 supports 1–8 hops; no-swap routes carry no route bytes/hops. Opaque 0x routes require an independently trusted positive route gas budget; otherwise the preview is unavailable. The service independently configures its own budget and does not trust client gas hints. A model preview is not an RPC simulation or transaction gas limit.
 
-`verifyRouterBroadcasterQuote` is also exported for detached verification. Its expected hash always comes from `RouterRelayInput`; never substitute a remotely supplied hash. `provenanceRequired` may be true, false or absent as service capability metadata; the envelope hash remains unchanged. Pure public Router funding has no private-input provenance sidecar, even when `provenanceRequired` is true. No scheduling or aggregation is requested. Signed authorization `chainId`, `nonce`, `yParity`, `r` and `s` use minimal geth JSON quantities, including signatures with leading zero limbs.
+For native input use `tokenIn: ZeroAddress`. `prepareNativeAccountPayment` checks the pinned implementation, Router/code hash and current account action nonce; it refuses a foreign installed delegation. Supply the persisted action nonce when undelegated (`0n` only for a known fresh account; revocation preserves action storage). Build the unsigned account draft with `buildAccountPaymentDraft`. If delegation is needed, include `unsignedDelegation(result.authorizationRequest)` in the draft authorization list: its chain, delegate and EOA nonce are bound, while its signature remains empty. Obtain the formal quote, prove, rebuild the actual Router call and replace `result.payment.routerCall`, then sign `signNativePayment` and the exact EIP-7702 authorization request. Build the actual outer call with `buildAccountPayment`, simulate with the signed authorization list, and explicitly submit using the same quote. A matching installed delegation requires no authorization tuple. Router intent nonce, account action nonce, payer EOA authorization nonce and Broadcaster outer transaction nonce are distinct. The host coordinates pending payer transactions; the SDK never replaces foreign delegation or broadcasts a delegation change.
 
-The fee token is the embedded Core output token; native or ERC20 input needs no separate Broadcaster price listing. Discover enabled `paymentRouters` and the actual sender through `broadcaster_getStatus` / `broadcaster_getTokenSupport`, and independently pin chain/Core, quote signer, fee recipient and deployments. The Broadcaster is the fixed `relayer` in the signed payment. Self-submitted modes use the payer wallet directly.
+Direct native/token modes use the payer wallet and no Broadcaster. ERC20 input needs Router allowance (`inputAllowance`/`inputApproval`) or an ERC-2612 permit (`inputPermitTypedData`/`signedInputPermit`). Set the permit deadline in the draft before quoting; its signature can follow the quote. Permits and allowance do not replace the Router intent signature. Native `value` is the maximum input; sponsored native wraps this inner call in a zero-value account outer call. Omit the swap quote for same-token funding or native-to-WETH wrapping.
 
-Persist `input` and `signedQuote` before explicitly calling `submitTransaction`. Save `submission.id` as an opaque server identifier. Query the standard API with a host JSON-RPC transport (the dedicated client currently has no status convenience method):
+## Broadcaster RPC
 
-```json
-{"jsonrpc":"2.0","id":2,"method":"broadcaster_getTransactionStatus","params":[{"id":"<returned submission id>"}]}
-```
+Construct `PaymentRouterRelayClient` with an HTTPS endpoint and independently trusted `chainId`, `core`, `quoteSigner` and `feeRecipient`. Discover enabled deployments and the actual fixed relayer through `broadcaster_getStatus` / `broadcaster_getTokenSupport`. The normal Core `BroadcasterClient` uses a different request hash and must not verify Router quotes.
 
-Poll with backoff. `pending`, `submitted`, `confirmed`, `reverted` and `uncertain` describe execution progress; confirmed receipt success does not establish native finality. If the submission response is lost before saving the ID, replay the exact saved envelope/quote through `submitTransaction` while its local quote verifier still accepts it; the server returns the original accepted outcome. The server also supports frozen raw-request recovery after quote expiry, but this client's expiry verifier prevents that replay, so the host must use its own JSON-RPC transport for that case. Never generate a fresh proof/quote to recover an uncertain submission. Proof bytes, player signatures and authorization tuples are part of Router envelope identity; changing any creates a different request. An uncertain send retains service reservations and requires reconciliation, without automatic rebroadcast.
+`estimateRouterFee` (alias `estimateQuote`) and `getQuote` send canonical draft `{data,router:{to,data,value:"0",authorizationList?}}` through `broadcaster_estimateQuote` and `broadcaster_getQuote`. `submitTransaction` sends the actual proved/signed envelope plus `quote` and `signature` through `broadcaster_submitTransaction`; it rejects empty proof/player signatures and verifies the quote again. The service validates actual Core/route hashes, wallet signatures, deployment and live nonces, and estimates/simulates the full final outer call within signed gas and fee caps.
 
-The [canonical host examples](../../examples/08-payment-router/03-canonical-host.ts) prepare real proofs and return reviewed self/relay calls without broadcasting by default. Their callbacks retain wallet custody and delegation decisions with the host.
+`hashRouterIntent` strictly decodes canonical relay ABI and recomputes the existing raw envelope hash after clearing the Core proof and rebuilding its Core request hash, clearing Router/account and permit signatures (retaining permit deadline), and clearing EIP-7702 signature limbs (retaining ordered chain/delegate/nonces). It wraps that normalized hash under `InvisiPaymentRouterIntentV1`. Every other business field remains bound. Embedded Core calldata must match its own outer call at both draft and final stages. `verifyRouterBroadcasterQuote` derives the identity locally and accepts `payment-router-intent-v1` plus explicit legacy `payment-router-envelope-v1` records. `hashRelayEnvelope` remains the raw-envelope identity/debug utility and legacy quote hash. `relayDraftEnvelope` permits unsigned metadata; `relayEnvelope` requires an actual proof and signatures. Relaying supports only `payTokenFor` or account-wrapped sponsored `payNative`.
+
+Quote verification pins the settlement token, exact Core fee and recipient, quote signer, direct execution, and expiry within Core/Router/account deadlines. Proof and signature changes retain the new semantic quote; changing fee, route, payer, budget, nonces, deadlines, deliveries, delegation metadata or outer target requires another quote. Optional `provenanceRequired` is service capability metadata; pure Router funding sends no private-input sidecar. Authorization integer fields use minimal geth JSON quantities.
+
+Persist the final input and signed quote before explicit submission; save the returned opaque `id` and query `broadcaster_getTransactionStatus` with `params:[{id}]`, polling with backoff. An uncertain acknowledgement must recover the original saved request and outcome, without automatic rebroadcast. The service uses semantic identity for new records and retains legacy identity for old records. This client's expiry verifier blocks expired replay; use the host RPC recovery interface for an already accepted expired record. Confirmed execution does not establish chain finality.
+
+The [canonical host examples](../../examples/08-payment-router/03-canonical-host.ts) implement both token and native formal quote-before-proof flows, preserve host fee/input caps, and return reviewed calls without broadcasting.
 
 ## Legacy native-only deployments
 

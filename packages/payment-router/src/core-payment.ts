@@ -17,7 +17,8 @@ export function inspectCorePayment(
     call: TransactionCall,
     deployment: PaymentRouterDeployment,
     now: bigint,
-    allowWethOutput = false
+    allowWethOutput = false,
+    allowEmptyProof = false
 ): { proof: Hex; request: TransactRequest } {
     check(
         same(call.to, deployment.coreAddress) && call.value === 0n,
@@ -25,7 +26,7 @@ export function inspectCorePayment(
     );
     const [rawProof, r] = coreInterface.decodeFunctionData("transact", hex(call.data));
     const proof = hex(rawProof, "core proof");
-    check(proof !== "0x", "core proof is required");
+    check(allowEmptyProof || proof !== "0x", "core proof is required");
     const params: TransactRequest["params"] = {
         token: r.params.token,
         sources: Array.from(r.params.sources, (s: any) => ({

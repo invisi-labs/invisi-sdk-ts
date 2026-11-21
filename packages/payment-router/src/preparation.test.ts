@@ -2,6 +2,15 @@ import { expect, it } from "vitest";
 import { Invisi, NoteOutput, Wallet } from "@invisi-labs/sdk";
 import { fixture } from "../../../test-support/operation-fixture";
 import { backend } from "../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
+import { Interface } from "ethers";
+import { coreInterface } from "./core-payment";
+import {
+    PaymentMode,
+    buildRouterPaymentDraft,
+    finalizeRouterPayment,
+    paymentRouterAbi,
+    estimateRouterPaymentGas,
+} from "./index";
 import { PaymentRouterClient, UniswapV3Adapter } from "./index";
 import { A, chain, deployment, routerInterface } from "./testing";
 it("composes actual detached SDK preparation and proof lifecycle with Router-funded outputs and fee", async () => {
@@ -42,8 +51,58 @@ it("composes actual detached SDK preparation and proof lifecycle with Router-fun
         sigNonce: 0n,
         deadline: 0n,
     });
+    const canonical = new Interface(paymentRouterAbi);
+    const originalCall = rpc.provider.call.bind(rpc.provider);
+    rpc.provider.call = async (tx) =>
+        tx.data?.toString().startsWith(canonical.getFunction("nonces")!.selector)
+            ? canonical.encodeFunctionResult("nonces", [0n])
+            : originalCall(tx);
+    const draftOptions = {
+        payment: prepared,
+        payer: A.player,
+        tokenIn: A.token,
+        mode: PaymentMode.DirectToken,
+        refundRecipient: A.player,
+        deadline: 2000000100n,
+        amountInMaximum: 10n,
+    };
+    const draft = await client.prepareRouterPaymentDraft(draftOptions);
+    expect(draft.proof).toBe("0x");
+    expect(
+        coreInterface.decodeFunctionData(
+            "transact",
+            (await prepared.exportBroadcasterIntent()).data
+        )[0]
+    ).toBe("0x");
+    expect(() => client.buildRouterTransaction(draft)).toThrow("proof");
+    expect(buildRouterPaymentDraft(draft).value).toBe(0n);
+    const baseline = prepared.estimateGas();
+    expect(baseline.available).toBe(true);
+    if (baseline.available)
+        expect(estimateRouterPaymentGas(draft, baseline.gasUnits)).toMatchObject({
+            available: true,
+            source: "model",
+        });
+    await expect(
+        client.prepareRouterPayment({
+            ...draftOptions,
+            payment: {
+                to: A.core,
+                value: 0n,
+                data: (await prepared.exportBroadcasterIntent()).data,
+            },
+        })
+    ).rejects.toThrow("proof");
     // The cryptographic backend is the explicit test boundary; SDK statement/proof checks are real.
     const ready = await prepared.prove(backend());
+    const actual = finalizeRouterPayment(draft, await ready.exportTransaction());
+    expect(actual.proof).not.toBe("0x");
+    expect(actual.intent.coreRequestHash).not.toBe(draft.intent.coreRequestHash);
+    expect(() => client.buildRouterTransaction(actual)).not.toThrow();
+    await expect(
+        client.prepareRouterPaymentDraft({ ...draftOptions, payment: prepared })
+    ).rejects.toThrow(); // stale prepared handle
+
     const quote = await client.quote(
         new UniswapV3Adapter({
             provider: rpc.provider,

@@ -5,6 +5,7 @@ import type { Address } from "@invisi-labs/protocol/contracts";
 import {
     buildPaymentIntent,
     buildRouterPayment,
+    buildRouterPaymentDraft,
     simulateOuterPayment,
     PaymentMode,
     RouteChannel,
@@ -168,28 +169,42 @@ export class PaymentRouterClient {
         } else throw new Error("unsupported swap channel");
     }
     /** Inspect the prepared Core call and bind the quote and current payer nonce to the Router intent. */
-    async prepareRouterPayment(options: {
-        payment: CorePayment;
-        payer: Address;
-        tokenIn: Address;
-        mode: PaymentMode;
-        refundRecipient: Address;
-        relayer?: Address;
-        deadline: bigint;
-        amountInMaximum: bigint;
-        quote?: SwapQuote;
-    }): Promise<RouterPayment> {
+    async prepareRouterPayment(options: RouterPreparation): Promise<RouterPayment> {
+        return this.#prepareRouterPayment(options, false);
+    }
+    /** Quote-only preparation: accepts an unproved Core call or PreparedTransaction. */
+    async prepareRouterPaymentDraft(options: RouterPreparation): Promise<RouterPayment> {
+        return this.#prepareRouterPayment(options, true);
+    }
+    async #prepareRouterPayment(
+        options: RouterPreparation,
+        draft: boolean
+    ): Promise<RouterPayment> {
         const { payment, ...values } = options;
         const config = structuredClone(values);
         const call = structuredClone(
-            "exportTransaction" in payment ? await payment.exportTransaction() : payment
+            draft && "exportBroadcasterIntent" in payment
+                ? {
+                      to: this.#deployment.coreAddress,
+                      value: 0n,
+                      data: (await payment.exportBroadcasterIntent()).data,
+                  }
+                : "exportTransaction" in payment
+                  ? await payment.exportTransaction()
+                  : payment
         );
         const snapshot = await frame(
             this.#provider,
             this.#deployment,
             config.quote?.channel === "zeroex"
         );
-        const { proof, request } = inspectCorePayment(call, this.#deployment, snapshot.now, true);
+        const { proof, request } = inspectCorePayment(
+            call,
+            this.#deployment,
+            snapshot.now,
+            true,
+            draft
+        );
         let route = noSwapRoute();
         const quote = config.quote;
         if (quote) {
@@ -244,7 +259,7 @@ export class PaymentRouterClient {
             route,
             intent,
         };
-        buildRouterPayment({
+        buildRouterPaymentDraft({
             ...prepared,
             ...(config.mode === PaymentMode.RelayedToken ? { signature: "0x" as const } : {}),
         });
@@ -395,4 +410,16 @@ export class PaymentRouterClient {
         await assertFrame(this.#provider, snapshot);
         return { gasEstimate, ethSpent, ethRefunded: call.value - ethSpent };
     }
+}
+
+export interface RouterPreparation {
+    payment: CorePayment;
+    payer: Address;
+    tokenIn: Address;
+    mode: PaymentMode;
+    refundRecipient: Address;
+    relayer?: Address;
+    deadline: bigint;
+    amountInMaximum: bigint;
+    quote?: SwapQuote;
 }

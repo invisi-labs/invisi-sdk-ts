@@ -194,6 +194,21 @@ export interface RouterPayment {
     signature?: Hex;
 }
 export function buildRouterPayment(payment: RouterPayment): TransactionCall {
+    check(payment.proof !== "0x", "core proof is required");
+    if (payment.intent.mode === PaymentMode.RelayedToken)
+        check(!!payment.signature && payment.signature !== "0x", "missing intent signature");
+    return encodeRouterPayment(payment);
+}
+/** Unsigned, unproved quote-only call. Never submit this call. */
+export function buildRouterPaymentDraft(payment: RouterPayment): TransactionCall {
+    return encodeRouterPayment({
+        ...payment,
+        ...(payment.intent.mode === PaymentMode.RelayedToken
+            ? { signature: payment.signature ?? ("0x" as Hex) }
+            : {}),
+    });
+}
+function encodeRouterPayment(payment: RouterPayment): TransactionCall {
     const { routerAddress, proof, request, intent, route } = payment;
     const native =
         intent.mode === PaymentMode.DirectNative || intent.mode === PaymentMode.SponsoredNative;
@@ -360,6 +375,23 @@ export async function signNativePayment(signer: Signer, p: NativeAccountPayment)
     return hex(await signer.signTypedData(domain, types, message));
 }
 export function buildAccountPayment(p: NativeAccountPayment, signature: Hex): TransactionCall {
+    check(signature !== "0x", "missing account signature");
+    const [proof, request, intent, route] = router.decodeFunctionData(
+        "payNative",
+        p.routerCall.data
+    );
+    check(proof !== "0x", "core proof is required");
+    check(
+        intent.coreRequestHash.toLowerCase() === hashCoreRequest(proof, request) &&
+            intent.routeHash.toLowerCase() === hashRoute(route),
+        "intent hash mismatch"
+    );
+    return buildAccountPaymentDraft(p, signature);
+}
+export function buildAccountPaymentDraft(
+    p: NativeAccountPayment,
+    signature: Hex = "0x"
+): TransactionCall {
     nativePaymentTypedData(p);
     return {
         to: address(p.payer),
@@ -420,10 +452,39 @@ export async function simulateOuterPayment(
     const [result, gasEstimate] = await Promise.all([provider.call(tx), provider.estimateGas(tx)]);
     return { spent: coder.decode(["uint256"], result)[0] as bigint, gasEstimate };
 }
+export type RouterAuthorization = Pick<Authorization, "address" | "chainId" | "nonce"> & {
+    signature: Pick<Signature, "yParity" | "r" | "s">;
+};
+export function unsignedDelegation(request: {
+    address: string;
+    chainId: bigint;
+    nonce: number | bigint;
+}): RouterAuthorization {
+    return {
+        ...request,
+        nonce: BigInt(request.nonce),
+        signature: { yParity: 0, r: ZeroHash, s: ZeroHash },
+    };
+}
 export function relayEnvelope(
     coreCalldata: Hex,
     outer: TransactionCall,
-    authorizationList?: Authorization[]
+    authorizationList?: RouterAuthorization[]
+) {
+    return encodeRelayEnvelope(coreCalldata, outer, authorizationList, false);
+}
+export function relayDraftEnvelope(
+    coreCalldata: Hex,
+    outer: TransactionCall,
+    authorizationList?: RouterAuthorization[]
+) {
+    return encodeRelayEnvelope(coreCalldata, outer, authorizationList, true);
+}
+function encodeRelayEnvelope(
+    coreCalldata: Hex,
+    outer: TransactionCall,
+    authorizationList: RouterAuthorization[] = [],
+    draft: boolean
 ) {
     check(outer.value === 0n, "relay outer value must be zero");
     address(outer.to);
@@ -436,6 +497,7 @@ export function relayEnvelope(
                 inner.toLowerCase(),
             "noncanonical account calldata"
         );
+        if (!draft) check(args[5] !== "0x", "missing account signature");
         inner = args[0];
         accountPayer = outer.to;
         const [, , intent] = router.decodeFunctionData("payNative", inner);
@@ -448,9 +510,9 @@ export function relayEnvelope(
             "invalid native relay"
         );
         check((authorizationList?.length ?? 0) <= 1, "unexpected delegation authorizations");
-        for (const auth of authorizationList ?? [])
+        for (const auth of draft ? [] : (authorizationList ?? []))
             check(
-                same(verifyAuthorization(auth, auth.signature), outer.to),
+                same(verifyAuthorization(auth, Signature.from(auth.signature)), outer.to),
                 "authorization payer mismatch"
             );
     } else {
@@ -479,6 +541,16 @@ export function relayEnvelope(
                 .toLowerCase() === coreCalldata.toLowerCase(),
         "embedded Core calldata mismatch"
     );
+    const [proof, request, intent, route] = decoded.args;
+    check(
+        intent.coreRequestHash.toLowerCase() === hashCoreRequest(proof, request) &&
+            intent.routeHash.toLowerCase() === hashRoute(route),
+        "intent hash mismatch"
+    );
+    if (!draft) {
+        check(proof !== "0x", "core proof is required");
+        if (!accountPayer) check(decoded.args[5] !== "0x", "missing intent signature");
+    }
     return {
         data: coreCalldata,
         router: {
@@ -509,7 +581,7 @@ export function hashRelayEnvelope(
     chainId: bigint,
     core: Address,
     outer: TransactionCall,
-    authorizationList: Authorization[] = []
+    authorizationList: RouterAuthorization[] = []
 ): Hex {
     uint(chainId, 256, "chain ID", true);
     check(outer.value === 0n && hex(outer.data).length >= 10, "invalid relay envelope");
@@ -625,4 +697,77 @@ export async function prepareNativeAccountPayment(
               }
             : {}),
     };
+}
+
+export const PAYMENT_ROUTER_INTENT_HASH_FORMAT = "payment-router-intent-v1" as const;
+/** Semantic quote identity: proof and wallet signatures are supplied only after quoting. */
+export function hashRouterIntent(
+    chainId: bigint,
+    core: Address,
+    outer: TransactionCall,
+    authorizationList: RouterAuthorization[] = []
+): Hex {
+    let inner = outer.data;
+    let wrapper: unknown[] | undefined;
+    if (inner.slice(0, 10) === account.getFunction("executeNativePayment")!.selector) {
+        wrapper = account.decodeFunctionData("executeNativePayment", inner).toArray(true);
+        check(
+            account.encodeFunctionData("executeNativePayment", wrapper).toLowerCase() ===
+                inner.toLowerCase(),
+            "noncanonical account calldata"
+        );
+        inner = wrapper[0] as Hex;
+    }
+    const parsed = router.parseTransaction({ data: inner });
+    check(
+        parsed && (parsed.name === "payTokenFor" || (wrapper && parsed.name === "payNative")),
+        "invalid relay call"
+    );
+    const args = parsed.args.toArray(true);
+    const coreCalldata = coreInterface.encodeFunctionData("transact", [args[0], args[1]]) as Hex;
+    relayDraftEnvelope(coreCalldata, outer, authorizationList);
+    args[0] = "0x";
+    (args[2] as unknown[])[7] = hashCoreRequest("0x", parsed.args[1]);
+    if (parsed.name === "payTokenFor") {
+        const permit = args[4] as unknown[];
+        permit[1] = 0;
+        permit[2] = ZeroHash;
+        permit[3] = ZeroHash;
+        args[5] = "0x";
+    }
+    let data = router.encodeFunctionData(parsed.name, args) as Hex;
+    if (wrapper) {
+        wrapper[0] = data;
+        wrapper[5] = "0x";
+        data = account.encodeFunctionData("executeNativePayment", wrapper) as Hex;
+    }
+    const normalized = authorizationList.map((a) => ({
+        ...a,
+        signature: { yParity: 0 as const, r: ZeroHash, s: ZeroHash },
+    }));
+    const normalizedHash = hashRelayEnvelope(chainId, core, { ...outer, data }, normalized);
+    return keccak256(
+        coder.encode(["bytes32", "bytes32"], [id("InvisiPaymentRouterIntentV1"), normalizedHash])
+    ) as Hex;
+}
+/** Retain all quoted business fields, replace the proof, and rebuild the actual signing hash. */
+export function finalizeRouterPayment(
+    draft: RouterPayment,
+    coreCall: TransactionCall
+): RouterPayment {
+    const [proof, request] = coreInterface.decodeFunctionData("transact", coreCall.data);
+    check(
+        proof !== "0x" &&
+            coreCall.value === 0n &&
+            hashCoreRequest("0x", request) === hashCoreRequest("0x", draft.request),
+        "final Core business fields mismatch"
+    );
+    const payment = {
+        ...draft,
+        proof: proof as Hex,
+        request: structuredClone(draft.request),
+        intent: { ...draft.intent, coreRequestHash: hashCoreRequest(proof, request) },
+    };
+    delete payment.signature;
+    return payment;
 }

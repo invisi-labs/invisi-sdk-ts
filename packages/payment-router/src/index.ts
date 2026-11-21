@@ -8,6 +8,7 @@ export {
 export type { ZeroExPayloadOptions } from "./codecs";
 export type * from "./types";
 export { PaymentRouterClient } from "./client";
+export type { RouterPreparation } from "./client";
 export { UniswapV3Adapter } from "./adapters/uniswap-v3";
 export { ZeroExAdapter, createZeroExQuoteFetcher } from "./adapters/zeroex";
 
@@ -17,3 +18,5 @@ export type { ZeroExQuoteTransport, ZeroExHttpOptions } from "./adapters/zeroex"
 export * from "./canonical-abi";
 export * from "./canonical";
 export * from "./relay-client";
+
+export * from "./gas";

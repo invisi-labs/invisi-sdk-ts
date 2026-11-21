@@ -1,15 +1,23 @@
-import { Signature, Interface, verifyTypedData, type Authorization } from "ethers";
+import { Interface, verifyTypedData } from "ethers";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import type { TransactionCall } from "@invisi-labs/protocol";
 import { paymentRouterAbi, paymentRouterAccountAbi } from "./canonical-abi";
 import { coreInterface } from "./core-payment";
-import { hashRelayEnvelope, relayEnvelope, PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT } from "./canonical";
+import {
+    hashRelayEnvelope,
+    hashRouterIntent,
+    relayDraftEnvelope,
+    relayEnvelope,
+    PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT,
+    PAYMENT_ROUTER_INTENT_HASH_FORMAT,
+    type RouterAuthorization,
+} from "./canonical";
 import { address, check, decimal, hex, record, same, uint } from "./validation";
 
 export interface RouterRelayInput {
     coreCalldata: Hex;
     outer: TransactionCall;
-    authorizationList?: Authorization[];
+    authorizationList?: RouterAuthorization[];
 }
 export interface RouterBroadcasterTrust {
     chainId: bigint;
@@ -29,7 +37,8 @@ export interface RouterBroadcasterQuote {
 export interface SignedRouterBroadcasterQuote {
     quote: RouterBroadcasterQuote;
     signature: Hex;
-    requestHashFormat: typeof PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT;
+    requestHashFormat:
+        typeof PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT | typeof PAYMENT_ROUTER_INTENT_HASH_FORMAT;
     provenanceRequired?: boolean;
 }
 export interface RouterBroadcasterEstimate {
@@ -73,7 +82,11 @@ function snapshotInput(input: RouterRelayInput): RouterRelayInput {
             ? {
                   authorizationList: input.authorizationList.map((a) => ({
                       ...a,
-                      signature: Signature.from(a.signature.serialized),
+                      signature: {
+                          yParity: a.signature.yParity,
+                          r: a.signature.r,
+                          s: a.signature.s,
+                      },
                   })),
               }
             : {}),
@@ -82,7 +95,7 @@ function snapshotInput(input: RouterRelayInput): RouterRelayInput {
 const router = new Interface(paymentRouterAbi),
     account = new Interface(paymentRouterAccountAbi);
 function paymentBounds(input: RouterRelayInput) {
-    relayEnvelope(input.coreCalldata, input.outer, input.authorizationList);
+    relayDraftEnvelope(input.coreCalldata, input.outer, input.authorizationList);
     const [, request] = coreInterface.decodeFunctionData("transact", input.coreCalldata);
     let inner = input.outer.data,
         deadline = request.params.deadline as bigint;
@@ -109,7 +122,8 @@ export function verifyRouterBroadcasterQuote(
                 ["quote", "signature", "requestHashFormat", "provenanceRequired"].includes(k)
             ) &&
             (s.provenanceRequired === undefined || typeof s.provenanceRequired === "boolean") &&
-            s.requestHashFormat === PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT,
+            (s.requestHashFormat === PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT ||
+                s.requestHashFormat === PAYMENT_ROUTER_INTENT_HASH_FORMAT),
         "invalid Router quote format"
     );
     const q = record(signed.quote, "quote"),
@@ -140,7 +154,14 @@ export function verifyRouterBroadcasterQuote(
     );
     check(
         hex(q.requestHash).toLowerCase() ===
-            hashRelayEnvelope(trust.chainId, trust.core, input.outer, input.authorizationList),
+            (signed.requestHashFormat === PAYMENT_ROUTER_INTENT_HASH_FORMAT
+                ? hashRouterIntent
+                : hashRelayEnvelope)(
+                trust.chainId,
+                trust.core,
+                input.outer,
+                input.authorizationList
+            ),
         "Router quote envelope mismatch"
     );
     check(
@@ -248,7 +269,7 @@ export class PaymentRouterRelayClient {
         options: { signal?: AbortSignal } = {}
     ): Promise<RouterBroadcasterEstimate> {
         const pinned = snapshotInput(input),
-            wire = relayEnvelope(pinned.coreCalldata, pinned.outer, pinned.authorizationList);
+            wire = relayDraftEnvelope(pinned.coreCalldata, pinned.outer, pinned.authorizationList);
         const estimate = record(
             await this.#call("broadcaster_estimateQuote", wire, options.signal),
             "Router estimate"
@@ -271,12 +292,16 @@ export class PaymentRouterRelayClient {
         );
         return { ...estimate } as unknown as RouterBroadcasterEstimate;
     }
+    /** Obtain the service's current Core-token fee floor before proving. */
+    estimateRouterFee(input: RouterRelayInput, options: { signal?: AbortSignal } = {}) {
+        return this.estimateQuote(input, options);
+    }
     async getQuote(
         input: RouterRelayInput,
         options: { signal?: AbortSignal } = {}
     ): Promise<SignedRouterBroadcasterQuote> {
         const pinned = snapshotInput(input),
-            wire = relayEnvelope(pinned.coreCalldata, pinned.outer, pinned.authorizationList);
+            wire = relayDraftEnvelope(pinned.coreCalldata, pinned.outer, pinned.authorizationList);
         const signed = (await this.#call(
             "broadcaster_getQuote",
             wire,
