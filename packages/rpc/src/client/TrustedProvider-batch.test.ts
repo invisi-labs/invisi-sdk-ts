@@ -50,7 +50,7 @@ function fixture(alter: (responses: any[]) => unknown = (r) => r.reverse()) {
 }
 it("batches full headers in bounded groups and restores request order", async () => {
     const f = fixture();
-    const numbers = Array.from({ length: 45 }, (_, i) => BigInt(i + 1));
+    const numbers = Array.from({ length: 45 }, (_, i) => BigInt(i * 2 + 1));
     const blocks = await f.reader.getBlocks(numbers);
     expect(blocks.map((b) => b.number)).toEqual(numbers);
     expect(f.fetcher.mock.calls.map(([, init]) => JSON.parse(init.body).length)).toEqual([
@@ -77,5 +77,5 @@ it.each([
         (r: any[]) => [{ ...r[0], result: { ...r[0].result, headerHash: h(999) } }, r[1]],
     ],
 ])("rejects %s without accepting a partial header set", async (_label, alter) => {
-    await expect(fixture(alter).reader.getBlocks([1n, 2n])).rejects.toThrow();
+    await expect(fixture(alter).reader.getBlocks([1n, 3n])).rejects.toThrow();
 });

@@ -74,6 +74,7 @@ function header(raw: unknown, hash: unknown): CanonicalBlock {
         ["excessBlobGas", true],
         ["parentBeaconBlockRoot", false],
         ["requestsHash", false],
+        ["slotNumber", true],
     ] as const) {
         if (h[name] === undefined || h[name] === null) {
             gap = true;
@@ -93,11 +94,16 @@ function header(raw: unknown, hash: unknown): CanonicalBlock {
 export class TrustedProvider implements ChainReader {
     readonly #read: (request: unknown) => Promise<Record<string, unknown>>;
     readonly #scope: DeploymentContext;
+    readonly #readHeaders: (
+        from: number,
+        to: number
+    ) => Promise<Record<string, unknown> | undefined>;
     readonly #readBatch: (requests: readonly unknown[]) => Promise<Record<string, unknown>[]>;
     constructor(client: ProtocolRpcClient, scope: DeploymentContext) {
         this.#scope = { ...scope };
         this.#read = client.trustedChainState(this.#scope);
         this.#readBatch = client.trustedChainStateBatch(this.#scope);
+        this.#readHeaders = client.trustedBlockHeaders(this.#scope);
     }
     private context(scope: DeploymentContext) {
         check(
@@ -116,15 +122,79 @@ export class TrustedProvider implements ChainReader {
         check(b.number === number, "trusted header number mismatch");
         return b;
     }
+    /** Historical consecutive reads use indexed full headers; single reads remain live.
+     * Heights above MAX_SAFE_INTEGER use the live hexadecimal transport without rounding.
+     */
     async getBlocks(numbers: readonly bigint[]): Promise<CanonicalBlock[]> {
-        const results = await this.#readBatch(
-            numbers.map((number) => ({ kind: "header", block: blockTag(number) }))
+        for (const number of numbers)
+            check(
+                typeof number === "bigint" && number >= 0n && number < 1n << 63n,
+                "invalid block number"
+            );
+        const consecutive = numbers.every(
+            (number, index) => index === 0 || number === numbers[index - 1]! + 1n
         );
-        return results.map((r, index) => {
-            const block = header(r.header, r.headerHash);
-            check(block.number === numbers[index], "trusted header number mismatch");
-            return block;
-        });
+        const historical =
+            consecutive && numbers.every((number) => number <= BigInt(Number.MAX_SAFE_INTEGER));
+        if (!historical) return this.liveBlocks(numbers);
+        const blocks: CanonicalBlock[] = [];
+        for (let offset = 0; offset < numbers.length; offset += 256) {
+            const chunk = numbers.slice(offset, offset + 256);
+            const result = await this.#readHeaders(
+                Number(chunk[0]),
+                Number(chunk[chunk.length - 1])
+            );
+            // Restart all reads after an explicit unavailable-history response.
+            // Mixing earlier historical chunks with a later live fork is unsafe.
+            if (result === undefined) return this.liveBlocks(numbers);
+            const range = result.range as Record<string, unknown> | null;
+            check(
+                range &&
+                    range.fromBlock === Number(chunk[0]) &&
+                    range.toBlock === Number(chunk[chunk.length - 1]),
+                "trusted header range mismatch"
+            );
+            check(
+                Array.isArray(result.headers) && result.headers.length === chunk.length,
+                "trusted header count mismatch"
+            );
+            const decoded = result.headers.map((entry: unknown, index: number) => {
+                check(entry && typeof entry === "object", "invalid trusted header entry");
+                const value = entry as Record<string, unknown>;
+                const block = header(value.header, value.headerHash);
+                check(block.number === chunk[index], "trusted header number mismatch");
+                return block;
+            });
+            check(
+                decoded[decoded.length - 1]!.hash === word(range.blockHash),
+                "trusted header range anchor mismatch"
+            );
+            for (const block of decoded) {
+                const previous = blocks[blocks.length - 1];
+                check(
+                    !previous || block.parentHash === previous.hash,
+                    "trusted header parent mismatch"
+                );
+                blocks.push(block);
+            }
+        }
+        return blocks;
+    }
+    private async liveBlocks(numbers: readonly bigint[]): Promise<CanonicalBlock[]> {
+        const blocks: CanonicalBlock[] = [];
+        for (let offset = 0; offset < numbers.length; offset += 256) {
+            const chunk = numbers.slice(offset, offset + 256);
+            const results = await this.#readBatch(
+                chunk.map((number) => ({ kind: "header", block: blockTag(number) }))
+            );
+            for (let index = 0; index < results.length; index++) {
+                const r = results[index]!;
+                const block = header(r.header, r.headerHash);
+                check(block.number === chunk[index], "trusted header number mismatch");
+                blocks.push(block);
+            }
+        }
+        return blocks;
     }
     async getLatestBlockNumber() {
         const b = await this.getBlockByTag("latest");

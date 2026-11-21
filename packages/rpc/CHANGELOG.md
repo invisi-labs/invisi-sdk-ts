@@ -1,5 +1,10 @@
 # @invisi-labs/rpc
 
+## Unreleased
+
+- Read consecutive historical headers through `invisi_getBlockHeaders` in ranges of up to 256, checking full-header hashes, deployment pins, range anchors and parent continuity, including all fork fields through `slotNumber` and rejecting missing fork-field gaps. Public history uses this path automatically.
+- Fall back to live batched reads only when the server explicitly reports missing method or missing stored history; malformed responses fail closed. Missing later chunks discard partial history and restart the entire live batch, including through independent CommonJS package entrypoints. Nonconsecutive heights and heights above JavaScript's safe integer range retain exact live hexadecimal reads. Single-block, finality and canonical reorg checks stay live.
+
 ## 1.3.2
 
 - Align the fixed SDK release group with optional Payment Router support and independently authenticated Core and Provenance resource loading.

@@ -82,6 +82,40 @@ export class ProtocolRpcClient implements ProtocolDataProvider {
             );
         };
     }
+    /** @internal Historical full-header transport, authenticated against all explicit pins. */
+    trustedBlockHeaders(context: DeploymentContext) {
+        if (!this.#explicitDeployment)
+            throw Error("trusted provider requires explicit deployment pins");
+        this.context(context);
+        return async (
+            fromBlock: number,
+            toBlock: number
+        ): Promise<Record<string, unknown> | undefined> => {
+            if (
+                !Number.isSafeInteger(fromBlock) ||
+                !Number.isSafeInteger(toBlock) ||
+                fromBlock < 0 ||
+                toBlock < fromBlock ||
+                toBlock - fromBlock >= 256
+            )
+                invalid("Invalid trusted header range");
+            let result: unknown;
+            try {
+                result = await this.rpc("invisi_getBlockHeaders", [{ fromBlock, toBlock }]);
+            } catch (error) {
+                // Classify beside the validated transport. Independent CommonJS entry
+                // bundles have distinct ProtocolRpcError constructor identities.
+                if (
+                    error instanceof ProtocolRpcError &&
+                    error.kind === "rpc" &&
+                    (error.code === -32601 || error.code === -32004)
+                )
+                    return undefined;
+                throw error;
+            }
+            return this.validateTrustedChainState(result);
+        };
+    }
     private validateTrustedChainState(value: unknown) {
         const result = object(value);
         if (result.apiVersion !== "v1" || result.protocolVersion !== "1")
