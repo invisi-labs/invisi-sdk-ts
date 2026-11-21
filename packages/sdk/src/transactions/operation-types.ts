@@ -211,6 +211,10 @@ export interface SavedOperation {
     };
     broadcasterSubmissionId?: string;
     broadcasterAttempted?: boolean;
+    /** A refused statement must be abandoned and freshly prepared before another submission. */
+    broadcasterRefusal?: import("../errors").InvisiErrorCode;
+    /** Fences a refusal rollback against overlapping submissions. */
+    broadcasterAttemptToken?: string;
     broadcasterCancelled?: boolean;
     broadcasterCancellation?: import("@invisi-labs/rpc/broadcaster").BroadcasterStatus;
     broadcasterRequest?: {

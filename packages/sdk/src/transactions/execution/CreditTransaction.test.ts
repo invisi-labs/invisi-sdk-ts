@@ -835,3 +835,58 @@ it("allows the exclusive scheduled Credit end at UTC midnight and rejects crossi
         })
     ).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
 });
+
+it.each([
+    [-32024, "CREDIT_PERIOD_CHANGED"],
+    [-32025, "INSUFFICIENT_EXECUTION_SLACK"],
+    [-32026, "CREDIT_PERIOD_ENDING"],
+] as const)(
+    "keeps a detached first refusal %s available for live validation",
+    async (code, reason) => {
+        const h = await creditSetup({ expiry: 2000200000n });
+        const { BroadcasterClient } = await import("../../broadcaster");
+        const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+        const base = quoteClient(h.context, () => 3n);
+        let submissions = 0;
+        const client = new BroadcasterClient(base.configuration, async (request) => {
+            if (request.method === "broadcaster_submitTransaction") {
+                submissions++;
+                return {
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    error: { code, message: reason + ": reprepare" },
+                };
+            }
+            return base.transport(request);
+        });
+        const options = {
+            ...h.identity,
+            grantId: 99n,
+            spender: h.bob.getAddress(),
+            expiry: 2000200000n,
+            availableCredit: 100n,
+            deadline: 2000100000n,
+            initialPayment: { amount: 10n },
+        };
+        const prepared = await h.invisi.prepareCreateCredit(options);
+        const quoted = await client.quote(prepared, { maxFeeAmount: 3n });
+        const ready = await (
+            await externallyAuthorize(quoted, new EvmWallet(`0x${"01".repeat(32)}`))
+        ).prove();
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: reason });
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: reason });
+        expect(submissions).toBe(1);
+        await expect(ready.exportTransaction()).rejects.toMatchObject({ code: reason });
+        const getBlock = h.reader.getBlock.bind(h.reader);
+        h.reader.getBlock = async (number) => ({
+            ...(await getBlock(number)),
+            timestamp: 2000073600n,
+        });
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: reason });
+        expect(submissions).toBe(1);
+        const replacement = await h.invisi.prepareCreateCredit(options);
+        expect(replacement.preview().creditOutputs![0]!.grantId).toBe(
+            prepared.preview().creditOutputs![0]!.grantId
+        );
+    }
+);

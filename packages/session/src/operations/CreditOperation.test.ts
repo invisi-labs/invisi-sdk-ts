@@ -22,7 +22,7 @@ async function creditFixture(
     changes: Partial<
         Pick<
             import("@invisi-labs/primitives").CreditState,
-            "availableCredit" | "unlimited" | "totalSpent"
+            "availableCredit" | "unlimited" | "totalSpent" | "expiry"
         >
     > = {}
 ) {
@@ -36,7 +36,7 @@ async function creditFixture(
                 spenderWalletIdentity: h.bob.ownerAddress,
                 grantId: 1n,
                 nonce: 456n,
-                expiry: 2000003600n,
+                expiry: changes.expiry ?? 2000003600n,
                 creditSharedKey: 789n,
                 availableCredit: changes.availableCredit ?? 100n,
                 unlimited: changes.unlimited ?? false,
@@ -421,3 +421,186 @@ it("rechecks Credit time after asynchronous managed validation before recording 
         .payload as SavedOperation;
     expect(saved.broadcasterAttempted).not.toBe(true);
 });
+
+it.each([
+    [-32024, "CREDIT_PERIOD_CHANGED"],
+    [-32025, "INSUFFICIENT_EXECUTION_SLACK"],
+    [-32026, "CREDIT_PERIOD_ENDING"],
+] as const)(
+    "recovers a first structured Credit refusal %s without releasing inputs",
+    async (code, reason) => {
+        const h = await creditFixture({ expiry: 2004000000n });
+        const { BroadcasterClient } = await import("@invisi-labs/sdk");
+        const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+        const base = quoteClient(h.context, () => 3n);
+        let submissions = 0;
+        const client = new BroadcasterClient(base.configuration);
+        vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+            const request = JSON.parse(init!.body as string);
+            if (request.method === "broadcaster_submitTransaction") submissions++;
+            const response =
+                request.method === "broadcaster_submitTransaction"
+                    ? {
+                          jsonrpc: "2.0",
+                          id: request.id,
+                          error: { code, message: reason + ": reprepare" },
+                      }
+                    : await base.transport(request);
+            return new Response(JSON.stringify(response), {
+                headers: { "content-type": "application/json" },
+            });
+        });
+        const options = {
+            tokenAddress: h.context.tokenAddress,
+            credits: [{ credit: h.commitment, amount: 10n }],
+            recipient: h.wallet.getAddress(),
+            deadline: 2003000000n,
+        };
+        const prepared = await h.spenderSession.prepareDrawCredit(options);
+        const quoted = await client.quote(prepared, { maxFeeAmount: 3n });
+        const ready = await (await authorizeOperation(quoted)).prove();
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: reason });
+        await expect(client.submit(ready)).rejects.toMatchObject({ code: reason });
+        expect(submissions).toBe(1);
+        const scope = { ...h.scope, ownerAddress: h.bob.ownerAddress };
+        const state = await h.store.readSnapshot(scope);
+        const saved = state.operations[ready.id]!.payload as SavedOperation;
+        expect(saved.broadcasterAttempted).not.toBe(true);
+        expect(saved.externalized).not.toBe(true);
+        expect(saved.broadcasterRefusal).toBe(reason);
+        await expect(ready.exportTransaction()).rejects.toMatchObject({ code: reason });
+        expect(state.reservations["credit:" + h.commitment]).toBe(ready.id);
+        const getBlock = h.reader.getBlock.bind(h.reader);
+        h.reader.getBlock = async (number) => ({
+            ...(await getBlock(number)),
+            timestamp:
+                reason === "CREDIT_PERIOD_ENDING"
+                    ? BigInt(Date.parse("2033-06-01T00:00:00Z") / 1000)
+                    : 2000073600n,
+        });
+        const recovered = await h.spenderSession.resume(ready.id);
+        await recovered.abandon();
+        expect(
+            ((await h.store.readSnapshot(scope)).operations[ready.id]!.payload as SavedOperation)
+                .broadcasterRefusal
+        ).toBeUndefined();
+        const replacement = await h.spenderSession.prepareDrawCredit(options);
+        expect(replacement.id).not.toBe(ready.id);
+        expect(replacement.preview().creditOutputs![0]!.grantId).toBe(1n);
+    }
+);
+
+it.each([
+    [-32024, "CREDIT_PERIOD_CHANGED"],
+    [-32025, "INSUFFICIENT_EXECUTION_SLACK"],
+    [-32026, "CREDIT_PERIOD_ENDING"],
+] as const)("retains a lost first submission after later refusal %s", async (code, reason) => {
+    const h = await creditFixture({ expiry: 2000200000n });
+    const { BroadcasterClient } = await import("@invisi-labs/sdk");
+    const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+    const base = quoteClient(h.context, () => 3n);
+    let first = true;
+    const requests: unknown[] = [];
+    const client = new BroadcasterClient(base.configuration, async (request) => {
+        if (request.method === "broadcaster_submitTransaction") {
+            requests.push(structuredClone(request.params));
+            if (first) {
+                first = false;
+                throw Error("response lost");
+            }
+            return {
+                jsonrpc: "2.0",
+                id: request.id,
+                error: { code, message: reason + ": reprepare" },
+            };
+        }
+        return base.transport(request);
+    });
+    const prepared = await h.ownerSession.prepareCreateCredit({
+        tokenAddress: h.context.tokenAddress,
+        spender: h.bob.getAddress(),
+        expiry: 2000100000n,
+        deadline: 2000100000n,
+        availableCredit: 100n,
+        initialPayment: { amount: 10n },
+    });
+    const quoted = await client.quote(prepared, { maxFeeAmount: 3n });
+    const ready = await (await authorizeOperation(quoted)).prove();
+    await expect(client.submit(ready)).rejects.toThrow("response lost");
+    const recovered = await h.ownerSession.resume(ready.id);
+    await expect(client.submit(recovered)).rejects.toThrow();
+    expect(requests[1]).toEqual(requests[0]);
+    await expect(recovered.abandon()).rejects.toThrow("requires chain reconciliation");
+});
+
+it.each(["persist", "lease", "concurrent", "export", "hash", "accepted"] as const)(
+    "keeps refusal uncertainty when %s prevents atomic rollback",
+    async (failure) => {
+        const h = await creditFixture();
+        const { BroadcasterClient } = await import("@invisi-labs/sdk");
+        const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+        const base = quoteClient(h.context, () => 3n);
+        let id = "";
+        let ready: import("./Operation").Operation;
+        let transportCalls = 0;
+        const client = new BroadcasterClient(base.configuration, async (request) => {
+            if (request.method !== "broadcaster_submitTransaction") return base.transport(request);
+            transportCalls++;
+            const callNumber = transportCalls;
+            if (failure === "export") await ready.exportTransaction();
+            if (failure === "hash" || failure === "accepted")
+                await h.store.transaction(h.scope, (state) => {
+                    const record = state.operations[id]!;
+                    if (failure === "hash") record.transactionHash = `0x${"ab".repeat(32)}`;
+                    else (record.payload as SavedOperation).broadcasterSubmissionId = "accepted-id";
+                });
+            if (failure === "lease")
+                await h.store.transaction(h.scope, (state) => {
+                    (state.operations[id]!.payload as SavedOperation).generation++;
+                });
+            if (failure === "persist") {
+                const transaction = h.store.transaction.bind(h.store);
+                vi.spyOn(h.store, "transaction").mockImplementation((scope, work) =>
+                    transaction(scope, (state) => {
+                        const result = work(state);
+                        if (
+                            (state.operations[id]?.payload as SavedOperation)
+                                ?.broadcasterAttempted === false
+                        )
+                            throw Error("rollback persistence failed");
+                        return result;
+                    })
+                );
+            }
+            if (failure === "concurrent" && callNumber === 1)
+                await expect(client.submit(ready)).rejects.toThrow("response lost");
+            if (failure === "concurrent" && callNumber === 2) throw Error("response lost");
+            return {
+                jsonrpc: "2.0",
+                id: request.id,
+                error: { code: -32024, message: "CREDIT_PERIOD_CHANGED: reprepare" },
+            };
+        });
+        const prepared = await h.ownerSession.prepareCreateCredit({
+            tokenAddress: h.context.tokenAddress,
+            spender: h.bob.getAddress(),
+            expiry: 2000100000n,
+            deadline: 2000100000n,
+            availableCredit: 100n,
+            initialPayment: { amount: 10n },
+        });
+        const quoted = await client.quote(prepared, { maxFeeAmount: 3n });
+        ready = await (await authorizeOperation(quoted)).prove();
+        id = ready.id;
+        await expect(client.submit(ready)).rejects.toThrow();
+        vi.restoreAllMocks();
+        const retained = (await h.store.readSnapshot(h.scope)).operations[id]!
+            .payload as SavedOperation;
+        expect(retained.broadcasterAttempted).toBe(true);
+        expect(retained.externalized).toBe(true);
+        expect(retained.broadcasterRefusal).toBeUndefined();
+        await expect((await h.ownerSession.resume(id)).abandon()).rejects.toThrow(
+            "requires chain reconciliation"
+        );
+    }
+);

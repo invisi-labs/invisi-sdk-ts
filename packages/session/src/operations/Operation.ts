@@ -1,3 +1,7 @@
+import {
+    broadcasterSubmissionRefusal,
+    assertBroadcasterNotRefused,
+} from "@invisi-labs/sdk/session-support";
 import { validateOperationSubmission } from "./submission-validation";
 import { readTransactionConfirmation, type TransactionConfirmation } from "@invisi-labs/protocol";
 import { bindBroadcasterOperation } from "@invisi-labs/sdk/session-support";
@@ -518,7 +522,9 @@ export class Operation {
             const record = state.operations[this.id];
             const saved = this.current(record);
             check(record!.status === "ready" && saved.call, "operation is not ready");
+            assertBroadcasterNotRefused(saved.broadcasterRefusal);
             saved.externalized = true;
+            delete saved.broadcasterAttemptToken;
             return structuredClone(saved.call);
         });
         return result;
@@ -553,6 +559,7 @@ export class Operation {
             structuredClone(this.current(state.operations[this.id]))
         );
         check(this.status === "ready", "operation is not ready");
+        assertBroadcasterNotRefused(durable.broadcasterRefusal);
         validateBroadcastEnvelope(durable, client);
         if (durable.broadcasterCancelled)
             return client.status(durable.broadcasterBinding!.scheduleHandle!.id!);
@@ -584,9 +591,15 @@ export class Operation {
                 assertCreditPeriodCurrent(durable.plan, head.timestamp);
             }
         }
-        const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+        const attempt = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const record = state.operations[this.id];
             const current = this.current(record);
+            assertBroadcasterNotRefused(current.broadcasterRefusal);
+            const first =
+                !current.broadcasterAttempted &&
+                !current.externalized &&
+                !record!.transactionHash &&
+                !current.broadcasterSubmissionId;
             check(record!.status === "ready", "operation is not ready");
             current.broadcasterRequest ??= exportBroadcasterSubmission(current);
             validateBroadcastEnvelope(current, client);
@@ -598,14 +611,46 @@ export class Operation {
             }
             current.externalized = true;
             current.broadcasterAttempted = true;
-            return structuredClone(current);
+            current.broadcasterAttemptToken = crypto.randomUUID();
+            return { saved: structuredClone(current), first };
         });
-        const result = await client.submitTransaction(
-            saved.broadcasterRequest!.data,
-            saved.broadcasterQuote!,
-            structuredClone(saved.provenance?.sidecars ?? []),
-            structuredClone(saved.broadcasterRequest!.memberProof)
-        );
+        const { saved } = attempt;
+        let result;
+        try {
+            result = await client.submitTransaction(
+                saved.broadcasterRequest!.data,
+                saved.broadcasterQuote!,
+                structuredClone(saved.provenance?.sidecars ?? []),
+                structuredClone(saved.broadcasterRequest!.memberProof)
+            );
+        } catch (cause) {
+            const refusal = broadcasterSubmissionRefusal(cause);
+            if (refusal && attempt.first) {
+                // Commit rollback before exposing recovery; a failed write keeps the durable attempt uncertain.
+                const restored = await this.#runtime.store.transaction(
+                    this.#runtime.scope,
+                    (state) => {
+                        check(!state.invalidated, "wallet requires canonical resync");
+                        const record = state.operations[this.id];
+                        const current = this.current(record);
+                        check(
+                            !record!.transactionHash && !current.broadcasterSubmissionId,
+                            "operation already tracked"
+                        );
+                        check(
+                            current.broadcasterAttemptToken === saved.broadcasterAttemptToken,
+                            "broadcaster submission changed during refusal"
+                        );
+                        current.broadcasterAttempted = false;
+                        current.externalized = false;
+                        current.broadcasterRefusal = refusal.code;
+                        return structuredClone(current);
+                    }
+                );
+                Object.assign(this.#saved, restored);
+            }
+            throw refusal ?? cause;
+        }
         const acknowledged = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const current = this.current(state.operations[this.id]);
             check(
@@ -643,6 +688,7 @@ export class Operation {
                 "recursive member proof must have 458 fields"
             );
             saved.externalized = true;
+            delete saved.broadcasterAttemptToken;
             return {
                 bundle: publicProof(saved.proof),
                 statement: structuredClone(plan.statement),
@@ -736,6 +782,7 @@ export class Operation {
                 }
             }
             record!.status = "failed";
+            delete current.broadcasterRefusal;
             current.generation++;
             return structuredClone(current);
         });

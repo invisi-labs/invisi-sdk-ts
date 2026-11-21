@@ -32,3 +32,6 @@ For scheduled broadcaster rejections, inspect `status.reasonCode` on the returne
 `BroadcasterStatus`; `CREDIT_PERIOD_CHANGED` identifies a frozen Credit proof whose
 period no longer matches chain time. The scheduled execution window remains
 available in `publishAfter` and `executeBefore`.
+
+
+For Credit submission paths, a first transport attempt is known not to have been sent only when the structured Broadcaster RPC error matches both its numeric code and machine reason: `-32024/CREDIT_PERIOD_CHANGED`, `-32025/INSUFFICIENT_EXECUTION_SLACK`, or `-32026/CREDIT_PERIOD_ENDING`. Managed journals persist that local refusal state; detached callers retain their handle and own durable recovery storage. The refused handle blocks an unchanged SDK submission. Refresh or safely abandon the known-unsent operation, obtain a fresh quote, and authorize/prove a new statement. When rebuilding creation with an initial payment, preserve its originally selected grant ID; choosing a different ID creates a separate authorization. Ordinary transport failures, malformed or mismatched errors, and a refusal received after an earlier uncertain attempt retain the exact original request and reservations. A missing transaction hash alone never permits rebuilding.

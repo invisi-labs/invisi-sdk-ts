@@ -9,6 +9,10 @@ export type InvisiErrorCode =
     | "PREPARATION_FAILED"
     /** Credit UTC period changed. Reauthorize and regenerate the proof before submitting. */
     | "CREDIT_PERIOD_CHANGED"
+    /** The signed deadline leaves insufficient execution time; prepare a fresh statement. */
+    | "INSUFFICIENT_EXECUTION_SLACK"
+    /** The current Credit usage period is ending; prepare a fresh statement. */
+    | "CREDIT_PERIOD_ENDING"
     /**
      * Required infrastructure or permissions were not supplied.
      * The capability field identifies what is missing.

@@ -1,3 +1,7 @@
+import {
+    broadcasterSubmissionRefusal,
+    assertBroadcasterNotRefused,
+} from "../../broadcaster/submission-refusal";
 import { readTransactionConfirmation, type TransactionConfirmation } from "@invisi-labs/protocol";
 import { bindBroadcasterOperation } from "../../broadcaster/operation-bridge";
 import {
@@ -181,6 +185,7 @@ export class PreparedTransaction {
         this.current();
         check(!this.#saved.broadcasterCancelled, "Broadcaster cancellation already acknowledged");
         check(this.status === "ready", "transaction is not ready");
+        assertBroadcasterNotRefused(this.#saved.broadcasterRefusal);
         const { validateBroadcastEnvelope, validatePreparedBroadcast } =
             await import("../../broadcaster/provenance-preparation");
         validateBroadcastEnvelope(this.#saved, client);
@@ -202,6 +207,11 @@ export class PreparedTransaction {
                 await this.#proveProvenance();
             await validatePreparedBroadcast(this.#saved, client, this.#runtime);
         }
+        assertBroadcasterNotRefused(this.#saved.broadcasterRefusal);
+        const first =
+            !this.#saved.broadcasterAttempted &&
+            !this.#saved.externalized &&
+            !this.#saved.broadcasterSubmissionId;
         this.#saved.externalized = true;
         this.#saved.broadcasterRequest ??= exportBroadcasterSubmission(this.#saved);
         const handle = this.#saved.broadcasterBinding?.scheduleHandle;
@@ -223,13 +233,31 @@ export class PreparedTransaction {
         )
             await this.validateSubmission();
         this.#saved.broadcasterAttempted = true;
+        const attemptToken = crypto.randomUUID();
+        this.#saved.broadcasterAttemptToken = attemptToken;
         const request = this.#saved.broadcasterRequest;
-        const result = await client.submitTransaction(
-            request.data,
-            this.#saved.broadcasterQuote!,
-            structuredClone(this.#saved.provenance?.sidecars ?? []),
-            structuredClone(request.memberProof)
-        );
+        let result;
+        try {
+            result = await client.submitTransaction(
+                request.data,
+                this.#saved.broadcasterQuote!,
+                structuredClone(this.#saved.provenance?.sidecars ?? []),
+                structuredClone(request.memberProof)
+            );
+        } catch (cause) {
+            const refusal = broadcasterSubmissionRefusal(cause);
+            if (
+                refusal &&
+                first &&
+                !this.#saved.broadcasterSubmissionId &&
+                this.#saved.broadcasterAttemptToken === attemptToken
+            ) {
+                this.#saved.broadcasterAttempted = false;
+                this.#saved.externalized = false;
+                this.#saved.broadcasterRefusal = refusal.code;
+            }
+            throw refusal ?? cause;
+        }
         check(
             !this.#saved.broadcasterSubmissionId ||
                 this.#saved.broadcasterSubmissionId === result.id,
@@ -575,6 +603,7 @@ export class PreparedTransaction {
             "recursive operations must be exported as aggregate members"
         );
         check(this.status === "ready" && this.#saved.call, "transaction is not ready");
+        assertBroadcasterNotRefused(this.#saved.broadcasterRefusal);
         return structuredClone(this.#saved.call);
     }
     exportProof(): ProofBundle {
