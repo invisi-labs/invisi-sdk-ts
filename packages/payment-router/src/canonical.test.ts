@@ -91,7 +91,7 @@ for (const c of vectors.cases) {
     });
 }
 
-import { AbiCoder, Wallet, Signature, id, keccak256 } from "ethers";
+import { AbiCoder, Wallet, Signature, id, keccak256, toQuantity } from "ethers";
 import {
     hashRelayEnvelope,
     PaymentMode,
@@ -188,8 +188,8 @@ describe("canonical authorization and relay boundaries", () => {
             chainId: "0x7a69",
             nonce: "0x8",
             yParity: auth.signature.yParity ? "0x1" : "0x0",
-            r: auth.signature.r,
-            s: auth.signature.s,
+            r: toQuantity(auth.signature.r),
+            s: toQuantity(auth.signature.s),
         });
     });
     it("constructs same-token and native wrap calls without a swap", () => {
@@ -336,4 +336,48 @@ it("validates canonical ERC20 AllowanceHolder input and rejects token/target sub
     expect(() =>
         validateZeroExPayload({ ...options, data: (data + "00") as `0x${string}` })
     ).toThrow("noncanonical");
+});
+
+it("serializes leading-zero authorization signature limbs as geth quantities", async () => {
+    const wallet = new Wallet("0x" + "12".repeat(32));
+    let auth;
+    for (let nonce = 0; nonce < 100; nonce++) {
+        const candidate = await wallet.authorize({
+            chainId: 31337n,
+            address: vectors.addresses.implementation,
+            nonce,
+        });
+        if (candidate.signature.r.startsWith("0x0") || candidate.signature.s.startsWith("0x0")) {
+            auth = candidate;
+            break;
+        }
+    }
+    expect(auth).toBeDefined();
+    const c = vectors.cases.find((c: any) => c.account),
+        abi = new Interface(paymentRouterAbi),
+        decoded = abi.decodeFunctionData("payNative", c.call.data);
+    const data = abi.encodeFunctionData("payNative", [
+        decoded[0],
+        decoded[1],
+        { ...c.intent, payer: wallet.address },
+        c.route,
+    ]) as `0x${string}`;
+    const outer = buildAccountPayment(
+        {
+            chainId: 31337n,
+            implementation: vectors.addresses.implementation,
+            payer: wallet.address as any,
+            routerCodeHash: c.account.routerCodeHash,
+            routerCall: { ...c.call, data },
+            nonce: 3n,
+            deadline: c.intent.deadline,
+            relayer: vectors.addresses.relayer,
+        },
+        c.account.signature
+    );
+    const wire = relayEnvelope(c.coreCalldata, outer, [auth!]).router.authorizationList![0]!;
+    expect(wire.r).toBe(toQuantity(auth!.signature.r));
+    expect(wire.s).toBe(toQuantity(auth!.signature.s));
+    expect(wire.r).toMatch(/^0x[1-9a-f][0-9a-f]*$/);
+    expect(wire.s).toMatch(/^0x[1-9a-f][0-9a-f]*$/);
 });

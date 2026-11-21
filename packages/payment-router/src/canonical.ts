@@ -493,8 +493,8 @@ export function relayEnvelope(
                               chainId: toQuantity(chainId),
                               nonce: toQuantity(nonce),
                               yParity: toQuantity(signature.yParity),
-                              r: signature.r,
-                              s: signature.s,
+                              r: toQuantity(signature.r),
+                              s: toQuantity(signature.s),
                           })
                       ),
                   }

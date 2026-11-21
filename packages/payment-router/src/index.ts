@@ -16,3 +16,4 @@ export type { ZeroExQuoteTransport, ZeroExHttpOptions } from "./adapters/zeroex"
 
 export * from "./canonical-abi";
 export * from "./canonical";
+export * from "./relay-client";

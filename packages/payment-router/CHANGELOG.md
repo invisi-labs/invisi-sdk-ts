@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a dedicated Router relay RPC client for estimate/quote/submit with trusted EIP-712 verification, exact fee/token/recipient binding, authorization expiry checks, and tamper-resistant envelope hashes. Preserve provenance capability metadata without changing Router hashing.
+- Serialize EIP-7702 signature limbs as minimal geth JSON quantities, including leading-zero signatures; add mocked wire and tampering regressions.
+
 - Add the canonical PaymentRouter and delegated-account ABIs, four payment modes, EIP-712 intent/account signing, exact ABI hashes, ERC20 allowance/permit helpers and full outer simulation.
 - Quote native/ERC20 input with both V3 and 0x; support same-token and native-to-WETH payments without a swap. Enforce canonical 0x calldata and current dependency bindings.
 - Add zero-value Broadcaster envelopes, geth authorization serialization and `payment-router-envelope-v1` hashes. Keep native-only transaction methods explicitly documented as legacy.

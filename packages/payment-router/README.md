@@ -33,6 +33,34 @@ The Router nonce, account action nonce, EOA transaction nonce and EIP-7702 autho
 
 `relayEnvelope` emits `{data: embeddedCoreCalldata, router:{to,data,value:"0",authorizationList?}}`. Signed authorization integers use geth JSON quantities. `hashRelayEnvelope` matches Go's `EnvelopeHash` and binds chain, Core, outer target, zero value, calldata and ordered authorizations under `payment-router-envelope-v1`. Execute the quoted outer transaction unchanged. Relay only accepts `payTokenFor` or a sponsored-native account call.
 
+## Broadcaster RPC
+
+Use the dedicated `PaymentRouterRelayClient` for Router payments. The ordinary Core `BroadcasterClient` verifies a different request hash and must not process Router quotes.
+
+```ts
+const relay = new PaymentRouterRelayClient({
+  endpoint: "https://your-broadcaster.example",
+  trust: {
+    chainId: deployment.chainId, core: deployment.coreAddress,
+    quoteSigner: trustedBroadcasterSigner, feeRecipient: trustedFeeRecipient,
+  },
+});
+const input = {
+  coreCalldata: (await ready.exportTransaction()).data,
+  outer, // signed payTokenFor or signed delegated-account transaction
+  ...(authorizationList ? { authorizationList } : {}),
+};
+const estimate = await relay.estimateQuote(input);
+// If the final Core fee changes, prepare/prove again and rebuild all affected
+// Router/account signatures before asking for the executable quote.
+const signedQuote = await relay.getQuote(input);
+const submission = await relay.submitTransaction(input, signedQuote);
+```
+
+These methods send the standard `broadcaster_estimateQuote`, `broadcaster_getQuote` and `broadcaster_submitTransaction` methods. Each request carries the embedded Core `data` and `router` envelope; submission additionally sends `quote` and `signature`. The client pins the trusted chain/Core, quote signer and fee recipient, computes the request hash from the actual outer transaction and ordered authorizations, verifies the EIP-712 signature, and rechecks the quote before submission. It accepts direct execution only, requires the exact Core settlement token/fee, and bounds quote expiry by the Core request, Router intent and account action. An expired quote cannot be submitted through this client. An optional injected `transport` supports hosts with their own networking; default transport requires HTTPS and limits response size/time.
+
+`verifyRouterBroadcasterQuote` is also exported for detached verification. Its expected hash always comes from `RouterRelayInput`; never substitute a remotely supplied hash. `provenanceRequired` may be true, false or absent as service capability metadata; the envelope hash remains unchanged. Pure public Router funding has no private-input provenance sidecar. No scheduling or aggregation is requested. Signed authorization `chainId`, `nonce`, `yParity`, `r` and `s` use minimal geth JSON quantities, including signatures with leading zero limbs.
+
 ## Legacy native-only deployments
 
 The following workflow uses the old `NativePaymentRouter` / `ZeroExNativePaymentRouter` contracts. `buildPaymentTransaction` and `simulatePayment` remain legacy APIs; use the canonical APIs above for unified PaymentRouter deployments. Their ABI is exported as `legacyNativePaymentRouterAbi` and `zeroExPaymentRouterAbi`.
