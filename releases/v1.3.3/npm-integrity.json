@@ -1,0 +1,67 @@
+{
+  "format": "invisi.npm.release-integrity.v1",
+  "version": "1.3.3",
+  "archives": "github-release",
+  "packages": [
+    {
+      "name": "@invisi-labs/ipp",
+      "version": "1.3.3",
+      "filename": "invisi-labs-ipp-1.3.3.tgz",
+      "integrity": "sha512-5H5YwUs5DtuLffYHXooNd3/sk5b/VEEiHXO6TFkE9wlDuFgTy16BZbe2DdNJUK6mdXdc6Y/HKOIvgqQNzuPvng=="
+    },
+    {
+      "name": "@invisi-labs/payment-router",
+      "version": "1.3.3",
+      "filename": "invisi-labs-payment-router-1.3.3.tgz",
+      "integrity": "sha512-TLFD7A5FwVoE9IXrX89I6JEjaz0WRX13QDaDVA1RzxXA+7Kbv8ucA2VQlkF8OmldradBRdLZergxUYIpD8fV7A=="
+    },
+    {
+      "name": "@invisi-labs/primitives",
+      "version": "1.3.3",
+      "filename": "invisi-labs-primitives-1.3.3.tgz",
+      "integrity": "sha512-XDN5QFW1sK6xPlUj+tErFAWHj02mgkFiz4atbZtFXyk5b1WQ9xgUHSBi1h6NlVagwapyIx0kyWHLq2nFS7AiXg=="
+    },
+    {
+      "name": "@invisi-labs/protocol",
+      "version": "1.3.3",
+      "filename": "invisi-labs-protocol-1.3.3.tgz",
+      "integrity": "sha512-zsh0t640ief9JeQ+yE65JCytHvpPPuyZpXSfJPMO6seqWtLQKaAk1S7dmN3zzI+5PP0D7t0Ne5TXPs3b711HKw=="
+    },
+    {
+      "name": "@invisi-labs/prover",
+      "version": "1.3.3",
+      "filename": "invisi-labs-prover-1.3.3.tgz",
+      "integrity": "sha512-ZzzkJbaVeLzQhdnV7vQX0WVcRxBXFziq2Z9H2jUgqQoII2fDYLwebIywuOiafiMirr5ToxDF2hsvKEu5hFsKaw=="
+    },
+    {
+      "name": "@invisi-labs/react",
+      "version": "1.3.3",
+      "filename": "invisi-labs-react-1.3.3.tgz",
+      "integrity": "sha512-Tm1ruSETiHhZT/O+hF7RuR0hvMO7qLCa+WUvqX2uv+lEgT2IrGnURJ06DCBmDJRXJhW3KIi27aKtA0lKwvGniA=="
+    },
+    {
+      "name": "@invisi-labs/rpc",
+      "version": "1.3.3",
+      "filename": "invisi-labs-rpc-1.3.3.tgz",
+      "integrity": "sha512-ojogPW88od48stJYlVDtTW9P+SiWKoYK4HOjsjR4IgVu7uFGwe8Z92U2D6v9ROhyYpGZsCU8ssyfP7anUKVV7A=="
+    },
+    {
+      "name": "@invisi-labs/sdk",
+      "version": "1.3.3",
+      "filename": "invisi-labs-sdk-1.3.3.tgz",
+      "integrity": "sha512-4BLIfPL4scmGTC5i+pihZsO28WB44EThHizExllRA/IA6OTN9QwhEy1jRKpvINVRe1tQtrHbF5b8AMQICD1MhQ=="
+    },
+    {
+      "name": "@invisi-labs/session",
+      "version": "1.3.3",
+      "filename": "invisi-labs-session-1.3.3.tgz",
+      "integrity": "sha512-VpiB6RnTlRm3jpTWeuSsmrP56Fn55wac6HFvi8rVJ+aQXsnEbluuMHeGEFVRhjUj8k6bkpBImYK1ICWrCkhS7A=="
+    },
+    {
+      "name": "@invisi-labs/vue",
+      "version": "1.3.3",
+      "filename": "invisi-labs-vue-1.3.3.tgz",
+      "integrity": "sha512-OeRsS/cbmFJHcIIBekaFLcYKtwYj6HePeMAGkaptMZJZsAc/sw952PEK5UBBUPbSIWIA5UnpXoKWI7bH81Ekzg=="
+    }
+  ]
+}
