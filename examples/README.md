@@ -1,6 +1,6 @@
 # TypeScript examples
 
-Each named scenario is a flat, independent script. Authorization signatures use ethers EIP-712 signing. Supply the corresponding account key through `ALICE_PRIVATE_KEY`, `BOB_PRIVATE_KEY`, or `CHARLIE_PRIVATE_KEY`; Session examples use `<SESSION_ACCOUNT in uppercase>_PRIVATE_KEY`. Each signer is checked against the required owner or payer. Keep private keys out of `accounts/accounts.json`. Viewing keys, detection keys, and Note/Credit decryption belong to the App. Configure its explicit callbacks in `app-decryptor.ts` before running decryption examples. Only the offline Note output example runs without `--execute`. The Broadcaster and self-provenance submission examples submit as part of their `--execute` flow.
+Each named scenario is a flat, independent script. Authorization signatures use ethers EIP-712 signing. Supply the corresponding account key through `ALICE_PRIVATE_KEY`, `BOB_PRIVATE_KEY`, or `CHARLIE_PRIVATE_KEY`; Session examples use `<SESSION_ACCOUNT in uppercase>_PRIVATE_KEY`. Each signer is checked against the required owner or payer. Keep private keys out of `accounts/accounts.json`. Viewing keys, detection keys, and Note/Credit decryption belong to the App. Configure its explicit callbacks in `app-decryptor.ts` before running decryption examples. The offline Note output example runs without `--execute`; canonical Router host integration functions have no top-level execution. The Broadcaster and self-provenance submission examples submit as part of their `--execute` flow.
 
 ## Setup
 
@@ -33,7 +33,7 @@ The App owns account selection, key storage, unlocking and public-profile lookup
 
 ## Host request and response boundaries
 
-Authorization examples call `exportWalletAuthorization()`, sign its exact `domain`, `types`, and `message` with ethers `signTypedData()`, then attach the signature through `withWalletSignature()`. They do not export native signing requests or match signing responses by ID. Final Broadcaster quotes must be accepted before signing.
+Authorization examples call `exportWalletAuthorization()`, sign its exact `domain`, `types`, and `message` with ethers `signTypedData()`, then attach the signature through `withWalletSignature()`. They do not export native signing requests or match signing responses by ID. Ordinary Core Broadcaster quotes must be accepted before signing. Canonical Router relay instead requires complete proof and player signatures before outer-call estimation/quotation; see below.
 
 Decryption is explicitly injected through `DeliveryDecryptor`. Implement the two callbacks in `app-decryptor.ts` using your App's wallet. They receive ciphertext and the complete owner/deployment/token/commitment context, plus the Credit delivery role. Return authenticated delivery bytes, explicit `null` only for a known nonrecipient, or `{ status: "authentication-failed" }` when AEAD failure is ambiguous. Optional native batch detection also receives clues. Throw on locked accounts, expired sessions, cancellation and other operational errors.
 
@@ -124,13 +124,18 @@ Gas estimation: the Note funding, four Credit and Broadcaster examples call `pre
 
 See the [contribution guidelines](../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.
 
-## Native input Payment Router
+## Canonical and legacy PaymentRouter
 
-`08-payment-router/01-uniswap-v3.ts` and `02-zeroex.ts` prepare public ETH-to-token payments through the separately deployed contracts in `invisi-periphery`. Configure verified Router/WETH/V3 addresses and the same chain/deployment in `08-payment-router/settings.ts`. V3 also needs QuoterV2 and a liquid configured route. The 0x example requires a `ZeroExPaymentRouter` deployment, its AllowanceHolder/registry, and an explicitly supplied backend `ZEROX_API_KEY`; browser applications should inject a backend quote proxy instead.
+`08-payment-router/03-canonical-host.ts` exports executable, typechecked host integration functions for canonical `DirectToken`, `RelayedToken` and `SponsoredNative` payments. Import them from your application and provide the real preparation inputs (including two explicit Note outputs), provider, verified deployment, approved input/fee budgets and wallet capabilities. Each function runs `preparePayment` and the real `prove()` lifecycle. It supports V3/0x via a supplied `SwapQuoteAdapter`, or omits the quote for same-token/native-to-WETH funding. No fake proof, embedded private key or automatic broadcast is used.
 
-Both examples explicitly create two Note outputs, matching the current pure-funding circuit shape. They bind the Router as payer before proving, refresh the quote after proving, simulate the whole payable call with Alice as sender, and export the unsigned transaction. They do not approve ERC20s from Alice or submit transactions. The native budget excludes network gas. Current 0x execution accepts only the reviewed native execute/exec/NATIVE_CHECK payload subset; an API route outside that subset is rejected.
+`prepareSelfToken` checks Router allowance through a host confirmation callback, simulates from the payer, then returns the unsigned direct ERC20 call for review. `prepareRelayedToken` adds the payer's EIP-712 Router signature. `prepareRelayedNative` prepares the constrained account, obtains a separate account action signature and asks the host's EIP-7702 wallet callback for an authorization only if delegation is absent. Its outer value is zero, with principal supplied by the player account. The host confirms chain/RPC/wallet support and keeps the persisted action nonce after revocation; an existing matching delegation needs no new tuple. Delegation may survive execution failure.
+
+Relayed functions take an explicit provisional Core fee and return the complete signed envelope **without submitting**. `reviewRelay` estimates the complete outer call and only obtains a signed executable quote if the approved Core fee covers the estimate and stays within the user cap. An approved fee above the estimate is retained. If `rebuildRequired` is returned, obtain host approval, rerun the preparation function with the new fee and refresh all affected route/account/player signatures. Enforce a user fee cap and bounded retries; prices/gas may change again. This is distinct from the ordinary Core quote-before-proving examples. Save the exact input/signed quote before an explicit `relay.submitTransaction(input, signedQuote)` call. Save the returned opaque ID and poll `broadcaster_getTransactionStatus` with `params:[{id}]` using the host JSON-RPC transport. Replaying the identical accepted envelope returns its existing ID; changed proof/signature/authorization bytes create a new identity. For lost acknowledgements and quote expiry see the [recovery limitations](../packages/payment-router/README.md#broadcaster-rpc).
+
+The older `08-payment-router/01-uniswap-v3.ts` and `02-zeroex.ts` demonstrate **legacy native-only** `NativePaymentRouter` / `ZeroExNativePaymentRouter` deployments using `buildPaymentTransaction` / `simulatePayment`. They prepare/prove, quote, simulate and export; they do not broadcast. Their settings and native 0x payload restrictions apply only to these legacy examples. `ZEROX_API_KEY` is explicitly supplied by a backend; browser applications inject a backend proxy.
 
 ```sh
 pnpm --filter @invisi-examples/scenarios example:payment-router:v3 --execute
 pnpm --filter @invisi-examples/scenarios example:payment-router:zeroex --execute
+pnpm --filter @invisi-examples/scenarios lint
 ```

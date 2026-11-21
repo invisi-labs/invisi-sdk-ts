@@ -1,3 +1,4 @@
+// LEGACY native-only deployment. For canonical modes use 03-canonical-host.ts.
 import { Contract, JsonRpcProvider, parseUnits } from "ethers";
 import { Invisi, NoteOutput, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";

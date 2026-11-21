@@ -82,3 +82,9 @@ pass the same wallet and registry deployment to
 `RegistrationOperation.restoreConfirmation(registry, { wallet, reader }, snapshot)`.
 It checks the original transaction and receipt. If the result is uncertain,
 call `reconcile()` again. Restored operations cannot export a transaction.
+
+## PaymentRouter Broadcaster requests
+
+Router relay uses `PaymentRouterRelayClient` from `@invisi-labs/payment-router`, not the ordinary Core `BroadcasterClient` request-hash verifier. It sends the standard `broadcaster_estimateQuote`, `broadcaster_getQuote` and `broadcaster_submitTransaction` methods with `{data, router:{to,data,value:"0",authorizationList?}}`; submit adds the signed `quote` and `signature`. Embedded Core data must equal the Core call inside the outer transaction. Quotes bind the complete outer envelope and ordered authorizations with `requestHashFormat: "payment-router-envelope-v1"` and `execution: "direct"`. Router scheduling, aggregation and private-input funding are rejected.
+
+Router estimate/quote require a complete Core proof, player signatures, allowance/permit and balance. They simulate/estimate the full outer call, including EIP-7702 authorizations. Fee pricing is in the Core output token only and uses its existing fee ledger; changing the Core fee requires preparation/proving and player signatures again. This differs from ordinary Core quote-before-proving preparation. Sponsored native outer value is zero; the player account funds principal. See the [PaymentRouter guide](../payment-router/README.md) for deployment trust, nonce/delegation handling, explicit submission, frozen-request recovery and `broadcaster_getTransactionStatus({id})`. The dedicated Router client currently exposes no status convenience method or expired-quote recovery bypass; use a host JSON-RPC transport for those operations.

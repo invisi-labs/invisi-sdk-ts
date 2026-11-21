@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Align workspace guides with all four canonical modes and full outer Broadcaster estimation; add typechecked host examples for self ERC20 and relayed ERC20/native, explicit fee rebuilds, delegation and submission recovery limits.
+
 - Add a dedicated Router relay RPC client for estimate/quote/submit with trusted EIP-712 verification, exact fee/token/recipient binding, authorization expiry checks, and tamper-resistant envelope hashes. Preserve provenance capability metadata without changing Router hashing.
 - Serialize EIP-7702 signature limbs as minimal geth JSON quantities, including leading-zero signatures; add mocked wire and tampering regressions.
 

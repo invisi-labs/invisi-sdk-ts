@@ -1,3 +1,4 @@
+// Legacy native-only examples 01/02. Canonical host examples accept their own deployment.
 // Configure verified addresses for the same chain as examples/settings.ts.
 // Zero placeholders deliberately fail before quoting or proving.
 export const routerSettings = {
