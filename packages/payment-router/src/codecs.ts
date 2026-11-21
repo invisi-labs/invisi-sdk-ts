@@ -1,4 +1,4 @@
-import { Interface, concat, dataLength, toBeHex } from "ethers";
+import { ZeroAddress, Interface, concat, dataLength, toBeHex } from "ethers";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 import { address, check, hex, same, uint } from "./validation";
 export const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE" as const;
@@ -39,6 +39,7 @@ export function validateV3Path(path: Hex, weth: Address, output: Address): void 
     encodeV3ExactOutputPath(tokens, fees);
 }
 export interface ZeroExPayloadOptions {
+    tokenIn?: Address;
     target: Address;
     data: Hex;
     routerAddress: Address;
@@ -67,10 +68,19 @@ export function validateZeroExPayload(options: ZeroExPayloadOptions): {
     let data = hex(options.data),
         allowance = 0n;
     const wrapped = same(target, holder);
+    const erc20 =
+        options.tokenIn && !same(options.tokenIn, ZeroAddress)
+            ? address(options.tokenIn)
+            : undefined;
+    if (erc20)
+        check(
+            wrapped && !same(erc20, options.tokenOut),
+            "ERC20 quotes must use AllowanceHolder and distinct tokens"
+        );
     if (wrapped) {
         const args = zeroExInterface.decodeFunctionData("exec", data);
         check(same(args[0], settler) && same(args[3], settler), "0x nested target mismatch");
-        check(same(args[1], NATIVE_TOKEN), "0x input must be native ETH");
+        check(same(args[1], erc20 ?? NATIVE_TOKEN), "0x input must be native ETH");
         allowance = args[2];
         check(allowance <= options.maxInput, "0x allowance exceeds budget");
         data = hex(args[4]);
@@ -82,7 +92,7 @@ export function validateZeroExPayload(options: ZeroExPayloadOptions): {
     const actions = Array.from(rawActions as readonly string[]).map((action) => hex(action));
     const nativeSelector = zeroExInterface.getFunction("NATIVE_CHECK")!.selector;
     let nativeDeadline: bigint | undefined;
-    for (const action of actions) {
+    for (const action of erc20 ? [] : actions) {
         check(dataLength(action) >= 4, "malformed 0x action");
         if (action.slice(0, 10).toLowerCase() !== nativeSelector) continue;
         check(
@@ -96,23 +106,29 @@ export function validateZeroExPayload(options: ZeroExPayloadOptions): {
         );
         nativeDeadline = deadline;
     }
+    if (erc20) nativeDeadline = (1n << 256n) - 1n;
     check(nativeDeadline !== undefined, "missing 0x native guard");
     const normalized = zeroExInterface.encodeFunctionData("execute", [
         [router, options.tokenOut, options.amountOut],
         actions,
         zid,
     ]);
-    return {
-        target,
-        data: (wrapped
+    const canonicalData = (
+        wrapped
             ? zeroExInterface.encodeFunctionData("exec", [
                   settler,
-                  NATIVE_TOKEN,
+                  erc20 ?? NATIVE_TOKEN,
                   allowance,
                   settler,
                   normalized,
               ])
-            : normalized) as Hex,
+            : normalized
+    ) as Hex;
+    check(canonicalData.toLowerCase() === options.data.toLowerCase(), "noncanonical 0x calldata");
+    if (erc20) check(allowance > 0n, "empty ERC20 allowance");
+    return {
+        target,
+        data: canonicalData,
         settlerAddress: settler,
         nativeDeadline,
     };

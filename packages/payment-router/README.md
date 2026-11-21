@@ -1,6 +1,41 @@
 # @invisi-labs/payment-router
 
-Optional atomic native-ETH swap payments for Invisi. Supports original Uniswap V3 exact-output routes and compatible native 0x Settler / AllowanceHolder payloads. Requires separately deployed `invisi-periphery` contracts; this package does not deploy, sign or broadcast transactions.
+Atomic native/ERC20 payments for the canonical `invisi-periphery` PaymentRouter at `ffd81f4`. Supports direct native, direct ERC20, signed relayed ERC20 and delegated-account sponsored native payments. Core proofs and settlement remain unchanged. Wallet keys and transaction submission remain host-provided.
+
+## Canonical PaymentRouter
+
+Use `paymentRouterAbi` and `paymentRouterAccountAbi` for the unified deployment. `preparePayment` binds the Core funding payer to the Router; prove the returned prepared transaction before quoting. The Core funding amount includes note outputs **and** the Core token fee. Use `tokenIn: ZeroAddress` for native input; ERC20 addresses select token input. Both `UniswapV3Adapter` and `ZeroExAdapter` accept `tokenIn`; V3 paths run from the effective input (WETH for native) to the Core token. ERC20 0x quotes must use the configured AllowanceHolder and current registry Settler. Structural checks do not certify opaque liquidity actions; simulate the complete call.
+
+```ts
+const quote = await client.quote(adapter, {
+  tokenIn, tokenOut, amountOut: fundingAmount, maxInput, deadline,
+});
+const payment = await client.prepareRouterPayment({
+  payment: ready, payer, tokenIn, mode: PaymentMode.RelayedToken,
+  refundRecipient: payer, relayer, deadline, amountInMaximum: quote.maxInput, quote,
+});
+payment.signature = await signPaymentIntent(signer, deployment.chainId, deployment.routerAddress, payment.intent);
+const outer = client.buildRouterTransaction(payment);
+await client.simulateRouterPayment(outer, { from: relayer });
+const rpcFields = relayEnvelope((await ready.exportTransaction()).data, outer);
+const quoteHash = hashRelayEnvelope(deployment.chainId, deployment.coreAddress, outer);
+// Pass rpcFields beside normal fee fields to Broadcaster estimate/quote/submit.
+// Compare its hash under PAYMENT_ROUTER_ENVELOPE_HASH_FORMAT before submission.
+```
+
+For direct submission, select `PaymentMode.DirectNative` or `PaymentMode.DirectToken`, omit `relayer` and signature, simulate from `payer`, and send the returned call from that wallet. Native `value` is the maximum input; token calls have zero value. Omit `quote` for same-token input or native-to-WETH wrapping; `noSwapRoute` is selected automatically. Low-level `buildPaymentIntent`, `hashCoreRequest`, `hashRoute`, `intentTypedData`, `hashPaymentIntent` and `buildRouterPayment` support detached integrations. The typed intent binds the exact proof, Core request, route, payer, Router nonce, budget, deadline and fixed relayer.
+
+ERC20 withdrawal additionally requires `inputApproval`/`inputAllowance`, or an ERC-2612 permit constructed with `inputPermitTypedData` and `signedInputPermit`. Set `payment.permit` before encoding; no permit is assumed for WETH. Token-domain metadata and token permit nonce come from the host. An allowance or permit does not replace the relayed intent signature.
+
+For sponsored native input, select `PaymentMode.SponsoredNative`, build the inner Router call, then use `prepareNativeAccountPayment(provider, {chainId, implementation, payer, routerCall, deadline, relayer}, {implementationCodeHash?, undelegatedNonce?})`. It checks the implementation's pinned Router/code hash and refuses another installed implementation. When no delegation is installed, explicitly supply the known action nonce (`0n` only for a fresh account); revoking delegation preserves old action storage. Sign `result.authorizationRequest` with a compatible wallet's EIP-7702 authorization method only when `delegationNeeded`, validate it with `validateDelegation`, and separately sign `result.payment` with `signNativePayment`. Use `buildAccountPayment(result.payment, signature)` for the zero-value outer transaction. Call `simulateRouterPayment` with the actual Broadcaster sender and optional signed `authorizationList`, then `relayEnvelope(coreCalldata, outer, authorizationList)` and `hashRelayEnvelope` with that same list.
+
+The Router nonce, account action nonce, EOA transaction nonce and EIP-7702 authorization nonce are independent. An existing matching delegation needs no new authorization tuple. Chain/wallet EIP-7702 support must be confirmed by the host and the complete type-4 simulation; this package does not install, replace or revoke delegation. A delegation can persist even if payment execution reverts. `prepareNativeAccountPayment` reads state for preparation; repeat simulation immediately before submitting because nonce, registry and chain state can change.
+
+`relayEnvelope` emits `{data: embeddedCoreCalldata, router:{to,data,value:"0",authorizationList?}}`. Signed authorization integers use geth JSON quantities. `hashRelayEnvelope` matches Go's `EnvelopeHash` and binds chain, Core, outer target, zero value, calldata and ordered authorizations under `payment-router-envelope-v1`. Execute the quoted outer transaction unchanged. Relay only accepts `payTokenFor` or a sponsored-native account call.
+
+## Legacy native-only deployments
+
+The following workflow uses the old `NativePaymentRouter` / `ZeroExNativePaymentRouter` contracts. `buildPaymentTransaction` and `simulatePayment` remain legacy APIs; use the canonical APIs above for unified PaymentRouter deployments. Their ABI is exported as `legacyNativePaymentRouterAbi` and `zeroExPaymentRouterAbi`.
 
 ```sh
 pnpm add @invisi-labs/payment-router ethers
@@ -28,6 +63,8 @@ See the workspace `examples/08-payment-router/` scenarios. Public ABI snapshots 
 ## Cross-SDK validation
 
 The workspace golden vectors in `test-support/payment-router/vectors.json` cover reversed paths, native 0x acceptance and rejection, complete Router calldata and simulation accounting. Go and Rust consume the same bytes. Run `UPDATE_PAYMENT_ROUTER_VECTORS=1 pnpm --filter @invisi-labs/payment-router exec vitest run src/parity-vectors.test.ts` only when deliberately updating the reviewed reference.
+
+The shared canonical intent vectors cover all four modes and account signing; envelope vectors include the Go-generated nonempty signed authorization list. Owned-Anvil tests execute all four canonical modes through V3, actual EIP-7702 delegation, the ERC20 0x Holder flow, and three legacy native channel variants. They use real Router/account bytecode, Core/proof and liquidity boundary doubles, verify token movement and cleared allowances, and reject nonce replay.
 
 Run contract execution tests with `INVISI_PERIPHERY_REPO=/path/to/invisi-periphery pnpm --filter @invisi-labs/payment-router exec vitest run src/contracts.integration.test.ts`. Build Periphery contracts first. The tests execute V3, direct 0x and Holder-wrapped 0x payments and reject failed Core settlement with full rollback. They use real Router bytecode with Core and external liquidity doubles on an owned Anvil chain.
 

@@ -1,3 +1,4 @@
+import { ZeroAddress } from "ethers";
 import { snapshotQuoteRequest } from "../quote-request";
 import type { SwapQuoteAdapter, SwapQuoteRequest, ZeroExQuote } from "../types";
 import { NATIVE_TOKEN, validateZeroExPayload } from "../codecs";
@@ -27,7 +28,12 @@ export class ZeroExAdapter implements SwapQuoteAdapter {
         check(body.liquidityAvailable === true, "0x liquidity is unavailable");
         check(same(text(body.buyToken, "buyToken"), request.tokenOut), "0x buy token mismatch");
         check(
-            same(text(body.sellToken, "sellToken"), NATIVE_TOKEN),
+            same(
+                text(body.sellToken, "sellToken"),
+                request.tokenIn && !same(request.tokenIn, ZeroAddress)
+                    ? request.tokenIn
+                    : NATIVE_TOKEN
+            ),
             "0x sell token must be native ETH"
         );
         check(decimal(body.buyAmount, "buyAmount") === request.amountOut, "0x buy amount mismatch");
@@ -35,7 +41,8 @@ export class ZeroExAdapter implements SwapQuoteAdapter {
         check(maxInput > 0n && maxInput <= request.maxInput, "0x quote exceeds ETH budget");
         const tx = record(body.transaction, "0x transaction");
         check(
-            decimal(tx.value, "transaction value") === maxInput,
+            decimal(tx.value, "transaction value") ===
+                (request.tokenIn && !same(request.tokenIn, ZeroAddress) ? 0n : maxInput),
             "0x native transaction value mismatch"
         );
         for (const field of ["taker", "recipient"]) {
@@ -54,6 +61,7 @@ export class ZeroExAdapter implements SwapQuoteAdapter {
                     "0x quote chain mismatch"
                 );
         const checked = validateZeroExPayload({
+            ...(request.tokenIn ? { tokenIn: request.tokenIn } : {}),
             target: address(text(tx.to, "transaction target")),
             data: text(tx.data, "transaction data") as `0x${string}`,
             routerAddress: request.deployment.routerAddress,
@@ -69,6 +77,7 @@ export class ZeroExAdapter implements SwapQuoteAdapter {
         check(estimatedInput <= maxInput, "0x estimated input exceeds budget");
         return Object.freeze({
             channel: this.channel,
+            ...(request.tokenIn ? { tokenIn: request.tokenIn } : {}),
             chainId: request.deployment.chainId,
             routerAddress: request.deployment.routerAddress,
             tokenOut: address(request.tokenOut),
@@ -114,7 +123,10 @@ export function createZeroExQuoteFetcher(options: ZeroExHttpOptions): ZeroExQuot
         const url = new URL(endpoint);
         url.search = new URLSearchParams({
             chainId: request.deployment.chainId.toString(),
-            sellToken: NATIVE_TOKEN,
+            sellToken:
+                request.tokenIn && !same(request.tokenIn, ZeroAddress)
+                    ? request.tokenIn
+                    : NATIVE_TOKEN,
             buyToken: request.tokenOut,
             buyAmount: request.amountOut.toString(),
             taker: request.deployment.routerAddress,

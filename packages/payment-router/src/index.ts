@@ -1,4 +1,4 @@
-export { paymentRouterAbi, zeroExPaymentRouterAbi } from "./abi";
+export { paymentRouterAbi as legacyNativePaymentRouterAbi, zeroExPaymentRouterAbi } from "./abi";
 export {
     encodeV3ExactOutputPath,
     validateV3Path,
@@ -13,3 +13,6 @@ export { ZeroExAdapter, createZeroExQuoteFetcher } from "./adapters/zeroex";
 
 export type { UniswapV3AdapterOptions } from "./adapters/uniswap-v3";
 export type { ZeroExQuoteTransport, ZeroExHttpOptions } from "./adapters/zeroex";
+
+export * from "./canonical-abi";
+export * from "./canonical";

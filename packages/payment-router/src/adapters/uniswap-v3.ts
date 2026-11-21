@@ -1,5 +1,5 @@
 import { snapshotQuoteRequest } from "../quote-request";
-import type { Provider } from "ethers";
+import { ZeroAddress, type Provider } from "ethers";
 import type { Address } from "@invisi-labs/protocol/contracts";
 import type { SwapQuoteAdapter, SwapQuoteRequest, UniswapV3Quote } from "../types";
 import { encodeV3ExactOutputPath, quoterV2Interface } from "../codecs";
@@ -7,7 +7,7 @@ import { address, check, same, uint } from "../validation";
 export interface UniswapV3AdapterOptions {
     provider: Provider;
     quoterAddress: Address;
-    /** Forward token order, starting at WETH and ending at the requested output. */
+    /** Forward token order, starting at tokenIn (WETH for native) and ending at the requested output. */
     routes: readonly { tokens: readonly Address[]; fees: readonly number[] }[];
 }
 /** Quote configured original-V3 routes with QuoterV2 via eth_call; never sends a trade. */
@@ -45,8 +45,12 @@ export class UniswapV3Adapter implements SwapQuoteAdapter {
         );
         const routes = this.#routes.filter(
             (r) =>
-                same(r.tokens[0]!, request.deployment.wethAddress) &&
-                same(r.tokens.at(-1)!, request.tokenOut)
+                same(
+                    r.tokens[0]!,
+                    request.tokenIn && !same(request.tokenIn, ZeroAddress)
+                        ? request.tokenIn
+                        : request.deployment.wethAddress
+                ) && same(r.tokens.at(-1)!, request.tokenOut)
         );
         const results = await Promise.allSettled(
             routes.map(async (route) => {
@@ -68,6 +72,7 @@ export class UniswapV3Adapter implements SwapQuoteAdapter {
                 check(maxInput <= request.maxInput, "V3 quote exceeds ETH budget");
                 return {
                     channel: this.channel,
+                    ...(request.tokenIn ? { tokenIn: request.tokenIn } : {}),
                     chainId: request.deployment.chainId,
                     routerAddress: request.deployment.routerAddress,
                     tokenOut: address(request.tokenOut),

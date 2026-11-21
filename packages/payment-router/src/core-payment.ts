@@ -16,7 +16,8 @@ export const coreInterface = new Interface(
 export function inspectCorePayment(
     call: TransactionCall,
     deployment: PaymentRouterDeployment,
-    now: bigint
+    now: bigint,
+    allowWethOutput = false
 ): { proof: Hex; request: TransactRequest } {
     check(
         same(call.to, deployment.coreAddress) && call.value === 0n,
@@ -78,7 +79,10 @@ export function inspectCorePayment(
             BigInt(params.withdrawalAddress) === 0n,
         "Router payment requires zero private inputs and no withdrawal"
     );
-    check(!same(params.token, deployment.wethAddress), "WETH output is not supported");
+    check(
+        allowWethOutput || !same(params.token, deployment.wethAddress),
+        "WETH output is not supported"
+    );
     normalizeTransactRequest(
         {
             chainId: deployment.chainId,

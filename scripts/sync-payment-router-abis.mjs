@@ -12,7 +12,7 @@ const revision = execFileSync("git", ["-C", repository, "rev-parse", "--short", 
 }).trim();
 const exports = [
     ["PaymentRouter", "paymentRouterAbi"],
-    ["ZeroExPaymentRouter", "zeroExPaymentRouterAbi"],
+    ["PaymentRouterAccount", "paymentRouterAccountAbi"],
 ];
 const source =
     `// Public ABI snapshots from invisi-periphery ${revision}; no implementation bytecode.\n` +
@@ -24,7 +24,7 @@ const source =
             return `export const ${binding} = ${JSON.stringify(artifact.abi, null, 4)} as const;\n`;
         })
         .join("\n");
-const target = resolve(root, "packages/payment-router/src/abi.ts");
+const target = resolve(root, "packages/payment-router/src/canonical-abi.ts");
 const formatted = await format(source, { ...(await resolveConfig(target)), filepath: target });
 if (process.argv.includes("--check")) {
     // The source revision is provenance metadata, not ABI identity.

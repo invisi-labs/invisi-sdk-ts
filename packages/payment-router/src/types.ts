@@ -13,6 +13,7 @@ export interface PaymentRouterDeployment {
     zeroEx?: { allowanceHolderAddress: Address; settlerRegistryAddress: Address };
 }
 export interface QuoteParameters {
+    tokenIn?: Address;
     tokenOut: Address;
     amountOut: bigint;
     maxInput: bigint;
@@ -28,6 +29,7 @@ export interface SwapQuoteRequest extends QuoteParameters {
     settlerAddress?: Address;
 }
 interface QuoteCommon {
+    tokenIn?: Address;
     chainId: bigint;
     routerAddress: Address;
     tokenOut: Address;
