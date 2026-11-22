@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/vue",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Invisi Protocol Vue composables",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -14,8 +14,8 @@
     }
   },
   "dependencies": {
-    "@invisi-labs/sdk": "workspace:1.3.3",
-    "@invisi-labs/session": "workspace:1.3.3"
+    "@invisi-labs/sdk": "workspace:1.3.4",
+    "@invisi-labs/session": "workspace:1.3.4"
   },
   "peerDependencies": {
     "vue": ">=3.4.0"

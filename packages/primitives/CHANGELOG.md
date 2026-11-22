@@ -1,6 +1,6 @@
 # @invisi-labs/primitives
 
-## Unreleased
+## 1.3.4
 
 - Canonicalize validated Credit owner and spender identities to lowercase EVM addresses. Hex casing does not change commitments or encrypted delivery payloads; nonzero 20-byte identity validation remains required.
 

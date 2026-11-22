@@ -1,6 +1,6 @@
 # @invisi-labs/rpc
 
-## Unreleased
+## 1.3.4
 
 - Add a restricted `Protocol.forCreditRevocation` binding for Core grant namespaces. Only fee-free public revocation can omit ERC20 deployment checks; Core chain, runtime, version and registry pins remain enforced.
 

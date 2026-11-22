@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/primitives",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Pure Invisi cryptographic primitives, fields, keys, commitments and delivery codecs",
   "type": "module",
   "main": "./dist/index.cjs",

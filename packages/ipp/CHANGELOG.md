@@ -1,5 +1,9 @@
 # @invisi-labs/ipp
 
+## 1.3.4
+
+- Release with exact SDK 1.3.4 primitives and SDK dependencies for canonical Credit and Note identity handling. IPP receipt and credential schemas remain unchanged from 1.3.3.
+
 ## 1.3.3
 
 - Replace `revocationShard` / `revocationSlot` with canonical positive uint128 decimal `grantId` in Credit receipts and optional credential proof metadata; update preparation output and strict receipt/credential validation.

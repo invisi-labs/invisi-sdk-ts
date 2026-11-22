@@ -1,6 +1,6 @@
 # @invisi-labs/sdk
 
-## Unreleased
+## 1.3.4
 
 - Accept equivalent hex casing for ordinary Note owners during explicit and managed preparation, authorization, and proving, including restored plans; retain strict nonzero 20-byte encoding and all commitment/context checks.
 

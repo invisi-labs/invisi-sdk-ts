@@ -1,5 +1,9 @@
 # @invisi-labs/payment-router
 
+## 1.3.4
+
+- Release with exact SDK 1.3.4 dependencies, inheriting Note/Credit address normalization and fee-free Credit pre-revocation from the SDK. Payment Router implementation, intent identity and deployed ABI bindings remain unchanged from 1.3.3.
+
 ## 1.3.3
 
 - Add canonical PaymentRouter and delegated-account ABI snapshots, four payment modes, EIP-712 Router/account intent signing, allowance/permit helpers and full outer-call simulation. Support native/ERC20 inputs, same-token payments and native-to-WETH routes with Uniswap V3 or canonical 0x calldata.

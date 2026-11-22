@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.3.4
+
+- Release with exact SDK 1.3.4 sibling dependencies for the identity and recovery fixes. Prover implementation, authenticated Core/Provenance resource pins and proof formats remain unchanged from 1.3.3.
+
 ## 1.3.3
 
 - Load verification key bytes from authenticated assets instead of bundling duplicate `vkHex` / `vkFields` payloads. Reconstruct recursive fields on demand and validate binary width, field bounds, key hash and recursive commitment before aggregation.

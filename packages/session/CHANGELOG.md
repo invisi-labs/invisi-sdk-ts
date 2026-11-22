@@ -1,6 +1,6 @@
 # @invisi-labs/session
 
-## Unreleased
+## 1.3.4
 
 - Validate recovered Credit updates and frozen transactions before taking over operation leases. Failed validation preserves the original handle and input reservations; recovery rejects concurrent journal changes before committing.
 

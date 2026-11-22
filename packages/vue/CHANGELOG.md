@@ -1,5 +1,9 @@
 # @invisi-labs/vue
 
+## 1.3.4
+
+- Release with exact SDK/session 1.3.4 dependencies, inheriting address casing compatibility, historical source-proof recovery and validation before operation lease takeover. Vue adapter implementation remains unchanged; custom RecoveryService adapters must add submitSourceProof as described by session.
+
 ## 1.3.3
 
 - Release with the fixed SDK 1.3.3 package group and exact sibling dependencies. The Vue adapter implementation is unchanged; consumers inherit the updated session refresh, submission recovery and Credit grant schema from SDK/session dependencies. Migrate Credit state and custom integrations as described in those package entries.

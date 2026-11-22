@@ -1,5 +1,9 @@
 # @invisi-labs/protocol
 
+## 1.3.4
+
+- Release with exact SDK 1.3.4 sibling dependencies, including canonical Credit identity handling in primitives. Protocol ABI and wire definitions remain unchanged from 1.3.3.
+
 ## 1.3.3
 
 - Align Core and Factory ABIs with canonical Core `4940be2`: Core construction uses `(params, addressRegistry)` and Factory `deploy` / `computeInstanceAddress` use `(creationCode, salt, initialOwner, emergencyAdmin, addressRegistry)`. Remove the retired Core screening getter, setter, event and error; refresh ABI identity hashes.
