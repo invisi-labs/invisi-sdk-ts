@@ -9,10 +9,10 @@ export const settings = {
     nativeCurrencyDecimals: 18,
     suggestedGasBalance: "0.1",
     helperGasBalance: "0.01",
-    chainRpcUrl: "http://127.0.0.1:18565",
+    chainRpcUrl: "https://bsc-testnet-rpc.publicnode.com",
     protocolRpcUrl: "https://rpc.invisipay.fi/v1/chains/97",
     tokenAddress: "0xf78DB005c9af4e9Ce4ebE6A5C162f9C42f2E4b65" as `0x${string}`,
-    // Optional paid broadcasting. Pin the operator's EIP-712 quote signer independently.
-    broadcasterMaxFeeAmount: 1000n, // Same-token base units; edit for your token and budget.
-    bbBin: fileURLToPath(new URL("./bin/bb", import.meta.url)),
+    // Optional paid broadcasting; discovery authenticates the operator's signing identity.
+    broadcasterMaxFeeAmount: 1_000_000_000_000_000_000n, // Maximum 1 iUSD (18 decimals).
+    bbBin: fileURLToPath(new URL("../../invisi-core/.tools/bb/bb", import.meta.url)),
 };

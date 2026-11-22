@@ -4,6 +4,8 @@ Each named scenario is a flat, independent script. Authorization signatures use 
 
 ## Setup
 
+Protocol RPC defaults to the deployed official HTTPS endpoint `https://rpc.invisipay.fi/v1/chains/97` on BSC Testnet (chain 97); official domains do not mean mainnet. Broadcaster examples use the first client returned by authenticated on-chain discovery (`clients[0]`). Provenance uses the SDK's default official client and authenticated bootstrap, without a separate endpoint setting or manual trust pins. The separate EVM node defaults to `https://bsc-testnet-rpc.publicnode.com`. The prover defaults to the sibling Core checkout's `.tools/bb/bb` (verified 6.0.0); set `bbBin` explicitly for another matching installation.
+
 ```sh
 pnpm install
 pnpm build
@@ -149,4 +151,4 @@ pnpm --filter @invisi-examples/scenarios lint
 
 [`08-payment-router/README.md`](08-payment-router/README.md) covers direct ERC20, direct native V3, relayed ERC20, sponsored EIP-7702 native-to-token (100.2 target tokens), and ERC20 0x swaps. Each new numbered script uses public SDK account profiles, an external verified ethers signer and an explicit `--execute` submission guard. Legacy `01`/`02` and importable host `03` remain available.
 
-[`09-router-provenance/README.md`](09-router-provenance/README.md) contains the source-recognition scenario matrix, a read-only Router transaction/Note query, and later spending of a recognized Note with real Core and Provenance proofs. Its private spend reuses authenticated App decryption and canonical candidate discovery. All trust identities are configured independently; missing placeholders stop before connecting.
+[`09-router-provenance/README.md`](09-router-provenance/README.md) contains the source-recognition scenario matrix, a read-only Router transaction/Note query, and later spending of a recognized Note with real Core and Provenance proofs. Its private spend reuses authenticated App decryption and canonical candidate discovery. Source trust is authenticated by the SDK default official client; the read-only query still requires an actual transaction hash and Note commitment.

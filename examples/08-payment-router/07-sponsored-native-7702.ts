@@ -50,9 +50,6 @@ const implementation = "0x0000000000000000000000000000000000000000";
 const implementationCodeHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 // Retain the action nonce after revocation. Use 0n only for a verified fresh account.
 const persistedUndelegatedNonce: bigint | undefined = undefined;
-const broadcasterEndpoint = "https://PLACEHOLDER.invalid/router";
-const quoteSigner = "0x0000000000000000000000000000000000000000";
-const feeRecipient = "0x0000000000000000000000000000000000000000";
 const relayer = "0x0000000000000000000000000000000000000000";
 if (
     [
@@ -62,8 +59,6 @@ if (
         uniswapRouterAddress,
         tokenAddress,
         quoterV2Address,
-        quoteSigner,
-        feeRecipient,
         relayer,
         implementation,
     ].some((address) => address === ZeroAddress)
@@ -74,9 +69,6 @@ if (
 }
 if (tokenAddress.toLowerCase() === wethAddress.toLowerCase()) {
     throw new Error("Native V3 input must buy a Core token different from WETH");
-}
-if (broadcasterEndpoint.includes("PLACEHOLDER")) {
-    throw new Error("Configure the trusted Broadcaster HTTPS endpoint");
 }
 if (BigInt(implementationCodeHash) === 0n) {
     throw new Error("Configure the trusted account implementation runtime code hash");
@@ -98,6 +90,12 @@ try {
     if (BigInt(protocol.context.protocolAddress) !== BigInt(coreAddress)) {
         throw new Error("Protocol RPC deployment does not match the pinned Core address");
     }
+    const clients = await protocol.getBroadcasters({ tokenAddress });
+    const broadcaster = clients[0];
+    if (!broadcaster) throw new Error("No broadcaster supports this token");
+    const { endpoint } = broadcaster.configuration;
+    const quoteSigner = broadcaster.configuration.quoteSigner as `0x${string}`;
+    const feeRecipient = broadcaster.configuration.feeRecipient as `0x${string}`;
     const aliceSigner = new EthereumWallet(process.env.ALICE_PRIVATE_KEY!, provider);
     if (aliceSigner.address.toLowerCase() !== alice.address.toLowerCase()) {
         throw new Error("ALICE_PRIVATE_KEY must match the configured payer");
@@ -140,7 +138,7 @@ try {
         }),
     ];
     const relay = new PaymentRouterRelayClient({
-        endpoint: broadcasterEndpoint,
+        endpoint,
         trust: {
             chainId: settings.chainId,
             core: coreAddress,

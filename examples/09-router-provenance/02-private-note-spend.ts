@@ -1,11 +1,10 @@
 import { randomInt } from "node:crypto";
-import { JsonRpcProvider, Wallet as EthersWallet, getBytes } from "ethers";
+import { JsonRpcProvider, Wallet as EthersWallet } from "ethers";
 import { Invisi, Protocol, ProtocolRpcClient, NoteOutput, type NoteInput } from "@invisi-labs/sdk";
 import {
     Provenance,
-    ProvenanceClient,
+    officialProvenanceClient,
     preflightTracking,
-    type TrustContext,
 } from "@invisi-labs/sdk/provenance";
 import { NativeProver, checkBBAvailable } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
@@ -21,42 +20,9 @@ if (!process.argv.includes("--execute")) {
     process.exit(0);
 }
 
-// Pin Source scope and signing identity independently from the service being queried.
-const provenanceEndpoint = "REPLACE_WITH_REVIEWED_PROVENANCE_ENDPOINT";
-const protocolAddress = "REPLACE_WITH_DEPLOYED_PROTOCOL_ADDRESS";
-const chainGeneration = "REPLACE_WITH_CHAIN_GENERATION";
-const providerId = "REPLACE_WITH_PROVIDER_ID";
-const signingKeyId = "REPLACE_WITH_SIGNING_KEY_ID";
-const signingPublicKey = "REPLACE_WITH_ED25519_PUBLIC_KEY";
-const manifestSha256 = "REPLACE_WITH_MANIFEST_SHA256";
-if (
-    !/^https:\/\//.test(provenanceEndpoint) ||
-    !/^0x[0-9a-fA-F]{40}$/.test(protocolAddress) ||
-    !/^[1-9][0-9]*$/.test(chainGeneration) ||
-    !/^0x[0-9a-fA-F]{64}$/.test(providerId) ||
-    !/^0x[0-9a-fA-F]{64}$/.test(signingKeyId) ||
-    !/^0x[0-9a-fA-F]{64}$/.test(signingPublicKey) ||
-    !/^[0-9a-fA-F]{64}$/.test(manifestSha256)
-) {
-    throw new Error("Configure all independently verified Provenance trust parameters");
-}
-const trust: TrustContext = {
-    chainId: settings.chainId,
-    protocolAddress,
-    chainGeneration,
-    providerId,
-    signingKeys: {
-        [signingKeyId]: getBytes(signingPublicKey),
-    },
-    manifestSha256,
-};
 const prover = new NativeProver({ bbBin: settings.bbBin });
 if (!(await checkBBAvailable(settings.bbBin))) {
     throw new Error("Barretenberg 6.0.0 is required before connecting");
-}
-const capability = await prover.getProvenanceCapability();
-if (capability.manifest.sha256 !== manifestSha256) {
-    throw new Error("Pinned manifest differs from the local NativeProver resource identity");
 }
 const [alice, bob] = getAccounts();
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
@@ -66,11 +32,8 @@ try {
     }
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
-    if (BigInt(protocol.context.protocolAddress) !== BigInt(protocolAddress)) {
-        throw new Error("Protocol RPC deployment differs from the pinned Provenance scope");
-    }
-    const source = new ProvenanceClient(provenanceEndpoint, trust);
-    const provenance = new Provenance({ prover, client: source });
+    const source = await officialProvenanceClient(protocol.context);
+    const provenance = new Provenance({ prover });
     const invisi = new Invisi({ provider, protocolRpc, prover });
     const tokenAddress = settings.tokenAddress;
     const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);

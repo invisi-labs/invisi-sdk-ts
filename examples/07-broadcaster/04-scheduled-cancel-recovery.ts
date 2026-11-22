@@ -71,7 +71,8 @@ try {
         outputs: [output],
         deadline: publishAfter + 600n,
     });
-    const [client] = await protocol.getBroadcasters({ tokenAddress });
+    const clients = await protocol.getBroadcasters({ tokenAddress });
+    const client = clients[0];
     if (!client) throw Error("No broadcaster supports this token");
     // Managed quotation atomically stores its scoped cancellation capability before returning.
     const quoted = await client.quote(prepared, {
