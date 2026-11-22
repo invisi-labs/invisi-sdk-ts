@@ -188,7 +188,7 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
-            const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
+            const preparation = explicitPreparation(runtime, {}, request.tokenAddress, true);
             return preparation.prepareRevokeCredit(request);
         });
     }

@@ -604,3 +604,63 @@ it.each(["persist", "lease", "concurrent", "export", "hash", "accepted"] as cons
         );
     }
 );
+
+it.each([
+    "0x0000000000000000000000000000000000000000",
+    "0x9999999999999999999999999999999999999999",
+] as const)(
+    "pre-revokes undeployed Core token namespace %s without a fee",
+    async (tokenAddress) => {
+        const h = await creditFixture();
+        h.reader.getCode = async (address) =>
+            address.toLowerCase() === tokenAddress.toLowerCase() ? "0x" : "0x6000";
+        h.reader.getCreditStatus = async () => 0;
+        const identity = { tokenAddress, grantId: 7n };
+        const prepared = await h.ownerSession.prepareRevokeCredit({
+            ...identity,
+            caller: h.wallet.ownerAddress,
+        });
+        const ready = await prepared.ready();
+        expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe("revokeCredit");
+        await (await h.ownerSession.resume(ready.id)).validateSubmission();
+        expect((await h.store.readSnapshot(h.scope)).reservations).toEqual({});
+        const detached = await h.ownerSession.prepareRevokeCredit(identity);
+        const request = await detached.exportRevocationAuthorization();
+        const signature = await new EvmWallet(`0x${"01".repeat(32)}`).signTypedData(
+            request.domain,
+            request.types,
+            request.message
+        );
+        expect(
+            iface.parseTransaction(
+                await (
+                    await detached.withRevocationSignature(signature as `0x${string}`)
+                ).exportTransaction()
+            )!.name
+        ).toBe("revokeCredit");
+        await expect(
+            h.ownerSession.prepareRevokeCredit({
+                ...identity,
+                fee: { recipient: h.bob.ownerAddress, amount: 1n },
+            })
+        ).rejects.toThrow(/contract|nonzero/);
+        const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+        const repriced = await h.ownerSession.prepareRevokeCredit({
+            ...identity,
+            caller: h.wallet.ownerAddress,
+        });
+        await expect(
+            quoteClient(h.context, () => 1n).quote(repriced, {
+                maxFeeAmount: 2n,
+            })
+        ).rejects.toThrow(/contract/);
+        await expect(
+            h.ownerSession.prepareRevokeCredit({ ...identity, deadline: 1n })
+        ).rejects.toThrow(/deadline/);
+        h.reader.getChainId = async () => 1n;
+        await expect(h.ownerSession.prepareRevokeCredit(identity)).rejects.toThrow(/chain/);
+        h.reader.getChainId = async () => h.context.chainId;
+        h.reader.getCode = async () => "0x6001";
+        await expect(h.ownerSession.prepareRevokeCredit(identity)).rejects.toThrow(/runtime/);
+    }
+);

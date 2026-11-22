@@ -187,3 +187,32 @@ it("validates deployment code, version and registry at a fixed observation block
     await p.validateDeployment(reader, block);
     expect(observed).toEqual([block, block, block, block]);
 });
+
+it("keeps the Core revocation binding restricted to fee-free public revocation", async () => {
+    const p = new Protocol({ deployment });
+    const binding = p.forCreditRevocation("0x0000000000000000000000000000000000000000");
+    const reader = {
+        getChainId: async () => 31337n,
+        getCode: async (target: string) =>
+            target === address ? ("0x6000" as const) : ("0x" as const),
+    };
+    await expect(
+        binding.validateDeployment(reader, { revocationFeeAmount: 0n })
+    ).resolves.toBeUndefined();
+    await expect(binding.validateDeployment(reader, { revocationFeeAmount: 1n })).rejects.toThrow(
+        /token.*contract/
+    );
+    await expect(binding.validateDeployment(reader)).rejects.toThrow(/token.*contract/);
+    for (const method of [
+        "transact",
+        "aggregate",
+        "createCredit",
+        "drawCredit",
+        "updateCredit",
+    ] as const)
+        expect(() => binding[method]({} as never)).toThrow(/only supports revokeCredit/);
+    await expect(binding.shield({} as never)).rejects.toThrow(/only supports revokeCredit/);
+    await expect(
+        p.forToken(a).validateDeployment(reader, { revocationFeeAmount: 0n })
+    ).rejects.toThrow(/token.*contract/);
+});

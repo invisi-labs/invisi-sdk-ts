@@ -130,6 +130,15 @@ export class Protocol {
         };
     }
 
+    /** Public revocation addresses a Core grant namespace, including an undeployed token. */
+    forCreditRevocation(tokenAddress: Address): TokenProtocol {
+        return TokenProtocol.forCreditRevocation(
+            { ...this.context, tokenAddress: getAddress(tokenAddress) as Hex },
+            { expectedRuntimeCodeHash: this.deployment.protocol.runtimeCodeHash },
+            (reader) => this.validateDeployment(reader)
+        );
+    }
+
     /** Build an operation context for one asset within this same deployment. */
     forToken(tokenAddress: Address): TokenProtocol {
         return new TokenProtocol(

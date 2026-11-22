@@ -823,7 +823,12 @@ export class Operation {
         const record = state.operations[this.id];
         check(record, "operation is unavailable");
         if (!record.transactionHash) return { level: "pending", status: "available", block: null };
-        await this.#runtime.options.protocol.validateDeployment(this.#runtime.reader);
+        await this.#runtime.options.protocol.validateDeployment(this.#runtime.reader, {
+            revocationFeeAmount:
+                this.#saved.plan.kind === "revoke-credit"
+                    ? this.#saved.plan.credit?.revocation?.feeAmount
+                    : undefined,
+        });
         return readTransactionConfirmation(this.#runtime.reader, record.transactionHash);
     }
 

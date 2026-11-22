@@ -283,7 +283,7 @@ export class WalletSession {
         }
     }
 
-    private runtime(tokenAddress: `0x${string}`): OperationRuntime {
+    private runtime(tokenAddress: `0x${string}`, creditRevocation = false): OperationRuntime {
         const options = this.#options;
         if (!options.store) {
             throw new MissingCapabilityError("wallet store");
@@ -292,7 +292,12 @@ export class WalletSession {
             throw new MissingCapabilityError("chain reader");
         }
         return {
-            options: { ...options, protocol: options.protocol.forToken(tokenAddress) },
+            options: {
+                ...options,
+                protocol: creditRevocation
+                    ? options.protocol.forCreditRevocation(tokenAddress)
+                    : options.protocol.forToken(tokenAddress),
+            },
             scope: this.scope,
             store: options.store,
             reader: options.chainReader,
@@ -521,9 +526,10 @@ export class WalletSession {
 
     private async preparation(
         tokenAddress: Hex,
-        fresh = false
+        fresh = false,
+        creditRevocation = false
     ): Promise<TransactionPreparation<Operation>> {
-        const runtime = this.runtime(tokenAddress);
+        const runtime = this.runtime(tokenAddress, creditRevocation);
         const snapshot = fresh ? undefined : await this.cachedPreparation();
         const cached = snapshot
             ? snapshotInfrastructure(snapshot, runtime.reader, runtime.options.protocolRpc)
@@ -550,15 +556,16 @@ export class WalletSession {
     }
     async #prepareUsingSnapshot(
         tokenAddress: Hex,
-        work: (preparation: TransactionPreparation<Operation>) => Promise<Operation>
+        work: (preparation: TransactionPreparation<Operation>) => Promise<Operation>,
+        creditRevocation = false
     ): Promise<Operation> {
         try {
-            return await work(await this.preparation(tokenAddress));
+            return await work(await this.preparation(tokenAddress, false, creditRevocation));
         } catch (error) {
             let cause: unknown = error;
             for (let depth = 0; depth < 8 && cause instanceof Error; depth++, cause = cause.cause) {
                 if (cause instanceof MissingPreparationSnapshotData)
-                    return work(await this.preparation(tokenAddress, true));
+                    return work(await this.preparation(tokenAddress, true, creditRevocation));
             }
             throw error;
         }
@@ -657,8 +664,10 @@ export class WalletSession {
     async prepareRevokeCredit(options: RevokeCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareRevokeCredit", async () => {
             await this.ready();
-            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareRevokeCredit(options)
+            return this.#prepareUsingSnapshot(
+                options.tokenAddress,
+                (preparation) => preparation.prepareRevokeCredit(options),
+                true
             );
         });
     }
@@ -671,7 +680,10 @@ export class WalletSession {
         const saved = state.operations[operationId]?.payload as
             { plan?: OperationPlan } | undefined;
         if (!saved?.plan) throw new Error("operation not found");
-        return Operation.resume(this.runtime(saved.plan.context.tokenAddress), operationId);
+        return Operation.resume(
+            this.runtime(saved.plan.context.tokenAddress, saved.plan.kind === "revoke-credit"),
+            operationId
+        );
     }
 
     toJSON() {

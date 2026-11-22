@@ -16,7 +16,8 @@ export async function revocationSigningRequest(
     const signingReader = runtime.reader;
     const [, block] = await Promise.all([
         runtime.options.protocol.validateDeployment(
-            runtime.preparationReads?.reader() ?? runtime.reader
+            runtime.preparationReads?.reader() ?? runtime.reader,
+            { revocationFeeAmount: params.feeAmount }
         ),
         signingReader.getLatestBlockNumber().then((number) => signingReader.getBlock(number)),
     ]);

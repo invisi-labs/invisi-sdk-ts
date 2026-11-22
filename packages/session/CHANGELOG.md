@@ -1,5 +1,10 @@
 # @invisi-labs/session
 
+## Unreleased
+
+- Recover confirmed tracked Provenance reproof through historical `submitSourceProof` after validating the mined locator, persisting the acknowledged replacement before polling and preserving the frozen transaction and tracking delivery mode. Custom `RecoveryService` adapters must expose `submitSourceProof`. Initial broadcast permits retain strict preflight evaluation.
+- Support fee-free managed Credit pre-revocation in zero and undeployed token namespaces, including detached owner signatures and resume, while retaining Core pins and fee-bearing token validation.
+
 ## 1.3.3
 
 - Batch authenticated public-history reads and coalesce Credit replay across empty ranges, preserving replay checkpoints until private transitions are committed and retaining live canonical fences.

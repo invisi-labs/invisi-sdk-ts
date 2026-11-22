@@ -1,5 +1,9 @@
 # @invisi-labs/rpc
 
+## Unreleased
+
+- Add a restricted `Protocol.forCreditRevocation` binding for Core grant namespaces. Only fee-free public revocation can omit ERC20 deployment checks; Core chain, runtime, version and registry pins remain enforced.
+
 ## 1.3.3
 
 - Read consecutive historical headers through `invisi_getBlockHeaders` in ranges of up to 256. Verify full-header hashes, deployment pins, range anchors, parent continuity and all fork fields through `slotNumber`; reject missing fork-field gaps.

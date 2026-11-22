@@ -88,7 +88,10 @@ export async function confirmOperation(
     const state = await store.readSnapshot(scope);
     const { saved } = current(state, id, generation);
     const plan = saved.plan;
-    await options.protocol.validateDeployment(reader);
+    await options.protocol.validateDeployment(reader, {
+        revocationFeeAmount:
+            plan.kind === "revoke-credit" ? plan.credit?.revocation?.feeAmount : undefined,
+    });
     await barrier(runtime, state);
     const receipt = await reader.getReceipt(hash);
     if (!receipt) {
@@ -323,7 +326,10 @@ export async function reconcileOperation(
     const state = await store.readSnapshot(scope);
     const { record, saved } = current(state, id, generation);
     const plan = saved.plan;
-    await options.protocol.validateDeployment(reader);
+    await options.protocol.validateDeployment(reader, {
+        revocationFeeAmount:
+            plan.kind === "revoke-credit" ? plan.credit?.revocation?.feeAmount : undefined,
+    });
     await barrier(runtime, state);
     const block = await reader.getBlock(await reader.getLatestBlockNumber());
     const facts = inputFacts(plan);

@@ -114,7 +114,12 @@ export class PreparedTransaction {
     }
     /** Observe canonical inclusion/finality only; this does not verify the intended operation effects. */
     async getConfirmation(transactionHash: Hex): Promise<TransactionConfirmation> {
-        await this.#runtime.options.protocol.validateDeployment(this.#runtime.reader);
+        await this.#runtime.options.protocol.validateDeployment(this.#runtime.reader, {
+            revocationFeeAmount:
+                this.#saved.plan.kind === "revoke-credit"
+                    ? this.#saved.plan.credit?.revocation?.feeAmount
+                    : undefined,
+        });
         return readTransactionConfirmation(this.#runtime.reader, transactionHash);
     }
     /** Persisted scoped cancellation record; available before submitting. */

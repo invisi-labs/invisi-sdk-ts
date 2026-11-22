@@ -77,10 +77,10 @@ export class Preparation<Result> {
     }
     constructor(readonly runtime: PreparationRuntime<Result>) {}
 
-    async frame(requested?: bigint): Promise<PreparationFrame> {
+    async frame(requested?: bigint, revocationFeeAmount?: bigint): Promise<PreparationFrame> {
         const { reader, options } = this.runtime;
         const [, block] = await Promise.all([
-            options.protocol.validateDeployment(reader),
+            options.protocol.validateDeployment(reader, { revocationFeeAmount }),
             reader.getLatestBlockNumber().then((number) => reader.getBlock(number)),
         ]);
         const timestamp =

@@ -27,14 +27,26 @@ export interface TokenProtocolOptions {
     expectedRuntimeCodeHash?: Hex;
 }
 
+const creditRevocationScope = Symbol("Core Credit revocation");
+
 /** A token-specific operation binding within a multi-token deployment. Pure builders never sign or submit. */
 export class TokenProtocol {
     readonly context: Readonly<TransactionContext>;
     readonly expectedRuntimeCodeHash: Hex | undefined;
 
-    constructor(context: TransactionContext, options: TokenProtocolOptions = {}) {
+    constructor(
+        context: TransactionContext,
+        options: TokenProtocolOptions = {},
+        private readonly revocationScope?: typeof creditRevocationScope,
+        private readonly validateCore?: (
+            reader: Pick<ChainReader, "getChainId" | "getCode">
+        ) => Promise<void>
+    ) {
         const normalized = normalizeContext(context);
-        if (BigInt(normalized.protocolAddress) === 0n || BigInt(normalized.tokenAddress) === 0n) {
+        if (
+            BigInt(normalized.protocolAddress) === 0n ||
+            (BigInt(normalized.tokenAddress) === 0n && revocationScope !== creditRevocationScope)
+        ) {
             throw new Error("deployment addresses must be nonzero");
         }
         if (
@@ -49,17 +61,33 @@ export class TokenProtocol {
         Object.freeze(this);
     }
 
+    /** Restricted binding: only public Credit revocation can use an undeployed token namespace. */
+    static forCreditRevocation(
+        context: TransactionContext,
+        options: TokenProtocolOptions,
+        validateCore: (reader: Pick<ChainReader, "getChainId" | "getCode">) => Promise<void>
+    ): TokenProtocol {
+        return new TokenProtocol(context, options, creditRevocationScope, validateCore);
+    }
+
+    private requireTokenOperation(): void {
+        if (this.revocationScope) throw Error("Core revocation binding only supports revokeCredit");
+    }
+
     async validateDeployment(
         reader: Pick<ChainReader, "getChainId" | "getCode">,
-        options: { requireRuntimeProfile?: boolean } = {}
+        options: { requireRuntimeProfile?: boolean; revocationFeeAmount?: bigint | undefined } = {}
     ): Promise<void> {
         if ((options.requireRuntimeProfile ?? true) && !this.expectedRuntimeCodeHash) {
             throw new MissingCapabilityError("trusted deployment profile");
         }
+        if (this.revocationScope) await this.validateCore!(reader);
+        const feeFreeRevocation =
+            this.revocationScope === creditRevocationScope && options.revocationFeeAmount === 0n;
         const [chainId, code, tokenCode] = await Promise.all([
             reader.getChainId(),
             reader.getCode(this.context.protocolAddress),
-            reader.getCode(this.context.tokenAddress),
+            feeFreeRevocation ? "0x" : reader.getCode(this.context.tokenAddress),
         ]);
         if (chainId !== this.context.chainId) {
             throw new Error("deployment chain mismatch");
@@ -71,12 +99,13 @@ export class TokenProtocol {
         ) {
             throw new Error("deployment runtime code profile mismatch");
         }
-        if (!/^0x(?:[0-9a-fA-F]{2})+$/.test(tokenCode)) {
+        if (!feeFreeRevocation && !/^0x(?:[0-9a-fA-F]{2})+$/.test(tokenCode)) {
             throw new Error("token address must have contract code");
         }
     }
 
     transact(request: Omit<BuildTransactCalldataParams, "context">) {
+        this.requireTokenOperation();
         return {
             to: this.context.protocolAddress,
             value: 0n,
@@ -85,6 +114,7 @@ export class TokenProtocol {
     }
 
     aggregate(request: Omit<BuildTransactAggregateCalldataParams, "context">) {
+        this.requireTokenOperation();
         return {
             to: this.context.protocolAddress,
             value: 0n,
@@ -93,6 +123,7 @@ export class TokenProtocol {
     }
 
     async shield(request: Omit<BuildShieldCalldataParams, "context">) {
+        this.requireTokenOperation();
         return {
             to: this.context.protocolAddress,
             value: 0n,
@@ -103,6 +134,7 @@ export class TokenProtocol {
     createCredit(
         request: Omit<BuildCreateCreditCalldataParams, "context"> & { timestamp?: bigint }
     ) {
+        this.requireTokenOperation();
         return {
             to: this.context.protocolAddress,
             value: 0n,
@@ -117,6 +149,7 @@ export class TokenProtocol {
     }
 
     drawCredit(request: Omit<BuildCreditDrawCalldataParams, "context">) {
+        this.requireTokenOperation();
         return {
             to: this.context.protocolAddress,
             value: 0n,
@@ -133,6 +166,7 @@ export class TokenProtocol {
     }
 
     updateCredit(request: Omit<BuildUpdateCreditCalldataParams, "context">) {
+        this.requireTokenOperation();
         return {
             to: this.context.protocolAddress,
             value: 0n,

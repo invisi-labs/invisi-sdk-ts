@@ -241,3 +241,9 @@ SQLite adapters may implement `SQLiteStatement.all` in addition to `get` and `ru
 Managed broadcaster quotation retains one detached inventory for its fee iterations. Each preparation receives an independent copy, and the final transaction still checks the current operation generation, invalidation state and selected inputs. Inventory is not shared across separate quotes.
 
 Run `node test-support/performance/measure-wallet-storage.cjs BASELINE_ROOT CANDIDATE_ROOT OUTPUT_JSON` after building both SDK checkouts to compare encrypted, real SQLite storage with 128 synthetic retained operations. The [recorded Node measurements](../../test-support/performance/wallet-storage-node-20261117.json) show snapshot median 8.8 to 5.8 ms and transaction median 18.5 to 13.6 ms. These are desktop storage measurements, not App end-to-end or Hermes latency claims.
+
+### Confirmed Provenance reproof and public Credit revocation
+
+`RecoveryService` adapters provide `submitSourceProof(data, sidecars)` alongside `evaluateTransaction`. `ProvenanceClient` implements both methods. Initial tracked preparation uses strict transaction preflight. After the host authenticates a confirmed transaction and its mined locator, generation recovery submits a replacement sidecar with `submitSourceProof` and records the replacement tracking ID. This historical delivery can recover a mined transaction after its native deadline; it cannot authorize a new payment or rebroadcast. Pending, unseen and reorged transactions do not receive historical delivery permission.
+
+`prepareRevokeCredit` supports fee-free pre-revocation of Core grant namespaces whose token is zero or has no deployed code. Caller and detached owner authorization, grant ID, deadline and Core deployment checks still apply. Adding a fee, including through broadcaster repricing, requires deployed ERC20 code. Other token operations retain their existing deployment requirements.

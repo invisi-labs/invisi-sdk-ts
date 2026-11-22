@@ -1,5 +1,9 @@
 # @invisi-labs/sdk
 
+## Unreleased
+
+- Prepare fee-free public Credit revocation for zero or undeployed token namespaces. Keep Core deployment pins and authorization checks; fee-bearing revocation and repricing still require deployed ERC20 code.
+
 ## 1.3.3
 
 - Generate and preserve positive uint128 Credit `grantId` values before proving; replace shard/slot fields in create, update, revoke, discovery, records, previews, signing statements and the ethers chain reader. Use matching Core grant-status reads and refreshed Credit gas baselines.

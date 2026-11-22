@@ -101,6 +101,9 @@ async function recoveryHarness() {
         evaluateTransaction: async () => {
             throw Error("Explicit direct fixture has no preflight");
         },
+        submitSourceProof: async () => {
+            throw Error("No historical delivery in direct fixture");
+        },
         getTracking: async () => {
             throw Error("No direct tracking");
         },
@@ -522,3 +525,338 @@ it("rejects reserved internal submit keys before HTTP", async () => {
     ).rejects.toThrow("reserved");
     expect(calls).toBe(0);
 });
+
+it("recovers confirmed tracked reproof past the native deadline", async () => {
+    const h = await recoveryHarness();
+    const tracking = {
+        id: "a".repeat(48),
+        status: "pending_confirmation" as const,
+        operationDigest:
+            "0x" + BigInt(fixtures.intent.operationDigest).toString(16).padStart(64, "0"),
+        expiresAt: "9999999999",
+    };
+    let preflights = 0,
+        historical = 0;
+    const { ProvenanceClient } = await import("@invisi-labs/rpc/provenance");
+    const client = new ProvenanceClient("https://example.test", h.service.trust, (async (
+        _url,
+        init
+    ) => {
+        historical++;
+        const request = JSON.parse(init!.body as string);
+        expect(request.method).toBe("provenance_submitSourceProof");
+        expect(request.params[0].data).toBe(fixtures.intent.calldata);
+        expect(request.params[0].proofSidecars).toHaveLength(1);
+        return new Response(
+            JSON.stringify({
+                jsonrpc: "2.0",
+                id: request.id,
+                result: {
+                    scope: fixtures.scope,
+                    chainGeneration: "2",
+                    providerId: fixtures.providerId,
+                    signingKeyId: fixtures.signingKeyId,
+                    manifestSha256: fixtures.manifestSha256,
+                    broadcastDecision: "allow",
+                    operationDigest: fixtures.intent.operationDigest,
+                    tracking: { ...tracking, id: "b".repeat(48) },
+                },
+            }),
+            { status: 200 }
+        );
+    }) as typeof fetch);
+    h.service.submitSourceProof = client.submitSourceProof.bind(client);
+    h.service.getTracking = async (id) => ({
+        scope: fixtures.scope,
+        tracking: {
+            ...tracking,
+            id,
+            status: "recognized",
+            matched: h.fact.locator as {
+                txHash: string;
+                blockHash: string;
+                operationIndex: string;
+            },
+        },
+    });
+    h.service.evaluateTransaction = async () => {
+        preflights++;
+        if (preflights > 1)
+            throw Error("Source -32602 invalid params: native deadline expired (evaluate.go:294)");
+        return {
+            scope: fixtures.scope,
+            broadcastDecision: "allow",
+            operationDigest: fixtures.intent.operationDigest,
+            tracking,
+        };
+    };
+    await h
+        .coordinator()
+        .prepare(
+            "tracked-expired",
+            fixtures.intent,
+            fixtures.sidecars[0]! as ProofSidecar,
+            "stable"
+        );
+    await h.coordinator().markBroadcast("tracked-expired", h.fact.transactionHash!);
+    h.fact = { ...h.fact, chainGeneration: "2" };
+    h.service.trust.chainGeneration = "2";
+    h.recognized();
+    const result = await h.coordinator().resume("tracked-expired", { reprove: true });
+    expect(result.state).toBe("recognized");
+    expect(result.intent).toEqual(fixtures.intent);
+    expect(result.locator).toEqual(h.fact.locator);
+    expect(result.deliveryMode).toBe("tracked");
+    expect(result.idempotencyKey).toBe("stable");
+    expect(result.trackingId).toBe("b".repeat(48));
+    expect(h.submits).toBe(0);
+    await h.coordinator().resume("tracked-expired");
+    expect(historical).toBe(1);
+    expect(preflights).toBe(1);
+});
+
+it("keeps confirmed direct reproof on historical submitProof", async () => {
+    const h = await recoveryHarness();
+    let preflights = 0;
+    h.service.evaluateTransaction = async () => {
+        preflights++;
+        throw Error("expired native deadline");
+    };
+    await h
+        .coordinator()
+        .prepareDirect(
+            "direct-expired",
+            fixtures.intent,
+            fixtures.sidecars[0]! as ProofSidecar,
+            "stable"
+        );
+    await h.coordinator().markBroadcast("direct-expired", h.fact.transactionHash!);
+    h.fact = { ...h.fact, chainGeneration: "2" };
+    h.service.trust.chainGeneration = "2";
+    h.recognized();
+    expect((await h.coordinator().resume("direct-expired", { reprove: true })).state).toBe(
+        "recognized"
+    );
+    expect(preflights).toBe(0);
+    expect(h.submits).toBe(1);
+});
+
+it.each(["unseen", "pending", "reorged"] as const)(
+    "never delivers historical source proof for %s reconciliation",
+    async (status) => {
+        const h = await recoveryHarness();
+        await h
+            .coordinator()
+            .prepareDirect(
+                "unconfirmed",
+                fixtures.intent,
+                fixtures.sidecars[0]! as ProofSidecar,
+                "stable"
+            );
+        const record = (await h.store.load("unconfirmed"))!;
+        await h.store.compareAndSwap("unconfirmed", record.revision, {
+            ...record,
+            revision: record.revision + 1,
+            deliveryMode: "tracked",
+            trackingId: "a".repeat(48),
+        });
+        let writes = 0;
+        h.service.submitSourceProof = async () => {
+            writes++;
+            throw Error("unexpected source delivery");
+        };
+        h.fact = { ...h.fact, status, chainGeneration: "2" };
+        h.service.trust.chainGeneration = "2";
+        expect((await h.coordinator().resume("unconfirmed", { reprove: true })).state).toBe(
+            "needs_reproof"
+        );
+        expect(writes).toBe(0);
+        expect(h.submits).toBe(0);
+    }
+);
+it.each(["missing", "mismatched", "malformed"])(
+    "rejects %s confirmed locator before source delivery",
+    async (kind) => {
+        const h = await recoveryHarness();
+        await h
+            .coordinator()
+            .prepareDirect(
+                "bad-locator",
+                fixtures.intent,
+                fixtures.sidecars[0]! as ProofSidecar,
+                "stable"
+            );
+        const record = (await h.store.load("bad-locator"))!;
+        await h.store.compareAndSwap("bad-locator", record.revision, {
+            ...record,
+            revision: record.revision + 1,
+            deliveryMode: "tracked",
+            trackingId: "a".repeat(48),
+        });
+        let writes = 0;
+        h.service.submitSourceProof = async () => {
+            writes++;
+            throw Error("unexpected source delivery");
+        };
+        h.fact = {
+            ...h.fact,
+            chainGeneration: "2",
+            locator: {
+                ...h.fact.locator!,
+                ...(kind === "mismatched"
+                    ? { txHash: "0x" + "ef".repeat(32) }
+                    : { blockHash: "invalid" }),
+            },
+        };
+        if (kind === "missing") delete h.fact.locator;
+        h.service.trust.chainGeneration = "2";
+        await expect(h.coordinator().resume("bad-locator", { reprove: true })).rejects.toThrow(
+            /locator|integer/
+        );
+        expect(writes).toBe(0);
+    }
+);
+
+async function trackedReplacementHarness(outage: "tracking" | "recognition" = "tracking") {
+    const h = await recoveryHarness();
+    await h
+        .coordinator()
+        .prepareDirect(
+            "replacement",
+            fixtures.intent,
+            fixtures.sidecars[0]! as ProofSidecar,
+            "stable"
+        );
+    const record = (await h.store.load("replacement"))!;
+    await h.store.compareAndSwap("replacement", record.revision, {
+        ...record,
+        revision: record.revision + 1,
+        deliveryMode: "tracked",
+        trackingId: "a".repeat(48),
+    });
+    h.fact = { ...h.fact, chainGeneration: "2" };
+    h.service.trust.chainGeneration = "2";
+    let submissions = 0,
+        reproves = 0,
+        polls = 0;
+    const reprove = h.host.localReprove!;
+    h.host.localReprove = async (...args) => {
+        reproves++;
+        return reprove(...args);
+    };
+    const tracking = {
+        id: "b".repeat(48),
+        status: "pending_confirmation",
+        operationDigest:
+            "0x" + BigInt(fixtures.intent.operationDigest).toString(16).padStart(64, "0"),
+        expiresAt: "9999999999",
+    };
+    h.service.submitSourceProof = async () => {
+        submissions++;
+        return {
+            scope: fixtures.scope,
+            broadcastDecision: "allow",
+            operationDigest: fixtures.intent.operationDigest,
+            tracking,
+        };
+    };
+    h.service.getTracking = async (id) => {
+        polls++;
+        expect(id).toBe(tracking.id);
+        if (polls === 1 && outage === "tracking") throw Error("tracking temporarily unavailable");
+        return {
+            scope: fixtures.scope,
+            tracking: {
+                ...tracking,
+                id,
+                status: "recognized",
+                matched: h.fact.locator as {
+                    txHash: string;
+                    blockHash: string;
+                    operationIndex: string;
+                },
+            },
+        };
+    };
+    h.recognized();
+    const recognize = h.service.getOperationRecognition;
+    let recognitions = 0;
+    h.service.getOperationRecognition = async (...args) => {
+        if (++recognitions === 1 && outage === "recognition")
+            throw Error("recognition temporarily unavailable");
+        return recognize(...args);
+    };
+    return {
+        h,
+        get counts() {
+            return { submissions, reproves, polls };
+        },
+    };
+}
+
+it.each(["tracking", "recognition"] as const)(
+    "durably saves acknowledged replacement before %s outage and resumes without reproof",
+    async (outage) => {
+        const test = await trackedReplacementHarness(outage),
+            { h } = test;
+        await expect(h.coordinator().resume("replacement", { reprove: true })).rejects.toThrow(
+            `${outage} temporarily unavailable`
+        );
+        const saved = (await h.store.load("replacement"))!;
+        expect(saved.trackingId).toBe("b".repeat(48));
+        expect(saved.chainGeneration).toBe("2");
+        expect(saved.sidecar).toEqual(fixtures.sidecars[1]);
+        expect(saved.locator).toEqual(h.fact.locator);
+        expect(saved.state).toBe("pending");
+        expect((await h.coordinator().resume("replacement")).state).toBe("recognized");
+        expect(test.counts).toEqual({ submissions: 1, reproves: 1, polls: 2 });
+    }
+);
+
+it.each(["failed", "invalid", "conflict"])(
+    "does not poll or overwrite state after %s replacement acknowledgement",
+    async (failure) => {
+        const test = await trackedReplacementHarness(),
+            { h } = test;
+        const before = await h.store.load("replacement");
+        if (failure === "conflict") h.reject();
+        else
+            h.service.submitSourceProof = async () => {
+                if (failure === "failed") throw Error("source unavailable");
+                return { scope: fixtures.scope, broadcastDecision: "allow" };
+            };
+        await expect(h.coordinator().resume("replacement", { reprove: true })).rejects.toThrow();
+        expect(await h.store.load("replacement")).toEqual(before);
+        expect(test.counts.polls).toBe(0);
+    }
+);
+
+it.each(["txHash", "blockHash", "operationIndex"] as const)(
+    "rejects replacement acknowledgement matched to another %s before saving",
+    async (field) => {
+        const test = await trackedReplacementHarness(),
+            { h } = test;
+        const before = await h.store.load("replacement");
+        h.service.submitSourceProof = async () => ({
+            scope: fixtures.scope,
+            broadcastDecision: "allow",
+            operationDigest: fixtures.intent.operationDigest,
+            tracking: {
+                id: "b".repeat(48),
+                status: "recognized",
+                expiresAt: "9999999999",
+                operationDigest:
+                    "0x" + BigInt(fixtures.intent.operationDigest).toString(16).padStart(64, "0"),
+                matched: {
+                    ...h.fact.locator,
+                    [field]: field === "operationIndex" ? "1" : "0x" + "ef".repeat(32),
+                },
+            },
+        });
+        await expect(h.coordinator().resume("replacement", { reprove: true })).rejects.toThrow(
+            /matched another transaction/
+        );
+        expect(await h.store.load("replacement")).toEqual(before);
+        expect(test.counts.polls).toBe(0);
+    }
+);

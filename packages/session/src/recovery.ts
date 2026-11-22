@@ -294,6 +294,10 @@ export interface RecoveryService {
         data: unknown,
         sidecars: ProofSidecar[]
     ): Promise<import("@invisi-labs/protocol/provenance").PublicResult>;
+    submitSourceProof(
+        data: string,
+        sidecars: readonly ProofSidecar[]
+    ): Promise<import("@invisi-labs/protocol/provenance").PublicResult>;
     getTracking(id: string): Promise<TrackingResult>;
     submitProof(
         locator: Record<string, string>,
@@ -460,8 +464,8 @@ export class RecoveryCoordinator {
         options: { signal?: AbortSignal; reprove?: boolean } = {}
     ): Promise<RecoveryRecord> {
         checkCancelled(options.signal);
-        const record = await this.required(id),
-            previous = record.revision;
+        const record = await this.required(id);
+        let previous = record.revision;
         // Reconciliation precedes generation checks and every remote mutation.
         const fact = clone(await this.host.reconcileFrozenTransaction(clone(record)));
         checkCancelled(options.signal);
@@ -473,6 +477,20 @@ export class RecoveryCoordinator {
             throw Error("Reconciled frozen transaction mismatch");
         if (!["unseen", "pending", "confirmed", "reorged"].includes(fact.status))
             throw Error("Invalid reconciliation status");
+        if (fact.status === "confirmed") {
+            if (!fact.locator || !fact.transactionHash)
+                throw Error("Missing authenticated mined locator");
+            if (
+                word(fact.transactionHash) !== fact.transactionHash ||
+                Object.keys(fact.locator).some(
+                    (k) => !["blockHash", "txHash", "operationIndex"].includes(k)
+                ) ||
+                fact.locator.txHash !== fact.transactionHash ||
+                word(fact.locator.blockHash!) !== fact.locator.blockHash ||
+                BigInt(fact.locator.operationIndex!) !== BigInt(record.intent.operationIndex)
+            )
+                throw Error("Invalid authenticated locator");
+        }
         uint(fact.chainGeneration, 64);
         if (
             record.chainGeneration !== fact.chainGeneration ||
@@ -510,36 +528,39 @@ export class RecoveryCoordinator {
                 };
                 await this.validate(next);
                 if (record.deliveryMode === "tracked") {
-                    const evaluated = await this.service.evaluateTransaction(next.intent.calldata, [
+                    const delivered = await this.service.submitSourceProof(next.intent.calldata, [
                         clone(next.sidecar),
                     ]);
-                    record.trackingId = preflightTracking(
-                        evaluated,
+                    const tracking = preflightTracking(
+                        delivered,
                         next.intent.operationIndex,
                         next.intent.operationDigest
-                    ).id;
+                    );
+                    if (
+                        tracking.matched &&
+                        (tracking.matched.txHash !== fact.transactionHash ||
+                            tracking.matched.blockHash !== fact.locator!.blockHash ||
+                            tracking.matched.operationIndex !== fact.locator!.operationIndex)
+                    )
+                        throw Error("Tracking matched another transaction");
+                    record.trackingId = tracking.id;
                 }
                 record.sidecar = next.sidecar;
                 record.chainGeneration = next.chainGeneration;
                 // A replacement bundle gets its own deterministic submission key without changing the frozen transaction.
                 record.state = "pending";
+                if (record.deliveryMode === "tracked") {
+                    record.transactionHash = fact.transactionHash!;
+                    record.locator = clone(fact.locator!);
+                    // Retain the acknowledged replacement before a polling outage or restart.
+                    const saved = await this.save(record, previous);
+                    previous = saved.revision;
+                }
             } else return this.save(record, previous);
         }
         if (fact.status === "confirmed") {
-            if (!fact.locator || !fact.transactionHash)
-                throw Error("Missing authenticated mined locator");
-            if (
-                word(fact.transactionHash) !== fact.transactionHash ||
-                Object.keys(fact.locator).some(
-                    (k) => !["blockHash", "txHash", "operationIndex"].includes(k)
-                ) ||
-                fact.locator.txHash !== fact.transactionHash ||
-                word(fact.locator.blockHash!) !== fact.locator.blockHash ||
-                BigInt(fact.locator.operationIndex!) !== BigInt(record.intent.operationIndex)
-            )
-                throw Error("Invalid authenticated locator");
-            record.transactionHash = fact.transactionHash;
-            record.locator = clone(fact.locator);
+            record.transactionHash = fact.transactionHash!;
+            record.locator = clone(fact.locator!);
         }
         if (record.deliveryMode === "tracked") {
             if (!record.trackingId) throw Error("Recovery tracking id required");
@@ -580,7 +601,7 @@ export class RecoveryCoordinator {
             if (tracking.status === "pending_source") {
                 record.state = "pending_source";
                 record.sourceState = "pending_source";
-                record.transactionHash = fact.transactionHash;
+                record.transactionHash = fact.transactionHash!;
                 record.locator = clone(fact.locator);
                 return this.save(record, previous);
             }

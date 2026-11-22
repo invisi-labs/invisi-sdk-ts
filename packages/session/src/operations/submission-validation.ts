@@ -21,7 +21,12 @@ export async function validateOperationSubmission(
 ): Promise<void> {
     signal?.throwIfAborted();
     const { reader, options: runtimeOptions } = runtime;
-    await runtimeOptions.protocol.validateDeployment(reader);
+    await runtimeOptions.protocol.validateDeployment(reader, {
+        revocationFeeAmount:
+            saved.plan.kind === "revoke-credit"
+                ? saved.plan.credit?.revocation?.feeAmount
+                : undefined,
+    });
     const head = await reader.getBlock(await reader.getLatestBlockNumber());
     const plan = saved.plan;
     check(head.timestamp <= plan.deadline, "operation has expired");

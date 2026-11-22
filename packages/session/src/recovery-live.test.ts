@@ -236,6 +236,7 @@ it.skipIf(!enabled)(
         const trackedService = {
             trust: client.trust,
             evaluateTransaction: client.evaluateTransaction.bind(client),
+            submitSourceProof: client.submitSourceProof.bind(client),
             getTracking: client.getTracking.bind(client),
             getOperationRecognition: client.getOperationRecognition.bind(client),
             submitProof: async () => {

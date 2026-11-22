@@ -14,7 +14,8 @@ export function explicitPreparation(
         creditInputs?: readonly CreditInput[];
         changeAddress?: string;
     },
-    tokenAddress: `0x${string}`
+    tokenAddress: `0x${string}`,
+    creditRevocation = false
 ) {
     if (!options.chainReader) throw new Error("chain reader required");
     const inputs = structuredClone(data.inputs ?? []);
@@ -64,7 +65,12 @@ export function explicitPreparation(
     const preparationReads = new PreparationReads(options.chainReader!, options.protocolRpc);
     const runtime = {
         preparationReads,
-        options: { ...capabilities, protocol: options.protocol.forToken(tokenAddress) },
+        options: {
+            ...capabilities,
+            protocol: creditRevocation
+                ? options.protocol.forCreditRevocation(tokenAddress)
+                : options.protocol.forToken(tokenAddress),
+        },
         reader: options.chainReader!,
         scope,
     };

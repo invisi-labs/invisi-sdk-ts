@@ -516,7 +516,7 @@ export class CreditPreparation<Result> {
         return this.runtime.complete(plan);
     }
     async revoke(options: RevokeCreditPreparation): Promise<Result> {
-        const frame = await this.#prepare.frame(options.deadline),
+        const frame = await this.#prepare.frame(options.deadline, options.fee?.amount ?? 0n),
             params = {
                 token: frame.context.tokenAddress,
                 owner: options.owner ?? this.runtime.scope.ownerAddress,
