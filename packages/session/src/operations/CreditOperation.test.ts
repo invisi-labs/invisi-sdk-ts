@@ -696,3 +696,172 @@ it.each(["owner", "spender"] as const)(
         });
     }
 );
+
+it.each(["owner", "chain", "protocol"] as const)(
+    "rejects a Credit recovery with foreign %s without committing wallet state",
+    async (mode) => {
+        const h = await creditFixture();
+        const operation = await h.spenderSession.prepareDrawCredit({
+            tokenAddress: h.context.tokenAddress,
+            credits: [{ credit: h.commitment, amount: 10n }],
+            recipient: h.wallet.getAddress(),
+        });
+        const scope = { ...h.scope, ownerAddress: h.bob.ownerAddress };
+        await h.store.transaction(scope, (draft) => {
+            const saved = draft.operations[operation.id]!.payload as SavedOperation;
+            if (mode === "owner") saved.plan.scope.ownerAddress = h.wallet.ownerAddress;
+            else if (mode === "chain") saved.plan.context.chainId++;
+            else saved.plan.context.protocolAddress = h.wallet.ownerAddress;
+        });
+        const before = await h.store.readSnapshot(scope);
+        await expect(h.spenderSession.resume(operation.id)).rejects.toThrow(/scope|context/);
+        expect(await h.store.readSnapshot(scope)).toEqual(before);
+        expect(h.prover.prove).not.toHaveBeenCalled();
+    }
+);
+
+it.each(["update", "draw"] as const)(
+    "retains Credit %s reservations across recovery and fences the previous handle",
+    async (kind) => {
+        const h = await creditFixture();
+        const session = kind === "update" ? h.ownerSession : h.spenderSession;
+        const operation =
+            kind === "update"
+                ? await session.prepareUpdateCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      credit: h.commitment,
+                      singleLimit: 10n,
+                  })
+                : await session.prepareDrawCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      credits: [{ credit: h.commitment, amount: 10n }],
+                      recipient: h.wallet.getAddress(),
+                  });
+        const scope = session.scope;
+        const before = await h.store.readSnapshot(scope);
+        expect(before.reservations["credit:" + h.commitment]).toBe(operation.id);
+        const resumed = await session.resume(operation.id);
+        const after = await h.store.readSnapshot(scope);
+        expect(after.reservations).toEqual(before.reservations);
+        expect(after.credits).toEqual(before.credits);
+        expect((after.operations[operation.id]!.payload as SavedOperation).generation).toBe(
+            (before.operations[operation.id]!.payload as SavedOperation).generation + 1
+        );
+        await expect(operation.abandon()).rejects.toThrow(/stale|recovered/);
+        expect(await h.store.readSnapshot(scope)).toEqual(after);
+        await resumed.abandon();
+        const released = await h.store.readSnapshot(scope);
+        expect(released.reservations["credit:" + h.commitment]).toBeUndefined();
+        expect(
+            released.credits[h.commitment + (kind === "update" ? ":owner" : ":spender")]!.spent
+        ).toBe("unspent");
+    }
+);
+
+it("rejects invalid Credit update recovery without taking its worker lease", async () => {
+    const h = await creditFixture();
+    const operation = await h.ownerSession.prepareUpdateCredit({
+        tokenAddress: h.context.tokenAddress,
+        credit: h.commitment,
+        increaseAvailableCredit: 10n,
+    });
+    await h.store.transaction(h.scope, (draft) => {
+        const saved = draft.operations[operation.id]!.payload as SavedOperation;
+        saved.plan.credit!.outputs[0]!.state.note.availableCredit += 1n;
+    });
+    const before = await h.store.readSnapshot(h.scope);
+    await expect(h.ownerSession.resume(operation.id)).rejects.toThrow(/adjustment/);
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+});
+
+it("rejects changed frozen Credit calldata without committing recovery", async () => {
+    const h = await creditFixture();
+    const operation = await h.ownerSession.prepareRevokeCredit({
+        tokenAddress: h.context.tokenAddress,
+        grantId: 1n,
+        caller: h.wallet.ownerAddress,
+    });
+    const ready = await operation.ready();
+    await ready.exportTransaction();
+    await h.store.transaction(h.scope, (draft) => {
+        const saved = draft.operations[operation.id]!.payload as SavedOperation;
+        saved.call!.data = (saved.call!.data + "00") as `0x${string}`;
+    });
+    const before = await h.store.readSnapshot(h.scope);
+    await expect(h.ownerSession.resume(operation.id)).rejects.toThrow(/frozen operation/);
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+});
+
+it("does not overwrite a Credit worker changed while recovery validates", async () => {
+    const h = await creditFixture();
+    const operation = await h.ownerSession.prepareUpdateCredit({
+        tokenAddress: h.context.tokenAddress,
+        credit: h.commitment,
+        singleLimit: 10n,
+    });
+    const before = await h.store.readSnapshot(h.scope);
+    const originalTransaction = h.store.transaction.bind(h.store);
+    let changed = false;
+    vi.spyOn(h.store, "transaction").mockImplementation(async (scope, action) => {
+        if (!changed) {
+            changed = true;
+            await originalTransaction(scope, (draft) => {
+                const saved = draft.operations[operation.id]!.payload as SavedOperation;
+                saved.generation++;
+            });
+        }
+        return originalTransaction(scope, action);
+    });
+    await expect(h.ownerSession.resume(operation.id)).rejects.toThrow(/changed.*retry/);
+    const after = await h.store.readSnapshot(h.scope);
+    expect(after.revision).toBe(before.revision + 1);
+    expect((after.operations[operation.id]!.payload as SavedOperation).generation).toBe(
+        (before.operations[operation.id]!.payload as SavedOperation).generation + 1
+    );
+    expect(after.reservations).toEqual(before.reservations);
+    expect(after.credits).toEqual(before.credits);
+});
+
+it.each(["create", "update", "draw", "revoke"] as const)(
+    "cannot recover another wallet's Credit %s from the same store",
+    async (kind) => {
+        const h = await creditFixture();
+        const session = kind === "draw" ? h.spenderSession : h.ownerSession;
+        const foreign = kind === "draw" ? h.ownerSession : h.spenderSession;
+        const operation =
+            kind === "create"
+                ? await session.prepareCreateCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      spender: h.bob.getAddress(),
+                      expiry: 2000003600n,
+                      availableCredit: 100n,
+                      unlimited: false,
+                  })
+                : kind === "update"
+                  ? await session.prepareUpdateCredit({
+                        tokenAddress: h.context.tokenAddress,
+                        credit: h.commitment,
+                        singleLimit: 10n,
+                    })
+                  : kind === "draw"
+                    ? await session.prepareDrawCredit({
+                          tokenAddress: h.context.tokenAddress,
+                          credits: [{ credit: h.commitment, amount: 10n }],
+                          recipient: h.wallet.getAddress(),
+                      })
+                    : await session.prepareRevokeCredit({
+                          tokenAddress: h.context.tokenAddress,
+                          grantId: 1n,
+                          caller: h.wallet.ownerAddress,
+                      });
+        await foreign.getHistory();
+        const originalBefore = await h.store.readSnapshot(session.scope);
+        const foreignBefore = await h.store.readSnapshot(foreign.scope);
+        await expect(foreign.resume(operation.id)).rejects.toThrow(/operation.*not found/);
+        expect(await h.store.readSnapshot(session.scope)).toEqual(originalBefore);
+        expect(await h.store.readSnapshot(foreign.scope)).toEqual(foreignBefore);
+        await operation.abandon();
+        const released = await h.store.readSnapshot(session.scope);
+        expect(released.reservations["credit:" + h.commitment]).toBeUndefined();
+    }
+);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate recovered Credit updates and frozen transactions before taking over operation leases. Failed validation preserves the original handle and input reservations; recovery rejects concurrent journal changes before committing.
+
 - Match ordinary Note owners by address value during import, collection, receipt reconciliation and confirmation, preserving caller inputs, stored openings and reservations across preparation and recovery.
 
 - Normalize stored Credit identities during managed preparation so checksummed owner and spender addresses retain the same update and draw authority as their lowercase forms.

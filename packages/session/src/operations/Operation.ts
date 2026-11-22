@@ -49,6 +49,7 @@ import {
 } from "@invisi-labs/sdk/session-support";
 import type { OperationRecord, OperationStatus } from "../storage/state";
 import { scopeKey } from "../storage/store";
+import { serializeRecord } from "../storage/codec";
 import { confirmOperation, reconcileOperation } from "./operation-confirmation";
 import type {
     OperationAggregateMember,
@@ -140,50 +141,68 @@ export class Operation {
     }
 
     static async resume(runtime: OperationRuntime, id: string): Promise<Operation> {
-        const result = await runtime.store.transaction(runtime.scope, (state) => {
-            const record = state.operations[id];
-            check(record, "unknown operation");
-            const saved = record.payload as SavedOperation;
-            check(
-                saved?.plan?.version === 1 &&
-                    saved.plan.id === id &&
-                    Number.isSafeInteger(saved.generation) &&
-                    saved.generation >= 0 &&
-                    saved.generation < Number.MAX_SAFE_INTEGER,
-                "invalid operation payload"
-            );
-            const context = runtime.options.protocol.context;
-            const actual = saved.plan.context;
-            check(
-                scopeKey(saved.plan.scope) === scopeKey(runtime.scope) &&
-                    actual.chainId === context.chainId &&
-                    actual.protocolAddress.toLowerCase() ===
-                        context.protocolAddress.toLowerCase() &&
-                    actual.tokenAddress.toLowerCase() === context.tokenAddress.toLowerCase(),
-                "recovered operation scope/deployment context mismatch"
-            );
-            if (saved.plan.kind !== "shield" && saved.plan.kind !== "revoke-credit") {
-                statement(saved.plan);
-            }
-            if (saved.proof) {
-                sameStatement(saved.proof, saved.plan.statement!);
-            }
-            // Explicit recovery fences any former worker. Signing material is never restored from storage.
-            saved.generation++;
-            delete saved.claim;
-            return new Operation(runtime, saved, record.status);
-        });
-        await assertCreditUpdatePlan(result.#saved.plan);
-        if (result.#saved.call) {
-            const expected = await result.encode(result.#saved);
-            check(
-                expected.to === result.#saved.call.to &&
-                    expected.value === result.#saved.call.value &&
-                    expected.data === result.#saved.call.data,
-                "recovered transaction differs from frozen operation"
-            );
+        const snapshot = await runtime.store.readSnapshot(runtime.scope);
+        const record = snapshot.operations[id];
+        check(record, "unknown operation");
+        const saved = record.payload as SavedOperation;
+        check(
+            saved?.plan?.version === 1 &&
+                saved.plan.id === id &&
+                Number.isSafeInteger(saved.generation) &&
+                saved.generation >= 0 &&
+                saved.generation < Number.MAX_SAFE_INTEGER,
+            "invalid operation payload"
+        );
+        const context = runtime.options.protocol.context;
+        const actual = saved.plan.context;
+        check(
+            scopeKey(saved.plan.scope) === scopeKey(runtime.scope) &&
+                actual.chainId === context.chainId &&
+                actual.protocolAddress.toLowerCase() === context.protocolAddress.toLowerCase() &&
+                actual.tokenAddress.toLowerCase() === context.tokenAddress.toLowerCase(),
+            "recovered operation scope/deployment context mismatch"
+        );
+        if (saved.plan.kind !== "shield" && saved.plan.kind !== "revoke-credit") {
+            statement(saved.plan);
         }
-        return result;
+        if (saved.proof) {
+            sameStatement(saved.proof, saved.plan.statement!);
+        }
+        const frozen = serializeRecord(record);
+        try {
+            const candidate = new Operation(runtime, saved, record.status);
+            await assertCreditUpdatePlan(saved.plan);
+            if (saved.call) {
+                const expected = await candidate.encode(saved);
+                check(
+                    expected.to === saved.call.to &&
+                        expected.value === saved.call.value &&
+                        expected.data === saved.call.data,
+                    "recovered transaction differs from frozen operation"
+                );
+            }
+            return await runtime.store.transaction(runtime.scope, (state) => {
+                const current = state.operations[id];
+                check(current, "operation disappeared during recovery");
+                const actual = serializeRecord(current);
+                try {
+                    check(
+                        actual.length === frozen.length &&
+                            actual.every((value, index) => value === frozen[index]),
+                        "operation changed during recovery; retry"
+                    );
+                } finally {
+                    actual.fill(0);
+                }
+                const restored = current.payload as SavedOperation;
+                // Only a validated, unchanged journal may fence its former worker.
+                restored.generation++;
+                delete restored.claim;
+                return new Operation(runtime, restored, current.status);
+            });
+        } finally {
+            frozen.fill(0);
+        }
     }
 
     /** Public non-sendable intent for a firm quote before wallet authorization. */
