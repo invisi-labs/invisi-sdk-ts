@@ -1,7 +1,7 @@
 import { authorizeOperation } from "../../../../test-support/native-wallet";
 import { Wallet } from "@invisi-labs/primitives";
 import { it, expect, vi, afterEach } from "vitest";
-import { AbiCoder, Interface, Wallet as EvmWallet } from "ethers";
+import { AbiCoder, Interface, getAddress, Wallet as EvmWallet } from "ethers";
 import {
     computeCreditCommitment,
     normalizeCreditPolicy,
@@ -24,7 +24,8 @@ async function creditFixture(
             import("@invisi-labs/primitives").CreditState,
             "availableCredit" | "unlimited" | "totalSpent" | "expiry"
         >
-    > = {}
+    > = {},
+    checksum = false
 ) {
     const h = await fixture(),
         state: CreditDeliveryState = {
@@ -32,8 +33,12 @@ async function creditFixture(
                 chainId: h.context.chainId,
                 protocolAddress: BigInt(h.context.protocolAddress),
                 tokenAddress: BigInt(h.context.tokenAddress),
-                ownerWalletIdentity: h.wallet.ownerAddress,
-                spenderWalletIdentity: h.bob.ownerAddress,
+                ownerWalletIdentity: (checksum
+                    ? getAddress(h.wallet.ownerAddress)
+                    : h.wallet.ownerAddress) as `0x${string}`,
+                spenderWalletIdentity: (checksum
+                    ? getAddress(h.bob.ownerAddress)
+                    : h.bob.ownerAddress) as `0x${string}`,
                 grantId: 1n,
                 nonce: 456n,
                 expiry: changes.expiry ?? 2000003600n,
@@ -662,5 +667,32 @@ it.each([
         h.reader.getChainId = async () => h.context.chainId;
         h.reader.getCode = async () => "0x6001";
         await expect(h.ownerSession.prepareRevokeCredit(identity)).rejects.toThrow(/runtime/);
+    }
+);
+
+it.each(["owner", "spender"] as const)(
+    "prepares and authorizes managed %s Credit with checksummed identities",
+    async (role) => {
+        const h = await creditFixture({}, true);
+        const operation =
+            role === "owner"
+                ? await h.ownerSession.prepareUpdateCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      credit: h.commitment,
+                      increaseAvailableCredit: 10n,
+                  })
+                : await h.spenderSession.prepareDrawCredit({
+                      tokenAddress: h.context.tokenAddress,
+                      credits: [{ credit: h.commitment, amount: 30n }],
+                      recipient: h.wallet.getAddress(),
+                  });
+        const ready = await (await authorizeOperation(operation)).prove();
+        expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe(
+            role === "owner" ? "updateCredit" : "creditDraw"
+        );
+        expect(ready.preview().creditOutputs![0]).toMatchObject({
+            availableCredit: role === "owner" ? 110n : 70n,
+            grantId: 1n,
+        });
     }
 );

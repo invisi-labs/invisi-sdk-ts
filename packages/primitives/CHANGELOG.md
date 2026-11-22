@@ -1,5 +1,9 @@
 # @invisi-labs/primitives
 
+## Unreleased
+
+- Canonicalize validated Credit owner and spender identities to lowercase EVM addresses. Hex casing does not change commitments or encrypted delivery payloads; nonzero 20-byte identity validation remains required.
+
 ## 1.3.3
 
 - Replace Credit revocation shard/slot pairs with a positive uint128 `grantId` throughout Credit state, commitments, disclosures, delivery encryption and wallet serialization. Add `generateCreditGrantId` and `normalizeCreditGrantId`; generate identifiers with Web Crypto and reject zero, out-of-range and noncanonical decimal values.

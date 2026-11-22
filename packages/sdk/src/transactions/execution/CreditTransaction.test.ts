@@ -5,7 +5,7 @@ import {
     normalizeCreditUsage,
     type CreditDeliveryState,
 } from "@invisi-labs/primitives";
-import { Interface, Wallet as EvmWallet } from "ethers";
+import { Interface, getAddress, Wallet as EvmWallet } from "ethers";
 import { it, expect, vi, afterEach } from "vitest";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
 import { setup, externallyAuthorize } from "./ExplicitTransaction-fixtures";
@@ -952,5 +952,137 @@ it.each([
         h.reader.getChainId = async () => h.context.chainId;
         h.reader.getCode = async () => "0x6001";
         await expect(h.invisi.prepareRevokeCredit(identity)).rejects.toThrow(/runtime/);
+    }
+);
+
+it.each([false, true])(
+    "accepts the same owner Credit address across casing through update authorization (%s)",
+    async (checksum) => {
+        const h = await creditSetup();
+        if (checksum)
+            h.state.note.ownerWalletIdentity = getAddress(h.wallet.ownerAddress) as `0x${string}`;
+        expect(await computeCreditCommitment(h.state.note)).toBe(h.commitment);
+        const prepared = await h.invisi.prepareUpdateCredit({
+            ...h.identity,
+            creditInputs: [h.input],
+            credit: h.commitment,
+            singleLimit: 10n,
+        });
+        const ready = await (await externallyAuthorize(prepared)).prove();
+        const decoded = iface.parseTransaction(await ready.exportTransaction())!;
+        expect(decoded.name).toBe("updateCredit");
+        expect(decoded.args[1].owner.toLowerCase()).toBe(h.wallet.ownerAddress);
+        expect(ready.preview().creditOutputs![0]).toMatchObject({
+            availableCredit: 100n,
+            grantId: 1n,
+        });
+    }
+);
+it.each([false, true])(
+    "accepts the same spender Credit address across casing through draw authorization (%s)",
+    async (checksum) => {
+        const h = await creditSetup();
+        if (checksum)
+            h.state.note.spenderWalletIdentity = getAddress(h.bob.ownerAddress) as `0x${string}`;
+        expect(await computeCreditCommitment(h.state.note)).toBe(h.commitment);
+        const prepared = await h.invisi.prepareDrawCredit({
+            ...h.identity,
+            wallet: Wallet.fromAddress(h.bob.getAddress()),
+            creditInputs: [{ ...h.input, role: "spender" }],
+            credits: [{ credit: h.commitment, amount: 30n }],
+            recipient: h.wallet.getAddress(),
+        });
+        const ready = await (
+            await externallyAuthorize(prepared, new EvmWallet(`0x${"02".repeat(32)}`))
+        ).prove();
+        expect(iface.parseTransaction(await ready.exportTransaction())!.name).toBe("creditDraw");
+        expect(ready.preview().creditOutputs![0]).toMatchObject({
+            availableCredit: 70n,
+            totalSpent: 30n,
+        });
+    }
+);
+it("groups mixed-case grants from the same owner into one sorted payer without changing gross fees", async () => {
+    const h = await creditSetup();
+    h.reader.getCreditStatus = async (_context, owner, _token, grantId) =>
+        ((grantId === 1n || grantId === 2n) && owner.toLowerCase() === h.wallet.ownerAddress) ||
+        (grantId === 3n && owner.toLowerCase() === h.bob.ownerAddress)
+            ? 1
+            : 0;
+    const inputs = [{ ...h.input, role: "spender" as const }];
+    for (const [grantId, owner] of [
+        [2n, getAddress(h.wallet.ownerAddress)],
+        [3n, h.bob.ownerAddress],
+    ] as const) {
+        const state = structuredClone(h.state);
+        state.note.grantId = grantId;
+        state.note.ownerWalletIdentity = owner as `0x${string}`;
+        if (grantId === 3n)
+            state.ownerReceivingKeys = h.bob.getReceivingAddress().getReceivingKeys();
+        const commitment = await computeCreditCommitment(state.note);
+        await h.tree.insert(BigInt(commitment));
+        inputs.push({ ...h.input, state, commitment, leafIndex: Number(grantId), role: "spender" });
+    }
+    const prepared = await h.invisi.prepareDrawCredit({
+        ...h.identity,
+        wallet: Wallet.fromAddress(h.bob.getAddress()),
+        creditInputs: inputs,
+        credits: [...inputs].reverse().map((input) => ({ credit: input.commitment, amount: 15n })),
+        recipient: h.wallet.getAddress(),
+        fee: { recipient: h.wallet.ownerAddress, amount: 3n },
+    });
+    const ready = await (
+        await externallyAuthorize(prepared, new EvmWallet(`0x${"02".repeat(32)}`))
+    ).prove();
+    const params = iface.parseTransaction(await ready.exportTransaction())!.args[1];
+    expect(params.payers).toHaveLength(2);
+    expect(
+        params.payers.map((p: { payer: string; amount: bigint }) => [
+            p.payer.toLowerCase(),
+            p.amount,
+        ])
+    ).toEqual(
+        [
+            [h.bob.ownerAddress, 15n],
+            [h.wallet.ownerAddress, 30n],
+        ].sort(([a], [b]) => (BigInt(a!) < BigInt(b!) ? -1 : 1))
+    );
+    expect(BigInt(params.payers[0].payer)).toBeLessThan(BigInt(params.payers[1].payer));
+    expect(params.grantRefs.map((g: { grantId: bigint }) => g.grantId).sort()).toEqual([
+        1n,
+        2n,
+        3n,
+    ]);
+    expect(params.totalAmount).toBe(45n);
+    expect(params.feeAmount).toBe(3n);
+    expect(ready.getOutputs()[0]!.amount).toBe(42n);
+    expect(ready.preview().creditOutputs).toHaveLength(3);
+    for (const output of ready.preview().creditOutputs!)
+        expect(output).toMatchObject({ availableCredit: 85n, totalSpent: 15n });
+    for (const ref of params.grantRefs)
+        expect(params.payers[Number(ref.payerIndex)].payer.toLowerCase()).toBe(
+            ref.grantId === 3n ? h.bob.ownerAddress : h.wallet.ownerAddress
+        );
+});
+it.each(["owner", "spender"] as const)(
+    "rejects a genuinely different %s identity with its valid commitment",
+    async (role) => {
+        const h = await creditSetup();
+        h.state.note[role === "owner" ? "ownerWalletIdentity" : "spenderWalletIdentity"] =
+            `0x${"ab".repeat(20)}`;
+        const commitment = await computeCreditCommitment(h.state.note);
+        await h.tree.insert(BigInt(commitment));
+        const creditInputs = [{ ...h.input, commitment, leafIndex: 2, role }];
+        const operation =
+            role === "owner"
+                ? h.invisi.prepareUpdateCredit({ ...h.identity, creditInputs, credit: commitment })
+                : h.invisi.prepareDrawCredit({
+                      ...h.identity,
+                      wallet: Wallet.fromAddress(h.bob.getAddress()),
+                      creditInputs,
+                      credits: [{ credit: commitment, amount: 1n }],
+                      recipient: h.wallet.getAddress(),
+                  });
+        await expect(operation).rejects.toThrow(/role, commitment or deployment mismatch/);
     }
 );

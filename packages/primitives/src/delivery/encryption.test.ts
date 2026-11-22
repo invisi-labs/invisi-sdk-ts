@@ -1,3 +1,4 @@
+import { getAddress } from "ethers";
 import { createDecipheriv, createECDH, hkdfSync } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import * as core from "../index";
@@ -146,6 +147,43 @@ describe("current authenticated delivery envelopes", () => {
                 await core.decryptCreditState(
                     bytes(vectors[role].viewingPrivateKey),
                     envelope,
+                    cc(role)
+                )
+            ).toEqual(state);
+        }
+    );
+    it.each(["owner", "spender"] as const)(
+        "keeps mixed-case Credit addresses equivalent on the encrypted wire for %s",
+        async (role) => {
+            const mixed = {
+                ...state,
+                note: {
+                    ...state.note,
+                    ownerWalletIdentity: getAddress(
+                        state.note.ownerWalletIdentity
+                    ) as `0x${string}`,
+                    spenderWalletIdentity: getAddress(
+                        state.note.spenderWalletIdentity
+                    ) as `0x${string}`,
+                },
+            };
+            const lowerEnvelope = await core.encryptCreditState(
+                keys(role).viewingPublicKey,
+                state,
+                cc(role)
+            );
+            const mixedEnvelope = await core.encryptCreditState(
+                keys(role).viewingPublicKey,
+                mixed,
+                cc(role)
+            );
+            expect(independentlyOpen(mixedEnvelope, role)).toEqual(
+                independentlyOpen(lowerEnvelope, role)
+            );
+            expect(
+                await core.decryptCreditState(
+                    bytes(vectors[role].viewingPrivateKey),
+                    mixedEnvelope,
                     cc(role)
                 )
             ).toEqual(state);

@@ -174,6 +174,9 @@ export function normalizeCreditState(state: CreditState): CreditState {
         throw TypeError("payload must be Uint8Array");
     return {
         ...state,
+        // Compare and group EVM identities by their address value, independent of hex casing.
+        ownerWalletIdentity: state.ownerWalletIdentity.toLowerCase() as `0x${string}`,
+        spenderWalletIdentity: state.spenderWalletIdentity.toLowerCase() as `0x${string}`,
         ...normalizeCreditPolicy(state),
         ...normalizeCreditUsage(state),
         ...balance(state),

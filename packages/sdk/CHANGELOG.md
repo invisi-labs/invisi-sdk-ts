@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accept equivalent lowercase and checksummed Credit input identities for owner updates and spender draws, and group same-owner grants into one sorted payer receipt regardless of input address casing.
+
 - Prepare fee-free public Credit revocation for zero or undeployed token namespaces. Keep Core deployment pins and authorization checks; fee-bearing revocation and repricing still require deployed ERC20 code.
 
 ## 1.3.3

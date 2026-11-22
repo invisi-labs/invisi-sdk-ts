@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { applyCreditDrawUsage, deriveCreditUpdate, normalizeCreditState } from "./state";
+import {
+    applyCreditDrawUsage,
+    computeCreditCommitment,
+    deriveCreditUpdate,
+    normalizeCreditState,
+} from "./state";
 import type { CreditState } from "../types";
 const state = (values: Partial<CreditState> = {}): CreditState => ({
     chainId: 31337n,
@@ -153,3 +158,26 @@ it("exports canonical mode bits in audit openings without exposing the recovery 
             ).rejects.toThrow(/unlimited/);
     }
 });
+
+it("canonicalizes Credit identities without changing their committed address values", async () => {
+    const lower = state({
+        ownerWalletIdentity: "0x52908400098527886e0f7030069857d2e4169ee7",
+        spenderWalletIdentity: "0x5aeda56215b167893e80b4fe645ba6d5bab767de",
+    });
+    // Identity validation accepts hex address values, including non-checksummed mixed case.
+    const mixed = {
+        ...lower,
+        ownerWalletIdentity: "0x52908400098527886E0F7030069857D2E4169EE7" as const,
+        spenderWalletIdentity: "0x5aEDA56215b167893e80B4fE645BA6d5Bab767dE" as const,
+    };
+    expect(normalizeCreditState(mixed)).toEqual(normalizeCreditState(lower));
+    expect(await computeCreditCommitment(mixed)).toBe(await computeCreditCommitment(lower));
+    expect(mixed.ownerWalletIdentity).toBe("0x52908400098527886E0F7030069857D2E4169EE7");
+});
+it.each(["ownerWalletIdentity", "spenderWalletIdentity"] as const)(
+    "rejects malformed and zero %s before normalization",
+    (identity) => {
+        for (const value of ["0x", "0x1234", `0x${"gg".repeat(20)}`, `0x${"00".repeat(20)}`])
+            expect(() => normalizeCreditState(state({ [identity]: value }))).toThrow(/identity/);
+    }
+);
