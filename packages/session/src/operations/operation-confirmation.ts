@@ -1,3 +1,4 @@
+import { noteOwnerAddress } from "@invisi-labs/sdk/session-support";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { readProtocolLogs } from "@invisi-labs/sdk/session-support";
 
@@ -142,7 +143,10 @@ export async function confirmOperation(
             (value) => value.role === "funds" && value.commitment === output.commitment
         );
         check(candidate, "confirmed output is missing from canonical receipt");
-        if (!output.note || output.note.ownerAddress !== scope.ownerAddress) {
+        if (
+            !output.note ||
+            noteOwnerAddress(output.note.ownerAddress) !== noteOwnerAddress(scope.ownerAddress)
+        ) {
             continue;
         }
         const input = {

@@ -3,7 +3,11 @@ import {
     computeNoteIdentity,
     NullifierCapability,
 } from "@invisi-labs/primitives";
-import { verifyMembership } from "@invisi-labs/sdk/session-support";
+import {
+    normalizeNoteOwner,
+    noteOwnerAddress,
+    verifyMembership,
+} from "@invisi-labs/sdk/session-support";
 import type { NoteInput } from "@invisi-labs/sdk";
 import type { WalletSessionInfrastructure } from "../operations/operation-types";
 import type { WalletScope } from "../storage/state";
@@ -33,13 +37,14 @@ export async function importSessionNotes(
     const context = options.protocol.context,
         seen = new Set<string>();
     for (const input of copied) {
-        const n = input.note;
+        const n = normalizeNoteOwner(input.note);
+        input.note = n;
         if (seen.has(input.commitment)) throw Error("duplicate note input");
         seen.add(input.commitment);
         if (
             n.chainId !== context.chainId ||
             n.protocolAddress !== BigInt(context.protocolAddress) ||
-            n.ownerAddress !== scope.ownerAddress
+            n.ownerAddress !== noteOwnerAddress(scope.ownerAddress)
         )
             throw Error("note deployment or owner mismatch");
         if (typeof n.amount !== "bigint" || n.amount <= 0n || n.amount >= 1n << 128n)
@@ -68,7 +73,10 @@ export async function importSessionNotes(
                 Object.keys(n).some((k) => {
                     const key = k as keyof typeof n;
                     const a = n[key],
-                        b = old.note[key];
+                        b =
+                            key === "ownerAddress"
+                                ? noteOwnerAddress(old.note.ownerAddress)
+                                : old.note[key];
                     return a instanceof Uint8Array && b instanceof Uint8Array
                         ? String(a) !== String(b)
                         : a !== b;

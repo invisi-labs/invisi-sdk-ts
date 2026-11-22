@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accept equivalent hex casing for ordinary Note owners during explicit and managed preparation, authorization, and proving, including restored plans; retain strict nonzero 20-byte encoding and all commitment/context checks.
+
 - Accept equivalent lowercase and checksummed Credit input identities for owner updates and spender draws, and group same-owner grants into one sorted payer receipt regardless of input address casing.
 
 - Prepare fee-free public Credit revocation for zero or undeployed token namespaces. Keep Core deployment pins and authorization checks; fee-bearing revocation and repricing still require deployed ERC20 code.

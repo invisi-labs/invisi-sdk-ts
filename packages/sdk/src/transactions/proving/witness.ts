@@ -1,3 +1,4 @@
+import { normalizeNoteOwner } from "../../notes/note-owner";
 import { assertCreditUpdatePlan } from "../../credit/state";
 import { type AuthorizedStatement } from "@invisi-labs/primitives";
 import { WitnessBuilder } from "@invisi-labs/prover";
@@ -59,7 +60,7 @@ export async function witnessFor(
         params: plan.params!,
         deliveries: plan.outputs.map((output) => output.delivery),
         funding: plan.funding,
-        inputs: plan.inputs,
+        inputs: plan.inputs.map((input) => ({ ...input, note: normalizeNoteOwner(input.note) })),
         outputs: plan.outputs.map((output) => ({
             identity: output.identity,
             amount: output.amount,

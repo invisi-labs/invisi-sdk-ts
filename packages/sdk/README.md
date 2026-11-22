@@ -6,6 +6,8 @@ Install with `npm install @invisi-labs/sdk@1.2.7`. API documentation and runnabl
 
 Preparation and quotation retain the existing APIs. A prepared operation automatically reuses its public deployment and block-bound reads for up to 30 seconds; a fee adjustment requiring a new input refreshes the snapshot automatically. Chain identity and canonical-block fences remain live. Funding authorization continues to check the current nonce and deadline. Independent preparation reads run with bounded concurrency and retain statement order and one root per source tree. No explicit synchronization or cache-population call is required.
 
+Ordinary `NoteInput.note.ownerAddress` openings accept any valid nonzero 20-byte hex address casing, including EIP-55. Preparation compares the address value and copies the opening before canonicalizing it for signing and proving. Caller inputs remain unchanged; commitments, deployment/token scope and membership checks still apply. Receiving-address strings retain their own checksum rules.
+
 ## Contributing
 
 See the [contribution guidelines](../../README.md#contributing) for issues, pull requests, validation, and handling sensitive material.

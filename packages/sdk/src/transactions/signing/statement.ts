@@ -1,3 +1,4 @@
+import { noteOwnerAddress } from "../../notes/note-owner";
 import { creditPeriods, type WalletOperation } from "@invisi-labs/primitives";
 import { InvisiError } from "../../errors";
 import { WitnessBuilder } from "@invisi-labs/prover";
@@ -27,7 +28,11 @@ export function requiresAuthorization(plan: OperationPlan): boolean {
         BigInt(plan.params.withdrawalAddress) === BigInt(plan.scope.ownerAddress) &&
         plan.params.withdrawalAmount ===
             plan.inputs.reduce((sum, input) => sum + input.note.amount, 0n) &&
-        plan.inputs.every((input) => input.note.ownerAddress === plan.scope.ownerAddress);
+        plan.inputs.every(
+            (input) =>
+                noteOwnerAddress(input.note.ownerAddress) ===
+                noteOwnerAddress(plan.scope.ownerAddress)
+        );
     if (ownerOnlyFullWithdrawal) return false;
     return !!plan.credit || plan.inputs.length > 0;
 }

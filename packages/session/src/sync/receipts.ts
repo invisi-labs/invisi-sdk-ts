@@ -1,3 +1,4 @@
+import { normalizeNoteOwner } from "@invisi-labs/sdk/session-support";
 import type { Checkpoint, StoredCredit, StoredNote, WalletState } from "../storage/state";
 
 export interface ReceiptRecords {
@@ -123,7 +124,10 @@ export function mergeReceiptRecords(state: WalletState, batch: ReceiptRecords): 
         if ("note" in record) {
             const previous = state.notes[record.commitment];
             if (previous) {
-                if (canonical(previous.note) !== canonical(record.note)) {
+                if (
+                    canonical(normalizeNoteOwner(previous.note)) !==
+                    canonical(normalizeNoteOwner(record.note))
+                ) {
                     throw new Error("canonical note preimage conflict");
                 }
                 if (previous.origin === "membership-import") {

@@ -1,3 +1,4 @@
+import { normalizeNoteOwner, noteOwnerAddress } from "../../notes/note-owner";
 import { PreparationReads } from "./preparation-reads";
 import { getAddress } from "ethers";
 import { PreparedTransaction } from "../execution/PreparedTransaction";
@@ -35,12 +36,13 @@ export function explicitPreparation(
     }
     for (const input of inputs) {
         position(input);
+        input.note = normalizeNoteOwner(input.note);
         positiveAmount(input.note.amount);
         if (inventory.notes[input.commitment]) throw new Error("duplicate explicit note input");
         if (
             input.note.chainId !== context.chainId ||
             input.note.protocolAddress !== BigInt(context.protocolAddress) ||
-            input.note.ownerAddress !== options.wallet.ownerAddress
+            input.note.ownerAddress !== noteOwnerAddress(options.wallet.ownerAddress)
         )
             throw new Error("explicit note identity or deployment mismatch");
         inventory.notes[input.commitment] = { ...input, spent: "unspent" };

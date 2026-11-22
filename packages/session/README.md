@@ -212,7 +212,7 @@ await session.sendTransaction(ready, { gasLimit });
 
 ### Explicit note collection
 
-`await session.importNotes(inputs)` accepts the SDK's `NoteInput[]` openings. Import validates owner/deployment, amount, recomputed commitment, authenticated membership and current nullifiers, then commits with a revision fence. Reimport preserves spent state and operation reservations. It updates the known-state observation without advancing discovery coverage; imported notes do not establish that all wallet funds were discovered.
+`await session.importNotes(inputs)` accepts the SDK's `NoteInput[]` openings. Import validates owner/deployment, amount, recomputed commitment, authenticated membership and current nullifiers, then commits with a revision fence. Owner hex casing does not change Note identity: lowercase, mixed-case and EIP-55 openings with the same 20 bytes import and spend identically. Preparation and recovery use copied canonical openings for signing and proving, while reimport and receipt reconciliation preserve existing stored openings. Reimport preserves spent state and operation reservations. It updates the known-state observation without advancing discovery coverage; imported notes do not establish that all wallet funds were discovered.
 
 ```ts
 await session.importNotes([{ note, commitment, treeId, leafIndex }]);

@@ -1,4 +1,8 @@
 import { expect, it } from "vitest";
+import { backend } from "../../../sdk/src/transactions/execution/ExplicitTransaction-fixtures";
+import { sessionOptions } from "../../../../test-support/session-options";
+import { testOutput } from "../../../../test-support/test-output";
+import { WalletSession } from "./WalletSession";
 import { fixture } from "../../../../test-support/operation-fixture";
 
 it("imports authenticated openings without advancing discovery and preserves spent reservations", async () => {
@@ -129,4 +133,93 @@ it("never adds an available larger note outside the explicit collection selectio
     expect(op.preview().withdrawalAmount).toBe(7n);
     expect(op.preview().outputs).toEqual([]);
     expect((await h.store.readSnapshot(h.scope)).reservations).toEqual({ [commitment]: op.id });
+});
+
+it("imports checksum Note owners idempotently and collects after recovery without rewriting inventory", async () => {
+    const { getAddress } = await import("ethers");
+    const h = await fixture();
+    const input = {
+        note: { ...h.note, ownerAddress: getAddress(h.note.ownerAddress) as `0x${string}` },
+        commitment: h.leaf,
+        treeId: 1n,
+        leafIndex: 0,
+    };
+    const original = structuredClone(input);
+    await h.session.importNotes([input]);
+    expect(input).toEqual(original);
+    await h.store.transaction(h.scope, (s) => {
+        s.notes[h.leaf]!.note.ownerAddress = input.note.ownerAddress;
+    });
+    const before = (await h.store.readSnapshot(h.scope)).notes;
+    await h.session.importNotes([{ ...input, note: h.note }]);
+    const session = new WalletSession(sessionOptions({ ...h.options, prover: backend() }));
+    const operation = await session.prepareCollection({
+        tokenAddress: h.context.tokenAddress,
+        recipient: h.wallet.ownerAddress,
+        commitments: [h.leaf],
+    });
+    expect(operation.preview().permissions.walletAuthorization).toBe(false);
+    const resumed = await session.resume(operation.id);
+    expect(resumed.preview().permissions.walletAuthorization).toBe(false);
+    expect(resumed.preview().withdrawalAmount).toBe(100n);
+    const ready = await resumed.prove();
+    expect((await ready.exportTransaction()).to).toBe(h.context.protocolAddress);
+    expect((await h.store.readSnapshot(h.scope)).notes).toEqual(before);
+});
+
+it("signs and proves a managed checksum Note after import and resume", async () => {
+    const { getAddress, Wallet } = await import("ethers");
+    const h = await fixture();
+    await h.store.transaction(h.scope, (s) => {
+        delete s.notes[h.leaf];
+    });
+    const input = {
+        note: { ...h.note, ownerAddress: getAddress(h.note.ownerAddress) as `0x${string}` },
+        commitment: h.leaf,
+        treeId: 1n,
+        leafIndex: 0,
+    };
+    await h.session.importNotes([input]);
+    const session = new WalletSession(sessionOptions({ ...h.options, prover: backend() }));
+    const prepared = await session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+    });
+    // Older stored plans may retain the original hex casing of their authenticated opening.
+    await h.store.transaction(h.scope, (s) => {
+        const saved = s.operations[prepared.id]!
+            .payload as import("../operations/operation-types").SavedOperation;
+        saved.plan.inputs[0]!.note.ownerAddress = input.note.ownerAddress;
+    });
+    const resumed = await session.resume(prepared.id);
+    expect(resumed.preview().permissions.walletAuthorization).toBe(true);
+    const request = await resumed.exportWalletAuthorization();
+    const signer = new Wallet(`0x${"01".repeat(32)}`);
+    const signature = await signer.signTypedData(request.domain, request.types, request.message);
+    const ready = await (await resumed.withWalletSignature(signature)).prove();
+    expect((await ready.exportTransaction()).to).toBe(h.context.protocolAddress);
+    expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(ready.id);
+});
+
+it("merges receipt owner casing while rejecting different Note preimages atomically", async () => {
+    const { mergeReceiptRecords } = await import("../sync/receipts");
+    const { getAddress } = await import("ethers");
+    const h = await fixture();
+    const before = await h.store.readSnapshot(h.scope);
+    const record = structuredClone(before.notes[h.leaf]!);
+    record.note.ownerAddress = getAddress(record.note.ownerAddress) as `0x${string}`;
+    const batch = { notes: [record], credits: [], checkpoint: before.observedThrough! };
+    await h.store.transaction(h.scope, (s) => mergeReceiptRecords(s, batch));
+    expect((await h.store.readSnapshot(h.scope)).notes).toEqual(before.notes);
+    for (const note of [
+        { ...record.note, ownerAddress: h.bob.ownerAddress },
+        { ...record.note, amount: 99n },
+    ]) {
+        await expect(
+            h.store.transaction(h.scope, (s) =>
+                mergeReceiptRecords(s, { ...batch, notes: [{ ...record, note }] })
+            )
+        ).rejects.toThrow(/preimage conflict/);
+        expect((await h.store.readSnapshot(h.scope)).notes).toEqual(before.notes);
+    }
 });

@@ -1,3 +1,4 @@
+import { normalizeNoteOwner, noteOwnerAddress } from "../../notes/note-owner";
 import { mapPreparation } from "./parallel";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { getAddress } from "ethers";
@@ -365,10 +366,10 @@ export class Preparation<Result> {
         const nullifiers: Hex[] = [];
         const memberships = await this.memberships(selected, frame);
         const opened = await mapPreparation(selected, async (input, index) => {
-            const note = input.note;
+            const note = normalizeNoteOwner(input.note);
             const c = frame.context;
             if (
-                note.ownerAddress !== scope.ownerAddress ||
+                note.ownerAddress !== noteOwnerAddress(scope.ownerAddress) ||
                 note.chainId !== c.chainId ||
                 note.protocolAddress !== BigInt(c.protocolAddress) ||
                 note.tokenAddress !== BigInt(c.tokenAddress) ||

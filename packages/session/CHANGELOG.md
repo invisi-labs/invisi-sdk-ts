@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Match ordinary Note owners by address value during import, collection, receipt reconciliation and confirmation, preserving caller inputs, stored openings and reservations across preparation and recovery.
+
 - Normalize stored Credit identities during managed preparation so checksummed owner and spender addresses retain the same update and draw authority as their lowercase forms.
 
 - Recover confirmed tracked Provenance reproof through historical `submitSourceProof` after validating the mined locator, persisting the acknowledged replacement before polling and preserving the frozen transaction and tracking delivery mode. Custom `RecoveryService` adapters must expose `submitSourceProof`. Initial broadcast permits retain strict preflight evaluation.

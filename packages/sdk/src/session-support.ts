@@ -49,3 +49,5 @@ export {
     broadcasterSubmissionRefusal,
     assertBroadcasterNotRefused,
 } from "./broadcaster/submission-refusal";
+
+export { normalizeNoteOwner, noteOwnerAddress } from "./notes/note-owner";
