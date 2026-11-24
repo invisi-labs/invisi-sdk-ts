@@ -4,6 +4,7 @@ import type { BroadcasterConfiguration, SignedBroadcasterQuote } from "./broadca
 type ReadService = (method: string, params: unknown, signal?: AbortSignal) => Promise<unknown>;
 type Context = { chainId: bigint; protocol: string };
 interface ServiceStatus {
+    feeLock?: { version: string; model: string; core: boolean; router: boolean };
     scheduling?: import("./broadcaster").BroadcasterSchedulingCapabilities;
     apiVersion: string;
     protocolVersion: string;
@@ -119,4 +120,27 @@ export async function schedulingCapabilities(
     )
         throw Error("Invalid Broadcaster scheduling capabilities");
     return { ...value };
+}
+
+export async function feeLockSupported(
+    read: ReadService,
+    configuration: Readonly<BroadcasterConfiguration>,
+    context: Context
+): Promise<boolean> {
+    const status = checkedServiceStatus(
+        await read("broadcaster_getStatus", undefined),
+        configuration,
+        context
+    );
+    if (status.submissionHalted) throw Error("Broadcaster submission halted");
+    if (status.feeLock === undefined) return false;
+    const cap = status.feeLock;
+    if (
+        cap.version !== "1" ||
+        cap.model !== "core-gas-v1.3.4" ||
+        typeof cap.core !== "boolean" ||
+        typeof cap.router !== "boolean"
+    )
+        throw Error("Unsupported broadcaster fee lock capability");
+    return cap.core;
 }

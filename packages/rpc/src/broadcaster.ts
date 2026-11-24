@@ -1,3 +1,10 @@
+import { verifyBroadcasterFeeLock, type SignedBroadcasterFeeLock } from "./fee-lock";
+export {
+    verifyBroadcasterFeeLock,
+    broadcasterFeeLockTypes,
+    broadcasterFeeLockModel,
+} from "./fee-lock";
+export type { BroadcasterFeeLock, SignedBroadcasterFeeLock } from "./fee-lock";
 import { provenanceIntentHash } from "@invisi-labs/primitives";
 import type { ProofSidecar } from "@invisi-labs/protocol/provenance";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
@@ -565,15 +572,38 @@ export class BroadcasterClient {
         }
         return response.result;
     }
+    /** Missing capability keeps the legacy flow; advertised lock failures never downgrade. */
+    async lockFee(
+        data: string,
+        context: { chainId: bigint; protocol: string }
+    ): Promise<SignedBroadcasterFeeLock | undefined> {
+        const { feeLockSupported } = await import("./service-status");
+        if (!(await feeLockSupported(this.call.bind(this), this.configuration, context)))
+            return undefined;
+        const intent = decodeBroadcasterIntent(data);
+        const ticket = (await this.call("broadcaster_lockFee", {
+            data,
+        })) as SignedBroadcasterFeeLock;
+        verifyBroadcasterFeeLock(
+            ticket,
+            { ...context, signer: this.configuration.quoteSigner },
+            intent.request.params.token,
+            this.configuration.feeRecipient
+        );
+        return structuredClone(ticket);
+    }
     async estimateQuote(
-        input: string | { data: string; schedule?: BroadcasterSchedule }
+        input:
+            | string
+            | { data: string; schedule?: BroadcasterSchedule; feeLock?: SignedBroadcasterFeeLock }
     ): Promise<BroadcasterEstimate> {
-        const { data, schedule } = typeof input === "string" ? { data: input } : input;
+        const { data, schedule, feeLock } = typeof input === "string" ? { data: input } : input;
         if (schedule) checkedSchedule(schedule);
         decodeBroadcasterIntent(data);
         const estimate = (await this.call("broadcaster_estimateQuote", {
             data,
             ...(schedule ? { schedule } : {}),
+            ...(feeLock ? { feeLock } : {}),
         })) as BroadcasterEstimate;
         if (
             !estimate ||
@@ -591,15 +621,18 @@ export class BroadcasterClient {
         return { ...estimate };
     }
     async getQuote(
-        input: string | { data: string; schedule?: BroadcasterSchedule },
+        input:
+            | string
+            | { data: string; schedule?: BroadcasterSchedule; feeLock?: SignedBroadcasterFeeLock },
         context: { chainId: bigint; protocol: string }
     ): Promise<SignedBroadcasterQuote> {
-        const { data, schedule } = typeof input === "string" ? { data: input } : input;
+        const { data, schedule, feeLock } = typeof input === "string" ? { data: input } : input;
         if (schedule) checkedSchedule(schedule);
         decodeBroadcasterIntent(data);
         const signed = (await this.call("broadcaster_getQuote", {
             data,
             ...(schedule ? { schedule } : {}),
+            ...(feeLock ? { feeLock } : {}),
         })) as SignedBroadcasterQuote;
         if (
             schedule
@@ -619,6 +652,19 @@ export class BroadcasterClient {
             },
             data
         );
+        if (feeLock) {
+            verifyBroadcasterFeeLock(
+                feeLock,
+                { ...context, signer: this.configuration.quoteSigner },
+                signed.quote.token,
+                this.configuration.feeRecipient
+            );
+            if (
+                BigInt(signed.quote.deadline) > BigInt(feeLock.lock.deadline) ||
+                BigInt(signed.quote.maxGas) > BigInt(feeLock.lock.maxGas)
+            )
+                throw Error("Quote exceeds fee lock bounds");
+        }
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
         return {

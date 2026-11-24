@@ -331,6 +331,17 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
         async (request) => {
             const payload = (request.params as unknown[])[0] as { data: string };
             const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
+            if (request.method === "broadcaster_getStatus")
+                return result({
+                    apiVersion: "v1",
+                    protocolVersion: "1",
+                    chainId: String(h.context.chainId),
+                    protocol: h.context.protocolAddress,
+                    sender: operator.address,
+                    feeRecipient: operator.address,
+                    submissionHalted: false,
+                    provenance: { enabled: false },
+                });
             if (request.method === "broadcaster_estimateQuote")
                 return result({
                     feeRecipient: operator.address,
