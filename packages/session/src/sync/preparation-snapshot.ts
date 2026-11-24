@@ -25,6 +25,7 @@ export async function retainPreparationSnapshot(
     const store = options.store!,
         live = options.chainReader!,
         rpc = options.protocolRpc!;
+    // History-only readers skip transaction prewarming. Detect the capability without selecting a nonce.
     if (typeof live.getFundingNonce !== "function") return;
     const state = await store.readSnapshot(scope);
     if (state.invalidated) return;
@@ -99,9 +100,7 @@ export async function retainPreparationSnapshot(
     ]);
     for (const token of tokens) {
         signal?.throwIfAborted();
-        const context = options.protocol.forToken(token).context;
         await options.protocol.forToken(token).validateDeployment(reader);
-        await reader.getFundingNonce(context, scope.ownerAddress, block);
     }
     // Pin each tree's first root before issuing bounded concurrent path reads.
     const roots = new Map<bigint, Hex>();

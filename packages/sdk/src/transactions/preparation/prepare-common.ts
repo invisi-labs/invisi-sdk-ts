@@ -81,7 +81,11 @@ export class Preparation<Result> {
     async frame(requested?: bigint, revocationFeeAmount?: bigint): Promise<PreparationFrame> {
         const { reader, options } = this.runtime;
         const [, block] = await Promise.all([
-            options.protocol.validateDeployment(reader, { revocationFeeAmount }),
+            this.runtime.preparationReads
+                ? this.runtime.preparationReads.validateDeployment(options.protocol, reader, {
+                      revocationFeeAmount,
+                  })
+                : options.protocol.validateDeployment(reader, { revocationFeeAmount }),
             reader.getLatestBlockNumber().then((number) => reader.getBlock(number)),
         ]);
         const timestamp =

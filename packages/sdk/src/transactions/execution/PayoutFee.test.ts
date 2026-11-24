@@ -55,7 +55,7 @@ it("rejects payout fees when a withdrawal retains private change or public fundi
     const funded = await h.invisi.prepareTransfer({
         ...base,
         withdrawal: { to: h.wallet.ownerAddress, amount: 110n },
-        funding: { payer: h.wallet.ownerAddress, amount: 10n, authorization: "caller" },
+        funding: { payer: h.wallet.ownerAddress, amount: 10n, authorization: "signature" },
     });
     await expect(
         quoteClient(h.context).quote(funded, { maxFeeAmount: 10n, feeSource: "payout" })

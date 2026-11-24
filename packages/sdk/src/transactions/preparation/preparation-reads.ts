@@ -1,11 +1,16 @@
 import type { ChainReader, ProtocolDataProvider } from "@invisi-labs/protocol";
+import { TokenProtocol } from "@invisi-labs/rpc";
+import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 
 const ttl = 30_000;
+const validateTokenDeployment = TokenProtocol.prototype.validateDeployment;
+type DeploymentReceipt = { client: unknown; epoch: unknown; codes: Map<string, Hex> };
+// Static facts belong to the infrastructure lifetime, not to each transaction.
+const deploymentReceipts = new WeakMap<ChainReader, Map<string, DeploymentReceipt>>();
 const reusable = new Set([
     "getCode",
     "getProtocolVersion",
     "getProtocolAddressRegistry",
-    "getFundingNonce",
     "getCreditStatus",
     "isKnownRoot",
     "isSpent",
@@ -48,12 +53,102 @@ export function preparationReadKey(method: string, args: readonly unknown[]): st
 }
 /** One operation's short-lived public read set. Live signing/sending readers are never replaced. */
 export class PreparationReads {
+    readonly #adapters = new WeakMap<object, object>();
     readonly #values = new Map<string, { at: number; value: Promise<unknown> }>();
     #head: { number: bigint; at: number } | undefined;
     constructor(
         readonly live: ChainReader,
-        readonly rpc?: ProtocolDataProvider
+        readonly rpc?: ProtocolDataProvider,
+        private readonly source: ChainReader = live
     ) {}
+
+    /** Reuse only a successfully validated static binding. Transaction state and
+     * payer/contract-wallet code must continue through the live submission reader.
+     */
+    async validateDeployment(
+        protocol: TokenProtocol,
+        reader: ChainReader,
+        options: NonNullable<Parameters<TokenProtocol["validateDeployment"]>[1]> = {},
+        source: ChainReader = this.source
+    ): Promise<void> {
+        const identity = Reflect.get(source, "getDeploymentValidationIdentity");
+        const epoch = typeof identity === "function" ? identity.call(source) : undefined;
+        if (
+            source !== this.source ||
+            epoch === undefined ||
+            Object.getPrototypeOf(protocol) !== TokenProtocol.prototype ||
+            protocol.validateDeployment !== validateTokenDeployment ||
+            Reflect.get(protocol, "revocationScope") !== undefined
+        ) {
+            await protocol.validateDeployment(reader, options);
+            return;
+        }
+        const key = JSON.stringify([
+            String(protocol.context.chainId),
+            protocol.context.protocolAddress.toLowerCase(),
+            protocol.context.tokenAddress.toLowerCase(),
+            protocol.expectedRuntimeCodeHash,
+            options.requireRuntimeProfile ?? true,
+            options.revocationFeeAmount?.toString(),
+        ]);
+        const deployments = deploymentReceipts.get(source) ?? new Map<string, DeploymentReceipt>();
+        deploymentReceipts.set(source, deployments);
+        const client = Reflect.get(source, "client");
+        const observe = Reflect.get(source, "watchDeploymentValidation");
+        const guard =
+            typeof observe === "function"
+                ? (observe.call(source) as
+                      | {
+                            assertUnchanged(): void;
+                            close(): void;
+                        }
+                      | undefined)
+                : undefined;
+        const cached = deployments.get(key);
+        const reusable =
+            cached && cached.client === client && cached.epoch === epoch ? cached.codes : undefined;
+        const codes = new Map<string, Hex>();
+        // A receipt miss bypasses the general address-only preparation memo.
+        // A snapshot upstream still supplies its deployment-bound chain ID.
+        const codeReader = (this.#adapters.get(reader) as ChainReader | undefined) ?? reader;
+        const deploymentReader = new Proxy(reader, {
+            get(target, method) {
+                if (method === "getCode")
+                    return async (address: Address) => {
+                        const code =
+                            reusable?.get(address.toLowerCase()) ??
+                            (await codeReader.getCode(address));
+                        codes.set(address.toLowerCase(), code);
+                        return code;
+                    };
+                const value = Reflect.get(target, method, target);
+                return typeof value === "function" ? value.bind(target) : value;
+            },
+        });
+        try {
+            if (reusable) {
+                // The immutable configuration key already matches the successful
+                // receipt; do not rehash the same deployment code on every send.
+                if ((await reader.getChainId()) !== protocol.context.chainId)
+                    throw Error("deployment chain mismatch");
+                for (const [address, code] of reusable) codes.set(address, code);
+            } else await protocol.validateDeployment(deploymentReader, options);
+            guard?.assertUnchanged();
+            if (client !== Reflect.get(source, "client") || epoch !== identity.call(source))
+                throw Error("deployment connection changed during validation");
+            // Individual successful code reads from a rejected unit are never promoted.
+            if (deployments.size >= 256 && !deployments.has(key))
+                deployments.delete(deployments.keys().next().value!);
+            deployments.set(key, { client, epoch, codes });
+        } catch (error) {
+            deployments.clear();
+            for (const key of this.#values.keys())
+                if (key.startsWith("getCode")) this.#values.delete(key);
+            throw error;
+        } finally {
+            guard?.close();
+        }
+    }
     reader(reprice = false): ChainReader {
         const pinned =
             reprice && this.#head && performance.now() - this.#head.at < ttl
@@ -82,7 +177,7 @@ export class PreparationReads {
         pinned: { number: bigint; at: number } | undefined
     ): T {
         const memo = this;
-        return new Proxy(target, {
+        const adapter = new Proxy(target, {
             get(object, name: string) {
                 const fn = Reflect.get(object, name);
                 if (typeof fn !== "function") return fn;
@@ -121,5 +216,7 @@ export class PreparationReads {
                 };
             },
         });
+        this.#adapters.set(adapter, target);
+        return adapter;
     }
 }

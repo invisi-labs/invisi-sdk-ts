@@ -6,7 +6,6 @@ import {
     operationDigest,
     word,
     assertCertificateTrust,
-    validateProofBundle,
     inputDigest,
     type ManifestIdentity,
     type ProofSidecar,
@@ -198,6 +197,26 @@ export async function prepareProvenance(
     );
     return { operationDigest: digest, sidecars: [sidecar] };
 }
+async function sourceCapability(
+    saved: SavedOperation,
+    runtime: TransactionRuntime
+): Promise<PreparedProvenanceCapability> {
+    const provider = runtime.options.prover as typeof runtime.options.prover &
+        Partial<import("@invisi-labs/prover/provenance-witness").ProvenanceProvider>;
+    const active =
+        runtime.options.provenance ??
+        (provider?.getProvenanceCapability
+            ? {
+                  ...(await provider.getProvenanceCapability()),
+                  client:
+                      runtime.options.provenanceClient ??
+                      (await officialProvenance.get(saved.plan.context)),
+              }
+            : undefined);
+    if (!active) throw Error("Local Provenance capability required");
+    return active;
+}
+
 export async function provePreparedProvenance(
     saved: SavedOperation,
     runtime: TransactionRuntime,
@@ -209,20 +228,7 @@ export async function provePreparedProvenance(
     const data = publicOperationData(saved);
     if (saved.provenance && saved.provenance.data !== data)
         throw Error("Prepared Provenance operation bytes changed");
-    const provider = runtime.options.prover as typeof runtime.options.prover &
-        Partial<import("@invisi-labs/prover/provenance-witness").ProvenanceProvider>;
-    const active =
-        capability ??
-        runtime.options.provenance ??
-        (provider?.getProvenanceCapability
-            ? {
-                  ...(await provider.getProvenanceCapability()),
-                  client:
-                      runtime.options.provenanceClient ??
-                      (await officialProvenance.get(saved.plan.context)),
-              }
-            : undefined);
-    if (!active) throw Error("Local Provenance capability required");
+    const active = capability ?? (await sourceCapability(saved, runtime));
     if (saved.provenance && !reprove)
         return validateProvenanceProof(structuredClone(saved.provenance), active.client.trust);
     const localRuntime = { ...runtime, options: { ...runtime.options, provenance: active } };
@@ -241,6 +247,27 @@ export async function provePreparedProvenance(
     };
     return validateProvenanceProof(packet, active.client.trust);
 }
+export async function finalizePreparedProvenance(
+    saved: SavedOperation,
+    runtime: TransactionRuntime
+) {
+    if (saved.broadcasterAttempted || saved.externalized)
+        throw Error("Cannot change an externalized submission");
+    if (
+        !saved.proof ||
+        (saved.plan.fundingMode === "signature" &&
+            (!saved.plan.funding.signature || saved.plan.funding.signature === "0x"))
+    )
+        throw Error("Main proof and final funding authorization required before ready");
+    if (saved.plan.statement?.target !== "noir-recursive" && !saved.call) {
+        const { encodeOperation } = await import("../transactions/execution/calldata");
+        saved.call = await encodeOperation(saved);
+    }
+    const capability = await sourceCapability(saved, runtime);
+    saved.provenance = await provePreparedProvenance(saved, runtime, capability);
+    saved.provenanceTrust = structuredClone(capability.client.trust);
+}
+
 export function validateBroadcastEnvelope(saved: SavedOperation, client: BroadcasterClient) {
     if (!saved.broadcasterQuote || !saved.broadcasterBinding)
         throw Error("Prepared broadcaster quote and ready call required");
@@ -267,6 +294,10 @@ export async function validatePreparedBroadcast(
     runtime: TransactionRuntime
 ) {
     validateBroadcastEnvelope(saved, client);
+    await validateReadyProvenance(saved, runtime);
+}
+/** Prior V1 attempts may predate the sidecar hash. Check retained native bindings locally. */
+export async function validateRetainedProvenance(saved: SavedOperation) {
     if (saved.broadcasterQuote!.provenanceRequired && saved.plan.inputs.length) {
         const source = saved.provenance;
         if (!source || source.sidecars.length !== 1)
@@ -288,9 +319,21 @@ export async function validatePreparedBroadcast(
             BigInt(pi[9]!) !== (await inputDigest(saved.plan.params!.nullifiers))
         )
             throw Error("Prepared Provenance evidence binding mismatch");
-        if (runtime.options.provenance)
-            await validateProofBundle(sidecar.proofBundle, runtime.options.provenance.client.trust);
     } else if (saved.provenance) throw Error("Unexpected Prepared Provenance evidence");
 }
 
+export async function validateReadyProvenance(saved: SavedOperation, runtime: TransactionRuntime) {
+    await validateRetainedProvenance(saved);
+    const source = saved.provenance;
+    if (!source) return;
+    const trust =
+        runtime.options.provenance?.client.trust ??
+        runtime.options.provenanceClient?.trust ??
+        saved.provenanceTrust;
+    if (!trust)
+        throw Error(
+            "Prepared Provenance trust required; explicitly revalidate with the intended Source client"
+        );
+    await validateProvenanceProof(source, trust);
+}
 const officialProvenance = new OfficialProvenanceClients();

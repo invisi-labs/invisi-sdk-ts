@@ -48,6 +48,7 @@ export async function runOperationStage(
         const next = await work(saved);
         signal?.throwIfAborted();
         await store.transaction(scope, (state) => {
+            signal?.throwIfAborted();
             check(!state.invalidated, "wallet invalidated during operation");
             const record = state.operations[snapshot.plan.id];
             const current = record?.payload as SavedOperation;
@@ -68,6 +69,8 @@ export async function runOperationStage(
             const current = state.operations[snapshot.plan.id]?.payload as
                 SavedOperation | undefined;
             if (current?.claim?.token === token) {
+                // Source generation has no external payment effect. The proved handle can retry.
+                if (stage === "Source finalization") current.generation = snapshot.generation;
                 delete current.claim;
             }
         });

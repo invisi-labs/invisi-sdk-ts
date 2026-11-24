@@ -1,0 +1,198 @@
+{
+  "before": {
+    "1": {
+      "totalHttp": [
+        8
+      ],
+      "hotMs": 265.0703740000008,
+      "hotRange": [
+        244.04225000000042,
+        347.08112299999993
+      ],
+      "phases": {
+        "fundingNoncePrefetch": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.002458000000387983
+        },
+        "prepareShield": {
+          "http": [
+            2
+          ],
+          "medianMs": 57.43858300000011
+        },
+        "broadcasterDiscovery": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.061792000000423286
+        },
+        "quote": {
+          "http": [
+            2
+          ],
+          "medianMs": 64.52808300000015
+        },
+        "fundingAuthorizationAndSignature": {
+          "http": [
+            0
+          ],
+          "medianMs": 14.23895900000025
+        },
+        "submit": {
+          "http": [
+            4
+          ],
+          "medianMs": 128.01829099999986
+        }
+      }
+    },
+    "2": {
+      "totalHttp": [
+        8
+      ],
+      "hotMs": 267.7624570000007,
+      "hotRange": [
+        264.1092919999983,
+        283.8647500000002
+      ],
+      "phases": {
+        "fundingNoncePrefetch": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.0025000000000545697
+        },
+        "prepareShield": {
+          "http": [
+            2
+          ],
+          "medianMs": 57.200457999999344
+        },
+        "broadcasterDiscovery": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.001959000000169908
+        },
+        "quote": {
+          "http": [
+            2
+          ],
+          "medianMs": 65.6736660000006
+        },
+        "fundingAuthorizationAndSignature": {
+          "http": [
+            0
+          ],
+          "medianMs": 17.00812500000029
+        },
+        "submit": {
+          "http": [
+            4
+          ],
+          "medianMs": 128.18391699999938
+        }
+      }
+    }
+  },
+  "after": {
+    "1": {
+      "totalHttp": [
+        7
+      ],
+      "hotMs": 227.52495799999997,
+      "hotRange": [
+        226.8991659999997,
+        308.01691600000004
+      ],
+      "phases": {
+        "fundingNoncePrefetch": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.005874999999832653
+        },
+        "prepareShield": {
+          "http": [
+            2
+          ],
+          "medianMs": 60.38883299999998
+        },
+        "broadcasterDiscovery": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.06141700000034689
+        },
+        "quote": {
+          "http": [
+            2
+          ],
+          "medianMs": 64.17274999999972
+        },
+        "fundingAuthorizationAndSignature": {
+          "http": [
+            0
+          ],
+          "medianMs": 14.552999999999884
+        },
+        "submit": {
+          "http": [
+            3
+          ],
+          "medianMs": 93.49758400000064
+        }
+      }
+    },
+    "2": {
+      "totalHttp": [
+        7
+      ],
+      "hotMs": 231.45579199999975,
+      "hotRange": [
+        228.4488769999998,
+        250.31783299999915
+      ],
+      "phases": {
+        "fundingNoncePrefetch": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.0024169999996956903
+        },
+        "prepareShield": {
+          "http": [
+            2
+          ],
+          "medianMs": 56.61383399999977
+        },
+        "broadcasterDiscovery": {
+          "http": [
+            0
+          ],
+          "medianMs": 0.0022499999995488906
+        },
+        "quote": {
+          "http": [
+            2
+          ],
+          "medianMs": 66.55704199999946
+        },
+        "fundingAuthorizationAndSignature": {
+          "http": [
+            0
+          ],
+          "medianMs": 17.485375000000204
+        },
+        "submit": {
+          "http": [
+            3
+          ],
+          "medianMs": 91.26849999999968
+        }
+      }
+    }
+  }
+}

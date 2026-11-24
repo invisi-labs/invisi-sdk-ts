@@ -172,6 +172,27 @@ export async function acceptFundingSignature(
     );
 }
 
+/** Rebuild and verify only the signature; managed submission owns the live chain gate.
+ * The caller must enforce deployment, nonce, deadlines and canonical fences in its live gate.
+ * Unlike offline signature attachment, the configured verifier always runs.
+ */
+export async function verifyOperationFundingSignature(
+    saved: SavedOperation,
+    signature: string,
+    verifier?: FundingAuthorizationVerifier
+) {
+    if (saved.plan.fundingMode !== "signature")
+        throw new Error("operation does not require a funding signature");
+    if (saved.plan.kind !== "shield" && !saved.proof)
+        throw new Error("proof must precede funding authorization");
+    return verifyFundingSignature(
+        createSigningRequest(await fundingTypedData(saved)),
+        saved.plan.funding.payer!,
+        signature,
+        verifier
+    );
+}
+
 async function verifyFundingSignature(
     request: FundingTypedData,
     payer: `0x${string}`,

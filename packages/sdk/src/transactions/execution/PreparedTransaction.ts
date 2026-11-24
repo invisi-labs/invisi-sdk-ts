@@ -18,7 +18,12 @@ import { normalizeFunding, type TransactionCall } from "@invisi-labs/protocol";
 import type { ProofBundle, Prover } from "@invisi-labs/prover";
 import { exportBroadcasterIntent } from "../../broadcaster/intent";
 import { resolveQuotedExecution } from "../../broadcaster/execution";
-import { exportBroadcasterSubmission, publicOperationData } from "../../broadcaster/submission";
+import {
+    exportBroadcasterSubmission,
+    publicOperationData,
+    requiresProvenanceFinalization,
+    retainedSidecarsHash,
+} from "../../broadcaster/submission";
 import { estimateOperationGas } from "../../gas/gas-estimation";
 import type {
     OperationAggregateMember,
@@ -50,14 +55,11 @@ function check(ok: unknown, message: string): asserts ok {
     if (!ok) throw new Error(message);
 }
 
-type Runtime = TransactionRuntime & {
-    reprepare?: (
-        intent: import("../../broadcaster/broadcaster-preparation").PreparationIntent
-    ) => Promise<OperationPlan>;
-};
+type Runtime = TransactionRuntime;
 type Lifecycle = {
     generation: number;
     busy: boolean;
+    mainProver?: Prover;
     persistSchedule?: import("../../broadcaster/broadcaster-preparation").BroadcasterQuoteOptions["persistSchedule"];
 };
 /** An immutable, local transaction handle. No wallet inventory, reservations or persistence. */
@@ -137,17 +139,13 @@ export class PreparedTransaction {
     ): Promise<PreparedTransaction> {
         this.current();
         check(
-            this.status === "prepared" && this.#runtime.reprepare,
+            this.status === "prepared",
             "broadcaster must attach to an unsigned prepared transaction"
         );
         const { prepareBroadcasterPlan } =
             await import("../../broadcaster/broadcaster-preparation");
-        const selected = await prepareBroadcasterPlan(
-            this.#saved.plan,
-            this.#runtime.reprepare,
-            client,
-            options
-        );
+        const selected = await prepareBroadcasterPlan(this.#saved.plan, client, options);
+        this.current();
         return new PreparedTransaction(
             this.#runtime,
             {
@@ -180,7 +178,11 @@ export class PreparedTransaction {
                 capability,
                 reprove
             );
-            if (!this.#saved.broadcasterAttempted) this.#saved.provenance = structuredClone(packet);
+            if (!this.#saved.broadcasterAttempted && !this.#saved.broadcasterRequest) {
+                this.#saved.provenance = structuredClone(packet);
+                if (capability)
+                    this.#saved.provenanceTrust = structuredClone(capability.client.trust);
+            }
             return packet;
         } finally {
             this.#lifecycle.busy = false;
@@ -191,25 +193,42 @@ export class PreparedTransaction {
         check(!this.#saved.broadcasterCancelled, "Broadcaster cancellation already acknowledged");
         check(this.status === "ready", "transaction is not ready");
         assertBroadcasterNotRefused(this.#saved.broadcasterRefusal);
-        const { validateBroadcastEnvelope, validatePreparedBroadcast } =
+        const { validateBroadcastEnvelope, validatePreparedBroadcast, validateRetainedProvenance } =
             await import("../../broadcaster/provenance-preparation");
         validateBroadcastEnvelope(this.#saved, client);
         if (this.#saved.broadcasterSubmissionId) {
             return client.status(this.#saved.broadcasterSubmissionId);
         }
+        const sidecarsHash = retainedSidecarsHash(this.#saved);
+        if (
+            this.#saved.broadcasterAttempted &&
+            sidecarsHash &&
+            !this.#saved.broadcasterSidecarsHash
+        )
+            await validateRetainedProvenance(this.#saved);
+        if (
+            this.#saved.broadcasterSidecarsHash &&
+            this.#saved.broadcasterSidecarsHash !== sidecarsHash
+        )
+            throw Error("Frozen broadcaster Source sidecars changed");
+        const schedule = this.#saved.broadcasterBinding?.scheduleHandle;
+        const authority =
+            schedule && !this.#saved.broadcasterAttempted
+                ? (
+                      await import("../../broadcaster/submission-authority")
+                  ).captureSubmissionAuthority(
+                      this.#runtime,
+                      this.#saved.plan.context.chainId,
+                      client
+                  )
+                : undefined;
         // A lost first response has no ID yet. Resend the retained request; only the relay can deduplicate it.
         if (!this.#saved.broadcasterAttempted) {
             const credit = this.#saved.plan.credit;
             if (credit?.draw || credit?.creation?.hasInitialPayment) {
                 await this.validateSubmission();
             }
-            const requirements = await client.submissionRequirements(this.#saved.broadcasterQuote!);
-            if (
-                requirements.provenanceRequired &&
-                this.#saved.plan.inputs.length &&
-                !this.#saved.provenance
-            )
-                await this.#proveProvenance();
+            await client.submissionRequirements(this.#saved.broadcasterQuote!);
             await validatePreparedBroadcast(this.#saved, client, this.#runtime);
         }
         assertBroadcasterNotRefused(this.#saved.broadcasterRefusal);
@@ -217,6 +236,9 @@ export class PreparedTransaction {
             !this.#saved.broadcasterAttempted &&
             !this.#saved.externalized &&
             !this.#saved.broadcasterSubmissionId;
+        if (sidecarsHash !== retainedSidecarsHash(this.#saved))
+            throw Error("Prepared Provenance changed during submission");
+        if (sidecarsHash) this.#saved.broadcasterSidecarsHash ??= sidecarsHash;
         this.#saved.externalized = true;
         this.#saved.broadcasterRequest ??= exportBroadcasterSubmission(this.#saved);
         const handle = this.#saved.broadcasterBinding?.scheduleHandle;
@@ -232,15 +254,29 @@ export class PreparedTransaction {
             this.#saved.broadcasterBinding!.scheduleHandle = pending;
         }
         const credit = this.#saved.plan.credit;
-        if (
+        const checkCreditPeriod =
             !this.#saved.broadcasterAttempted &&
-            (credit?.draw || credit?.creation?.hasInitialPayment)
-        )
-            await this.validateSubmission();
+            (credit?.draw || credit?.creation?.hasInitialPayment);
+        if (!authority && checkCreditPeriod) await this.validateSubmission();
         this.#saved.broadcasterAttempted = true;
         const attemptToken = crypto.randomUUID();
         this.#saved.broadcasterAttemptToken = attemptToken;
         const request = this.#saved.broadcasterRequest;
+        if (authority) {
+            // The scheduled packet is already durable. Any failure from here
+            // retains this exact attempt for explicit ID-less replay.
+            if (this.#saved.provenance?.sidecars.length) await client.prepareSubmissionEncoding();
+            if (checkCreditPeriod) await this.validateSubmission();
+            await authority.validate();
+            this.current();
+            check(
+                !this.#saved.broadcasterCancelled &&
+                    !this.#saved.broadcasterSubmissionId &&
+                    this.#saved.broadcasterAttemptToken === attemptToken,
+                "scheduled submission changed or cancelled"
+            );
+            authority.assertCurrent();
+        }
         let result;
         try {
             result = await client.submitTransaction(
@@ -493,7 +529,9 @@ export class PreparedTransaction {
         options.signal?.throwIfAborted();
         this.current();
         check(
-            this.status === (this.kind === "shield" ? "prepared" : "proved"),
+            this.status === (this.kind === "shield" ? "prepared" : "proved") &&
+                (!this.#saved.plan.funding.signature ||
+                    this.#saved.plan.funding.signature === "0x"),
             "operation is not awaiting funding authorization or proof"
         );
         const request = await fundingSigningRequest(this.#saved, this.#runtime);
@@ -510,7 +548,9 @@ export class PreparedTransaction {
         options.signal?.throwIfAborted();
         this.current();
         check(
-            this.status === (this.kind === "shield" ? "prepared" : "proved"),
+            this.status === (this.kind === "shield" ? "prepared" : "proved") &&
+                (!this.#saved.plan.funding.signature ||
+                    this.#saved.plan.funding.signature === "0x"),
             "operation is not awaiting funding authorization or proof"
         );
         const verified = await acceptFundingSignature(this.#saved, signature, this.#runtime);
@@ -522,7 +562,7 @@ export class PreparedTransaction {
                 if (saved.plan.statement?.target !== "noir-recursive") {
                     saved.call = await this.encode(saved);
                 }
-                return { status: "ready" };
+                return { status: requiresProvenanceFinalization(saved) ? "proved" : "ready" };
             },
             options.signal
         );
@@ -554,13 +594,13 @@ export class PreparedTransaction {
         if (!prover) {
             throw new MissingCapabilityError("prover");
         }
-        return this.stage(
+        const result = await this.stage(
             "proof",
             requiresAuthorization(plan) ? ["authorized"] : ["prepared"],
             async (saved) => {
                 const p = saved.plan;
                 saved.proof = await proveOperation(p, this.#authorization, prover, options);
-                if (p.fundingMode === "signature") {
+                if (p.fundingMode === "signature" || requiresProvenanceFinalization(saved)) {
                     return { status: "proved" };
                 }
                 if (p.statement?.target !== "noir-recursive") {
@@ -570,14 +610,51 @@ export class PreparedTransaction {
             },
             options.signal
         );
+        if (requiresProvenanceFinalization(this.#saved)) this.#lifecycle.mainProver = prover;
+        return result;
     }
 
     private encode(saved: SavedOperation): Promise<TransactionCall> {
         return encodeOperation(saved);
     }
 
-    /** Shield caller funding needs no wallet signing or proof; this step only encodes its frozen request. */
-    async ready(): Promise<PreparedTransaction> {
+    /** Finalize required Source evidence after main proof and funding authorization. */
+    async ready(options: { signal?: AbortSignal } = {}): Promise<PreparedTransaction> {
+        options.signal?.throwIfAborted();
+        this.current();
+        const required = requiresProvenanceFinalization(this.#saved);
+        if (this.status === "ready" && (!required || this.#saved.provenance)) {
+            if (required) {
+                const { validateReadyProvenance } =
+                    await import("../../broadcaster/provenance-preparation");
+                await validateReadyProvenance(this.#saved, this.#runtime);
+            }
+            return this;
+        }
+        if (required) {
+            return this.stage(
+                "Source finalization",
+                ["proved", "ready"],
+                async (saved) => {
+                    const { finalizePreparedProvenance } =
+                        await import("../../broadcaster/provenance-preparation");
+                    await finalizePreparedProvenance(
+                        saved,
+                        this.#lifecycle.mainProver
+                            ? {
+                                  ...this.#runtime,
+                                  options: {
+                                      ...this.#runtime.options,
+                                      prover: this.#lifecycle.mainProver,
+                                  },
+                              }
+                            : this.#runtime
+                    );
+                    return { status: "ready" };
+                },
+                options.signal
+            );
+        }
         check(
             (this.kind === "shield" && this.#saved.plan.fundingMode === "caller") ||
                 this.kind === "revoke-credit",

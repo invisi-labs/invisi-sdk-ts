@@ -37,11 +37,20 @@ export class TransactionPreparation<Result> {
         const protocolRpc = reads.provider(context.repricing);
         this.context = {
             ...context,
+            preparationReads: reads,
             reader: reads.reader(context.repricing),
             options: { ...context.options, ...(protocolRpc ? { protocolRpc } : {}) },
             complete: (plan) => {
                 const intent = this.#intent ? structuredClone(this.#intent) : undefined;
                 if (intent && (intent.kind === "transfer" || intent.kind === "shield")) {
+                    const source = intent.options.funding;
+                    if (source) {
+                        source.authorization =
+                            plan.fundingMode === "caller" ? "caller" : "signature";
+                        source.payer = plan.funding.payer!;
+                        source.sigNonce = plan.funding.sigNonce!;
+                        source.deadline = plan.funding.deadline!;
+                    }
                     const businessOutputs = plan.outputs.filter((output) => !output.change);
                     intent.options.outputs = intent.options.outputs.map((payment, index) =>
                         resolvedOutputSnapshot(payment, businessOutputs[index]!)
@@ -139,9 +148,11 @@ export class TransactionPreparation<Result> {
             ),
         ]);
         const change = selection.amount + (funding.funding.amount ?? 0n) - total;
-        if (change > 0n) {
-            outputs.push(await preparation.change(change, context));
-        }
+        const changeTemplate =
+            change > 0n || (selection.inputs.length && fee.amount > 0n)
+                ? await preparation.change(change > 0n ? change : 1n, context)
+                : undefined;
+        if (change > 0n) outputs.push(changeTemplate!);
         const params = {
             token: context.tokenAddress,
             sources: selection.sources,
@@ -171,6 +182,7 @@ export class TransactionPreparation<Result> {
             deadline,
             outputs,
             inputs: selection.inputs,
+            ...(change === 0n && changeTemplate ? { changeTemplate } : {}),
             ...funding,
             params,
             capacity: normalized.capacity,
@@ -250,5 +262,26 @@ export class TransactionPreparation<Result> {
         this.#intent = { kind: "revoke-credit", options: structuredClone(copied) };
         const { CreditPreparation } = await import("../../credit/preparation");
         return new CreditPreparation(this.runtime(copied.tokenAddress)).revoke(copied);
+    }
+}
+
+export async function prepareIntent(
+    runtime: PreparationRuntime<OperationPlan>,
+    intent: import("../../broadcaster/broadcaster-preparation").PreparationIntent
+): Promise<OperationPlan> {
+    const preparation = new TransactionPreparation(runtime);
+    switch (intent.kind) {
+        case "transfer":
+            return preparation.prepareTransfer(intent.options);
+        case "shield":
+            return preparation.prepareShield(intent.options);
+        case "draw-credit":
+            return preparation.prepareDrawCredit(intent.options);
+        case "create-credit":
+            return preparation.prepareCreateCredit(intent.options);
+        case "update-credit":
+            return preparation.prepareUpdateCredit(intent.options);
+        case "revoke-credit":
+            return preparation.prepareRevokeCredit(intent.options);
     }
 }

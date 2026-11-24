@@ -1,9 +1,22 @@
+import { keccak256, toUtf8Bytes } from "ethers";
+import type { Hex } from "@invisi-labs/protocol/contracts";
 import { buildTransactCalldata, encodeCreditProof } from "@invisi-labs/protocol";
 import { decodeBroadcasterIntent, type BroadcasterMemberProof } from "@invisi-labs/rpc/broadcaster";
 import type { SavedOperation } from "../transactions/operation-types";
 import { sameStatement } from "../transactions/proving/proof-integrity";
 import { publicProof } from "../transactions/proving/proof";
 import { statement } from "../transactions/signing/statement";
+
+export function requiresProvenanceFinalization(saved: SavedOperation): boolean {
+    return saved.broadcasterQuote?.provenanceRequired === true && saved.plan.inputs.length > 0;
+}
+
+export function retainedSidecarsHash(saved: SavedOperation): Hex | undefined {
+    if (!requiresProvenanceFinalization(saved)) return undefined;
+    if (!saved.provenance || saved.provenance.sidecars.length !== 1)
+        throw Error("Prepared Provenance evidence required before submission or replay");
+    return keccak256(toUtf8Bytes(JSON.stringify(saved.provenance.sidecars))) as Hex;
+}
 
 /** Canonical public operation bytes, also usable by Source without a broadcaster quote. */
 export function publicOperationData(saved: SavedOperation): string {

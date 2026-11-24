@@ -82,7 +82,7 @@ for (const format of ["js", "cjs"]) {
         protocol,
         tokenAddress,
         outputs: [output],
-        funding: { payer: ownerAddress, amount: 1n, authorization: "caller" },
+        funding: { payer: ownerAddress, amount: 1n, authorization: "signature" },
     };
     const detached = await invisi.prepareShield(request);
     const operation = await managed.prepareShield({

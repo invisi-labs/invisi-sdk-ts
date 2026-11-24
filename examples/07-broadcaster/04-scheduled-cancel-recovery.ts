@@ -85,7 +85,7 @@ try {
         authorization.types,
         authorization.message
     );
-    const ready = await (await quoted.withWalletSignature(signature)).prove();
+    const ready = await (await (await quoted.withWalletSignature(signature)).prove()).ready();
     const operationId = ready.id;
     const submitted = await client.submit(ready);
     console.log("Scheduled payment:", json(submitted));

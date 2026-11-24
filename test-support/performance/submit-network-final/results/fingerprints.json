@@ -1,0 +1,22 @@
+{
+  "packages/sdk/src/broadcaster/submission-authority.ts": {
+    "before": "7072c59df299ad513d0e309cdd1aa6c36c645b3d88090347b2fa529bf1ba24de",
+    "after": "a3fd47d8dd730c92375aec4a37fbf7272a7f6c0bbf288ae037574e122495f40b"
+  },
+  "packages/session/src/operations/submission-scope.test.ts": {
+    "before": "4492fec2bd135f16119baf149a7f276f183213627cac6fc400de5920a0399a19",
+    "after": "fcc6c86079e5bc7f362324b0c91dada4bb81c3b48ad564e392fff6963ad19e68"
+  },
+  "packages/sdk/src/integrations/ethers.ts": {
+    "before": "79abd81c01d44517d0ec6c31bd05ca1658f43e9ee44786f1f03b2b1ddc876d7f",
+    "after": "bb08909a34f0823d02038c41357ca34f1897e35fd55345b69153e0ecd60aa74e"
+  },
+  "packages/session/src/operations/Operation.ts": {
+    "before": "c9f1e4e13f27880be0c530ede825dd9003a9470e3f5a610b7ffd99f490478d74",
+    "after": "c500c98ab810e987b6869f699ec89000682044ac9c31c17d1fd426eff2262df0"
+  },
+  "packages/session/src/operations/submission-validation.ts": {
+    "before": "d1bdbba3c973e251af52c3f2b09acefc1f16feac46f7c2b6093e6ab8eecf34b8",
+    "after": "d13a91c61f24b062e6bed284bf0c917c2c857db697f28ce23127f437c471bb09"
+  }
+}

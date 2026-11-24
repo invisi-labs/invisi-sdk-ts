@@ -437,6 +437,10 @@ export interface BroadcasterConfiguration {
     quoteSigner: string;
     feeRecipient: string;
 }
+// Only the stateless encoder is shared. No packet, validation result, or
+// connection authority is retained across submissions.
+let sidecarEncoder:
+    typeof import("@invisi-labs/protocol/provenance").proofSidecarToWire | undefined;
 export class BroadcasterClient {
     readonly configuration: Readonly<BroadcasterConfiguration>;
     readonly url: string;
@@ -633,6 +637,10 @@ export class BroadcasterClient {
                 : { requestHashFormat: signed.requestHashFormat }),
         };
     }
+    /** @internal Load the optional codec before a managed first-send fence. */
+    async prepareSubmissionEncoding(): Promise<void> {
+        sidecarEncoder ??= (await import("@invisi-labs/protocol/provenance")).proofSidecarToWire;
+    }
     async submitTransaction(
         data: string,
         signed: SignedBroadcasterQuote,
@@ -658,7 +666,9 @@ export class BroadcasterClient {
             throw Error("quote execution and member proof mismatch");
         const member =
             memberProof === undefined ? undefined : checkedMemberProof(data, memberProof);
-        const { proofSidecarToWire } = await import("@invisi-labs/protocol/provenance");
+        // Managed first sends preload the codec before their authority check.
+        // Raw RPC clients and frozen retries load it on demand for actual evidence.
+        if (proofSidecars.length && !sidecarEncoder) await this.prepareSubmissionEncoding();
         return checkedStatus(
             await this.call("broadcaster_submitTransaction", {
                 data,
@@ -667,7 +677,7 @@ export class BroadcasterClient {
                 ...(member === undefined ? {} : { memberProof: member }),
                 ...(signed.provenanceRequired !== true
                     ? {}
-                    : { proofSidecars: proofSidecars.map(proofSidecarToWire) }),
+                    : { proofSidecars: proofSidecars.map((sidecar) => sidecarEncoder!(sidecar)) }),
             })
         );
     }

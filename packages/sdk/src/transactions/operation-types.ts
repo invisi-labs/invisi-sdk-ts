@@ -90,6 +90,8 @@ export interface ShieldPreparation {
     deadline?: bigint;
 }
 export interface PreparedOutput {
+    /** Resolved public address for local resealing of an adjusted short-address output. */
+    resolvedAddress?: string;
     context: import("../notes/NoteOutput").NoteOutputContext;
     recipient: import("../notes/NoteOutput").NoteOutputRecipient;
     amount: bigint;
@@ -195,6 +197,8 @@ export interface OperationPlan {
     funding: FundingInput;
     fundingMode: "none" | "signature" | "caller";
     params?: TransactRequestParams;
+    /** Change opening retained across fee iterations, including a fully consumed fee budget. */
+    changeTemplate?: PreparedOutput;
     shieldParams?: ShieldParams;
     shieldOutputs?: ShieldOutput[];
     capacity?: number;
@@ -204,6 +208,8 @@ export interface OperationPlan {
 export interface SavedOperation {
     plan: OperationPlan;
     provenance?: import("../provenance/proof-record").ProvenanceProof;
+    /** Trusted public Source keys used when finalizing this private payment. */
+    provenanceTrust?: import("@invisi-labs/protocol/provenance").TrustContext;
     broadcasterBinding?: {
         configuration: import("../broadcaster/index").BroadcasterConfiguration;
         intentHash: string;
@@ -217,6 +223,8 @@ export interface SavedOperation {
     broadcasterAttemptToken?: string;
     broadcasterCancelled?: boolean;
     broadcasterCancellation?: import("@invisi-labs/rpc/broadcaster").BroadcasterStatus;
+    /** Integrity binding for the exact public Source sidecars retained on first attempt. */
+    broadcasterSidecarsHash?: Hex;
     broadcasterRequest?: {
         data: string;
         memberProof?: import("@invisi-labs/rpc/broadcaster").BroadcasterMemberProof;

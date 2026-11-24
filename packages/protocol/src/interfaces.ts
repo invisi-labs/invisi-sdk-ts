@@ -47,6 +47,8 @@ export interface ChainReader {
     getBlocks?(numbers: readonly bigint[]): Promise<readonly CanonicalBlock[]>;
     getBlockByTag?(tag: import("./finality").FinalityTag): Promise<CanonicalBlock | null>;
     getLatestBlockNumber(): Promise<bigint>;
+    /** Select the latest signature nonce for this preparation. Execution still validates the nonce. */
+    getFundingNonceForAuthorization?(context: DeploymentContext, payer: Address): Promise<bigint>;
     getFundingNonce(
         context: DeploymentContext,
         payer: Address,

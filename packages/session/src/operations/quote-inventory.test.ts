@@ -3,7 +3,7 @@ import { BroadcasterClient } from "@invisi-labs/sdk";
 import { fixture } from "../../../../test-support/operation-fixture";
 import { quoteClient } from "../../../../test-support/broadcaster-fixture";
 
-it("reads one detached inventory across fee iterations", async () => {
+it("uses only prepared inputs across fee iterations", async () => {
     const h = await fixture();
     const operation = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
@@ -15,7 +15,7 @@ it("reads one detached inventory across fee iterations", async () => {
     const read = vi.spyOn(h.store, "readSnapshot");
     const quoted = await client.quote(operation, { maxFeeAmount: 20n });
     expect(estimates).toBeGreaterThanOrEqual(3);
-    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).not.toHaveBeenCalled();
     expect(quoted.preview().feeAmount).toBe(13n);
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBe(operation.id);
     await quoted.abandon();

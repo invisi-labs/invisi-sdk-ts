@@ -1,5 +1,10 @@
 import { assertCreditPeriodCurrent } from "../transactions/signing/statement";
-import { broadcasterRequestHash } from "./index";
+import {
+    broadcasterRequestHash,
+    broadcasterTransactInterface,
+    decodeBroadcasterIntent,
+    BroadcasterRpcError,
+} from "./index";
 import type { SavedOperation } from "../transactions/operation-types";
 import { assertCreditUpdatePlan } from "../credit/state";
 import { getAddress, randomBytes, hexlify, keccak256 } from "ethers";
@@ -8,12 +13,11 @@ import type {
     CreateCreditPreparation,
     DrawCreditPreparation,
     OperationPlan,
-    PreparationRuntime,
     ShieldPreparation,
     UpdateCreditPreparation,
     TransferPreparation,
 } from "../transactions/operation-types";
-import { TransactionPreparation } from "../transactions/preparation/transaction-preparation";
+import { repricePlan, needsReprepare } from "./reprice";
 import type { BroadcasterClient, SignedBroadcasterQuote } from "./index";
 import { exportBroadcasterIntent } from "./intent";
 export type PreparationIntent =
@@ -39,36 +43,62 @@ export interface BroadcasterQuoteOptions {
         protocolAddress: `0x${string}`;
     }) => Promise<NonNullable<TransferPreparation["funding"]>["permit"]>;
 }
-export async function prepareIntent(
-    runtime: PreparationRuntime<OperationPlan>,
-    intent: PreparationIntent
-): Promise<OperationPlan> {
-    const preparation = new TransactionPreparation(runtime);
-    switch (intent.kind) {
-        case "transfer":
-            return preparation.prepareTransfer(intent.options);
-        case "shield":
-            return preparation.prepareShield(intent.options);
-        case "draw-credit":
-            return preparation.prepareDrawCredit(intent.options);
-        case "create-credit":
-            return preparation.prepareCreateCredit(intent.options);
-        case "update-credit":
-            return preparation.prepareUpdateCredit(intent.options);
-        case "revoke-credit":
-            return preparation.prepareRevokeCredit(intent.options);
-    }
-}
-export async function prepareBroadcasterPlan(
+/** Price the paid execution features without changing the prepared business intent.
+ * Estimates accept unsigned calldata; the real fee is still selected from the
+ * response and checked against the exact repriced intent before obtaining a quote.
+ */
+function initialOrdinaryEstimateData(
     plan: OperationPlan,
-    reprepare: (intent: PreparationIntent) => Promise<OperationPlan>,
-    client: BroadcasterClient,
-    options: BroadcasterQuoteOptions
-): Promise<{
+    feeRecipient: string,
+    signatureFunding: boolean
+): string {
+    const data = exportBroadcasterIntent(plan).data;
+    const decoded = decodeBroadcasterIntent(data);
+    if (decoded.method !== "transact" && decoded.method !== "shield") return data;
+    const params = {
+        ...decoded.request.params.toObject(),
+        feeRecipient,
+        feeAmount: 1n,
+    };
+    const funding = { ...decoded.request.funding.toObject() };
+    if (signatureFunding && funding.amount > 0n && funding.deadline === 0n)
+        funding.deadline = plan.deadline;
+    const args =
+        decoded.method === "transact"
+            ? [decoded.proof, { params, deliveries: decoded.request.deliveries, funding }]
+            : [params, decoded.args[1], decoded.request.deliveries, funding];
+    return broadcasterTransactInterface.encodeFunctionData(decoded.fragment, args);
+}
+
+type QuotedPlan = {
     plan: OperationPlan;
     quote: SignedBroadcasterQuote;
     broadcasterBinding: NonNullable<SavedOperation["broadcasterBinding"]>;
-}> {
+};
+export function prepareBroadcasterPlan(
+    plan: OperationPlan,
+    client: BroadcasterClient,
+    options: BroadcasterQuoteOptions
+): Promise<QuotedPlan>;
+/** @deprecated The legacy builder is accepted for compatibility. Quotes use only prepared inputs. */
+export function prepareBroadcasterPlan(
+    plan: OperationPlan,
+    legacyBuilder: (intent: PreparationIntent) => Promise<OperationPlan>,
+    client: BroadcasterClient,
+    options: BroadcasterQuoteOptions
+): Promise<QuotedPlan>;
+export async function prepareBroadcasterPlan(
+    plan: OperationPlan,
+    clientOrBuilder: BroadcasterClient | ((intent: PreparationIntent) => Promise<OperationPlan>),
+    clientOrOptions: BroadcasterClient | BroadcasterQuoteOptions,
+    legacyOptions?: BroadcasterQuoteOptions
+): Promise<QuotedPlan> {
+    const client = (
+        typeof clientOrBuilder === "function" ? clientOrOptions : clientOrBuilder
+    ) as BroadcasterClient;
+    const options = legacyOptions ?? (clientOrOptions as BroadcasterQuoteOptions);
+    if (plan.fundingMode === "caller")
+        needsReprepare("Prepare again with signature funding to select its nonce and deadline");
     if (options.schedule) assertCreditPeriodCurrent(plan, options.schedule.publishAfter);
     const capabilities = options.schedule
         ? await client.scheduling({
@@ -118,6 +148,9 @@ export async function prepareBroadcasterPlan(
         if (options.schedule) {
             assertCreditPeriodCurrent(final, options.schedule.publishAfter);
             assertCreditPeriodCurrent(final, end! - 1n);
+            for (const deadline of [final.funding.deadline, final.funding.permit?.deadline])
+                if (deadline && deadline < end!)
+                    throw Error("Schedule exceeds the funding or permit deadline");
         }
         const data = exportBroadcasterIntent(final).data;
         const quote = await client.getQuote(
@@ -140,7 +173,8 @@ export async function prepareBroadcasterPlan(
             },
         };
     };
-    if (!plan.intent) throw new Error("operation has no supported preparation intent");
+    if (!plan.intent || plan.intent.kind !== plan.kind)
+        needsReprepare("Prepare again with a complete business intent");
     await assertCreditUpdatePlan(plan);
     const intent = structuredClone(plan.intent);
     intent.options.deadline = plan.deadline;
@@ -155,25 +189,24 @@ export async function prepareBroadcasterPlan(
             throw new Error("Credit fees use the owner allowance or gross draw deduction");
         let current = plan;
         let previousAmount = 0n;
+        let schedule = await estimate(exportBroadcasterIntent(current).data);
         for (let i = 0; i < attempts; i++) {
-            const schedule = await estimate(exportBroadcasterIntent(current).data);
             const minimum = BigInt(schedule.feeAmount),
                 amount = minimum > previousAmount ? minimum : previousAmount;
             const recipient = getAddress(schedule.feeRecipient) as `0x${string}`;
             if (amount <= 0n || amount > maxFee || amount >= 1n << 128n || BigInt(recipient) === 0n)
                 throw new Error("broadcaster fee exceeds user limit or is invalid");
-            const request = structuredClone(intent);
-            request.options.fee = { recipient, amount };
-            if (
-                request.kind === "create-credit" &&
-                request.options.initialPayment?.netAmount !== undefined
-            )
-                request.options.initialPayment.amount =
-                    request.options.initialPayment.netAmount + amount;
-            current = await reprepare(request);
+            current = await repricePlan(plan, recipient, amount);
             await assertCreditUpdatePlan(current);
-            if (current.credit?.revocation)
+            if (current.credit?.revocation) {
+                if (
+                    intent.kind === "revoke-credit" &&
+                    intent.options.caller &&
+                    getAddress(intent.options.caller) !== client.configuration.quoteSigner
+                )
+                    needsReprepare("Prepare revocation for the broadcaster caller");
                 current.credit.revocationCaller = client.configuration.quoteSigner as `0x${string}`;
+            }
             const data = exportBroadcasterIntent(current).data;
             const recalculated = await estimate(data);
             if (
@@ -187,6 +220,7 @@ export async function prepareBroadcasterPlan(
                 return finalize(current);
             }
             previousAmount = amount;
+            schedule = recalculated;
         }
         throw new Error("broadcaster fee did not stabilize within the preparation limit");
     }
@@ -208,19 +242,15 @@ export async function prepareBroadcasterPlan(
             throw Error("payout requires the full selected note sum");
         let current = plan,
             previous = 0n;
+        let quoted = await estimate(exportBroadcasterIntent(current).data);
         for (let i = 0; i < attempts; i++) {
-            const quoted = await estimate(exportBroadcasterIntent(current).data);
             const minimum = BigInt(quoted.feeAmount),
                 amount = minimum > previous ? minimum : previous;
             const recipient = getAddress(quoted.feeRecipient) as `0x${string}`;
             if (amount <= 0n || amount > maxFee || amount >= 1n << 128n || BigInt(recipient) === 0n)
                 throw Error("broadcaster fee exceeds user limit or is invalid");
             if (amount >= gross) throw Error("payout fee leaves no positive withdrawal");
-            const request = structuredClone(intent);
-            request.options.commitments = plan.inputs.map((input) => input.commitment);
-            request.options.withdrawal = { ...intent.options.withdrawal, amount: gross - amount };
-            request.options.fee = { recipient, amount };
-            current = await reprepare(request);
+            current = await repricePlan(plan, recipient, amount, "payout");
             if (
                 current.outputs.length ||
                 current.inputs.length !== plan.inputs.length ||
@@ -242,6 +272,7 @@ export async function prepareBroadcasterPlan(
                 return finalize(current);
             }
             previous = amount;
+            quoted = required;
         }
         throw Error("broadcaster fee did not stabilize within the preparation limit");
     }
@@ -254,7 +285,9 @@ export async function prepareBroadcasterPlan(
     if (source === "public-funding" && !funding)
         throw new Error("public funding fee requires an explicit payer");
     const permitCallback = options.fundingPermit;
-    let schedule = await estimate(exportBroadcasterIntent(plan).data);
+    let schedule = await estimate(
+        initialOrdinaryEstimateData(plan, client.configuration.feeRecipient, Boolean(funding))
+    );
     let previousAmount = 0n;
     for (let i = 0; i < attempts; i++) {
         const minimum = BigInt(schedule.feeAmount);
@@ -278,32 +311,48 @@ export async function prepareBroadcasterPlan(
                 business;
             source = change >= amount ? "private-inputs" : "public-funding";
         }
+        const next = await repricePlan(plan, recipient, amount, source);
         if (
-            source === "public-funding" &&
-            funding?.permit &&
-            funding.permit.deadline !== 0n &&
+            plan.funding.permit?.deadline &&
+            plan.funding.amount !== next.funding.amount &&
             !permitCallback
         )
             throw new Error(
-                "existing permit cannot fund an increased amount; provide fundingPermit for final gross funding or approve separately"
+                "existing permit cannot fund a changed amount; provide fundingPermit for final gross funding or approve separately"
             );
-        const request = structuredClone(intent);
-        request.options.fee = { recipient, amount };
-        if (funding && "funding" in request.options) {
-            const signedFunding = { ...funding };
-            if (funding.authorization === "caller") {
-                delete signedFunding.sigNonce;
-                delete signedFunding.deadline;
-            }
-            request.options.funding = {
-                ...signedFunding,
-                amount: funding.amount + (source === "public-funding" ? amount : 0n),
-                authorization: "signature",
-            };
-        }
-        const next = await reprepare(request);
         if (source === "private-inputs" && next.inputs.length === 0)
             throw new Error("private-inputs fee requires private funds");
+        if (
+            intent.kind === "shield" &&
+            !requestedSchedule &&
+            !permitCallback &&
+            !plan.funding.permit?.deadline
+        ) {
+            // getQuote prices and signs this exact repriced intent. A successful
+            // verified quote supersedes a separate unsigned final estimate.
+            next.intent = structuredClone(intent);
+            try {
+                return await finalize(next);
+            } catch (cause) {
+                // Legacy quote endpoints use a generic business-refusal code.
+                // This read-only failure permits one fresh estimate per bounded
+                // iteration; retry only if the price actually increased.
+                if (
+                    !(cause instanceof BroadcasterRpcError) ||
+                    cause.code !== -32000 ||
+                    i + 1 >= attempts
+                )
+                    throw cause;
+                const refreshed = await estimate(exportBroadcasterIntent(next).data);
+                const required = BigInt(refreshed.feeAmount);
+                if (getAddress(refreshed.feeRecipient) !== recipient || required > maxFee)
+                    throw Error("broadcaster fee exceeds user limit or recipient changed");
+                if (required <= amount) throw cause;
+                previousAmount = amount;
+                schedule = refreshed;
+                continue;
+            }
+        }
         const recalculated = await estimate(exportBroadcasterIntent(next).data);
         const required = BigInt(recalculated.feeAmount);
         if (
@@ -315,17 +364,15 @@ export async function prepareBroadcasterPlan(
         if (amount >= required) {
             let final = next;
             if (permitCallback) {
-                if (!funding || !("funding" in request.options))
-                    throw new Error("fundingPermit requires public funding");
+                if (!funding) throw new Error("fundingPermit requires public funding");
                 const permit = await permitCallback({
                     payer: funding.payer,
-                    amount: request.options.funding!.amount,
+                    amount: next.funding.amount!,
                     tokenAddress: plan.context.tokenAddress,
                     protocolAddress: plan.context.protocolAddress,
                 });
                 if (!permit) throw new Error("fundingPermit did not return a permit");
-                request.options.funding = { ...request.options.funding!, permit };
-                final = await reprepare(request);
+                final = await repricePlan(next, recipient, amount, source, permit);
                 const permitted = await estimate(exportBroadcasterIntent(final).data);
                 if (
                     getAddress(permitted.feeRecipient) !== recipient ||

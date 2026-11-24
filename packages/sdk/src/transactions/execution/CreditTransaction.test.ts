@@ -309,7 +309,11 @@ async function broadcasterCreditPreparations(h: Awaited<ReturnType<typeof credit
             credits: [{ credit: h.commitment, amount: 30n }],
             recipient: h.wallet.getAddress(),
         }),
-        await h.invisi.prepareRevokeCredit({ ...h.identity, grantId: 1n }),
+        await h.invisi.prepareRevokeCredit({
+            ...h.identity,
+            grantId: 1n,
+            fee: { recipient: h.wallet.ownerAddress, amount: 3n },
+        }),
     ];
 }
 it("freezes paid broadcaster fees for all Credit operations before authorization", async () => {
@@ -362,6 +366,14 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
         }
     );
     const prepared = await broadcasterCreditPreparations(h);
+    const reads = [
+        vi.spyOn(h.reader, "getChainId"),
+        vi.spyOn(h.reader, "getCode"),
+        vi.spyOn(h.reader, "getBlock"),
+        vi.spyOn(h.reader, "getLatestBlockNumber"),
+        vi.spyOn(h.reader, "getFundingNonce"),
+        vi.spyOn(h.reader, "getCreditStatus"),
+    ];
     for (const original of prepared) {
         const quoted = await client.quote(original, { maxFeeAmount: 3n });
         expect(quoted.preview().feeAmount).toBe(3n);
@@ -379,6 +391,7 @@ it("freezes paid broadcaster fees for all Credit operations before authorization
             client.quote(original, { maxFeeAmount: 3n, feeSource: "public-funding" })
         ).rejects.toThrow(/Credit fees/);
     }
+    for (const read of reads) expect(read).not.toHaveBeenCalled();
 });
 
 it("keeps update deltas stable across fee stabilization and repeated quotes", async () => {
@@ -1086,3 +1099,47 @@ it.each(["owner", "spender"] as const)(
         await expect(operation).rejects.toThrow(/role, commitment or deployment mismatch/);
     }
 );
+
+it("retains a persisted detached Credit packet when its final credit period check fails", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(2000000000000);
+    const h = await creditSetup({ expiry: 2000200000n });
+    const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
+    const { BroadcasterClient } = await import("../../broadcaster");
+    const base = quoteClient(h.context, () => 3n);
+    const methods: string[] = [];
+    const client = new BroadcasterClient(base.configuration, async (request) => {
+        methods.push(request.method);
+        if (request.method === "broadcaster_submitTransaction")
+            return {
+                jsonrpc: "2.0",
+                id: request.id,
+                result: { id: "credit-recovery", state: "pending" },
+            };
+        return base.transport(request);
+    });
+    const prepared = await h.invisi.prepareCreateCredit({
+        ...h.identity,
+        spender: h.bob.getAddress(),
+        expiry: 2000200000n,
+        deadline: 2000100000n,
+        availableCredit: 100n,
+        initialPayment: { amount: 10n },
+    });
+    const block = h.reader.getBlock.bind(h.reader);
+    let timestamp = 2000000000n;
+    h.reader.getBlock = async (n) => ({ ...(await block(n)), timestamp });
+    const quoted = await client.quote(prepared, {
+        maxFeeAmount: 3n,
+        schedule: { publishAfter: 2000000060n },
+        persistSchedule: async (handle) => {
+            if (handle.submission && !handle.id) timestamp = 2000073600n;
+        },
+    });
+    const ready = await (await externallyAuthorize(quoted)).prove();
+    await expect(client.submit(ready)).rejects.toMatchObject({ code: "CREDIT_PERIOD_CHANGED" });
+    expect(methods).not.toContain("broadcaster_submitTransaction");
+    expect(ready.broadcasterScheduleHandle()?.submission?.data).toBeDefined();
+    methods.length = 0;
+    await expect(client.submit(ready)).resolves.toMatchObject({ id: "credit-recovery" });
+    expect(methods).toEqual(["broadcaster_submitTransaction"]);
+});

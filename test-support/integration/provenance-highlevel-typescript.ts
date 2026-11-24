@@ -321,7 +321,10 @@ try {
         authorization.message
     );
     const authorized = await quoted.withWalletSignature(signature);
-    const ready = await authorized.prove();
+    const proved = await authorized.prove();
+    assert.equal(proved.status, "proved");
+    assert.equal(sourceProofs, 0);
+    const ready = await proved.ready();
     assert.equal(mainProofs, 1);
     const single = abi.fragments.find(
         (f: any) =>
@@ -343,7 +346,7 @@ try {
         await assert.rejects(ready.exportTransaction(), /recursive/);
     const after = abi.parseTransaction({ data: transaction.data });
     assert(after && after.args[0] !== "0x");
-    assert.equal(sourceProofs, 0, "main proving must not prepare Source evidence");
+    assert.equal(sourceProofs, 1, "ready finalizes required Source evidence");
     assert.equal(ready.broadcasterQuote()?.quote.requestHash, quote.quote.requestHash);
     const publicRecord = {
         format: "invisi.highlevel.public-before-submit.v1",
@@ -396,7 +399,7 @@ try {
     }
     if (quote.quote.execution === "aggregate" && !config.scheduleMode)
         assert.equal(accepted.state, "queued");
-    assert.equal(sourceProofs, 1, "first submission prepares Source evidence once");
+    assert.equal(sourceProofs, 1, "first submission reuses finalized Source evidence");
     assert.deepEqual(sourceCapacities, [10]);
     const sourceIndex = events.indexOf("source:prove");
     assert(sourceIndex > events.indexOf("main:prove") && sourceIndex > quoteIndex);

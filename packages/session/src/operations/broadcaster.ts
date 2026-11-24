@@ -1,6 +1,5 @@
 import { inputFacts } from "@invisi-labs/sdk/session-support";
 import type { OperationRuntime, SavedOperation } from "./operation-types";
-import type { WalletState } from "../storage/state";
 function check(ok: unknown, message: string): asserts ok {
     if (!ok) {
         throw new Error(message);
@@ -12,49 +11,8 @@ export async function quoteManagedOperation(
     client: import("@invisi-labs/sdk").BroadcasterClient,
     options: import("@invisi-labs/sdk/session-support").BroadcasterQuoteOptions
 ): Promise<SavedOperation> {
-    const { prepareIntent, prepareBroadcasterPlan } =
-        await import("@invisi-labs/sdk/session-support");
-
-    let inventory: Promise<WalletState> | undefined;
-    const readInventory = async () => {
-        const state = await (inventory ??= runtime.store.readSnapshot(runtime.scope));
-        const copy = structuredClone(state);
-        for (const [key, owner] of Object.entries(copy.reservations))
-            if (owner === snapshot.plan.id) delete copy.reservations[key];
-        return copy;
-    };
-    const build = (
-        intent: import("@invisi-labs/sdk/session-support").PreparationIntent,
-        repricing: boolean
-    ) =>
-        prepareIntent(
-            {
-                options: runtime.options,
-                ...(runtime.preparationReads ? { preparationReads: runtime.preparationReads } : {}),
-                repricing,
-                ...(snapshot.plan.submissionValidation
-                    ? { preparationTime: BigInt(Math.floor(Date.now() / 1000)) }
-                    : {}),
-                ...(runtime.store.readSummary
-                    ? { readSummary: () => runtime.store.readSummary!(runtime.scope) }
-                    : {}),
-                scope: runtime.scope,
-                reader: runtime.reader,
-                readInventory,
-                complete: async (plan) => ({
-                    ...plan,
-                    ...(snapshot.plan.submissionValidation
-                        ? { submissionValidation: "required" as const }
-                        : {}),
-                }),
-            },
-            intent
-        );
-    const reprepare = (intent: import("@invisi-labs/sdk/session-support").PreparationIntent) =>
-        runtime.preparationReads
-            ? runtime.preparationReads.reprice((reuse) => build(intent, reuse))
-            : build(intent, false);
-    const selected = await prepareBroadcasterPlan(snapshot.plan, reprepare, client, {
+    const { prepareBroadcasterPlan } = await import("@invisi-labs/sdk/session-support");
+    const selected = await prepareBroadcasterPlan(snapshot.plan, client, {
         ...options,
         ...(options.schedule && !options.persistSchedule
             ? { persistSchedule: async () => {} }
@@ -76,13 +34,9 @@ export async function quoteManagedOperation(
         for (const fact of facts)
             check(
                 state[fact.kind][fact.key]?.spent === "unspent" &&
-                    (!state.reservations[fact.reservationKey] ||
-                        state.reservations[fact.reservationKey] === snapshot.plan.id),
+                    state.reservations[fact.reservationKey] === snapshot.plan.id,
                 "input unavailable or already reserved"
             );
-        for (const [key, owner] of Object.entries(state.reservations))
-            if (owner === snapshot.plan.id) delete state.reservations[key];
-        for (const fact of facts) state.reservations[fact.reservationKey] = snapshot.plan.id;
         const next: SavedOperation = {
             plan: nextPlan,
             broadcasterQuote: selected.quote,

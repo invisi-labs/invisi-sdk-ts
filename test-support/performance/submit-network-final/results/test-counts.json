@@ -1,0 +1,16 @@
+{
+  "packages": {
+    "@invisi-labs/primitives": "178 passed (178)",
+    "@invisi-labs/protocol": "92 passed (92)",
+    "@invisi-labs/rpc": "343 passed | 1 skipped (344)",
+    "@invisi-labs/prover": "230 passed | 23 skipped (253)",
+    "@invisi-labs/sdk": "373 passed | 7 skipped (380)",
+    "@invisi-labs/payment-router": "51 passed | 8 skipped (59)",
+    "@invisi-labs/session": "513 passed | 3 skipped (516)",
+    "@invisi-labs/ipp": "110 passed (110)",
+    "@invisi-labs/react": "2 passed (2)",
+    "@invisi-labs/vue": "2 passed (2)"
+  },
+  "passed": 1894,
+  "skipped": 42
+}

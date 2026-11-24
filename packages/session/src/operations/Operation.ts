@@ -1,5 +1,6 @@
 import {
     broadcasterSubmissionRefusal,
+    captureSubmissionAuthority,
     assertBroadcasterNotRefused,
 } from "@invisi-labs/sdk/session-support";
 import { validateOperationSubmission } from "./submission-validation";
@@ -40,6 +41,8 @@ import {
     exportBroadcasterIntent,
     exportBroadcasterSubmission,
     publicOperationData,
+    requiresProvenanceFinalization,
+    retainedSidecarsHash,
     resolveQuotedExecution,
     inputFacts,
     publicProof,
@@ -403,7 +406,9 @@ export class Operation {
         options.signal?.throwIfAborted();
         await this.signingCurrent();
         check(
-            this.status === (this.kind === "shield" ? "prepared" : "proved"),
+            this.status === (this.kind === "shield" ? "prepared" : "proved") &&
+                (!this.#saved.plan.funding.signature ||
+                    this.#saved.plan.funding.signature === "0x"),
             "operation is not awaiting funding authorization or proof"
         );
         const request = await fundingSigningRequest(this.#saved, this.#runtime);
@@ -420,7 +425,9 @@ export class Operation {
         options.signal?.throwIfAborted();
         await this.signingCurrent();
         check(
-            this.status === (this.kind === "shield" ? "prepared" : "proved"),
+            this.status === (this.kind === "shield" ? "prepared" : "proved") &&
+                (!this.#saved.plan.funding.signature ||
+                    this.#saved.plan.funding.signature === "0x"),
             "operation is not awaiting funding authorization or proof"
         );
         const verified = await acceptFundingSignature(this.#saved, signature, this.#runtime);
@@ -432,7 +439,7 @@ export class Operation {
                 if (saved.plan.statement?.target !== "noir-recursive") {
                     saved.call = await this.encode(saved);
                 }
-                return { status: "ready" };
+                return { status: requiresProvenanceFinalization(saved) ? "proved" : "ready" };
             },
             options.signal
         );
@@ -461,7 +468,7 @@ export class Operation {
             async (saved) => {
                 const p = saved.plan;
                 saved.proof = await proveOperation(p, this.#authorization, prover, options);
-                if (p.fundingMode === "signature") {
+                if (p.fundingMode === "signature" || requiresProvenanceFinalization(saved)) {
                     return { status: "proved" };
                 }
                 if (p.statement?.target !== "noir-recursive") {
@@ -481,6 +488,7 @@ export class Operation {
         const p = this.#saved.plan;
         check(p.fundingMode === "signature", "operation does not require a funding signature");
         check(p.kind === "shield" || this.#saved.proof, "proof must precede funding authorization");
+        check(!p.funding.signature || p.funding.signature === "0x", "funding already authorized");
         const signer = this.#runtime.options.fundingSigner;
         if (!signer) {
             throw new MissingCapabilityError("EVM funding signer");
@@ -501,14 +509,38 @@ export class Operation {
                 if (saved.plan.statement?.target !== "noir-recursive") {
                     saved.call = await this.encode(saved);
                 }
-                return { status: "ready" };
+                return { status: requiresProvenanceFinalization(saved) ? "proved" : "ready" };
             },
             options.signal
         );
     }
 
-    /** Shield caller funding needs no wallet signing or proof; this step only encodes its frozen request. */
-    async ready(): Promise<Operation> {
+    /** Finalize required Source evidence after main proof and funding authorization. */
+    async ready(options: { signal?: AbortSignal } = {}): Promise<Operation> {
+        options.signal?.throwIfAborted();
+        await this.signingCurrent();
+        const required = requiresProvenanceFinalization(this.#saved);
+        if (this.status === "ready" && (!required || this.#saved.provenance)) {
+            if (required) {
+                const { validateReadyProvenance } =
+                    await import("@invisi-labs/sdk/session-support");
+                await validateReadyProvenance(this.#saved, this.#runtime);
+            }
+            return this;
+        }
+        if (required) {
+            return this.stage(
+                "Source finalization",
+                ["proved", "ready"],
+                async (saved) => {
+                    const { finalizePreparedProvenance } =
+                        await import("@invisi-labs/sdk/session-support");
+                    await finalizePreparedProvenance(saved, this.#runtime);
+                    return { status: "ready" };
+                },
+                options.signal
+            );
+        }
         check(
             (this.kind === "shield" && this.#saved.plan.fundingMode === "caller") ||
                 this.kind === "revoke-credit",
@@ -565,18 +597,36 @@ export class Operation {
         const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
             const current = this.current(state.operations[this.id]);
             if (current.provenance && !reprove) return structuredClone(current.provenance);
-            if (!current.broadcasterAttempted) current.provenance = structuredClone(packet);
+            if (!current.broadcasterAttempted) {
+                current.provenance = structuredClone(packet);
+                if (capability) current.provenanceTrust = structuredClone(capability.client.trust);
+            }
             return packet;
         });
-        if (!original.broadcasterAttempted) this.#saved.provenance = structuredClone(saved);
+        if (!original.broadcasterAttempted) {
+            this.#saved.provenance = structuredClone(saved);
+            if (capability) this.#saved.provenanceTrust = structuredClone(capability.client.trust);
+        }
         return saved;
     }
     async #submitViaBroadcaster(client: import("@invisi-labs/sdk").BroadcasterClient) {
-        const { validateBroadcastEnvelope, validatePreparedBroadcast } =
+        const { validateBroadcastEnvelope, validatePreparedBroadcast, validateRetainedProvenance } =
             await import("@invisi-labs/sdk/session-support");
-        let durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
-            structuredClone(this.current(state.operations[this.id]))
-        );
+        const { store, scope } = this.#runtime;
+        const entry = await store.transaction(scope, (state) => {
+            const saved = this.current(state.operations[this.id]);
+            if (
+                !saved.broadcasterAttempted &&
+                !saved.broadcasterSubmissionId &&
+                !saved.broadcasterCancelled
+            )
+                check(!state.invalidated, "wallet requires canonical resync");
+            return {
+                saved: structuredClone(saved),
+                historyGeneration: state.publicHistoryGeneration,
+            };
+        });
+        const durable = entry.saved;
         check(this.status === "ready", "operation is not ready");
         assertBroadcasterNotRefused(durable.broadcasterRefusal);
         validateBroadcastEnvelope(durable, client);
@@ -588,20 +638,24 @@ export class Operation {
                 this.#saved.broadcasterBinding = structuredClone(durable.broadcasterBinding);
             return client.status(durable.broadcasterSubmissionId);
         }
-        if (!durable.broadcasterAttempted) {
-            const requirements = await client.submissionRequirements(durable.broadcasterQuote!);
-            if (
-                requirements.provenanceRequired &&
-                durable.plan.inputs.length &&
-                !durable.provenance
-            ) {
-                await this.#proveProvenance();
-                durable = await this.#runtime.store.transaction(this.#runtime.scope, (state) =>
-                    structuredClone(this.current(state.operations[this.id]))
-                );
-            }
-            await this.validateExport();
+        const sidecarsHash = retainedSidecarsHash(durable);
+        if (durable.broadcasterAttempted && sidecarsHash && !durable.broadcasterSidecarsHash)
+            await validateRetainedProvenance(durable);
+        if (durable.broadcasterSidecarsHash && durable.broadcasterSidecarsHash !== sidecarsHash)
+            throw Error("Frozen broadcaster Source sidecars changed");
+        const authority = durable.broadcasterAttempted
+            ? undefined
+            : captureSubmissionAuthority(this.#runtime, durable.plan.context.chainId, client);
+        if (authority) {
+            await client.submissionRequirements(durable.broadcasterQuote!);
             await validatePreparedBroadcast(durable, client, this.#runtime);
+            await validateOperationSubmission(
+                this.#runtime,
+                durable,
+                undefined,
+                "broadcaster",
+                authority
+            );
             const credit = durable.plan.credit;
             if (credit?.draw || credit?.creation?.hasInitialPayment) {
                 const head = await this.#runtime.reader.getBlock(
@@ -610,10 +664,26 @@ export class Operation {
                 assertCreditPeriodCurrent(durable.plan, head.timestamp);
             }
         }
-        const attempt = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+        const attempt = await store.transaction(scope, (state) => {
             const record = state.operations[this.id];
             const current = this.current(record);
             assertBroadcasterNotRefused(current.broadcasterRefusal);
+            if (authority) {
+                check(
+                    JSON.stringify(current.provenance) === JSON.stringify(durable.provenance),
+                    "Prepared Provenance changed during submission"
+                );
+                check(
+                    !state.invalidated && state.publicHistoryGeneration === entry.historyGeneration,
+                    "wallet requires canonical resync"
+                );
+                check(
+                    !current.broadcasterAttempted &&
+                        !current.broadcasterCancelled &&
+                        !current.broadcasterSubmissionId,
+                    "broadcaster submission changed; recover the operation"
+                );
+            }
             const first =
                 !current.broadcasterAttempted &&
                 !current.externalized &&
@@ -621,6 +691,7 @@ export class Operation {
                 !current.broadcasterSubmissionId;
             check(record!.status === "ready", "operation is not ready");
             current.broadcasterRequest ??= exportBroadcasterSubmission(current);
+            if (sidecarsHash) current.broadcasterSidecarsHash ??= sidecarsHash;
             validateBroadcastEnvelope(current, client);
             if (current.broadcasterBinding?.scheduleHandle) {
                 current.broadcasterBinding.scheduleHandle.submission ??= {
@@ -634,6 +705,40 @@ export class Operation {
             return { saved: structuredClone(current), first };
         });
         const { saved } = attempt;
+        if (authority) {
+            const walletWrites = store.observeWrites?.(scope);
+            try {
+                if (saved.provenance?.sidecars.length) await client.prepareSubmissionEncoding();
+                // A captured event epoch also covers the awaited wallet read. Without
+                // one, the real chain identity must be the last asynchronous sample.
+                if (authority.observedNetwork) await authority.validate();
+                const state = await store.readSnapshot(scope);
+                if (!authority.observedNetwork) await authority.validate();
+                const record = state.operations[this.id];
+                const current = this.current(record);
+                check(
+                    !state.invalidated && state.publicHistoryGeneration === entry.historyGeneration,
+                    "wallet requires canonical resync"
+                );
+                check(
+                    record!.status === "ready" &&
+                        !record!.transactionHash &&
+                        !current.broadcasterCancelled &&
+                        !current.broadcasterSubmissionId &&
+                        current.broadcasterAttemptToken === saved.broadcasterAttemptToken,
+                    "wallet submission changed or cancelled"
+                );
+                check(
+                    record!.inputs.every((key) => state.reservations[key] === this.id),
+                    "wallet input reservation changed"
+                );
+                check(this.#runtime.store === store, "wallet store changed");
+                authority.assertCurrent();
+                walletWrites?.assertCurrent();
+            } finally {
+                walletWrites?.close();
+            }
+        }
         let result;
         try {
             result = await client.submitTransaction(

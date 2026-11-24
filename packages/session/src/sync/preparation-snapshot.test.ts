@@ -550,12 +550,13 @@ it("does not commit captured facts if the public generation changes during reten
     const h = await fixture();
     const history = h.session.publicHistory;
     const snapshot = history.snapshot.bind(history);
-    h.reader.getFundingNonce = async () => {
+    const original = h.reader.isKnownRoot.bind(h.reader);
+    h.reader.isKnownRoot = async (...args) => {
         vi.spyOn(history, "snapshot").mockImplementation(async () => ({
             ...(await snapshot()),
             generation: 999,
         }));
-        return 0n;
+        return original(...args);
     };
     await expect(
         h.session.scanHistory(noDecrypt, { fromBlock: 13n, toBlock: 12n })
@@ -904,4 +905,49 @@ it("invalidates inventory-only refresh when an uncovered private anchor reorgs d
     expect(state.invalidated).toBeTruthy();
     expect(state.notes[h.leaf]!.spent).toBe("unknown");
     expect(state.preparationSnapshot).toBeUndefined();
+});
+
+it("selects one live signature funding nonce per prepared operation and never during quote", async () => {
+    const h = await synchronized();
+    const { quoteClient } = await import("../../../../test-support/broadcaster-fixture");
+    const oldBlock = await h.reader.getBlock(12n);
+    let headNumber = 18n;
+    h.reader.getLatestBlockNumber = async () => ++headNumber;
+    h.reader.getBlock = async (number) => ({ ...oldBlock, number });
+    const nonce = vi
+        .spyOn(h.reader, "getFundingNonce")
+        .mockResolvedValueOnce(7n)
+        .mockResolvedValueOnce(14n);
+    const code = vi.spyOn(h.reader, "getCode");
+    const membership = vi.spyOn(h.membership, "getMembership");
+    const client = quoteClient(h.context);
+    for (const expected of [7n, 14n]) {
+        const prepared = await h.session.prepareShield({
+            tokenAddress: h.context.tokenAddress,
+            outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+            funding: { payer: h.wallet.ownerAddress, amount: 30n },
+        });
+        const before = nonce.mock.calls.length;
+        expect(prepared.preview().submissionValidation).toBe("required");
+        expect(prepared.preview().funding.sigNonce).toBe(expected);
+        const saved = (await h.store.readSnapshot(h.scope)).operations[prepared.id]!
+            .payload as import("../operations/operation-types").SavedOperation;
+        expect(saved.plan.intent).toMatchObject({
+            options: {
+                funding: {
+                    sigNonce: expected,
+                    authorization: "signature",
+                    deadline: prepared.preview().funding.deadline,
+                },
+            },
+        });
+        const quoted = await client.quote(prepared, { maxFeeAmount: 10n });
+        expect(quoted.preview().funding.sigNonce).toBe(expected);
+        expect(quoted.preview().submissionValidation).toBe("required");
+        expect(nonce).toHaveBeenCalledTimes(before);
+    }
+    expect(nonce).toHaveBeenCalledTimes(2);
+    expect(nonce.mock.calls.map(([, , block]) => block.number)).toEqual([19n, 20n]);
+    expect(code).not.toHaveBeenCalled();
+    expect(membership).not.toHaveBeenCalled();
 });

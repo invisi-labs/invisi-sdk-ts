@@ -131,7 +131,12 @@ export class IndexedDBWalletStore extends TransactionalWalletStore {
         options: { recentRecords?: number } = {}
     ) {
         const records = new IndexedDBAtomicRecords(name, factory);
-        super(records, codec, { persistent: true, ...options });
+        super(
+            records,
+            codec,
+            { persistent: true, ...options },
+            { owner: factory ?? indexedDB, namespace: name }
+        );
         this.#records = records;
     }
     close(): Promise<void> {

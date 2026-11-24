@@ -63,6 +63,8 @@ export interface WalletState {
 
 export interface WalletStore {
     readonly persistent: boolean;
+    /** Finite, synchronous observation of overlapping writes in this store's scope. */
+    observeWrites?(scope: WalletScope): { assertCurrent(): void; close(): void };
     restoreReorgedOperations?(scope: WalletScope, fromBlock: bigint): Promise<void>;
     readSummary?(scope: WalletScope): Promise<WalletState>;
     readRecords?(

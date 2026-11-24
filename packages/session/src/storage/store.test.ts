@@ -281,3 +281,25 @@ it("reloads raw encrypted memo metadata through the record codec without aliasin
         fundsV1.decode((await reloaded.readSnapshot(scope)).notes[leaf(1)]!.note.payload!).memo
     ).toEqual(new Uint8Array([0, 255, 192, 128]));
 });
+
+it("fences same-scope writes across wallet handles sharing a backend", async () => {
+    const records = new MemoryAtomicRecords();
+    const first = new TransactionalWalletStore(records, new MemoryRecordCodec(), {
+        persistent: false,
+    });
+    const second = new TransactionalWalletStore(records, new MemoryRecordCodec(), {
+        persistent: false,
+    });
+    const fence = first.observeWrites(scope);
+    await second.transaction({ ...scope, namespace: "other" }, () => {});
+    fence.assertCurrent();
+    const pending = second.transaction(scope, () => {});
+    expect(() => first.observeWrites(scope)).toThrow(/write in progress/);
+    expect(() => fence.assertCurrent()).toThrow(/wallet changed/);
+    await pending;
+    expect(() => fence.assertCurrent()).toThrow(/wallet changed/);
+    fence.close();
+    const fresh = first.observeWrites(scope);
+    fresh.assertCurrent();
+    fresh.close();
+});

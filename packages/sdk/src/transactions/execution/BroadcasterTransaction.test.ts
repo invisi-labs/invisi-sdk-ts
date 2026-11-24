@@ -180,7 +180,7 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
-        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "signature" },
     });
     const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
     expect(original.preview().fundingAmount).toBe(30n);
@@ -188,7 +188,7 @@ it("adds a Shield broadcaster fee to public funding without shrinking its busine
     expect(original.preview().funding).toMatchObject({
         payer: getAddress(h.wallet.ownerAddress),
         amount: 30n,
-        authorization: "caller",
+        authorization: "signature",
     });
     expect(quoted.preview().funding).toMatchObject({
         payer: getAddress(h.wallet.ownerAddress),
@@ -261,7 +261,7 @@ it("requests an app-owned permit once after the gross funding amount stabilizes"
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
-        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller", permit },
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "signature", permit },
     });
     await expect(quoteClient(h.context).quote(original, { maxFeeAmount: 10n })).rejects.toThrow(
         /existing permit/
@@ -290,7 +290,7 @@ it("re-quotes from the original public funding intent without accumulating fees"
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
-        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "caller" },
+        funding: { payer: h.wallet.ownerAddress, amount: 30n, authorization: "signature" },
     });
     const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
     const replaced = await quoteClient(h.context, () => 5n).quote(quoted, { maxFeeAmount: 10n });
@@ -309,7 +309,7 @@ it("broadcasts a zero-input funded transfer while preserving its business paymen
         tokenAddress: h.context.tokenAddress,
         inputs: [],
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
-        funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "caller" },
+        funding: { payer: h.wallet.ownerAddress, amount: 100n, authorization: "signature" },
     });
     const quoted = await quoteClient(h.context).quote(original, { maxFeeAmount: 10n });
     expect(quoted.preview().fundingAmount).toBe(110n);
@@ -350,7 +350,7 @@ it("uses existing private change before increasing mixed public funding", async 
     expect(explicit.preview().fundingAmount).toBe(60n);
 });
 
-it("refreshes caller-only zero nonce and deadline when attaching a broadcaster", async () => {
+it("requires preparation for caller-to-signature funding", async () => {
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");
     h.reader.getFundingNonce = async () => 7n;
@@ -367,12 +367,11 @@ it("refreshes caller-only zero nonce and deadline when attaching a broadcaster",
             deadline: 0n,
         },
     });
-    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
-    const request = await quoted.exportFundingAuthorization();
-    expect(BigInt(request.message.sigNonce as string)).toBe(7n);
-    expect(BigInt(request.message.deadline as bigint)).toBeGreaterThan(0n);
+    await expect(
+        quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n })
+    ).rejects.toMatchObject({ code: "NEEDS_REPREPARE" });
+    expect(prepared.preview().funding).toMatchObject({ authorization: "caller", sigNonce: 0n });
 });
-
 it("stops fee iteration when rebuilt intent pays at least its recalculated fee", async () => {
     const h = await setup();
     const { quoteClient } = await import("../../../../../test-support/broadcaster-fixture");

@@ -5,7 +5,7 @@ import { testOutput } from "../../../../../test-support/test-output";
 import { quoteClient } from "../../../../../test-support/broadcaster-fixture";
 import { setup } from "../execution/ExplicitTransaction-fixtures";
 
-it("reuses deployment code and pinned membership during quotation while retaining canonical fences", async () => {
+it("quotes from prepared materials without chain or membership reads", async () => {
     const h = await setup();
     const prepared = await h.invisi.prepareTransfer({
         wallet: Wallet.fromAddress(h.wallet.getAddress()),
@@ -21,10 +21,10 @@ it("reuses deployment code and pinned membership during quotation while retainin
     expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([30n, 60n]);
     expect(code).not.toHaveBeenCalled();
     expect(membership).not.toHaveBeenCalled();
-    expect(block.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(block).not.toHaveBeenCalled();
 });
 
-it("refreshes the frame if fee funding selects an input absent from the original read set", async () => {
+it("refuses new fee inputs until explicitly prepared with a budget", async () => {
     const h = await fixture();
     const prepared = await h.session.prepareTransfer({
         tokenAddress: h.context.tokenAddress,
@@ -55,7 +55,21 @@ it("refreshes the frame if fee funding selects an input absent from the original
         ...(await membership(context, input, block)),
         block,
     });
-    const quoted = await quoteClient(h.context).quote(prepared, { maxFeeAmount: 10n });
+    const client = quoteClient(h.context);
+    const before = await h.store.readSnapshot(h.scope);
+    await expect(client.quote(prepared, { maxFeeAmount: 10n })).rejects.toMatchObject({
+        code: "NEEDS_REPREPARE",
+    });
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+    expect(h.reader.getLatestBlockNumber).not.toHaveBeenCalled();
+    await prepared.abandon();
+    const budgeted = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 100n })],
+        fee: { recipient: h.bob.ownerAddress, amount: 50n },
+    });
+    expect(budgeted.getOutputs()).toHaveLength(1);
+    const quoted = await client.quote(budgeted, { maxFeeAmount: 10n });
     expect(quoted.preview().inputs).toBe(2);
     expect(quoted.preview().outputs.map((o) => o.amount)).toEqual([100n, 40n]);
     expect(h.reader.getLatestBlockNumber).toHaveBeenCalled();

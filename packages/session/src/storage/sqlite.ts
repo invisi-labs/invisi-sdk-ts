@@ -138,7 +138,12 @@ export class SQLiteWalletStore extends TransactionalWalletStore {
         codec: WalletRecordCodec,
         options: { recentRecords?: number } = {}
     ) {
-        super(new SQLiteAtomicRecords(db), codec, { persistent: true, ...options });
+        super(
+            new SQLiteAtomicRecords(db),
+            codec,
+            { persistent: true, ...options },
+            { owner: db, namespace: "invisi_wallet_state" }
+        );
     }
 }
 

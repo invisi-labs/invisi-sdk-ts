@@ -1,5 +1,8 @@
 import {
-    acceptFundingSignature,
+    verifyOperationFundingSignature,
+    openEthersSubmissionValidation,
+    openEthersSubmissionNetworkValidation,
+    UnsupportedSubmissionHash,
     acceptRevocationSignature,
     inputFacts,
     operationExpired,
@@ -7,60 +10,226 @@ import {
     operationSources,
 } from "@invisi-labs/sdk/session-support";
 import type { Hex } from "@invisi-labs/protocol/contracts";
+import type { CanonicalBlock, ChainReader } from "@invisi-labs/protocol";
 import type { OperationRuntime, SavedOperation } from "./operation-types";
+import type { captureSubmissionAuthority } from "@invisi-labs/sdk/session-support";
+import { ReceivingAddress } from "@invisi-labs/primitives/address";
+import { TokenProtocol } from "@invisi-labs/rpc";
+
+const stockDeploymentValidation = TokenProtocol.prototype.validateDeployment;
+type CanonicalFence = (canonical: () => Promise<void>) => Promise<void>;
+
+/** Only this proof-free shape has no historical chain facts left to authorize.
+ * Registry-resolved deliveries, private inputs and unknown/custom paths retain
+ * preparation ancestry; current snapshot canonicality is always checked.
+ */
+function currentStateShield(runtime: OperationRuntime, saved: SavedOperation): boolean {
+    const plan = saved.plan;
+    if (
+        plan.kind !== "shield" ||
+        plan.submissionValidation !== "required" ||
+        plan.fundingMode !== "signature" ||
+        !plan.funding.signature ||
+        !plan.shieldParams ||
+        !plan.shieldOutputs ||
+        plan.params ||
+        plan.credit ||
+        plan.statement ||
+        saved.proof ||
+        saved.provenance ||
+        plan.inputs.length ||
+        operationSources(plan).length ||
+        !plan.outputs.length ||
+        plan.outputs.length !== plan.shieldOutputs.length ||
+        Object.getPrototypeOf(runtime.options.protocol) !== TokenProtocol.prototype ||
+        runtime.options.protocol.validateDeployment !== stockDeploymentValidation
+    )
+        return false;
+    try {
+        return plan.outputs.every((output) => {
+            if (output.deliveryPending || output.change) return false;
+            const recipient = output.recipient;
+            const empty = output.delivery.ciphertext === "0x" && output.delivery.clue === "0x";
+            if (recipient.type === "identity")
+                return (
+                    empty &&
+                    recipient.identity.toLowerCase() === output.identity.toLowerCase() &&
+                    output.address === output.identity
+                );
+            if (recipient.type === "evm") return recipient.envelope === false && empty;
+            if (recipient.type !== "invisi" || output.address !== recipient.address || empty)
+                return false;
+            return ReceivingAddress.parse(recipient.address).kind === "long";
+        });
+    } catch {
+        return false;
+    }
+}
 
 function check(value: unknown, message: string): asserts value {
     if (!value) throw Error(message);
 }
 
-/** Cached facts construct the message; only live readers authorize its submission. */
+/** Manual exports retain full preflight. A bound broadcaster can own execution
+ * validity for self-contained Shield requests; the contract remains authoritative.
+ */
 export async function validateOperationSubmission(
     runtime: OperationRuntime,
     saved: SavedOperation,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    destination: "manual" | "broadcaster" = "manual",
+    postPersistenceAuthority?: ReturnType<typeof captureSubmissionAuthority>
+): Promise<void> {
+    signal?.throwIfAborted();
+    if (
+        destination === "broadcaster" &&
+        saved.broadcasterBinding &&
+        saved.broadcasterQuote?.quote.execution === "direct" &&
+        !saved.broadcasterQuote.quote.schedule &&
+        currentStateShield(runtime, saved)
+    ) {
+        const network = await openEthersSubmissionNetworkValidation(
+            runtime.reader,
+            saved.plan.context.chainId,
+            runtime.options.fundingVerifier
+        );
+        if (network) {
+            try {
+                signal?.throwIfAborted();
+                if (runtime.preparationReads)
+                    await runtime.preparationReads.validateDeployment(
+                        runtime.options.protocol,
+                        network.reader,
+                        {},
+                        runtime.reader
+                    );
+                else await runtime.options.protocol.validateDeployment(network.reader);
+                signal?.throwIfAborted();
+                if (postPersistenceAuthority?.observedNetwork) {
+                    // The managed first-send caller performs the real terminal
+                    // identity read after its durable commit. Keep the event and
+                    // policy checks here without repeating that network request.
+                    postPersistenceAuthority.assertFor(runtime, saved.plan.context.chainId);
+                    network.assertCurrent();
+                } else await network.finish();
+                signal?.throwIfAborted();
+                return;
+            } finally {
+                network.close();
+            }
+        }
+    }
+    const scope =
+        saved.plan.submissionValidation && saved.plan.fundingMode === "signature"
+            ? await openEthersSubmissionValidation(
+                  runtime.reader,
+                  saved.plan.context.chainId,
+                  runtime.options.fundingVerifier
+              )
+            : undefined;
+    try {
+        await validateOperationSubmissionAt(
+            scope
+                ? {
+                      ...runtime,
+                      reader: scope.reader,
+                      options: {
+                          ...runtime.options,
+                          ...(scope.fundingVerifier
+                              ? { fundingVerifier: scope.fundingVerifier }
+                              : {}),
+                      },
+                  }
+                : runtime,
+            saved,
+            signal,
+            scope?.head,
+            runtime.reader,
+            scope?.finalizeCanonical
+        );
+        if (!scope?.finalizeCanonical) await scope?.finish();
+        signal?.throwIfAborted();
+    } catch (error) {
+        if (!scope || !(error instanceof UnsupportedSubmissionHash)) throw error;
+        scope.close();
+        await validateOperationSubmissionAt(runtime, saved, signal);
+    } finally {
+        scope?.close();
+    }
+}
+
+async function validateOperationSubmissionAt(
+    runtime: OperationRuntime,
+    saved: SavedOperation,
+    signal?: AbortSignal,
+    validationHead?: CanonicalBlock,
+    deploymentSource: ChainReader = runtime.reader,
+    finalizeCanonical?: CanonicalFence
 ): Promise<void> {
     signal?.throwIfAborted();
     const { reader, options: runtimeOptions } = runtime;
-    await runtimeOptions.protocol.validateDeployment(reader, {
+    const deploymentOptions = {
         revocationFeeAmount:
             saved.plan.kind === "revoke-credit"
                 ? saved.plan.credit?.revocation?.feeAmount
                 : undefined,
-    });
-    const head = await reader.getBlock(await reader.getLatestBlockNumber());
+    };
+    if (validationHead && !saved.plan.credit && runtime.preparationReads)
+        await runtime.preparationReads.validateDeployment(
+            runtimeOptions.protocol,
+            reader,
+            deploymentOptions,
+            deploymentSource
+        );
+    else await runtimeOptions.protocol.validateDeployment(reader, deploymentOptions);
+    const head = validationHead ?? (await reader.getBlock(await reader.getLatestBlockNumber()));
     const plan = saved.plan;
     check(head.timestamp <= plan.deadline, "operation has expired");
     assertCreditPeriodCurrent(plan, head.timestamp);
     check(!operationExpired(plan, head.timestamp), "operation has expired");
+    // Independent reads of the same pinned state can share an in-flight network
+    // detection. Deployment remains a prerequisite; custom and Credit paths keep
+    // their sequential policy. Never retain results beyond this validation.
+    const reads: (() => Promise<void>)[] = [];
+    const verifyRead = async (verify: () => Promise<void>) => {
+        if (validationHead && !plan.credit) reads.push(verify);
+        else await verify();
+    };
     if (plan.fundingMode === "signature") {
         check(head.timestamp <= (plan.funding.deadline ?? 0n), "funding authorization expired");
-        check(
-            (await reader.getFundingNonce(plan.context, plan.funding.payer!, head)) ===
-                plan.funding.sigNonce,
-            "funding nonce changed; prepare again"
-        );
+        await verifyRead(async () => {
+            check(
+                (await reader.getFundingNonce(plan.context, plan.funding.payer!, head)) ===
+                    plan.funding.sigNonce,
+                "funding nonce changed; prepare again"
+            );
+        });
     }
     if (plan.submissionValidation && plan.fundingMode === "signature" && plan.funding.signature) {
-        const livePlan = { ...plan };
-        delete livePlan.submissionValidation;
-        await acceptFundingSignature({ ...saved, plan: livePlan }, plan.funding.signature, {
-            reader,
-            options: runtimeOptions,
+        // This gate already owns deployment, head, deadline and nonce validation.
+        // Rebuild the signature from the operation without opening a second gate.
+        const signature = plan.funding.signature;
+        await verifyRead(async () => {
+            await verifyOperationFundingSignature(saved, signature, runtimeOptions.fundingVerifier);
         });
     }
     for (const source of operationSources(plan)) {
-        check(
-            await reader.isKnownRoot(plan.context, source.treeId, source.merkleRoot, head),
-            "source root is no longer accepted; prepare again"
-        );
+        await verifyRead(async () => {
+            check(
+                await reader.isKnownRoot(plan.context, source.treeId, source.merkleRoot, head),
+                "source root is no longer accepted; prepare again"
+            );
+        });
     }
     const nullifiers = inputFacts(plan).map((input) => input.nullifier);
     if (nullifiers.length) {
-        const spent = await reader.isSpent(plan.context, nullifiers, head);
-        check(
-            spent.length === nullifiers.length && spent.every((value) => value === false),
-            "input spent or invalid spent response"
-        );
+        await verifyRead(async () => {
+            const spent = await reader.isSpent(plan.context, nullifiers, head);
+            check(
+                spent.length === nullifiers.length && spent.every((value) => value === false),
+                "input spent or invalid spent response"
+            );
+        });
     }
     for (const input of plan.credit?.inputs ?? []) {
         const n = input.state.note;
@@ -137,30 +306,75 @@ export async function validateOperationSubmission(
         check(reader.getTokenBalanceAllowance, "token balance and allowance reader required");
     if (reader.getTokenBalanceAllowance)
         for (const { owner, amount, permit } of debits.values()) {
-            const current = await reader.getTokenBalanceAllowance(
-                plan.context,
-                owner,
-                plan.context.tokenAddress,
-                head
+            const readBalanceAllowance = reader.getTokenBalanceAllowance.bind(reader);
+            await verifyRead(async () => {
+                const current = await readBalanceAllowance(
+                    plan.context,
+                    owner,
+                    plan.context.tokenAddress,
+                    head
+                );
+                check(
+                    typeof current.balance === "bigint" && current.balance >= amount,
+                    "token balance is insufficient"
+                );
+                check(
+                    typeof current.allowance === "bigint" &&
+                        current.allowance >= 0n &&
+                        (permit || current.allowance >= amount),
+                    "token allowance is insufficient"
+                );
+            });
+        }
+    if (reads.length) {
+        signal?.throwIfAborted();
+        const results = await Promise.allSettled(
+            reads.map((verify) => Promise.resolve().then(verify))
+        );
+        signal?.throwIfAborted();
+        // Drain all work before fallback or scope closure. A terminal refusal
+        // must not be hidden by another read reporting unsupported hash params.
+        const failure =
+            results.find(
+                (result) =>
+                    result.status === "rejected" &&
+                    !(result.reason instanceof UnsupportedSubmissionHash)
+            ) ?? results.find((result) => result.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+    }
+    const canonical = async () => {
+        if (validationHead && finalizeCanonical && currentStateShield(runtime, saved)) {
+            check(
+                (await reader.getBlock(head.number)).hash === head.hash,
+                "canonical submission block changed"
+            );
+        } else if (validationHead) {
+            const prepared = plan.preparedAt;
+            const identical =
+                prepared.number === head.number &&
+                prepared.hash === head.hash &&
+                prepared.parentHash === head.parentHash &&
+                prepared.timestamp === head.timestamp;
+            const [anchor, current] = identical
+                ? await reader.getBlock(head.number).then((block) => [block, block])
+                : await Promise.all([
+                      reader.getBlock(prepared.number),
+                      reader.getBlock(head.number),
+                  ]);
+            check(anchor!.hash === prepared.hash, "preparation block changed; prepare again");
+            check(current!.hash === head.hash, "canonical submission block changed");
+        } else {
+            check(
+                (await reader.getBlock(plan.preparedAt.number)).hash === plan.preparedAt.hash,
+                "preparation block changed; prepare again"
             );
             check(
-                typeof current.balance === "bigint" && current.balance >= amount,
-                "token balance is insufficient"
-            );
-            check(
-                typeof current.allowance === "bigint" &&
-                    current.allowance >= 0n &&
-                    (permit || current.allowance >= amount),
-                "token allowance is insufficient"
+                (await reader.getBlock(head.number)).hash === head.hash,
+                "canonical submission block changed"
             );
         }
-    check(
-        (await reader.getBlock(plan.preparedAt.number)).hash === plan.preparedAt.hash,
-        "preparation block changed; prepare again"
-    );
-    check(
-        (await reader.getBlock(head.number)).hash === head.hash,
-        "canonical submission block changed"
-    );
+    };
+    if (finalizeCanonical) await finalizeCanonical(canonical);
+    else await canonical();
     signal?.throwIfAborted();
 }

@@ -1,3 +1,4 @@
+import { WalletWriteObservation } from "./write-observation";
 import { DecodedRecordCache } from "./decoded-cache";
 import { RecordWalletPersistence, type WalletRecordQuery } from "./record-wallet";
 import { FIELD_MODULUS, normalizeCreditDeliveryState } from "@invisi-labs/primitives";
@@ -215,11 +216,18 @@ export class TransactionalWalletStore implements WalletStore {
     readonly #records: AtomicRecordStore;
     readonly #codec: WalletRecordCodec;
     readonly #rows: RecordWalletPersistence | undefined;
+    readonly #writes: WalletWriteObservation;
     constructor(
         records: AtomicRecordStore,
         codec: WalletRecordCodec,
-        options: { persistent: boolean; recentRecords?: number }
+        options: { persistent: boolean; recentRecords?: number },
+        writeDomain: { owner: object; namespace: string } = { owner: records, namespace: "" }
     ) {
+        this.#writes = new WalletWriteObservation(
+            writeDomain.owner,
+            scopeKey,
+            writeDomain.namespace
+        );
         this.#records = records;
         this.#codec = new DecodedRecordCache(codec);
         this.persistent = options.persistent;
@@ -229,6 +237,9 @@ export class TransactionalWalletStore implements WalletStore {
                 this.#codec,
                 options.recentRecords ?? 128
             );
+    }
+    observeWrites(scope: WalletScope) {
+        return this.#writes.observeWrites(scope);
     }
     async readSnapshot(scope: WalletScope): Promise<WalletState> {
         if (this.#rows) return (await this.#rows.read(scope)).state;
@@ -241,7 +252,11 @@ export class TransactionalWalletStore implements WalletStore {
         validateState(state, scope, record.revision);
         return state;
     }
-    async transaction<T>(scope: WalletScope, action: (draft: WalletState) => T): Promise<T> {
+    transaction<T>(scope: WalletScope, action: (draft: WalletState) => T): Promise<T> {
+        const copied = { ...scope };
+        return this.#writes.write(copied, () => this.#commit(copied, action));
+    }
+    async #commit<T>(scope: WalletScope, action: (draft: WalletState) => T): Promise<T> {
         if (action.constructor.name === "AsyncFunction")
             throw new Error("wallet transaction action must be synchronous");
         if (this.#rows) return this.#rows.transaction({ ...scope }, action);
@@ -271,7 +286,12 @@ export class TransactionalWalletStore implements WalletStore {
         throw new Error("wallet transaction contention limit exceeded");
     }
     async restoreReorgedOperations(scope: WalletScope, fromBlock: bigint): Promise<void> {
-        await this.#rows?.restoreReorgedOperations(scope, fromBlock);
+        if (this.#rows) {
+            const copied = { ...scope };
+            await this.#writes.write(copied, () =>
+                this.#rows!.restoreReorgedOperations(copied, fromBlock)
+            );
+        }
     }
     async readSummary(scope: WalletScope): Promise<WalletState> {
         return this.#rows ? this.#rows.summary(scope) : this.readSnapshot(scope);

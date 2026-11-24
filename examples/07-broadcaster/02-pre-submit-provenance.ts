@@ -80,7 +80,7 @@ try {
         authorization.message
     );
     const authorized = await prepared.withWalletSignature(signature);
-    const ready = await authorized.prove();
+    const ready = await (await authorized.prove()).ready();
 
     // 4. Generate and submit the Source proof before broadcasting the main payment.
     const provenance = new Provenance({ prover });

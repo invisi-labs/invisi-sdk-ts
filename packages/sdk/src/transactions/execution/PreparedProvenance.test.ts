@@ -1,5 +1,8 @@
 import { createPrivateKey, createPublicKey, sign } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import type { AddressInfo } from "node:net";
 import { expect, it, vi } from "vitest";
 import { Wallet as EvmWallet, getBytes, hexlify, sha256 } from "ethers";
 import { ProvenanceClient } from "@invisi-labs/rpc/provenance";
@@ -99,75 +102,72 @@ async function configured(historical = false, execution: "direct" | "aggregate" 
         wrongSourceDigest = false;
     let deny = false,
         fee = 2n;
-    const source = new ProvenanceClient(
-        "https://source.test",
-        trust,
-        vi.fn(async (_url, init) => {
-            const q = JSON.parse(String(init?.body));
-            requests.push(q);
-            events.push(q.method);
-            const identity = {
-                scope: {
-                    chainId: String(trust.chainId),
-                    protocolAddress: trust.protocolAddress,
-                },
-                chainGeneration: "1",
-                providerId: trust.providerId,
-                signingKeyId: cert.signingKeyId,
-                manifestSha256: manifest.sha256,
+    const sourceTransport: typeof fetch = async (_url, init) => {
+        const q = JSON.parse(String(init?.body));
+        requests.push(q);
+        events.push(q.method);
+        const identity = {
+            scope: {
+                chainId: String(trust.chainId),
+                protocolAddress: trust.protocolAddress,
+            },
+            chainGeneration: "1",
+            providerId: trust.providerId,
+            signingKeyId: cert.signingKeyId,
+            manifestSha256: manifest.sha256,
+        };
+        let data: any;
+        if (q.method === "provenance_getStatus")
+            data = {
+                checkpointSequence: String(latest.rootSequence),
+                activeTreeId: String(latest.treeId),
             };
-            let data: any;
-            if (q.method === "provenance_getStatus")
-                data = {
-                    checkpointSequence: String(latest.rootSequence),
-                    activeTreeId: String(latest.treeId),
-                };
-            else if (q.method === "provenance_getRoot")
-                data = {
-                    rootId: q.params[0].rootId,
-                    certificate: q.params[0].rootId === "1:2" ? latest : cert,
-                    allowedForNewProof: true,
-                };
-            else if (q.method === "provenance_getRoots") {
-                if (q.params[0].cursor) {
-                    expect(q.params[0].cursor).toBe("opaque-page-2");
-                    expect(q.params[0].after).toBeUndefined();
-                    data = { items: [latest] };
-                } else data = { items: [cert], nextCursor: "opaque-page-2" };
-            } else if (q.method === "provenance_getLeaves")
-                data = {
-                    rootId: "1:1",
-                    certificate: cert,
-                    items: await Promise.all(
-                        h.inputs.map(async (input, i) => ({
-                            scope: identity.scope,
-                            noteCommitment: input.commitment,
-                            leaf: await recognizedLeaf(await scopeHash(trust), input.commitment),
-                            treeId: "1",
-                            chainGeneration: "1",
-                            leafIndex: String(i),
-                            checkpointSequence: "1",
-                        }))
-                    ),
-                    nextIndex: String(h.inputs.length),
-                };
-            else if (q.method === "provenance_getTracking") {
-                data = {
-                    tracking: {
-                        ...tracking(),
-                        ...(wrongSourceDigest ? { operationDigest: word(999) } : {}),
-                    },
-                };
-            } else throw Error(q.method);
-            return new Response(
-                JSON.stringify(
-                    { jsonrpc: "2.0", id: q.id, result: { ...identity, ...data } },
-                    (_, v) => (typeof v === "bigint" ? v.toString() : v)
+        else if (q.method === "provenance_getRoot")
+            data = {
+                rootId: q.params[0].rootId,
+                certificate: q.params[0].rootId === "1:2" ? latest : cert,
+                allowedForNewProof: true,
+            };
+        else if (q.method === "provenance_getRoots") {
+            if (q.params[0].cursor) {
+                expect(q.params[0].cursor).toBe("opaque-page-2");
+                expect(q.params[0].after).toBeUndefined();
+                data = { items: [latest] };
+            } else data = { items: [cert], nextCursor: "opaque-page-2" };
+        } else if (q.method === "provenance_getLeaves")
+            data = {
+                rootId: "1:1",
+                certificate: cert,
+                items: await Promise.all(
+                    h.inputs.map(async (input, i) => ({
+                        scope: identity.scope,
+                        noteCommitment: input.commitment,
+                        leaf: await recognizedLeaf(await scopeHash(trust), input.commitment),
+                        treeId: "1",
+                        chainGeneration: "1",
+                        leafIndex: String(i),
+                        checkpointSequence: "1",
+                    }))
                 ),
-                { status: 200 }
-            );
-        })
-    );
+                nextIndex: String(h.inputs.length),
+            };
+        else if (q.method === "provenance_getTracking") {
+            data = {
+                tracking: {
+                    ...tracking(),
+                    ...(wrongSourceDigest ? { operationDigest: word(999) } : {}),
+                },
+            };
+        } else throw Error(q.method);
+        return new Response(
+            JSON.stringify(
+                { jsonrpc: "2.0", id: q.id, result: { ...identity, ...data } },
+                (_, v) => (typeof v === "bigint" ? v.toString() : v)
+            ),
+            { status: 200 }
+        );
+    };
+    const source = new ProvenanceClient("https://source.test", trust, sourceTransport);
     const prover = {
         prove: vi.fn(async (request: any) => {
             events.push("source-prove");
@@ -312,6 +312,7 @@ async function configured(historical = false, execution: "direct" | "aggregate" 
             statusRequiresSource = required;
         },
         source,
+        sourceTransport,
         prover,
         client,
         capability,
@@ -348,11 +349,15 @@ it("quotes without reading submission policy, preparing source data or computing
     expect(h.requests.some((q) => q.method === "broadcaster_getStatus")).toBe(false);
     expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
 });
-it("generates source proof from ready only when submitting and returns an opaque service ID", async () => {
+it("generates Source proof only in explicit ready and returns an opaque service ID", async () => {
     const h = await configured();
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
-    expect(h.prover.prove).not.toHaveBeenCalled();
+    const proved = await (await externallyAuthorize(quoted)).prove();
+    expect(proved.status).toBe("proved");
+    expect(h.events).not.toContain("source-prove");
+    const ready = await proved.ready();
+    expect(h.events.filter((event) => event === "source-prove")).toHaveLength(1);
+    expect(await ready.ready()).toBe(ready);
     const result = await h.client.submit(ready);
     expect(result.id).toBe("relay-owned-id");
     expect(h.prover.prove).toHaveBeenCalledTimes(1);
@@ -369,14 +374,14 @@ it("blocks sending when submit source verification is denied", async () => {
     const h = await configured();
     h.setDeny(true);
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
+    const ready = await (await (await externallyAuthorize(quoted)).prove()).ready();
     await expect(h.client.submit(ready)).rejects.toThrow(/denied/);
 });
 it("allows explicit source proof generation from ready and reuses its cached proof on relay submission", async () => {
     const { Provenance } = await import("../../provenance");
     const h = await configured();
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
+    const ready = await (await (await externallyAuthorize(quoted)).prove()).ready();
     const source = new Provenance({
         client: h.source,
         prover: {
@@ -456,8 +461,10 @@ it("replays an ID-less uncertain managed send without requiring Source or unspen
         withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
     const ready = await (
-        await authorizeOperation(await h.client.quote(prepared, { maxFeeAmount: 20n }))
-    ).prove();
+        await (
+            await authorizeOperation(await h.client.quote(prepared, { maxFeeAmount: 20n }))
+        ).prove()
+    ).ready();
     h.loseSubmitResponse();
     await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
     h.reader.isSpent = async (_scope, words) => words.map(() => true);
@@ -479,8 +486,8 @@ it("uses bounded historical source roots only after ready and fails before sendi
     h.capability.maxRootPages = 1;
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
-    const ready = await (await externallyAuthorize(quoted)).prove();
-    await expect(h.client.submit(ready)).rejects.toThrow(/page budget/);
+    const proved = await (await externallyAuthorize(quoted)).prove();
+    await expect(proved.ready()).rejects.toThrow(/page budget/);
     expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
 });
 
@@ -488,7 +495,7 @@ it("explicit reproof returns a new packet without replacing an already externali
     const { Provenance } = await import("../../provenance");
     const h = await configured();
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
+    const ready = await (await (await externallyAuthorize(quoted)).prove()).ready();
     await h.client.submit(ready);
     const provenance = new Provenance({
         client: h.source,
@@ -520,8 +527,10 @@ it("distinguishes managed transaction export from the first relay attempt", asyn
         withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
     const ready = await (
-        await authorizeOperation(await h.client.quote(prepared, { maxFeeAmount: 20n }))
-    ).prove();
+        await (
+            await authorizeOperation(await h.client.quote(prepared, { maxFeeAmount: 20n }))
+        ).prove()
+    ).ready();
     await ready.exportTransaction();
     const exported = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
     expect(exported.externalized).toBe(true);
@@ -550,8 +559,8 @@ it("allows source-gated quoting without local Source capabilities but blocks sub
         withdrawal: { to: h.bob.ownerAddress, amount: 40n },
     });
     const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
-    const ready = await (await externallyAuthorize(quoted)).prove();
-    await expect(h.client.submit(ready)).rejects.toThrow(/Provenance capability/);
+    const proved = await (await externallyAuthorize(quoted)).prove();
+    await expect(proved.ready()).rejects.toThrow(/Provenance capability/);
     expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
 });
 
@@ -576,7 +585,7 @@ it("uses one proving provider for main and automatic Source proof without a sepa
     });
     const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
     expect(provider.getProvenanceCapability).not.toHaveBeenCalled();
-    const ready = await (await externallyAuthorize(quoted)).prove();
+    const ready = await (await (await externallyAuthorize(quoted)).prove()).ready();
     await h.client.submit(ready);
     expect(provider.getProvenanceCapability).toHaveBeenCalledTimes(1);
     expect(h.prover.prove).toHaveBeenCalledTimes(1);
@@ -585,21 +594,29 @@ it("uses one proving provider for main and automatic Source proof without a sepa
 it("rejects a changed Source policy at submit without generating proof or sending payment", async () => {
     const h = await configured();
     const ready = await (
-        await externallyAuthorize(await h.client.quote(await h.prepare(), { maxFeeAmount: 20n }))
-    ).prove();
+        await (
+            await externallyAuthorize(
+                await h.client.quote(await h.prepare(), { maxFeeAmount: 20n })
+            )
+        ).prove()
+    ).ready();
     h.setStatusRequiresSource(false);
     await expect(h.client.submit(ready)).rejects.toThrow(/requirement changed/);
-    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
     expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
 });
 it("keeps a first submission local when service requirements are unavailable", async () => {
     const h = await configured();
     const ready = await (
-        await externallyAuthorize(await h.client.quote(await h.prepare(), { maxFeeAmount: 20n }))
-    ).prove();
+        await (
+            await externallyAuthorize(
+                await h.client.quote(await h.prepare(), { maxFeeAmount: 20n })
+            )
+        ).prove()
+    ).ready();
     h.setStatusOffline();
     await expect(h.client.submit(ready)).rejects.toThrow(/status unavailable/);
-    expect(h.prover.prove).not.toHaveBeenCalled();
+    expect(h.prover.prove).toHaveBeenCalledTimes(1);
     expect(h.requests.some((q) => q.method === "broadcaster_submitTransaction")).toBe(false);
 });
 
@@ -611,7 +628,7 @@ it("submits public-only funding without requesting or attaching a source proof e
         protocol: h.protocol,
         tokenAddress: h.context.tokenAddress,
         outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
-        funding: { payer: payer.address as `0x${string}`, amount: 30n, authorization: "caller" },
+        funding: { payer: payer.address as `0x${string}`, amount: 30n, authorization: "signature" },
     });
     const quoted = await h.client.quote(prepared, { maxFeeAmount: 20n });
     const request = await quoted.exportFundingAuthorization();
@@ -643,13 +660,21 @@ it("persists a quoted aggregate member across response loss and restart, observe
         }),
         { maxFeeAmount: 20n }
     );
-    const ready = await (await authorizeOperation(quoted)).prove();
+    const ready = await (await (await authorizeOperation(quoted)).prove()).ready();
     expect(mainProver.prove).toHaveBeenCalledWith(
         expect.objectContaining({ target: "noir-recursive" }),
         expect.anything()
     );
     const member = await ready.exportAggregateMember();
     h.setRelayState("queued");
+    const send = h.client.submitTransaction.bind(h.client);
+    h.client.submitTransaction = (...args) => {
+        const count = h.requests.length;
+        const pending = send(...args);
+        // Populated Source evidence has finished loading its optional codec before the wire fence.
+        expect(h.requests.length).toBe(count + 1);
+        return pending;
+    };
     h.loseSubmitResponse();
     await expect(h.client.submit(ready)).rejects.toThrow(/lost response/);
     const stored = (await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload as any;
@@ -750,4 +775,276 @@ it("persists a quoted aggregate member across response loss and restart, observe
     expect(Object.values((await h.store.readSnapshot(h.scope)).reservations)).not.toContain(
         ready.id
     );
+});
+
+it("refuses revoked Source trust during the managed first-attempt commit", async () => {
+    const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
+    const { sessionOptions } = await import("../../../../../test-support/session-options");
+    const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const h = await configured(false, "aggregate");
+    const session = new WalletSession(
+        sessionOptions({ ...h.options, prover: backend(), provenance: h.capability })
+    );
+    const quoted = await h.client.quote(
+        await session.prepareTransfer({
+            tokenAddress: h.context.tokenAddress,
+            outputs: [],
+            withdrawal: { to: h.bob.ownerAddress, amount: 98n },
+        }),
+        { maxFeeAmount: 20n }
+    );
+    const ready = await (await (await authorizeOperation(quoted)).prove()).ready();
+    const transaction = h.store.transaction.bind(h.store);
+    h.store.transaction = async (scope, apply) => {
+        let attempted = false;
+        const result = await transaction(scope, (state) => {
+            const saved = state.operations[ready.id]!.payload as { broadcasterAttempted?: boolean };
+            const before = saved.broadcasterAttempted;
+            const value = apply(state);
+            attempted = !before && !!saved.broadcasterAttempted;
+            return value;
+        });
+        if (attempted) Object.values(h.source.trust.signingKeys)[0]!.fill(0);
+        return result;
+    };
+    await expect(h.client.submit(ready)).rejects.toThrow(/policy|trust/i);
+    expect(h.requests.some((r) => r.method === "broadcaster_submitTransaction")).toBe(false);
+    expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).toMatchObject({
+        broadcasterAttempted: true,
+        externalized: true,
+    });
+});
+
+it("records private transfer stages with loopback Source and relay, response loss and replay", async () => {
+    const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
+    const { sessionOptions } = await import("../../../../../test-support/session-options");
+    const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const h = await configured();
+    h.setFee(5n);
+    const main = backend();
+    const baseline = process.env.STAGE_BOUNDARY_BASELINE === "1";
+    const delayMs = Number(process.env.STAGE_BOUNDARY_DELAY_MS ?? 0);
+    expect(Number.isFinite(delayMs) && delayMs >= 0).toBe(true);
+    const rows: {
+        stage: string;
+        elapsedMs: number;
+        requests: { service: string; method: string; params: unknown; elapsedMs: number }[];
+        readerCalls: string[];
+        protocolCalls: string[];
+        mainProofs: number;
+        sourceProofs: number;
+    }[] = [];
+    let stage = "setup";
+    let loseFirstResponse = true;
+    const http: {
+        stage: string;
+        service: string;
+        method: string;
+        params: unknown;
+        elapsedMs: number;
+    }[] = [];
+    const readerCalls: string[] = [],
+        protocolCalls: string[] = [];
+    const counted = <T extends object>(target: T, calls: string[]): T => {
+        const methods = new Map<string | symbol, (...args: unknown[]) => unknown>();
+        return new Proxy(target, {
+            get(obj, property) {
+                const call = Reflect.get(obj, property, obj);
+                if (typeof call !== "function") return call;
+                if (!methods.has(property))
+                    methods.set(property, (...args: unknown[]) => {
+                        calls.push(String(property));
+                        return call.apply(obj, args);
+                    });
+                return methods.get(property);
+            },
+        });
+    };
+    const server = createServer(async (req, res) => {
+        try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) chunks.push(Buffer.from(chunk));
+            const body = Buffer.concat(chunks).toString();
+            const request = JSON.parse(body);
+            const source = req.url!.startsWith("/source");
+            const start = performance.now();
+            if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+            const data = source
+                ? await (await h.sourceTransport("https://source.test", { body })).text()
+                : JSON.stringify(await h.client.transport(request));
+            http.push({
+                stage,
+                service: source ? "Source" : "relay",
+                method: request.method,
+                params: request.params,
+                elapsedMs: performance.now() - start,
+            });
+            if (request.method === "broadcaster_submitTransaction" && loseFirstResponse) {
+                loseFirstResponse = false;
+                res.destroy();
+                return;
+            }
+            res.setHeader("content-type", "application/json");
+            res.end(data);
+        } catch (error) {
+            res.statusCode = 500;
+            res.end(String(error));
+        }
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const endpoint = "http://127.0.0.1:" + (server.address() as AddressInfo).port;
+    const client = new BroadcasterClient(h.client.configuration, async (request) => {
+        const r = await fetch(endpoint + "/relay", {
+            method: "POST",
+            body: JSON.stringify(request),
+        });
+        if (!r.ok) throw Error(await r.text());
+        return r.json();
+    });
+    const session = new WalletSession(
+        sessionOptions({
+            ...h.options,
+            chainReader: counted(h.reader, readerCalls),
+            protocolRpc: counted(h.membership, protocolCalls),
+            prover: main,
+            provenance: {
+                ...h.capability,
+                client: new ProvenanceClient(endpoint + "/source", h.source.trust),
+            },
+        })
+    );
+    const step = async <T>(name: string, action: () => Promise<T>): Promise<T> => {
+        stage = name;
+        const t = performance.now(),
+            r = readerCalls.length,
+            p = protocolCalls.length,
+            i = http.length;
+        const n = vi.mocked(main.prove).mock.calls.length,
+            s = h.prover.prove.mock.calls.length;
+        try {
+            return await action();
+        } finally {
+            rows.push({
+                stage: name,
+                elapsedMs: performance.now() - t,
+                requests: http.slice(i),
+                readerCalls: readerCalls.slice(r),
+                protocolCalls: protocolCalls.slice(p),
+                mainProofs: vi.mocked(main.prove).mock.calls.length - n,
+                sourceProofs: h.prover.prove.mock.calls.length - s,
+            });
+        }
+    };
+    try {
+        const prepared = await step("prepare", async () =>
+            session.prepareTransfer({
+                tokenAddress: h.context.tokenAddress,
+                outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 30n })],
+            })
+        );
+        const quoted = await step("quote", () => client.quote(prepared, { maxFeeAmount: 10n }));
+        expect(quoted.getOutputs().map((o) => o.amount)).toEqual([30n, 65n]);
+        const authorized = await step("authorize", () => authorizeOperation(quoted));
+        const proved = await step("mainProve", () => authorized.prove());
+        const ready = await step("ready", () =>
+            proved.status === "ready" ? Promise.resolve(proved) : proved.ready()
+        );
+        await step("submit", async () => {
+            await expect(client.submit(ready)).rejects.toThrow(/fetch failed/);
+        });
+        const restored = await step("restore", () => session.resume(ready.id));
+        const accepted = await step("replay", () => client.submit(restored));
+        expect(accepted.id).toBe("relay-owned-id");
+        await step("knownIDStatus", () => client.submit(restored));
+        const writes = http.filter((r) => r.method === "broadcaster_submitTransaction");
+        expect(writes).toHaveLength(2);
+        expect(writes[1]!.params).toEqual(writes[0]!.params);
+        expect(rows.find((r) => r.stage === "mainProve")!.mainProofs).toBe(1);
+        expect(rows.filter((r) => r.sourceProofs).map((r) => r.stage)).toEqual([
+            baseline ? "submit" : "ready",
+        ]);
+        if (!baseline) {
+            expect(proved.status).toBe("proved");
+            expect(rows.find((r) => r.stage === "quote")!.readerCalls).toEqual([]);
+            expect(rows.find((r) => r.stage === "quote")!.protocolCalls).toEqual([]);
+            expect(await restored.ready()).toBe(restored);
+        }
+        expect(
+            http
+                .filter((r) => r.service === "Source")
+                .every((r) => r.stage === (baseline ? "submit" : "ready"))
+        ).toBe(true);
+        expect(
+            rows.find((r) => r.stage === "knownIDStatus")!.requests.map((r) => r.method)
+        ).toEqual(["broadcaster_getTransactionStatus"]);
+        if (process.env.STAGE_BOUNDARY_PROFILE_OUTPUT)
+            writeFileSync(
+                process.env.STAGE_BOUNDARY_PROFILE_OUTPUT,
+                JSON.stringify(
+                    {
+                        runtime: "TypeScript",
+                        baseline,
+                        delayMs,
+                        fixture:
+                            "100-unit Note, fixed output 30, fee 5, no public funding, synthetic verified main/Source proof responses; Source and relay use actual loopback HTTP. Chain and Protocol calls use counted in-process readers.",
+                        rows,
+                    },
+                    null,
+                    2
+                )
+            );
+    } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+});
+
+it("retains the funded main proof and final signature across a failed Source finalization", async () => {
+    const { WalletSession } = await import("../../../../session/src/wallet/WalletSession");
+    const { sessionOptions } = await import("../../../../../test-support/session-options");
+    const { authorizeOperation } = await import("../../../../../test-support/native-wallet");
+    const h = await configured(),
+        main = backend(),
+        payer = new EvmWallet("0x" + "01".repeat(32));
+    const session = new WalletSession(
+        sessionOptions({ ...h.options, prover: main, provenance: h.capability })
+    );
+    const prepared = await session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [await testOutput(h, { to: h.bob.getAddress(), amount: 106n })],
+        funding: { payer: payer.address as `0x${string}`, amount: 10n },
+    });
+    const quoted = await h.client.quote(prepared, { maxFeeAmount: 10n });
+    const proved = await (await authorizeOperation(quoted)).prove();
+    expect(proved.status).toBe("proved");
+    const req = await proved.exportFundingAuthorization();
+    const signature = await payer.signTypedData(req.domain, req.types, req.message);
+    const signed = await proved.withFundingSignature(signature);
+    expect(signed.status).toBe("proved");
+    expect(h.requests.filter((r) => r.method.startsWith("provenance_"))).toEqual([]);
+    const before = await h.store.readSnapshot(h.scope);
+    h.prover.prove.mockRejectedValueOnce(Error("Source unavailable"));
+    await expect(signed.ready()).rejects.toThrow();
+    const after = await h.store.readSnapshot(h.scope);
+    expect(after.operations).toEqual(before.operations);
+    expect(after.reservations).toEqual(before.reservations);
+    const ready = await signed.ready();
+    expect(await ready.ready()).toBe(ready);
+    expect(main.prove).toHaveBeenCalledTimes(1);
+    const packet = (await h.store.readSnapshot(h.scope)).operations[ready.id]!
+        .payload as import("../operation-types").SavedOperation;
+    expect(packet.provenance!.data).toBe(packet.call!.data);
+    expect(decodeBroadcasterIntent(packet.call!.data).request.funding.signature).toBe(signature);
+    // A V1 journal may contain final main bytes without required sidecars.
+    await h.store.transaction(h.scope, (state) => {
+        delete (state.operations[ready.id]!.payload as typeof packet).provenance;
+    });
+    const restored = await session.resume(ready.id);
+    await expect(h.client.submit(restored)).rejects.toThrow(/evidence required/);
+    expect((await h.store.readSnapshot(h.scope)).operations[ready.id]!.payload).not.toHaveProperty(
+        "externalized"
+    );
+    expect(h.prover.prove).toHaveBeenCalledTimes(2);
+    expect(h.requests.filter((r) => r.method === "broadcaster_submitTransaction")).toEqual([]);
 });

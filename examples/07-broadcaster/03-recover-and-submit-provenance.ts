@@ -88,7 +88,7 @@ try {
             authorization.message
         );
         const authorized = await prepared.withWalletSignature(signature);
-        const ready = await authorized.prove();
+        const ready = await (await authorized.prove()).ready();
 
         // 3. The encrypted journal already retains openings, main proof and exact calldata, not a ready instance.
         // No Source proof has been generated, and this phase makes no Provenance requests.

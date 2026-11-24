@@ -99,7 +99,7 @@ try {
         authorization.message
     );
     const authorized = await quoted.withWalletSignature(signature);
-    const ready = await authorized.prove();
+    const ready = await (await authorized.prove()).ready();
 
     console.log("Verified quote:", json(ready.broadcasterQuote()));
 

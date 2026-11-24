@@ -1,3 +1,7 @@
+import {
+    configureTransactionInfrastructure,
+    validateTransactionInfrastructure,
+} from "./infrastructure";
 import { MissingCapabilityError, Wallet } from "@invisi-labs/primitives";
 import type { RegistrationOperation, RegistrationPreparation } from "@invisi-labs/rpc";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
@@ -14,11 +18,6 @@ import type {
     TransactionIdentity,
 } from "../transactions/explicit-types";
 import type { TransactionInfrastructure } from "../transactions/operation-types";
-import { explicitPreparation } from "../transactions/preparation/explicit-preparation";
-import {
-    configureTransactionInfrastructure,
-    validateTransactionInfrastructure,
-} from "./infrastructure";
 
 /** Compose independent Chain RPC and indexed Protocol RPC with local wallet capabilities. */
 export type InvisiOptions = Omit<TransactionInfrastructure, "wallet" | "protocol" | "coinSelector">;
@@ -137,6 +136,8 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
+            const { explicitPreparation } =
+                await import("../transactions/preparation/explicit-preparation");
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareTransfer(request);
         });
@@ -146,6 +147,8 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
+            const { explicitPreparation } =
+                await import("../transactions/preparation/explicit-preparation");
             const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
             return preparation.prepareShield(request);
         });
@@ -157,6 +160,8 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
+            const { explicitPreparation } =
+                await import("../transactions/preparation/explicit-preparation");
             const preparation = explicitPreparation(runtime, {}, request.tokenAddress);
             return preparation.prepareCreateCredit(request);
         });
@@ -166,6 +171,8 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
+            const { explicitPreparation } =
+                await import("../transactions/preparation/explicit-preparation");
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareDrawCredit(request);
         });
@@ -177,6 +184,8 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
+            const { explicitPreparation } =
+                await import("../transactions/preparation/explicit-preparation");
             const preparation = explicitPreparation(runtime, request, request.tokenAddress);
             return preparation.prepareUpdateCredit(request);
         });
@@ -188,6 +197,8 @@ export class Invisi {
             const { wallet, protocol, ...input } = options;
             const request = structuredClone(input);
             const runtime = await this.resolveExplicit(options);
+            const { explicitPreparation } =
+                await import("../transactions/preparation/explicit-preparation");
             const preparation = explicitPreparation(runtime, {}, request.tokenAddress, true);
             return preparation.prepareRevokeCredit(request);
         });

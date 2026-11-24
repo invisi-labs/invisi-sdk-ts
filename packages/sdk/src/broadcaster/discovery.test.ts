@@ -154,3 +154,165 @@ it("omits unsupported tokens and halted services without requesting a transactio
     const clients = await protocol.getBroadcasters({ tokenAddress });
     expect(clients.map((client) => client.url)).toEqual([entry(3).endpoint]);
 });
+
+function successfulTokenSupport() {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+        const req = JSON.parse(init!.body as string);
+        const n = Number(String(url).match(/relay(\d+)/)![1]);
+        return new Response(
+            JSON.stringify({ jsonrpc: "2.0", id: req.id, result: serviceStatus(n) })
+        );
+    });
+}
+
+it("reuses initialized token discovery without RPC and protects its cached array", async () => {
+    const rpc = { getBroadcasters: vi.fn().mockResolvedValue({ block, broadcasters: [entry(1)] }) };
+    const fetcher = successfulTokenSupport();
+    const protocol = await discover(rpc);
+    expect(Object.isFrozen(protocol)).toBe(true);
+    const initialized = await protocol.initializeBroadcasters({ tokenAddress });
+    initialized.splice(0);
+    const clients = await protocol.getBroadcasters({ tokenAddress });
+    expect(clients.map((client) => client.url)).toEqual(["https://relay1.example/rpc"]);
+    clients.splice(0);
+    expect(await protocol.getBroadcasters({ tokenAddress })).toHaveLength(1);
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const aborted = AbortSignal.abort();
+    await expect(protocol.getBroadcasters({ tokenAddress, signal: aborted })).rejects.toThrow();
+});
+
+it("keeps uninitialized discovery fresh and caches tokens independently", async () => {
+    const rpc = { getBroadcasters: vi.fn().mockResolvedValue({ block, broadcasters: [entry(1)] }) };
+    successfulTokenSupport();
+    const protocol = await discover(rpc);
+    await protocol.getBroadcasters({ tokenAddress });
+    await protocol.getBroadcasters({ tokenAddress });
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(2);
+    await protocol.initializeBroadcasters({ tokenAddress });
+    await protocol.getBroadcasters({ tokenAddress: a(43) });
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(4);
+});
+
+it("refreshes initialized discovery and replaces the registered signer pins", async () => {
+    const rpc = {
+        getBroadcasters: vi
+            .fn()
+            .mockResolvedValueOnce({ block, broadcasters: [entry(1)] })
+            .mockResolvedValueOnce({ block, broadcasters: [entry(2)] }),
+    };
+    successfulTokenSupport();
+    const protocol = await discover(rpc);
+    await protocol.initializeBroadcasters({ tokenAddress });
+    const refreshed = await protocol.getBroadcasters({ tokenAddress, refresh: true });
+    expect(refreshed[0]!.configuration.quoteSigner.toLowerCase()).toBe(a(12));
+    expect((await protocol.getBroadcasters({ tokenAddress }))[0]!.url).toBe(
+        "https://relay2.example/rpc"
+    );
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(2);
+});
+
+it("invalidates previous success after a rejected refresh and permits retry", async () => {
+    const rpc = {
+        getBroadcasters: vi
+            .fn()
+            .mockResolvedValueOnce({ block, broadcasters: [entry(1)] })
+            .mockRejectedValueOnce(new Error("registry unavailable"))
+            .mockResolvedValue({ block, broadcasters: [entry(2)] }),
+    };
+    successfulTokenSupport();
+    const protocol = await discover(rpc);
+    await protocol.initializeBroadcasters({ tokenAddress });
+    await expect(protocol.getBroadcasters({ tokenAddress, refresh: true })).rejects.toThrow(
+        "registry unavailable"
+    );
+    expect((await protocol.getBroadcasters({ tokenAddress }))[0]!.url).toBe(
+        "https://relay2.example/rpc"
+    );
+    await protocol.initializeBroadcasters({ tokenAddress });
+    await protocol.getBroadcasters({ tokenAddress });
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(4);
+});
+
+it("does not retain empty initialization or a cancelled refresh", async () => {
+    const rpc = {
+        getBroadcasters: vi
+            .fn()
+            .mockResolvedValueOnce({ block, broadcasters: [] })
+            .mockResolvedValue({ block, broadcasters: [entry(1)] }),
+    };
+    successfulTokenSupport();
+    const protocol = await discover(rpc);
+    expect(await protocol.initializeBroadcasters({ tokenAddress })).toEqual([]);
+    expect(await protocol.getBroadcasters({ tokenAddress })).toHaveLength(1);
+    await protocol.initializeBroadcasters({ tokenAddress });
+    const controller = new AbortController();
+    rpc.getBroadcasters.mockImplementationOnce(async () => {
+        controller.abort();
+        return { block, broadcasters: [entry(2)] };
+    });
+    await expect(
+        protocol.getBroadcasters({ tokenAddress, refresh: true, signal: controller.signal })
+    ).rejects.toThrow();
+    expect((await protocol.getBroadcasters({ tokenAddress }))[0]!.url).toBe(
+        "https://relay1.example/rpc"
+    );
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(5);
+});
+
+it("does not publish an older initialization over a newer refresh", async () => {
+    let resolveOld!: (value: {
+        block: typeof block;
+        broadcasters: ReturnType<typeof entry>[];
+    }) => void;
+    const rpc = {
+        getBroadcasters: vi
+            .fn()
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        resolveOld = resolve;
+                    })
+            )
+            .mockResolvedValueOnce({ block, broadcasters: [entry(2)] }),
+    };
+    successfulTokenSupport();
+    const protocol = await discover(rpc);
+    const older = protocol.initializeBroadcasters({ tokenAddress });
+    await protocol.getBroadcasters({ tokenAddress, refresh: true });
+    resolveOld({ block, broadcasters: [entry(1)] });
+    expect((await older)[0]!.url).toBe("https://relay1.example/rpc");
+    expect((await protocol.getBroadcasters({ tokenAddress }))[0]!.url).toBe(
+        "https://relay2.example/rpc"
+    );
+});
+
+it("initializes through an overridden discovery policy", async () => {
+    class CustomProtocol extends Protocol {
+        override async getBroadcasters() {
+            return [];
+        }
+    }
+    const protocol = new CustomProtocol({ deployment });
+    expect(await protocol.initializeBroadcasters({ tokenAddress })).toEqual([]);
+});
+
+it("bounds retained token snapshots and rediscovers an evicted token", async () => {
+    const rpc = { getBroadcasters: vi.fn().mockResolvedValue({ block, broadcasters: [entry(1)] }) };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+        const req = JSON.parse(init!.body as string);
+        return new Response(
+            JSON.stringify({
+                jsonrpc: "2.0",
+                id: req.id,
+                result: { ...serviceStatus(1), tokenAddress: req.params[0].tokenAddress },
+            })
+        );
+    });
+    const protocol = await discover(rpc);
+    for (let n = 1; n <= 257; n++) await protocol.initializeBroadcasters({ tokenAddress: a(n) });
+    await protocol.getBroadcasters({ tokenAddress: a(257) });
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(257);
+    await protocol.getBroadcasters({ tokenAddress: a(1) });
+    expect(rpc.getBroadcasters).toHaveBeenCalledTimes(258);
+});

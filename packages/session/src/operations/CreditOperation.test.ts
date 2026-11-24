@@ -343,6 +343,7 @@ it.each(["create", "update", "draw", "revoke"] as const)(
                     : await h.ownerSession.prepareRevokeCredit({
                           tokenAddress,
                           grantId: 1n,
+                          fee: { recipient: h.wallet.ownerAddress, amount: 3n },
                       });
         const quoted = await client.quote(prepared, {
             maxFeeAmount: 3n,

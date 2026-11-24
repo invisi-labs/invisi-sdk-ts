@@ -22,6 +22,7 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
         lose: false,
         missing: false,
         failAcknowledgement: false,
+        persistPacket: undefined as (() => Promise<void>) | undefined,
         cancellationUncertain: false,
         state: "queued" as BroadcasterStatus["state"],
     };
@@ -135,6 +136,7 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
                       if (handle.id && service.failAcknowledgement)
                           throw Error("Acknowledgement storage unavailable");
                       persisted.push(handle);
+                      if (handle.submission && !handle.id) await service.persistPacket?.();
                   },
               }
             : {}),
@@ -340,4 +342,48 @@ it("cancels a detached scheduled transaction through the client without a wallet
     expect(await h.client.cancel(ready)).toEqual(status);
     expect(h.calls).toHaveLength(acknowledgedCalls);
     await expect(h.client.submit(ready)).rejects.toThrow(/cancellation already acknowledged/);
+});
+
+it("fences a network change during detached schedule persistence and recovers the frozen packet", async () => {
+    const h = await fixture("direct", true);
+    const ready = await (await externallyAuthorize(h.quoted)).prove();
+    let chainId = h.context.chainId;
+    h.reader.getChainId = async () => chainId;
+    let release!: () => void;
+    let entered!: () => void;
+    const paused = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    const writing = new Promise<void>((resolve) => {
+        entered = resolve;
+    });
+    h.service.persistPacket = async () => {
+        entered();
+        await paused;
+    };
+    const submission = h.client.submit(ready);
+    await writing;
+    chainId = 1n;
+    release();
+    await expect(submission).rejects.toThrow(/chain|network/i);
+    expect(h.calls.filter((c) => c.method === "broadcaster_submitTransaction")).toHaveLength(0);
+    const frozen = h.persisted.at(-1)!;
+    expect(frozen.submission?.data).toBeDefined();
+    expect(frozen.id).toBeUndefined();
+    h.calls.length = 0;
+    h.reader.getChainId = async () => {
+        throw Error("recovery read the chain");
+    };
+    await h.client.submit(ready);
+    expect(h.calls.map((c) => c.method)).toEqual(["broadcaster_submitTransaction"]);
+    expect(h.calls[0]!.body).toMatchObject({
+        data: frozen.submission!.data,
+        quote: frozen.quote!.quote,
+        signature: frozen.quote!.signature,
+    });
+    await h.client.submit(ready);
+    expect(h.calls.map((c) => c.method)).toEqual([
+        "broadcaster_submitTransaction",
+        "broadcaster_getTransactionStatus",
+    ]);
 });

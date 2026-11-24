@@ -5,6 +5,7 @@ import { scanStatus, fundsStatus } from "../sync/status";
 import { PublicHistory, historyScope, type PublicSyncOptions } from "../public-history/history";
 import { PublicHistoryStore, publicScopeKey } from "../public-history/store";
 import { MemoryAtomicRecords } from "../storage/store";
+import { withObservedWrites } from "../storage/write-observation";
 import {
     scanAccount,
     retryUnresolved,
@@ -161,13 +162,16 @@ export class WalletSession {
             }
         }
         this.#history = history;
-        const store = options.store;
+        const store = options.store && withObservedWrites(options.store, scopeKey);
         this.#options = {
             ...options,
             ...(store
                 ? {
                       store: {
                           persistent: store.persistent,
+                          ...(store.observeWrites
+                              ? { observeWrites: store.observeWrites.bind(store) }
+                              : {}),
                           readSnapshot: (scope) =>
                               history
                                   ? fenceHistory(history, store, scope)
@@ -524,18 +528,15 @@ export class WalletSession {
         return result;
     }
 
-    private async preparation(
-        tokenAddress: Hex,
-        fresh = false,
-        creditRevocation = false
-    ): Promise<TransactionPreparation<Operation>> {
-        const runtime = this.runtime(tokenAddress, creditRevocation);
-        const snapshot = fresh ? undefined : await this.cachedPreparation();
+    private preparation(runtime: OperationRuntime, snapshot?: PreparationSnapshot) {
         const cached = snapshot
             ? snapshotInfrastructure(snapshot, runtime.reader, runtime.options.protocolRpc)
             : undefined;
         if (cached) {
-            runtime.preparationReads = new PreparationReads(cached.reader, cached.rpc);
+            runtime = {
+                ...runtime,
+                preparationReads: new PreparationReads(cached.reader, cached.rpc, runtime.reader),
+            };
         }
         return new TransactionPreparation({
             options: runtime.options,
@@ -554,18 +555,46 @@ export class WalletSession {
                 }),
         });
     }
-    async #prepareUsingSnapshot(
-        tokenAddress: Hex,
-        work: (preparation: TransactionPreparation<Operation>) => Promise<Operation>,
+    async #prepareUsingSnapshot<
+        T extends { tokenAddress: Hex; funding?: ShieldPreparation["funding"] },
+    >(
+        options: T,
+        work: (preparation: TransactionPreparation<Operation>, request: T) => Promise<Operation>,
         creditRevocation = false
     ): Promise<Operation> {
+        const request = structuredClone(options);
+        const runtime = this.runtime(request.tokenAddress, creditRevocation);
+        const snapshot = await this.cachedPreparation();
+        const funding = request.funding;
+        if (
+            snapshot &&
+            funding &&
+            funding.authorization !== "caller" &&
+            funding.sigNonce === undefined
+        ) {
+            // Select mutable authority once, independently of the synchronized business facts.
+            // A snapshot miss below must retry with the same selected terms.
+            const { reader } = runtime;
+            const { context } = runtime.options.protocol;
+            const payer = getAddress(funding.payer) as Hex;
+            if (reader.getFundingNonceForAuthorization) {
+                funding.sigNonce = await reader.getFundingNonceForAuthorization(context, payer);
+            } else {
+                if ((await reader.getChainId()) !== context.chainId)
+                    throw Error("funding nonce chain mismatch");
+                const block = await reader.getBlock(await reader.getLatestBlockNumber());
+                funding.sigNonce = await reader.getFundingNonce(context, payer, block);
+                if ((await reader.getBlock(block.number)).hash !== block.hash)
+                    throw Error("canonical block changed while selecting funding nonce");
+            }
+        }
         try {
-            return await work(await this.preparation(tokenAddress, false, creditRevocation));
+            return await work(this.preparation(runtime, snapshot), request);
         } catch (error) {
             let cause: unknown = error;
             for (let depth = 0; depth < 8 && cause instanceof Error; depth++, cause = cause.cause) {
-                if (cause instanceof MissingPreparationSnapshotData)
-                    return work(await this.preparation(tokenAddress, true, creditRevocation));
+                if (snapshot && cause instanceof MissingPreparationSnapshotData)
+                    return work(this.preparation(runtime), request);
             }
             throw error;
         }
@@ -620,16 +649,16 @@ export class WalletSession {
     async prepareTransfer(options: TransferPreparation): Promise<Operation> {
         return prepareWithErrors("prepareTransfer", async () => {
             await this.ready();
-            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareTransfer(options)
+            return this.#prepareUsingSnapshot(options, (preparation, request) =>
+                preparation.prepareTransfer(request)
             );
         });
     }
     async prepareShield(options: ShieldPreparation): Promise<Operation> {
         return prepareWithErrors("prepareShield", async () => {
             await this.ready();
-            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareShield(options)
+            return this.#prepareUsingSnapshot(options, (preparation, request) =>
+                preparation.prepareShield(request)
             );
         });
     }
@@ -640,24 +669,24 @@ export class WalletSession {
                 grantId: normalizeCreditGrantId(options.grantId ?? generateCreditGrantId()),
             };
             await this.ready();
-            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareCreateCredit(copied)
+            return this.#prepareUsingSnapshot(copied, (preparation, request) =>
+                preparation.prepareCreateCredit(request)
             );
         });
     }
     async prepareDrawCredit(options: DrawCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareDrawCredit", async () => {
             await this.ready();
-            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareDrawCredit(options)
+            return this.#prepareUsingSnapshot(options, (preparation, request) =>
+                preparation.prepareDrawCredit(request)
             );
         });
     }
     async prepareUpdateCredit(options: UpdateCreditPreparation): Promise<Operation> {
         return prepareWithErrors("prepareUpdateCredit", async () => {
             await this.ready();
-            return this.#prepareUsingSnapshot(options.tokenAddress, (preparation) =>
-                preparation.prepareUpdateCredit(options)
+            return this.#prepareUsingSnapshot(options, (preparation, request) =>
+                preparation.prepareUpdateCredit(request)
             );
         });
     }
@@ -665,8 +694,8 @@ export class WalletSession {
         return prepareWithErrors("prepareRevokeCredit", async () => {
             await this.ready();
             return this.#prepareUsingSnapshot(
-                options.tokenAddress,
-                (preparation) => preparation.prepareRevokeCredit(options),
+                options,
+                (preparation, request) => preparation.prepareRevokeCredit(request),
                 true
             );
         });

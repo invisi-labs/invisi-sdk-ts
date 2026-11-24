@@ -7,6 +7,7 @@ export type InvisiErrorCode =
      * or conflicting registration state. Inspect message and cause.
      */
     | "PREPARATION_FAILED"
+    | "NEEDS_REPREPARE"
     /** Credit UTC period changed. Reauthorize and regenerate the proof before submitting. */
     | "CREDIT_PERIOD_CHANGED"
     /** The signed deadline leaves insufficient execution time; prepare a fresh statement. */

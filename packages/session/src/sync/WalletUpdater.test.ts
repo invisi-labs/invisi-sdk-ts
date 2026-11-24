@@ -1362,7 +1362,8 @@ it("does not clear pending Credit recovery when a caller requests an older snaps
 
 it("retains normal-sync authenticated memberships without querying their paths or spent state twice", async () => {
     const h = await sharedHarness();
-    h.reader.getFundingNonce = async () => 0n;
+    const nonce = vi.fn(async () => 0n);
+    h.reader.getFundingNonce = nonce;
     const code = vi.spyOn(h.reader, "getCode");
     await h.a.synchronizeHistory({ toBlock: 16n, pageSize: 2 });
     expect(h.rpc.getMembership).toHaveBeenCalledTimes(1);
@@ -1372,6 +1373,7 @@ it("retains normal-sync authenticated memberships without querying their paths o
     expect(h.reader.isSpent).toHaveBeenCalledTimes(1);
     // Deployment code authenticated during this canonical public sync is reused privately.
     expect(code.mock.calls.slice(codeReads).map(([address]) => address)).toEqual([token]);
+    expect(nonce).not.toHaveBeenCalled();
     expect((await h.store.readSnapshot(h.a.scope)).preparationSnapshot).toBeDefined();
 });
 

@@ -51,3 +51,11 @@ export {
 } from "./broadcaster/submission-refusal";
 
 export { normalizeNoteOwner, noteOwnerAddress } from "./notes/note-owner";
+
+export {
+    openEthersSubmissionValidation,
+    openEthersSubmissionNetworkValidation,
+} from "./integrations/ethers";
+export { UnsupportedSubmissionHash } from "./integrations/ethers-submission-provider";
+
+export { captureSubmissionAuthority } from "./broadcaster/submission-authority";

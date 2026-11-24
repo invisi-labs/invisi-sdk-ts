@@ -7,7 +7,11 @@ import { registryFixture } from "../../../../test-support/registry-fixture";
 import { sessionOptions } from "../../../../test-support/session-options";
 import { WalletSession } from "./WalletSession";
 
-const shield = (h: Awaited<ReturnType<typeof registryFixture>>, output: NoteOutput) => ({
+const shield = (
+    h: Awaited<ReturnType<typeof registryFixture>>,
+    output: NoteOutput,
+    authorization: "caller" | "signature" = "caller"
+) => ({
     wallet: Wallet.fromAddress(h.h.wallet.getAddress()),
     protocol: h.protocol,
     tokenAddress: h.h.context.tokenAddress,
@@ -15,7 +19,7 @@ const shield = (h: Awaited<ReturnType<typeof registryFixture>>, output: NoteOutp
     funding: {
         payer: h.h.wallet.ownerAddress,
         amount: output.amount,
-        authorization: "caller" as const,
+        authorization,
     },
 });
 describe("per-output receiving-key lookup", () => {
@@ -88,7 +92,7 @@ describe("per-output receiving-key lookup", () => {
                 protocolRpc: h.protocolRpc,
             })
         );
-        const prepared = await session.prepareShield(shield(h, output));
+        const prepared = await session.prepareShield(shield(h, output, "signature"));
         const saved = () => h.h.store.readSnapshot(h.h.scope);
         const first = (await saved()).operations[prepared.id]!
             .payload as import("../operations/operation-types").SavedOperation;

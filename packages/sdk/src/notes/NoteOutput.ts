@@ -381,6 +381,7 @@ export async function materializeNoteOutput(
             { field: "to" }
         );
         const keys = resolved.getReceivingKeys();
+        output.resolvedAddress = resolved.toString();
         output.delivery = {
             ciphertext: hexlify(
                 await encryptPrivateTransferNote(keys.viewingPublicKey, output.note!, {

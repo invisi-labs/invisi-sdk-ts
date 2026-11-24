@@ -1,0 +1,28 @@
+{
+  "beforeProductionUnchanged": true,
+  "testOnlyBaselineOverlay": "packages/session/src/operations/submission-scope.test.ts",
+  "unchangedDriverSha256": "15741dc09f88e5cc38bd9a02ef227d191093ec3168118cd724241baa4dcdaa26",
+  "changedPaths": [
+    "packages/sdk/src/broadcaster/submission-authority.ts",
+    "packages/session/src/operations/submission-scope.test.ts",
+    "packages/sdk/src/integrations/ethers.ts",
+    "packages/session/src/operations/Operation.ts",
+    "packages/session/src/operations/submission-validation.ts"
+  ],
+  "samplesEachVariant": 6,
+  "allAfterSevenHTTP": true,
+  "allSubmitTwoChainIDs": true,
+  "allNonceBindingsAndIntactFirstJournal": true,
+  "coldSetupAndInitializationUnchanged": true,
+  "actualBroadcastHTTP": 0,
+  "metrics": {
+    "before": {
+      "submitMedianMs": 128.10110399999962,
+      "hotPathMedianMs": 266.41641550000077
+    },
+    "after": {
+      "submitMedianMs": 91.33404150000001,
+      "hotPathMedianMs": 229.95233449999978
+    }
+  }
+}

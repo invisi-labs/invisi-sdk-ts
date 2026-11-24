@@ -6,7 +6,7 @@ import type {
     Hex,
     InputSource,
 } from "@invisi-labs/protocol/contracts";
-import { getAddress, hexlify, toBeHex } from "ethers";
+import { getAddress, toBeHex } from "ethers";
 import { recipientLookup } from "../notes/recipient-infrastructure";
 import { resolveRecipient } from "../notes/resolve-recipient";
 
@@ -15,9 +15,7 @@ import {
     applyCreditDrawUsage,
     computeCreditNullifier,
     computeCreditRecoveryPad,
-    createClue,
     deriveCreditStateNonce,
-    encryptCreditState,
     generateCreditSharedKey,
     generateCreditGrantId,
     normalizeCreditGrantId,
@@ -39,6 +37,7 @@ import {
     word,
 } from "@invisi-labs/protocol";
 import type { CircuitName } from "@invisi-labs/prover";
+import { sealCreditOutput } from "./seal";
 import { creditLeaf } from "./state";
 
 import type {
@@ -81,32 +80,6 @@ export class CreditPreparation<Result> {
             throw new Error("Credit expiry must be a future uint64 timestamp");
         }
         return value;
-    }
-
-    private async seal(
-        input: CreditDeliveryState,
-        frame: PreparationFrame
-    ): Promise<PreparedCreditOutput> {
-        const state = normalizeCreditDeliveryState(input);
-        const commitment = await creditLeaf(state);
-        const context = {
-            chainId: frame.context.chainId,
-            protocolAddress: BigInt(frame.context.protocolAddress),
-            outputCommitment: commitment,
-        };
-        const deliveries = (await Promise.all(
-            (["owner", "spender"] as const).map(async (role) => {
-                const keys =
-                    role === "owner" ? state.ownerReceivingKeys : state.spenderReceivingKeys;
-                return {
-                    ciphertext: hexlify(
-                        await encryptCreditState(keys.viewingPublicKey, state, { ...context, role })
-                    ) as Hex,
-                    clue: hexlify(createClue(keys.clueKey)) as Hex,
-                };
-            })
-        )) as [Delivery, Delivery];
-        return { state, commitment, deliveries };
     }
 
     private async input(
@@ -278,7 +251,7 @@ export class CreditPreparation<Result> {
             : undefined;
         if (ordinary && !ordinary.note)
             throw Error("initial payment requires an encrypted Note recipient");
-        const output = await this.seal(
+        const output = await sealCreditOutput(
             {
                 note: ordinary
                     ? { ...initial, ...applyCreditDrawUsage(initial, totalAmount, frame.timestamp) }
@@ -286,7 +259,7 @@ export class CreditPreparation<Result> {
                 ownerReceivingKeys: owner.getReceivingKeys(),
                 spenderReceivingKeys: spender.getReceivingKeys(),
             },
-            frame
+            frame.context
         );
         const plan = this.base(frame, "create-credit"),
             params: CreditCreationParams = {
@@ -362,7 +335,7 @@ export class CreditPreparation<Result> {
             ),
         };
         const next = await deriveCreditUpdate(n, changes, frame.deadline),
-            output = await this.seal(
+            output = await sealCreditOutput(
                 {
                     ...previous.input.state,
                     note: {
@@ -372,7 +345,7 @@ export class CreditPreparation<Result> {
                         ),
                     },
                 },
-                frame
+                frame.context
             );
         const params = {
                 token: frame.context.tokenAddress,
@@ -449,7 +422,7 @@ export class CreditPreparation<Result> {
             sources.set(member.source.treeId, member.source.merkleRoot);
             const next = await deriveCreditState(n, amount, frame.timestamp);
             outputs.push(
-                await this.seal(
+                await sealCreditOutput(
                     {
                         ...member.input.state,
                         note: {
@@ -461,7 +434,7 @@ export class CreditPreparation<Result> {
                             ),
                         },
                     },
-                    frame
+                    frame.context
                 )
             );
             recoveryAmounts.push(word(next.recoveryAmount));
