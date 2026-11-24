@@ -49,6 +49,16 @@ it("reads, confirms and resumes a selected request via server links without chan
     }
     expect(JSON.stringify(client)).not.toContain(token);
 });
+it("treats null and omitted session descriptions equivalently across reads", async () => {
+    const omitted = session();
+    delete omitted.description;
+    const withoutDescription = { ...omitted, description: null };
+    const h = transport([json(withoutDescription), json(omitted), json(withoutDescription)]);
+    const client = new IppClient({ sessionUrl, token, fetch: h.fetcher });
+    for (let i = 0; i < 3; i++) {
+        expect(await client.readSession()).toEqual(omitted);
+    }
+});
 it("rejects cross-origin Location and unsafe links before sending credentials", async () => {
     const h = transport([
         json(session()),
