@@ -51,16 +51,17 @@
     "example:payment-router:7702": "tsx 08-payment-router/07-sponsored-native-7702.ts",
     "example:payment-router:zeroex-token": "tsx 08-payment-router/08-self-token-zeroex.ts",
     "example:router-provenance:recognition": "tsx 09-router-provenance/01-output-recognition.ts",
-    "example:router-provenance:spend": "tsx 09-router-provenance/02-private-note-spend.ts"
+    "example:router-provenance:spend": "tsx 09-router-provenance/02-private-note-spend.ts",
+    "example:services:e2e": "tsx public-services-e2e.ts"
   },
   "dependencies": {
-    "@invisi-labs/protocol": "workspace:1.3.4",
-    "@invisi-labs/prover": "workspace:1.3.4",
-    "@invisi-labs/sdk": "workspace:1.3.4",
+    "@invisi-labs/protocol": "workspace:1.3.5",
+    "@invisi-labs/prover": "workspace:1.3.5",
+    "@invisi-labs/sdk": "workspace:1.3.5",
     "ethers": "6.17.0",
-    "@invisi-labs/session": "workspace:1.3.4",
-    "@invisi-labs/primitives": "workspace:1.3.4",
-    "@invisi-labs/payment-router": "workspace:1.3.4"
+    "@invisi-labs/session": "workspace:1.3.5",
+    "@invisi-labs/primitives": "workspace:1.3.5",
+    "@invisi-labs/payment-router": "workspace:1.3.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,5 +1,9 @@
 # @invisi-labs/rpc
 
+## 1.3.5
+
+- Reuse initialized deployment, network and broadcaster capability checks; preserve authenticated discovery, bounded fee-lock caches, exact binding and expiry validation.
+
 ## 1.3.4
 
 - Add a restricted `Protocol.forCreditRevocation` binding for Core grant namespaces. Only fee-free public revocation can omit ERC20 deployment checks; Core chain, runtime, version and registry pins remain enforced.

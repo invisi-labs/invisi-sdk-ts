@@ -1,5 +1,9 @@
 # @invisi-labs/payment-router
 
+## 1.3.5
+
+- Release with exact 1.3.5 dependencies for new v1 receiving material and the streamlined proving lifecycle. Router intent identity and deployed ABI remain unchanged.
+
 ## 1.3.4
 
 - Release with exact SDK 1.3.4 dependencies, inheriting Note/Credit address normalization and fee-free Credit pre-revocation from the SDK. Payment Router implementation, intent identity and deployed ABI bindings remain unchanged from 1.3.3.

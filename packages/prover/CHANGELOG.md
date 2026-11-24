@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.3.5
+
+- Release with exact 1.3.5 sibling dependencies and the existing authenticated Core and Provenance circuit catalogs. Main and Source proof formats remain unchanged.
+
 ## 1.3.4
 
 - Release with exact SDK 1.3.4 sibling dependencies for the identity and recovery fixes. Prover implementation, authenticated Core/Provenance resource pins and proof formats remain unchanged from 1.3.3.

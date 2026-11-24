@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/session",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Managed Invisi wallet sessions, synchronization and persistent operations",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,12 +35,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi-labs/primitives": "workspace:1.3.4",
-    "@invisi-labs/protocol": "workspace:1.3.4",
+    "@invisi-labs/primitives": "workspace:1.3.5",
+    "@invisi-labs/protocol": "workspace:1.3.5",
     "ethers": "^6.17.0",
-    "@invisi-labs/rpc": "workspace:1.3.4",
+    "@invisi-labs/rpc": "workspace:1.3.5",
     "@noble/hashes": "1.8.0",
-    "@invisi-labs/sdk": "workspace:1.3.4"
+    "@invisi-labs/sdk": "workspace:1.3.5"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

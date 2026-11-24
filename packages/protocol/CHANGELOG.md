@@ -1,5 +1,9 @@
 # @invisi-labs/protocol
 
+## 1.3.5
+
+- Release the fixed 1.3.5 package cohort with new v1 receiving material; keep deployed protocol ABI, gas model and authenticated circuit pins unchanged.
+
 ## 1.3.4
 
 - Release with exact SDK 1.3.4 sibling dependencies, including canonical Credit identity handling in primitives. Protocol ABI and wire definitions remain unchanged from 1.3.3.

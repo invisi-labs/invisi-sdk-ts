@@ -1,5 +1,9 @@
 # @invisi-labs/ipp
 
+## 1.3.5
+
+- Release with exact 1.3.5 primitives and SDK dependencies for receiving-signature v1 and streamlined payment preparation; public IPP schemas are unchanged.
+
 ## 1.3.4
 
 - Release with exact SDK 1.3.4 primitives and SDK dependencies for canonical Credit and Note identity handling. IPP receipt and credential schemas remain unchanged from 1.3.3.

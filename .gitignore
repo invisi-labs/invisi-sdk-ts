@@ -39,3 +39,6 @@ examples/*.sqlite*
 # Local Python bytecode
 __pycache__/
 *.pyc
+
+# Public testnet acceptance reports and resumable transaction identifiers
+/.cache/public-services-e2e/

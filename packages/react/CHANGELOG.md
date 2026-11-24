@@ -1,5 +1,9 @@
 # @invisi-labs/react
 
+## 1.3.5
+
+- Release with exact SDK/session 1.3.5 dependencies for receiving-signature v1 and atomic submit recovery; adapter APIs are unchanged.
+
 ## 1.3.4
 
 - Release with exact SDK/session 1.3.4 dependencies, inheriting address casing compatibility, historical source-proof recovery and validation before operation lease takeover. React adapter implementation remains unchanged; custom RecoveryService adapters must add submitSourceProof as described by session.

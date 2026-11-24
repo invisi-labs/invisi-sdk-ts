@@ -1,5 +1,9 @@
 # @invisi-labs/session
 
+## 1.3.5
+
+- Preserve atomic frozen-packet storage and failed-send recovery. Recheck network and wallet authority after durable writes, reject concurrent state changes, and keep Source preparation out of submit.
+
 ## 1.3.4
 
 - Validate recovered Credit updates and frozen transactions before taking over operation leases. Failed validation preserves the original handle and input reservations; recovery rejects concurrent journal changes before committing.

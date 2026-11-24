@@ -152,3 +152,37 @@ pnpm --filter @invisi-examples/scenarios lint
 [`08-payment-router/README.md`](08-payment-router/README.md) covers direct ERC20, direct native V3, relayed ERC20, sponsored EIP-7702 native-to-token (100.2 target tokens), and ERC20 0x swaps. Each new numbered script uses public SDK account profiles, an external verified ethers signer and an explicit `--execute` submission guard. Legacy `01`/`02` and importable host `03` remain available.
 
 [`09-router-provenance/README.md`](09-router-provenance/README.md) contains the source-recognition scenario matrix, a read-only Router transaction/Note query, and later spending of a recognized Note with real Core and Provenance proofs. Its private spend reuses authenticated App decryption and canonical candidate discovery. Source trust is authenticated by the SDK default official client; the read-only query still requires an actual transaction hash and Note commitment.
+
+
+## Public service acceptance
+
+`public-services-e2e.ts` exercises BSC testnet 97 with the configured iUSD, local
+accounts, authenticated Protocol RPC and Broadcaster discovery, and the official
+Provenance service. It never rewrites the supplied account file. The host first
+signs the receiving-key v1 message and exports only public receiving addresses;
+payment construction consumes those addresses. Viewing and detection stay local.
+
+```sh
+INVISI_TEST_ACCOUNTS=/absolute/path/to/accounts.json \
+INVISI_BB_BIN=/absolute/path/to/bb6 \
+INVISI_TEST_REPORT=/absolute/path/to/local-report \
+pnpm --dir examples example:services:e2e --execute --submit --provenance
+```
+
+Without `--submit`, this performs read-only initialization. With it, Alice pays gas
+for Bob's registration, shields 10 iUSD, scans and authenticates the new output,
+then pays Bob 1 iUSD through the Broadcaster. `--provenance` also explicitly submits
+the locally generated Source proof and waits for recognized tracking. Both output
+decryption and successful transaction receipts are required. Existing transaction
+hashes in the report directory are resumed instead of resending those steps.
+Use a fresh directory only when intentionally starting another test payment.
+
+The supplied JSON must contain Alice and Bob records with their existing EVM
+`address` and `privateKey`. Stored legacy receiving keys are ignored; original
+private keys are never replaced or printed. Reports contain public transaction
+identifiers and per-stage RPC invocation timings, including canonical scan reads.
+They are not a seven-request Shield benchmark: this scenario also spends private
+Notes, proves Source membership and waits for receipt/indexer finality. HTTP-level
+transport retries may add requests beyond the RPC invocation counters.
+`INVISI_CHAIN_RPC` can select another historical BSC testnet endpoint; chain and
+deployment authentication still run. Keep all account files and reports local.
