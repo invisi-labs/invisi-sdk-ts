@@ -2,6 +2,8 @@
 
 ## 1.3.5
 
+- Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.
+
 - Release the fixed 1.3.5 package cohort with new v1 receiving material; keep deployed protocol ABI, gas model and authenticated circuit pins unchanged.
 
 ## 1.3.4

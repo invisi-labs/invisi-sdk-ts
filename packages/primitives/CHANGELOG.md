@@ -2,6 +2,8 @@
 
 ## 1.3.5
 
+- Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.
+
 - Derive new v1 receiving keys from an authenticated EVM personal signature, preserving independent viewing/detection capabilities and canonical owner binding.
 
 ## 1.3.4

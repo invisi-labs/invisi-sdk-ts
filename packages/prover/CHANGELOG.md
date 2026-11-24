@@ -2,6 +2,8 @@
 
 ## 1.3.5
 
+- Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.
+
 - Release with exact 1.3.5 sibling dependencies and the existing authenticated Core and Provenance circuit catalogs. Main and Source proof formats remain unchanged.
 
 ## 1.3.4

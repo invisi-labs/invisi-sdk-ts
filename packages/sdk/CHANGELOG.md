@@ -2,6 +2,8 @@
 
 ## 1.3.5
 
+- Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.
+
 - Move invariant checks to initialization, select fresh nonces only during prepare, keep quote free of preparation and generate Source proofs in prove/ready. Submit retains live service validation, fee-lock binding, durable packet preservation and the final network fence without repeating proof or nonce reads. Reuse valid fee-lock tickets and fence cache invalidation against stale asynchronous failures.
 
 ## 1.3.4

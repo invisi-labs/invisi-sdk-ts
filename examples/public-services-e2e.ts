@@ -175,10 +175,23 @@ try {
         }
         if (!saved.registration) {
             await measure("registration", async () => {
-                const prepared = await invisi.prepareRegistration({
-                    wallet: local.bob.wallet,
-                    update: false,
-                });
+                let prepared;
+                try {
+                    prepared = await invisi.prepareRegistration({
+                        wallet: local.bob.wallet,
+                        update: false,
+                    });
+                } catch (error) {
+                    if (
+                        !(error instanceof Error) ||
+                        error.message !== "wallet is already registered; prepare an update"
+                    )
+                        throw error;
+                    prepared = await invisi.prepareRegistration({
+                        wallet: local.bob.wallet,
+                        update: true,
+                    });
+                }
                 const auth = await prepared.exportRegistrationAuthorization();
                 const signature = await local.bob.signer.signTypedData(
                     auth.domain,

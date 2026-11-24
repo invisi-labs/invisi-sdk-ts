@@ -2,6 +2,8 @@
 
 ## 1.3.5
 
+- Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.
+
 - Reuse initialized deployment, network and broadcaster capability checks; preserve authenticated discovery, bounded fee-lock caches, exact binding and expiry validation.
 
 ## 1.3.4
