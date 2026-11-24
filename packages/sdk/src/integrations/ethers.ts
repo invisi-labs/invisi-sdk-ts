@@ -1115,3 +1115,6 @@ export function openEthersSubmissionNetworkValidation(
         ? reader.openSubmissionNetworkValidation(chainId, verifier)
         : Promise.resolve(undefined);
 }
+
+export { requestReceivingKeys } from "./receiving-keys";
+export type { ReceivingKeyProvider, ReceivingKeyRequest } from "./receiving-keys";

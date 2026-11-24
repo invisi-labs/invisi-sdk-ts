@@ -256,3 +256,10 @@ Core operations do not require the Provenance catalog; Provenance operations do 
 **Release prerequisite:** these split catalogs have been built and verified locally but are not claimed published. Publish each producer's authenticated CI artifact before releasing SDKs with these new defaults. Until then, provision matching local catalogs or select legacy mode explicitly. No production pins are fetched from an untrusted URL or inferred from a failed download.
 
 Native and WASM resource options accept `release: "legacy"`. Native `directory`/`baseUrls` configure Core; `provenanceDirectory`/`provenanceBaseUrls` configure Provenance. Browser options use the two URL lists and share their cache. In legacy mode, an unspecified Provenance URL inherits the combined source.
+
+
+### Broadcaster preparation fee locks
+
+High-level ordinary Core and Credit quotation discovers the broadcaster fee-lock capability. A supporting service signs a short-lived tariff before fee preparation; every estimate and the final quote use that same tariff. Fee-induced input/change/funding/Permit changes still affect gas, while market price refreshes do not invalidate preparation. The fee stays within the caller's existing maximum. Fees and final quotes are frozen before authorization and proving.
+
+Services without the advertised capability keep the legacy quotation flow. An advertised but invalid, expired or unavailable lock fails explicitly instead of silently switching to live pricing. Locks apply to Core quotation, including supported scheduling/aggregation; Router quotation is unchanged. The final quote and persisted submission/recovery formats are unchanged, and a lock never extends transaction authorization deadlines or Credit usage periods. Preparing a quote is atomic: only the final quote needs to survive a successful preparation; a failed preparation acquires a new ticket on retry.

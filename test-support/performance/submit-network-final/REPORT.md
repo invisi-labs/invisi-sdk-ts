@@ -1,5 +1,7 @@
 # TS submission network fence: eight reads to seven
 
+Historical benchmark at safety commit `5b9ab52`, before integrating develop receiving-signature-v1 and fee locks. Source fingerprints below deliberately identify that measured snapshot. See `integration.md` for merged verification.
+
 The extra request was `eth_chainId` with empty params `[]` in the end-of-validation check **before** persistence. Managed first send then performed another real identity read **after** persistence. The former completion read can be merged into the latter for the stock, observed, self-contained Shield path.
 
 ## Result

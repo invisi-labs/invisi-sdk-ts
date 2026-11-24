@@ -1,6 +1,7 @@
 import { Protocol as BaseProtocol } from "@invisi-labs/rpc";
 import { afterEach, expect, it, vi } from "vitest";
 import { Protocol } from "../protocol/Protocol";
+import { BroadcasterClient } from "./index";
 const tokenAddress = "0x0000000000000000000000000000000000000042";
 const a = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as `0x${string}`;
 const h = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as `0x${string}`;
@@ -35,6 +36,33 @@ function serviceStatus(n: number) {
 }
 afterEach(() => {
     vi.restoreAllMocks();
+});
+it("initializes explicit clients from one authenticated token support response", async () => {
+    const methods: string[] = [];
+    const registered = entry(3);
+    const configured = new BroadcasterClient(
+        {
+            endpoint: registered.endpoint,
+            quoteSigner: registered.quoteSigner,
+            feeRecipient: registered.feeRecipient,
+        },
+        async (request) => {
+            methods.push(request.method);
+            if (request.method !== "broadcaster_getTokenSupport")
+                throw Error("unexpected initialization request");
+            return { jsonrpc: "2.0", id: request.id, result: serviceStatus(3) };
+        }
+    );
+    const protocol = new Protocol({
+        deployment: { chainId: deployment.chainId, protocol: deployment.protocol },
+    });
+    const initialized = await protocol.initializeBroadcasters({
+        tokenAddress,
+        clients: [configured],
+    });
+    expect(initialized).toEqual([configured]);
+    await configured.prepareCapabilities({ chainId: 97n, protocol: deployment.protocol.address });
+    expect(methods).toEqual(["broadcaster_getTokenSupport"]);
 });
 async function discover(rpc: unknown) {
     vi.spyOn(BaseProtocol, "fromRpc").mockResolvedValue(new BaseProtocol({ deployment }));

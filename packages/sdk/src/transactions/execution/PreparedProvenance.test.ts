@@ -340,13 +340,13 @@ async function configured(historical = false, execution: "direct" | "aggregate" 
     };
 }
 
-it("quotes without reading submission policy, preparing source data or computing a source proof", async () => {
+it("negotiates pricing capability without preparing source data or computing a source proof", async () => {
     const h = await configured();
     h.setDeny(true);
     const quoted = await h.client.quote(await h.prepare(), { maxFeeAmount: 20n });
     expect(quoted.broadcasterQuote()).toBeDefined();
     expect(h.prover.prove).not.toHaveBeenCalled();
-    expect(h.requests.some((q) => q.method === "broadcaster_getStatus")).toBe(false);
+    expect(h.requests.filter((q) => q.method === "broadcaster_getStatus")).toHaveLength(1);
     expect(h.requests.some((q) => q.method.startsWith("provenance_"))).toBe(false);
 });
 it("generates Source proof only in explicit ready and returns an opaque service ID", async () => {

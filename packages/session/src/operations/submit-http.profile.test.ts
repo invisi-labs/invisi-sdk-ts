@@ -464,8 +464,35 @@ profile(
                     boundary:
                         "fixture/provider/protocol initialization, scan, retained snapshot and token-code prefetch; before transaction-specific funding nonce prerequisite",
                 };
+                const tracedClient = (base: BroadcasterClient) =>
+                    new BroadcasterClient({ ...base.configuration }, async (request) => {
+                        if (live || unifiedLocal)
+                            return requestHttp(
+                                live ? base.configuration.endpoint : endpoint,
+                                "broadcaster",
+                                request
+                            );
+                        if (!readAllowlist.has(request.method)) {
+                            denied++;
+                            throw Error(`PROFILE_DENY_WRITE:${request.method}`);
+                        }
+                        return base.transport(request);
+                    });
                 const initializationOffset = traces.length;
                 const initializationStarted = performance.now();
+                const configuredClient = unifiedLocal ? tracedClient(localQuoteService) : undefined;
+                const prepareCapabilities =
+                    configuredClient && Reflect.get(configuredClient, "prepareCapabilities");
+                const configuredPreparation = Boolean(
+                    configuredClient &&
+                    process.env.SUBMIT_HTTP_INITIALIZE_BROADCASTERS &&
+                    typeof prepareCapabilities === "function"
+                );
+                if (configuredPreparation && configuredClient && prepareCapabilities)
+                    await prepareCapabilities.call(configuredClient, {
+                        chainId: context.chainId,
+                        protocol: context.protocolAddress,
+                    });
                 const initializeBroadcasters = (
                     protocol as unknown as {
                         initializeBroadcasters?: (options: {
@@ -492,15 +519,17 @@ profile(
                     ),
                     boundary:
                         "explicit initializeBroadcasters token discovery/support prewarm, before first transaction only",
-                    adoption: initializeAdopted
-                        ? "initializeBroadcasters"
-                        : !live
-                          ? "fixture-backed discovery; initialization not applicable"
-                          : !process.env.SUBMIT_HTTP_INITIALIZE_BROADCASTERS
-                            ? "disabled"
-                            : "API unavailable in frozen baseline",
+                    adoption: configuredPreparation
+                        ? "configured client capability initialization"
+                        : initializeAdopted
+                          ? "initializeBroadcasters"
+                          : !live
+                            ? "fixture-backed discovery; initialization not applicable"
+                            : !process.env.SUBMIT_HTTP_INITIALIZE_BROADCASTERS
+                              ? "disabled"
+                              : "API unavailable in frozen baseline",
                 };
-                let reusedClient: BroadcasterClient | undefined;
+                let reusedClient: BroadcasterClient | undefined = configuredClient;
                 let firstJournal: { id: string; bytes: string } | undefined;
                 const journalBytes = (value: unknown) =>
                     JSON.stringify(value, (_key, item) =>
@@ -604,22 +633,7 @@ profile(
                                 );
                             base = selected;
                         }
-                        const selectedClient = new BroadcasterClient(
-                            { ...base.configuration },
-                            async (request) => {
-                                if (live || unifiedLocal)
-                                    return requestHttp(
-                                        live ? base.configuration.endpoint : endpoint,
-                                        "broadcaster",
-                                        request
-                                    );
-                                if (!readAllowlist.has(request.method)) {
-                                    denied++;
-                                    throw Error(`PROFILE_DENY_WRITE:${request.method}`);
-                                }
-                                return base.transport(request);
-                            }
-                        );
+                        const selectedClient = tracedClient(base);
                         if (unifiedLocal) reusedClient = selectedClient;
                         return selectedClient;
                     });

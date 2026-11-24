@@ -10,7 +10,6 @@ const source = join(protocol, "scripts/create-credit-client.mjs");
 const { encryptCreditNote, creditCommitment } = await import(pathToFileURL(source).href);
 const file = join(sdk, "packages/primitives/src/wallet/testdata/wallet-note-vectors.json");
 const vectors = JSON.parse(readFileSync(file, "utf8"));
-const clueKey = "0xc69480518ea88f8cb925fbcd8f5100b1ebc46cc4d8cbe19e0478936567e6b211";
 const fields = [
     "spenderWalletIdentity",
     "ownerWalletIdentity",
@@ -41,8 +40,8 @@ const note = {
 };
 const state = {
     note,
-    ownerReceivingKeys: { viewingPublicKey: vectors.owner.viewingPublicKey, clueKey },
-    spenderReceivingKeys: { viewingPublicKey: vectors.spender.viewingPublicKey, clueKey },
+    ownerReceivingKeys: vectors.credit.ownerReceivingKeys,
+    spenderReceivingKeys: vectors.credit.spenderReceivingKeys,
 };
 const context = {
     ...vectors.context,
@@ -60,7 +59,7 @@ vectors.credit = {
     draw: await deriveCreditState(context, note, 30n),
 };
 vectors.source =
-    "Independent protocol Node ECDH/HKDF/AES-GCM and Poseidon2; public test keys only; mode-B Credit available balance with canonical unlimited flag and opaque payload.";
+    "Public test keys, receiving signature v1 via ethers EIP-191 and Node HKDF. Independent protocol Node ECDH/HKDF/AES-GCM and Poseidon2; mode-B Credit available balance with canonical unlimited flag and opaque payload.";
 for (const entry of vectors.creditStateCases ?? []) {
     const fields = Object.fromEntries(
         Object.entries(entry.fields).map(([key, value]) => [
@@ -108,7 +107,7 @@ vectors.credit.deliverySource = {
     ciphertextBytes: (vectors.credit.ownerCiphertext.length - 2) / 2,
     protocolClientSha256: createHash("sha256").update(readFileSync(source)).digest("hex"),
     purpose:
-        "Independent Node crypto delivery vectors; canonical fixture clue points do not claim FMD detectability.",
+        "Independent Node crypto delivery vectors with signature-derived viewing and clue keys.",
 };
 const fundsSource = join(protocol, "scripts/private-transfer-client.mjs");
 const { encryptPrivateTransferNote } = await import(pathToFileURL(fundsSource).href);

@@ -165,6 +165,12 @@ it("obtains an exact signed Shield quote without a redundant final estimate", as
         methods.push(request.method);
         return base.transport(request, options);
     });
+    await client.prepareCapabilities({
+        chainId: h.context.chainId,
+        protocol: h.context.protocolAddress,
+    });
+    expect(methods).toEqual(["broadcaster_getStatus"]);
+    methods.length = 0;
     const quoted = await client.quote(h.original, { maxFeeAmount: 20n });
     expect(methods).toEqual(["broadcaster_estimateQuote", "broadcaster_getQuote"]);
     expect(quoted.preview().feeAmount).toBe(10n);
@@ -190,6 +196,12 @@ it("refreshes price after a rejected Shield quote and binds the new fee within t
         }
         return base.transport(request, options);
     });
+    await client.prepareCapabilities({
+        chainId: h.context.chainId,
+        protocol: h.context.protocolAddress,
+    });
+    expect(methods).toEqual(["broadcaster_getStatus"]);
+    methods.length = 0;
     const quoted = await client.quote(h.original, { maxFeeAmount: 12n, maxAttempts: 2 });
     expect(quoted.preview().feeAmount).toBe(12n);
     expect(methods).toEqual([

@@ -10,7 +10,7 @@ import {
     type NoteDecryptionContext,
 } from "../delivery/encryption";
 import { Disclosure } from "../disclosure/disclosure";
-import { deriveClueKey } from "../fmd/fmd";
+import { deriveClueKey, detectClue } from "../fmd/fmd";
 import { computeNoteNullifier } from "../notes/nullifier";
 import {
     buildWalletAuthorizationWitness,
@@ -124,6 +124,11 @@ export class Detector {
 
     getClueKey(): Uint8Array {
         return Uint8Array.from(this.#clueKey);
+    }
+
+    /** Detect a full-precision clue locally without exporting the detection key. */
+    detectClue(clue: Uint8Array): boolean {
+        return detectClue(this.#key, clue);
     }
 
     /** Full detection delegation; the receiver chooses the checked prefix length. */

@@ -1,5 +1,8 @@
 export {
     BroadcasterRpcError,
+    verifyBroadcasterFeeLock,
+    broadcasterFeeLockTypes,
+    broadcasterFeeLockModel,
     broadcasterQuoteDomain,
     broadcasterQuoteTypes,
     scheduledBroadcasterQuoteTypes,
@@ -10,6 +13,8 @@ export {
 } from "@invisi-labs/rpc/broadcaster";
 export type {
     BroadcasterQuote,
+    BroadcasterFeeLock,
+    SignedBroadcasterFeeLock,
     BroadcasterSchedule,
     BroadcasterSchedulingCapabilities,
     BroadcasterMemberProof,

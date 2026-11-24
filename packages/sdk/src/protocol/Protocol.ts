@@ -38,7 +38,24 @@ export class Protocol extends BaseProtocol {
     async initializeBroadcasters(options: {
         tokenAddress: string;
         signal?: AbortSignal;
+        /** Explicit configured clients can be prepared without registry discovery. */
+        clients?: readonly BroadcasterClient[];
     }): Promise<BroadcasterClient[]> {
+        if (options.clients) {
+            options.signal?.throwIfAborted();
+            const token = getAddress(options.tokenAddress);
+            const context = {
+                chainId: this.context.chainId,
+                protocol: this.context.protocolAddress,
+            };
+            const compatible = await Promise.all(
+                options.clients.map(async (client) =>
+                    (await client.supportsToken(token, context, options)) ? client : undefined
+                )
+            );
+            options.signal?.throwIfAborted();
+            return compatible.filter((client): client is BroadcasterClient => client !== undefined);
+        }
         return this.getBroadcasters({ ...options, refresh: true });
     }
 

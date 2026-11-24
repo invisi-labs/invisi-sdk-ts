@@ -103,7 +103,30 @@ for (const format of ["js", "cjs"]) {
             feeRecipient: operator.address,
         },
         async (envelope) => {
+            if (envelope.method === "broadcaster_getStatus") {
+                assert.deepEqual(envelope.params, []);
+                return {
+                    jsonrpc: "2.0",
+                    id: envelope.id,
+                    result: {
+                        apiVersion: "v1",
+                        protocolVersion: "1",
+                        chainId: chainId.toString(),
+                        protocol: protocolAddress,
+                        sender: operator.address,
+                        feeRecipient: operator.address,
+                        submissionHalted: false,
+                        provenance: { enabled: false },
+                    },
+                };
+            }
+            assert(
+                ["broadcaster_estimateQuote", "broadcaster_getQuote"].includes(envelope.method),
+                `unexpected broadcaster method: ${envelope.method}`
+            );
+            assert.equal(envelope.params.length, 1);
             const params = envelope.params[0];
+            assert.equal(typeof params.data, "string");
             if (envelope.method === "broadcaster_estimateQuote")
                 return {
                     jsonrpc: "2.0",

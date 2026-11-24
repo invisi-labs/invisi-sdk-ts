@@ -1,3 +1,10 @@
+import { verifyBroadcasterFeeLock, type SignedBroadcasterFeeLock } from "./fee-lock";
+export {
+    verifyBroadcasterFeeLock,
+    broadcasterFeeLockTypes,
+    broadcasterFeeLockModel,
+} from "./fee-lock";
+export type { BroadcasterFeeLock, SignedBroadcasterFeeLock } from "./fee-lock";
 import { provenanceIntentHash } from "@invisi-labs/primitives";
 import type { ProofSidecar } from "@invisi-labs/protocol/provenance";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
@@ -437,8 +444,8 @@ export interface BroadcasterConfiguration {
     quoteSigner: string;
     feeRecipient: string;
 }
-// Only the stateless encoder is shared. No packet, validation result, or
-// connection authority is retained across submissions.
+// Only the stateless encoder is shared. Preparation caches below are client-local;
+// submission packets and mutable submission policy are never cached.
 let sidecarEncoder:
     typeof import("@invisi-labs/protocol/provenance").proofSidecarToWire | undefined;
 export class BroadcasterClient {
@@ -446,6 +453,104 @@ export class BroadcasterClient {
     readonly url: string;
     readonly transport: BroadcasterTransport;
     private requestId = 0;
+    // Bounded, client-local preparation data. Mutable submission policy is always read afresh.
+    #preparation?: {
+        binding: string;
+        transport: BroadcasterTransport;
+        methods: readonly unknown[];
+        capabilities: Map<string, { expires: number; value: Promise<boolean> }>;
+        tickets: Map<string, Promise<SignedBroadcasterFeeLock>>;
+    };
+    #issuedFeeLocks = new WeakMap<SignedBroadcasterFeeLock, () => void>();
+    #preparationState() {
+        const methods = [
+            this.call,
+            this.supportsToken,
+            this.prepareCapabilities,
+            this.lockFee,
+            this.estimateQuote,
+            this.getQuote,
+            this.submissionRequirements,
+        ];
+        const binding = JSON.stringify([
+            this.url,
+            this.configuration.endpoint,
+            this.configuration.quoteSigner,
+            this.configuration.feeRecipient,
+        ]);
+        if (
+            !this.#preparation ||
+            this.#preparation.binding !== binding ||
+            this.#preparation.transport !== this.transport ||
+            methods.some((method, index) => this.#preparation!.methods[index] !== method)
+        ) {
+            this.#preparation = {
+                binding,
+                transport: this.transport,
+                methods,
+                capabilities: new Map(),
+                tickets: new Map(),
+            };
+        }
+        return this.#preparation;
+    }
+    #contextKey(context: { chainId: bigint; protocol: string }) {
+        if (context.chainId <= 0n || BigInt(getAddress(context.protocol)) === 0n)
+            throw Error("Invalid broadcaster context");
+        return `${context.chainId}:${getAddress(context.protocol)}`;
+    }
+    /** Authenticate preparation capabilities during startup, without requesting a price. */
+    async prepareCapabilities(context: { chainId: bigint; protocol: string }): Promise<void> {
+        await this.#feeLockCapability({ ...context });
+    }
+    async #feeLockCapability(context: { chainId: bigint; protocol: string }): Promise<{
+        supported: boolean;
+        receipt: { expires: number; value: Promise<boolean> };
+    }> {
+        const state = this.#preparationState();
+        const key = this.#contextKey(context);
+        const cached = state.capabilities.get(key);
+        if (cached && cached.expires > Date.now()) {
+            const value = await cached.value;
+            if (state.capabilities.get(key) !== cached) return this.#feeLockCapability(context);
+            return { supported: value, receipt: cached };
+        }
+        // A refreshed service capability starts a new ticket generation.
+        for (const ticketKey of state.tickets.keys())
+            if (ticketKey.startsWith(`${key}:`)) state.tickets.delete(ticketKey);
+        const entry = { expires: Date.now() + 300_000, value: Promise.resolve(false) };
+        entry.value = (async () => {
+            const { feeLockSupported } = await import("./service-status");
+            try {
+                const supported = await feeLockSupported(
+                    this.call.bind(this),
+                    this.configuration,
+                    context
+                );
+                if (this.#preparationState() !== state)
+                    throw Error("Broadcaster binding changed during preparation");
+                return supported;
+            } catch (error) {
+                if (state.capabilities.get(key) === entry) state.capabilities.delete(key);
+                throw error;
+            }
+        })();
+        state.capabilities.delete(key);
+        state.capabilities.set(key, entry);
+        if (state.capabilities.size > 8)
+            state.capabilities.delete(state.capabilities.keys().next().value!);
+        const supported = await entry.value;
+        if (state.capabilities.get(key) !== entry) return this.#feeLockCapability(context);
+        return { supported, receipt: entry };
+    }
+    #copyFeeLock(ticket: SignedBroadcasterFeeLock, evict: () => void) {
+        const copy = structuredClone(ticket);
+        this.#issuedFeeLocks.set(copy, evict);
+        return copy;
+    }
+    #evictFeeLock(ticket: SignedBroadcasterFeeLock) {
+        this.#issuedFeeLocks.get(ticket)?.();
+    }
     constructor(configuration: BroadcasterConfiguration, transport?: BroadcasterTransport) {
         if (
             Object.keys(configuration).some(
@@ -517,13 +622,28 @@ export class BroadcasterClient {
         context: { chainId: bigint; protocol: string },
         options: { signal?: AbortSignal } = {}
     ): Promise<boolean> {
+        context = { ...context };
+        const state = this.#preparationState();
+        const key = this.#contextKey(context);
         const { supportsToken } = await import("./service-status");
         return supportsToken(
             this.call.bind(this),
             this.configuration,
             tokenAddress,
             context,
-            options.signal
+            options.signal,
+            (supported) => {
+                if (this.#preparationState() !== state) return;
+                for (const ticketKey of state.tickets.keys())
+                    if (ticketKey.startsWith(`${key}:`)) state.tickets.delete(ticketKey);
+                state.capabilities.delete(key);
+                state.capabilities.set(key, {
+                    expires: Date.now() + 300_000,
+                    value: Promise.resolve(supported),
+                });
+                if (state.capabilities.size > 8)
+                    state.capabilities.delete(state.capabilities.keys().next().value!);
+            }
         );
     }
 
@@ -569,15 +689,102 @@ export class BroadcasterClient {
         }
         return response.result;
     }
+    /** Missing capability keeps the legacy flow; advertised lock failures never downgrade. */
+    async lockFee(
+        data: string,
+        context: { chainId: bigint; protocol: string }
+    ): Promise<SignedBroadcasterFeeLock | undefined> {
+        context = { ...context };
+        const intent = decodeBroadcasterIntent(data);
+        const token = getAddress(intent.request.params.token);
+        const state = this.#preparationState();
+        const capability = await this.#feeLockCapability(context);
+        const contextKey = this.#contextKey(context);
+        if (state.capabilities.get(contextKey) !== capability.receipt)
+            return this.lockFee(data, context);
+        if (this.#preparationState() !== state)
+            throw Error("Broadcaster binding changed during preparation");
+        if (!capability.supported) return undefined;
+        const key = `${this.#contextKey(context)}:${token}`;
+        const tickets = state.tickets;
+        let pending = tickets.get(key);
+        if (pending) {
+            const cached = await pending;
+            if (
+                state.capabilities.get(contextKey) !== capability.receipt ||
+                tickets !== state.tickets ||
+                tickets.get(key) !== pending
+            )
+                return this.lockFee(data, context);
+            if (this.#preparationState() !== state)
+                throw Error("Broadcaster binding changed during preparation");
+            try {
+                verifyBroadcasterFeeLock(
+                    cached,
+                    { ...context, signer: this.configuration.quoteSigner },
+                    token,
+                    this.configuration.feeRecipient
+                );
+                const retained = pending;
+                return this.#copyFeeLock(cached, () => {
+                    if (this.#preparationState() === state && tickets.get(key) === retained)
+                        tickets.delete(key);
+                });
+            } catch {
+                if (tickets.get(key) === pending) tickets.delete(key);
+                else return this.lockFee(data, context);
+            }
+        }
+        pending = (async () => {
+            const ticket = (await this.call("broadcaster_lockFee", {
+                data,
+            })) as SignedBroadcasterFeeLock;
+            if (this.#preparationState() !== state)
+                throw Error("Broadcaster binding changed during preparation");
+            verifyBroadcasterFeeLock(
+                ticket,
+                { ...context, signer: this.configuration.quoteSigner },
+                token,
+                this.configuration.feeRecipient
+            );
+            return structuredClone(ticket);
+        })();
+        tickets.set(key, pending);
+        if (tickets.size > 16) tickets.delete(tickets.keys().next().value!);
+        try {
+            const ticket = await pending;
+            if (
+                state.capabilities.get(contextKey) !== capability.receipt ||
+                tickets !== state.tickets ||
+                tickets.get(key) !== pending
+            )
+                return this.lockFee(data, context);
+            const retained = pending;
+            return this.#copyFeeLock(ticket, () => {
+                if (this.#preparationState() === state && tickets.get(key) === retained)
+                    tickets.delete(key);
+            });
+        } catch (error) {
+            if (tickets.get(key) === pending) tickets.delete(key);
+            throw error;
+        }
+    }
+
     async estimateQuote(
-        input: string | { data: string; schedule?: BroadcasterSchedule }
+        input:
+            | string
+            | { data: string; schedule?: BroadcasterSchedule; feeLock?: SignedBroadcasterFeeLock }
     ): Promise<BroadcasterEstimate> {
-        const { data, schedule } = typeof input === "string" ? { data: input } : input;
+        const { data, schedule, feeLock } = typeof input === "string" ? { data: input } : input;
         if (schedule) checkedSchedule(schedule);
         decodeBroadcasterIntent(data);
         const estimate = (await this.call("broadcaster_estimateQuote", {
             data,
             ...(schedule ? { schedule } : {}),
+            ...(feeLock ? { feeLock } : {}),
+        }).catch((error) => {
+            if (feeLock) this.#evictFeeLock(feeLock);
+            throw error;
         })) as BroadcasterEstimate;
         if (
             !estimate ||
@@ -595,15 +802,21 @@ export class BroadcasterClient {
         return { ...estimate };
     }
     async getQuote(
-        input: string | { data: string; schedule?: BroadcasterSchedule },
+        input:
+            | string
+            | { data: string; schedule?: BroadcasterSchedule; feeLock?: SignedBroadcasterFeeLock },
         context: { chainId: bigint; protocol: string }
     ): Promise<SignedBroadcasterQuote> {
-        const { data, schedule } = typeof input === "string" ? { data: input } : input;
+        const { data, schedule, feeLock } = typeof input === "string" ? { data: input } : input;
         if (schedule) checkedSchedule(schedule);
         decodeBroadcasterIntent(data);
         const signed = (await this.call("broadcaster_getQuote", {
             data,
             ...(schedule ? { schedule } : {}),
+            ...(feeLock ? { feeLock } : {}),
+        }).catch((error) => {
+            if (feeLock) this.#evictFeeLock(feeLock);
+            throw error;
         })) as SignedBroadcasterQuote;
         if (
             schedule
@@ -623,6 +836,19 @@ export class BroadcasterClient {
             },
             data
         );
+        if (feeLock) {
+            verifyBroadcasterFeeLock(
+                feeLock,
+                { ...context, signer: this.configuration.quoteSigner },
+                signed.quote.token,
+                this.configuration.feeRecipient
+            );
+            if (
+                BigInt(signed.quote.deadline) > BigInt(feeLock.lock.deadline) ||
+                BigInt(signed.quote.maxGas) > BigInt(feeLock.lock.maxGas)
+            )
+                throw Error("Quote exceeds fee lock bounds");
+        }
         if (getAddress(signed.quote.feeRecipient) !== this.configuration.feeRecipient)
             throw new Error("unregistered fee recipient");
         return {

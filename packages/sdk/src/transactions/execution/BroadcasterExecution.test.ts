@@ -5,6 +5,7 @@ import {
     BroadcasterClient,
     broadcasterQuoteDomain,
     broadcasterQuoteTypes,
+    broadcasterFeeLockTypes,
     scheduledBroadcasterQuoteTypes,
     broadcasterRequestHash,
     decodeBroadcasterIntent,
@@ -13,7 +14,7 @@ import {
 import { externallyAuthorize, setup } from "./ExplicitTransaction-fixtures";
 import { testOutput } from "../../../../../test-support/test-output";
 
-async function fixture(execution: "direct" | "aggregate", scheduled = false) {
+async function fixture(execution: "direct" | "aggregate", scheduled = false, locked = false) {
     const h = await setup();
     const signer = new EvmWallet(`0x${"03".repeat(32)}`);
     const calls: { method: string; body: any }[] = [];
@@ -36,6 +37,33 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
             const body = (request.params as any[])?.[0];
             calls.push({ method: request.method, body: structuredClone(body) });
             const result = (value: unknown) => ({ jsonrpc: "2.0", id: request.id, result: value });
+            if (request.method === "broadcaster_lockFee") {
+                const token = decodeBroadcasterIntent(body.data).request.params.token;
+                const lock = {
+                    token,
+                    feeRecipient: signer.address,
+                    numerator: "1",
+                    denominator: "1",
+                    gasPrice: "1",
+                    markupBps: "0",
+                    gasMarginBps: "0",
+                    maxGas: "2000000",
+                    deadline: String(Math.floor(Date.now() / 1000) + 300),
+                    model: "core-gas-v1.3.4",
+                };
+                return result({
+                    lock,
+                    signature: await signer.signTypedData(
+                        broadcasterQuoteDomain({
+                            chainId: h.context.chainId,
+                            protocol: h.context.protocolAddress,
+                            signer: signer.address,
+                        }),
+                        broadcasterFeeLockTypes,
+                        lock
+                    ),
+                });
+            }
             if (request.method === "broadcaster_estimateQuote")
                 return result({ feeRecipient: signer.address, feeAmount: "10", maxGas: "2000000" });
             if (request.method === "broadcaster_getQuote") {
@@ -51,7 +79,7 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
                     token: params.token,
                     feeRecipient: params.feeRecipient,
                     feeAmount: String(params.feeAmount),
-                    deadline: String(params.deadline),
+                    deadline: body.feeLock ? body.feeLock.lock.deadline : String(params.deadline),
                     maxGas: "2000000",
                     requestHash: broadcasterRequestHash(body.data),
                 };
@@ -70,6 +98,16 @@ async function fixture(execution: "direct" | "aggregate", scheduled = false) {
             }
             if (request.method === "broadcaster_getStatus")
                 return result({
+                    ...(locked
+                        ? {
+                              feeLock: {
+                                  version: "1",
+                                  model: "core-gas-v1.3.4",
+                                  core: true,
+                                  router: false,
+                              },
+                          }
+                        : {}),
                     apiVersion: "v1",
                     protocolVersion: "1",
                     chainId: String(h.context.chainId),
@@ -386,4 +424,20 @@ it("fences a network change during detached schedule persistence and recovers th
         "broadcaster_submitTransaction",
         "broadcaster_getTransactionStatus",
     ]);
+});
+
+it("uses one frozen tariff through preparation and preserves ordinary submission", async () => {
+    const h = await fixture("direct", false, true);
+    const pricing = h.calls.filter(
+        (c) => c.method === "broadcaster_estimateQuote" || c.method === "broadcaster_getQuote"
+    );
+    expect(pricing.length).toBeGreaterThan(1);
+    const ticket = pricing[0]!.body.feeLock;
+    expect(ticket.lock.model).toBe("core-gas-v1.3.4");
+    for (const c of pricing) expect(c.body.feeLock).toEqual(ticket);
+    expect(h.calls.filter((c) => c.method === "broadcaster_lockFee")).toHaveLength(1);
+    const ready = await (await externallyAuthorize(h.quoted)).prove();
+    await h.client.submit(ready);
+    const sent = h.calls.find((c) => c.method === "broadcaster_submitTransaction")!;
+    expect(sent.body.feeLock).toBeUndefined();
 });

@@ -142,8 +142,16 @@ export async function prepareBroadcasterPlan(
               executeBefore: requestedSchedule.executeBefore,
           }
         : undefined;
+    const feeLock = await client.lockFee(exportBroadcasterIntent(plan).data, {
+        chainId: plan.context.chainId,
+        protocol: plan.context.protocolAddress,
+    });
     const estimate = (data: string) =>
-        client.estimateQuote(requestedSchedule ? { data, schedule: requestedSchedule } : data);
+        client.estimateQuote({
+            data,
+            ...(requestedSchedule ? { schedule: requestedSchedule } : {}),
+            ...(feeLock ? { feeLock } : {}),
+        });
     const finalize = async (final: OperationPlan) => {
         if (options.schedule) {
             assertCreditPeriodCurrent(final, options.schedule.publishAfter);
@@ -154,7 +162,11 @@ export async function prepareBroadcasterPlan(
         }
         const data = exportBroadcasterIntent(final).data;
         const quote = await client.getQuote(
-            requestedSchedule ? { data, schedule: requestedSchedule } : data,
+            {
+                data,
+                ...(requestedSchedule ? { schedule: requestedSchedule } : {}),
+                ...(feeLock ? { feeLock } : {}),
+            },
             {
                 chainId: final.context.chainId,
                 protocol: final.context.protocolAddress,

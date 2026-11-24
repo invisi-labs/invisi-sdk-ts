@@ -4,7 +4,7 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { describe, expect, it } from "vitest";
 import { verifyWalletAuthorization } from "../index";
 import { signWalletAuthorization } from "./wallet";
-import vectors from "./testdata/wallet-kdf-vectors.json";
+import vectors from "./testdata/receiving-signature-v1-vectors.json";
 import { deriveWallet } from "./wallet";
 
 const request = {
@@ -18,13 +18,8 @@ describe("EVM account key restoration", () => {
     it("matches independent HKDF vectors and uses the same EVM signing key and separate viewing/detection keys", async () => {
         for (const row of vectors.vectors) {
             const wallet = await deriveWallet(row.privateKey);
-            for (const name of [
-                "spendingPrivateKey",
-                "viewingPrivateKey",
-                "detectionSeed",
-                "detectionKey",
-            ] as const) {
-                expect(bytesToHex(wallet[name])).toBe(row[name]);
+            for (const name of ["viewingPrivateKey", "detectionSeed", "detectionKey"] as const) {
+                expect(bytesToHex(wallet[name])).toBe(row[name].slice(2));
             }
             expect(bytesToHex(wallet.spendingPrivateKey)).toBe(row.privateKey.slice(2));
             expect(bytesToHex(wallet.spendingPrivateKey)).not.toBe(
@@ -49,7 +44,7 @@ describe("EVM account key restoration", () => {
         input.fill(0);
         const authorized = await wallet.exportAuthorization().authorize(request);
         const witness = authorized.withWitness((value) => value);
-        const publicKey = secp256k1.getPublicKey(hexToBytes(row.spendingPrivateKey), false);
+        const publicKey = secp256k1.getPublicKey(hexToBytes(row.privateKey.slice(2)), false);
         expect(
             await verifyWalletAuthorization(
                 wallet.ownerAddress,
