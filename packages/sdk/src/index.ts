@@ -6,11 +6,13 @@ export {
     NullifierCapability,
     ViewingCapability,
     Wallet,
+    buildReceivingKeyMessage,
     computeCreditNullifier,
     creditPeriods,
     creditV1,
     decodeDeliveryHeader,
     decodeMemoText,
+    deriveReceivingKeysFromSignature,
     encodeMemo,
     fundsV1,
 } from "@invisi-labs/primitives";
@@ -28,7 +30,9 @@ export type {
     Hex,
     Memo,
     Note,
+    ReceivingKeyMaterial,
     ReceivingKeys,
+    ReceivingSignatureInput,
 } from "@invisi-labs/primitives";
 export { RegistrationOperation } from "@invisi-labs/rpc";
 export type {

@@ -89,6 +89,11 @@ export type {
     WalletOperation,
 } from "./wallet/wallet";
 export { Wallet } from "./wallet/wallet-object";
+export {
+    buildReceivingKeyMessage,
+    deriveReceivingKeysFromSignature,
+} from "./wallet/receiving-keys";
+export type { ReceivingKeyMaterial, ReceivingSignatureInput } from "./wallet/receiving-keys";
 
 export type { Address, Hex } from "./crypto/primitives";
 

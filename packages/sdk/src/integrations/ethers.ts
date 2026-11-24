@@ -531,3 +531,6 @@ export class EthersFundingVerifier implements FundingAuthorizationVerifier {
         }
     }
 }
+
+export { requestReceivingKeys } from "./receiving-keys";
+export type { ReceivingKeyProvider, ReceivingKeyRequest } from "./receiving-keys";

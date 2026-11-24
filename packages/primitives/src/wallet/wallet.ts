@@ -1,12 +1,15 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { hkdf } from "@noble/hashes/hkdf";
-import { sha256 } from "@noble/hashes/sha256";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { bytesToHex, concatBytes, hexToBytes, utf8ToBytes } from "@noble/hashes/utils";
 import { normalizeCreditGrantId } from "../credit/state";
 import { FIELD_MODULUS } from "../crypto/random";
 import { deriveClueKey } from "../fmd/fmd";
 import type { ProtocolContext } from "../types";
+import {
+    deriveReceivingSecrets,
+    ownerAddressFromUncompressedPublicKey,
+    signReceivingKeyMessage,
+} from "./receiving-key-derivation";
 
 export type WalletBytes = Uint8Array | `0x${string}`;
 export interface InvisiWallet {
@@ -40,8 +43,6 @@ export const WALLET_AUTHORIZATION_TYPES = {
         { name: "statementHash", type: "bytes32" },
     ],
 } as const;
-const FMD_SCALAR_MODULUS =
-    2111115437357092606062206234695386632838870926408408195193685246394721360383n;
 const hex = (value: Uint8Array): `0x${string}` => `0x${bytesToHex(value)}`;
 function bytes(value: string | Uint8Array, length?: number): Uint8Array {
     if (typeof value === "string" && !/^0x(?:[0-9a-fA-F]{2})*$/.test(value))
@@ -53,94 +54,47 @@ function bytes(value: string | Uint8Array, length?: number): Uint8Array {
         throw new Error(`expected ${length} bytes`);
     return result;
 }
-function integer(value: Uint8Array): bigint {
-    return BigInt("0x" + bytesToHex(value));
-}
 function word(value: bigint): Uint8Array {
     if (value < 0n || value >= 1n << 256n) throw new RangeError("value exceeds uint256");
     return hexToBytes(value.toString(16).padStart(64, "0"));
 }
-function nonzeroField(value: bigint, name: string): void {
-    if (typeof value !== "bigint" || value <= 0n || value >= FIELD_MODULUS)
-        throw new RangeError(`invalid ${name}`);
-}
-function deriveScalar(
-    key: Uint8Array,
-    salt: string,
-    littleEndian = false,
-    modulus = FIELD_MODULUS
-): Uint8Array {
-    for (let counter = 0; counter <= 0xffffffff; counter++) {
-        const info = new Uint8Array([counter >>> 24, counter >>> 16, counter >>> 8, counter]);
-        const result = hkdf(sha256, key, utf8ToBytes(salt), info, 32);
-        if (littleEndian) result[31] = result[31]! & 7;
-        const candidate = integer(littleEndian ? result.slice().reverse() : result);
-        if (candidate > 0n && candidate < (littleEndian ? FMD_SCALAR_MODULUS : modulus))
-            return result;
-        result.fill(0);
-    }
-    throw new Error("scalar derivation exhausted");
-}
-
 /** Standard EVM owner address from a validated secp256k1 public key. */
 export async function computeOwnerAddress(publicKey: WalletBytes): Promise<`0x${string}`> {
     const point = secp256k1.ProjectivePoint.fromHex(bytes(publicKey));
     point.assertValidity();
-    return hex(keccak_256(point.toRawBytes(false).slice(1)).slice(12));
+    return ownerAddressFromUncompressedPublicKey(point.toRawBytes(false));
 }
 
 /** Derive a complete Invisi wallet from an EVM account private key, independent of HD paths. */
 export async function deriveWallet(privateKey: string | Uint8Array): Promise<InvisiWallet> {
     const input = bytes(privateKey, 32);
-    let root: Uint8Array | undefined;
-    let spendingPrivateKey: Uint8Array | undefined;
-    let viewingPrivateKey: Uint8Array | undefined;
-    let detectionSeed: Uint8Array | undefined;
-    let detectionKey: Uint8Array | undefined;
+    let signature: Uint8Array | undefined;
+    let receiving: ReturnType<typeof deriveReceivingSecrets> | undefined;
     let complete = false;
     try {
         if (!secp256k1.utils.isValidPrivateKey(input)) {
             throw new RangeError("invalid EVM account private key");
         }
-        root = hkdf(sha256, input, utf8ToBytes("Invisi.WalletRoot.v1"), new Uint8Array(), 32);
-        spendingPrivateKey = Uint8Array.from(input);
-        viewingPrivateKey = deriveScalar(
-            root,
-            "Invisi.WalletViewingKey.v1",
-            false,
-            secp256k1.CURVE.n
-        );
-        detectionSeed = hkdf(
-            sha256,
-            root,
-            utf8ToBytes("Invisi.WalletDetectionSeed.v1"),
-            new Uint8Array(),
-            32
-        );
-        const spendingPublicKey = secp256k1.getPublicKey(spendingPrivateKey, false);
+        const spendingPublicKey = secp256k1.getPublicKey(input, false);
         const ownerAddress = await computeOwnerAddress(spendingPublicKey);
-        nonzeroField(BigInt(ownerAddress), "owner address");
-        detectionKey = deriveScalar(detectionSeed, "Invisi.WalletDetectionKey.v1", true);
+        signature = signReceivingKeyMessage(ownerAddress, input);
+        receiving = deriveReceivingSecrets(ownerAddress, signature);
         const wallet = {
-            spendingPrivateKey,
+            ...receiving,
             spendingPublicKey,
-            viewingPrivateKey,
-            viewingPublicKey: secp256k1.getPublicKey(viewingPrivateKey, true),
-            detectionSeed,
-            detectionKey,
-            clueKey: deriveClueKey(detectionKey),
-            ownerAddress,
+            viewingPublicKey: secp256k1.getPublicKey(receiving.viewingPrivateKey, true),
+            clueKey: deriveClueKey(receiving.detectionKey),
+            spendingPrivateKey: Uint8Array.from(input),
         };
         complete = true;
         return wallet;
     } finally {
         input.fill(0);
-        root?.fill(0);
-        if (!complete) {
-            spendingPrivateKey?.fill(0);
-            viewingPrivateKey?.fill(0);
-            detectionSeed?.fill(0);
-            detectionKey?.fill(0);
+        signature?.fill(0);
+        if (!complete && receiving) {
+            receiving.viewingPrivateKey.fill(0);
+            receiving.detectionSeed.fill(0);
+            receiving.detectionKey.fill(0);
         }
     }
 }
