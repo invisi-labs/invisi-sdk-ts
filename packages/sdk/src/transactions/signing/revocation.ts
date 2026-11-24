@@ -1,6 +1,7 @@
 import { createSigningRequest } from "@invisi-labs/primitives";
 import { encodeRevokeCreditTypedData } from "@invisi-labs/protocol";
-import { getAddress, verifyTypedData } from "ethers";
+import { getAddress } from "ethers/address";
+import { verifyTypedData } from "ethers/hash";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import type { OperationPlan, TransactionRuntime } from "../operation-types";
 export async function revocationSigningRequest(

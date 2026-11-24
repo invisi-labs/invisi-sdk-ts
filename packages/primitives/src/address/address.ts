@@ -1,7 +1,7 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { bytesToHex, concatBytes, hexToBytes, utf8ToBytes } from "@noble/hashes/utils";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import { validateClueKey } from "../fmd/fmd";
 
 export interface ReceivingAddress {

@@ -1,4 +1,5 @@
-import { Contract, getAddress, type ContractRunner } from "ethers";
+import { getAddress } from "ethers/address";
+import { type ContractRunner } from "ethers";
 import type { Hex } from "../contracts/index";
 
 import { invisiCoreFactoryAbi } from "../contracts/index";
@@ -11,7 +12,7 @@ export async function resolveInstanceAddress(
     factoryAddress: `0x${string}`,
     salt: `0x${string}`
 ): Promise<`0x${string}`> {
-    const instance = await new Contract(
+    const instance = await new (await import("ethers/contract")).Contract(
         getAddress(factoryAddress),
         invisiCoreFactoryAbi,
         client

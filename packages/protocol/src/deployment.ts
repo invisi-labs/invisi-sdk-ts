@@ -1,5 +1,5 @@
 import type { Address, Hex } from "@invisi-labs/primitives";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 
 /** Runtime identity and indexing start for one deployed contract. */
 export interface ContractDeployment {

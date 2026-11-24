@@ -1,7 +1,7 @@
 import { encodeCreateCreditCall, normalizeFunding } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
-import { Interface } from "ethers";
+import { Interface } from "ethers/abi";
 import type { OperationPlan } from "../transactions/operation-types";
 import { statement } from "../transactions/signing/statement";
 

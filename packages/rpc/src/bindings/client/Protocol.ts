@@ -1,4 +1,6 @@
-import { Contract, getAddress, keccak256, type Provider } from "ethers";
+import { getAddress } from "ethers/address";
+import { keccak256 } from "ethers/crypto";
+import { type Provider } from "ethers";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 
 import { defineDeployment, type ProtocolDeployment, type ProtocolRpcClient } from "../../index";
@@ -68,7 +70,7 @@ export class Protocol {
                           (await connection.getCode(address, at?.number)) as Hex,
                       getProtocolAddressRegistry: async (address: Address, at?: CanonicalBlock) =>
                           getAddress(
-                              await new Contract(
+                              await new (await import("ethers/contract")).Contract(
                                   address,
                                   ["function addressRegistry() view returns (address)"],
                                   connection
@@ -78,7 +80,7 @@ export class Protocol {
                           ) as Address,
                       getProtocolVersion: async (address: Address, at?: CanonicalBlock) =>
                           BigInt(
-                              await new Contract(
+                              await new (await import("ethers/contract")).Contract(
                                   address,
                                   ["function VERSION() view returns (uint256)"],
                                   connection

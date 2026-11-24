@@ -1,4 +1,7 @@
-import { AbiCoder, keccak256, toUtf8Bytes, ZeroAddress } from "ethers";
+import { AbiCoder } from "ethers/abi";
+import { keccak256 } from "ethers/crypto";
+import { toUtf8Bytes } from "ethers/utils";
+import { ZeroAddress } from "ethers/constants";
 import type { Address, CrossTreeTransactParams, Delivery, Hex } from "../contracts/types";
 const paramsType =
     "tuple(address token,tuple(uint256 treeId,bytes32 merkleRoot)[] sources,bytes32[] nullifiers,bytes32[] noteCommitments,address withdrawalAddress,uint256 withdrawalAmount,uint256 deadline,address feeRecipient,uint256 feeAmount)";

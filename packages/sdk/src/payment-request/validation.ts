@@ -1,5 +1,5 @@
 import { FIELD_MODULUS, MAX_CIPHERTEXT_BYTES, ReceivingAddress } from "@invisi-labs/primitives";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import { uint } from "./binary";
 import type { PaymentRequest } from "./types";
 

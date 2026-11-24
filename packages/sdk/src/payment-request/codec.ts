@@ -1,5 +1,5 @@
 import { ReceivingAddress } from "@invisi-labs/primitives";
-import { decodeBase64, encodeBase64, getBytes, hexlify } from "ethers";
+import { decodeBase64, encodeBase64, getBytes, hexlify } from "ethers/utils";
 import { concat, Reader, uint } from "./binary";
 import type { PaymentRequest, NoteOutputRecipient } from "./types";
 import { MAX_REQUEST_PAYLOAD_BYTES, validatePaymentRequest } from "./validation";

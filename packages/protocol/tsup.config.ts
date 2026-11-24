@@ -10,8 +10,10 @@ export default defineConfig({
     format: ["esm", "cjs"],
     // Keep the shared pure codecs/finality helpers within the browser entry budget.
     esbuildOptions(options) {
+        options.minifyWhitespace = true;
         options.minifySyntax = true;
         options.minifyIdentifiers = true;
+        options.keepNames = true;
     },
     dts: true,
     sourcemap: true,

@@ -2,7 +2,6 @@ import { readChainFinality, type FinalityTag } from "@invisi-labs/protocol";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import type { Provider } from "ethers";
 import { readProtocolLogs } from "../discovery/receipt-logs";
-import { EthersChainReader } from "../integrations/ethers";
 
 import { Disclosure, type DisclosureOutput, type DisclosureResult } from "@invisi-labs/primitives";
 import { TokenProtocol } from "@invisi-labs/rpc";
@@ -70,7 +69,7 @@ function reference(value: DisclosureReference): DisclosureReference {
  */
 export class DisclosureVerifier {
     readonly #protocol: TokenProtocol;
-    readonly #reader: DisclosureReader;
+    readonly #reader: () => Promise<DisclosureReader>;
     readonly #finality: FinalityTag;
 
     constructor(
@@ -81,33 +80,42 @@ export class DisclosureVerifier {
         const finality = options.finality ?? "finalized";
         check(["latest", "safe", "finalized"].includes(finality), "invalid disclosure finality");
         this.#protocol = options.protocol;
-        this.#reader =
-            "provider" in options ? new EthersChainReader(options.provider) : options.reader;
+        if ("provider" in options) {
+            const { provider } = options;
+            let reader: Promise<DisclosureReader> | undefined;
+            this.#reader = () =>
+                (reader ??= import("../integrations/ethers").then(
+                    ({ EthersChainReader }) => new EthersChainReader(provider)
+                ));
+        } else {
+            const { reader } = options;
+            this.#reader = async () => reader;
+        }
         this.#finality = finality;
         Object.freeze(this);
     }
 
     private async barrier(block: Readonly<CanonicalBlock>): Promise<FinalityTag> {
-        await this.#protocol.validateDeployment(this.#reader);
-        const canonical = await this.#reader.getBlock(block.number);
+        const reader = await this.#reader();
+        await this.#protocol.validateDeployment(reader);
+        const canonical = await reader.getBlock(block.number);
         check(
             canonical.number === block.number &&
                 canonical.hash.toLowerCase() === block.hash.toLowerCase(),
             "disclosure canonical block changed; reorg verification required"
         );
-        const head = (await readChainFinality(this.#reader))[this.#finality];
+        const head = (await readChainFinality(reader))[this.#finality];
         check(
             head.status === "available" && head.block,
             `Native ${this.#finality} finality ${head.status}`
         );
         check(head.block.number >= block.number, "insufficient disclosure finality");
         check(
-            (await this.#reader.getBlock(block.number)).hash.toLowerCase() ===
-                block.hash.toLowerCase(),
+            (await reader.getBlock(block.number)).hash.toLowerCase() === block.hash.toLowerCase(),
             "disclosure canonical block changed during finality verification"
         );
         check(
-            (await this.#reader.getChainId()) === this.#protocol.context.chainId,
+            (await reader.getChainId()) === this.#protocol.context.chainId,
             "disclosure chain changed during verification"
         );
         return this.#finality;
@@ -116,8 +124,9 @@ export class DisclosureVerifier {
     /** Resolve the exact inserted output and its delivery from a successful canonical receipt. */
     async readOutput(value: DisclosureReference): Promise<DisclosureEvidence> {
         const selected = reference(value);
-        await this.#protocol.validateDeployment(this.#reader);
-        const received = await this.#reader.getReceipt(selected.transactionHash);
+        const reader = await this.#reader();
+        await this.#protocol.validateDeployment(reader);
+        const received = await reader.getReceipt(selected.transactionHash);
         check(received, "disclosure transaction receipt is unavailable");
         const receipt = structuredClone(received);
         check(receipt.status === "success", "disclosure requires a successful transaction receipt");

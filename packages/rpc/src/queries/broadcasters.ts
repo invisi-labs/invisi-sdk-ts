@@ -1,4 +1,4 @@
-import { getAddress, isAddress } from "ethers";
+import { getAddress, isAddress } from "ethers/address";
 import { type ProtocolDeployment } from "../deployment/deployment";
 import { invalid } from "../transport/errors";
 import type {

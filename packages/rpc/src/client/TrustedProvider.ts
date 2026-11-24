@@ -1,5 +1,8 @@
 import type { Address, Hex } from "@invisi-labs/primitives";
-import { encodeRlp, getAddress, Interface, keccak256, toBeHex } from "ethers";
+import { encodeRlp, toBeHex } from "ethers/utils";
+import { getAddress } from "ethers/address";
+import { Interface } from "ethers/abi";
+import { keccak256 } from "ethers/crypto";
 import type {
     CanonicalBlock,
     CanonicalReceipt,

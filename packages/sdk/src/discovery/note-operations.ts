@@ -1,4 +1,5 @@
-import { isAddress, ZeroAddress } from "ethers";
+import { isAddress } from "ethers/address";
+import { ZeroAddress } from "ethers/constants";
 import { noteOperationId } from "@invisi-labs/protocol/note";
 import type { Address, Delivery, Hex, InputSource } from "@invisi-labs/protocol/contracts";
 import type { DeliveryEventLog, DiscoveryContext } from "./discovery";

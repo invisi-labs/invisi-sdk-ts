@@ -5,7 +5,7 @@ import {
     type CreditDeliveryState,
 } from "@invisi-labs/primitives";
 import type { Delivery, Hex } from "@invisi-labs/protocol/contracts";
-import { hexlify } from "ethers";
+import { hexlify } from "ethers/utils";
 import { creditLeaf } from "./state";
 import type { OperationPlan, PreparedCreditOutput } from "../transactions/operation-types";
 

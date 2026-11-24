@@ -1,5 +1,6 @@
 import type { Address } from "@invisi-labs/protocol/contracts";
-import { Interface, type Result } from "ethers";
+import { Interface } from "ethers/abi";
+import { type Result } from "ethers";
 
 import { buildTransactCalldata, type TransactionCall } from "@invisi-labs/protocol";
 import { invisiCoreAbi, type TransactRequest } from "@invisi-labs/protocol/contracts";

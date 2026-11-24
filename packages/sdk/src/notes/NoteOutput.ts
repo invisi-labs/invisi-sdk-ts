@@ -11,7 +11,10 @@ import {
     type ReceivingKeyLookup,
 } from "@invisi-labs/primitives";
 import type { Delivery, Hex } from "@invisi-labs/protocol/contracts";
-import { AbiCoder, getAddress, hexlify, keccak256 } from "ethers";
+import { AbiCoder } from "ethers/abi";
+import { getAddress } from "ethers/address";
+import { hexlify } from "ethers/utils";
+import { keccak256 } from "ethers/crypto";
 import { InvisiError } from "../errors";
 import type { PreparedOutput } from "../transactions/operation-types";
 import type { AddressLookup } from "./recipient-infrastructure";

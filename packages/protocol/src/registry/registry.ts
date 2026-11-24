@@ -1,14 +1,8 @@
-import {
-    Contract,
-    Interface,
-    TypedDataEncoder,
-    getAddress,
-    getBytes,
-    hexlify,
-    isHexString,
-    toBeHex,
-    type ContractRunner,
-} from "ethers";
+import { Interface } from "ethers/abi";
+import { TypedDataEncoder } from "ethers/hash";
+import { getAddress } from "ethers/address";
+import { getBytes, hexlify, isHexString, toBeHex } from "ethers/utils";
+import { type ContractRunner } from "ethers";
 import type { Address, Hex } from "../contracts/index";
 
 import { ReceivingAddress, decodeAddress, type ReceivingKeyLookup } from "@invisi-labs/primitives";
@@ -184,7 +178,7 @@ export function createRegistryReceivingKeyLookup(
         const identity = decodeAddress(
             ReceivingAddress.fromIdentity(ownerAddress).toString()
         ).ownerAddress;
-        const [keys, nonce] = await new Contract(
+        const [keys, nonce] = await new (await import("ethers/contract")).Contract(
             address,
             invisiAddressRegistryAbi,
             client

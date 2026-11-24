@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha256";
 import { ed25519 } from "@noble/curves/ed25519";
-import { getBytes, hexlify, concat } from "ethers";
+import { getBytes, hexlify, concat } from "ethers/utils";
 import { uint, word } from "./index";
 import type { TrustContext } from "./index";
 export interface RotationRecord {

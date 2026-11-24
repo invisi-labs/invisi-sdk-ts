@@ -1,7 +1,3 @@
-import {
-    configureTransactionInfrastructure,
-    validateTransactionInfrastructure,
-} from "./infrastructure";
 import { MissingCapabilityError, Wallet } from "@invisi-labs/primitives";
 import type { RegistrationOperation, RegistrationPreparation } from "@invisi-labs/rpc";
 import { ProtocolRpcClient } from "@invisi-labs/rpc";
@@ -72,6 +68,8 @@ export class Invisi {
     }
 
     private async resolve(options: TransactionIdentity): Promise<TransactionInfrastructure> {
+        const { configureTransactionInfrastructure, validateTransactionInfrastructure } =
+            await import("./infrastructure");
         const runtime = configureTransactionInfrastructure({
             ...this.getInfrastructure(),
             ...options,

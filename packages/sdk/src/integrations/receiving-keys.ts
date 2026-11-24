@@ -4,7 +4,8 @@ import {
     type ReceivingKeyMaterial,
 } from "@invisi-labs/primitives";
 import { ReceivingAddress } from "@invisi-labs/primitives/address";
-import { hexlify, type Eip1193Provider } from "ethers";
+import { hexlify } from "ethers/utils";
+import { type Eip1193Provider } from "ethers";
 
 type ProviderListener = (value: unknown) => void;
 

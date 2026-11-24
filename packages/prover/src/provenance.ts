@@ -1,7 +1,8 @@
 import { browserProvenanceResources } from "./resources/browser";
 import { wasmSrsSize } from "./backends/wasm-srs";
 import type { ResourceOptions } from "./resources/loader";
-import { hexlify, sha256 } from "ethers";
+import { hexlify } from "ethers/utils";
+import { sha256 } from "ethers/crypto";
 import type { CompiledCircuit } from "@noir-lang/noir_js";
 import { authenticateManifest, witnessJSON } from "./provenance-witness";
 import { PUBLIC_INPUTS, word } from "@invisi-labs/protocol/provenance";

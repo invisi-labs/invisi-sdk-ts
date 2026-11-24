@@ -1,4 +1,5 @@
-import { keccak256, toUtf8Bytes } from "ethers";
+import { keccak256 } from "ethers/crypto";
+import { toUtf8Bytes } from "ethers/utils";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 import { buildTransactCalldata, encodeCreditProof } from "@invisi-labs/protocol";
 import { decodeBroadcasterIntent, type BroadcasterMemberProof } from "@invisi-labs/rpc/broadcaster";

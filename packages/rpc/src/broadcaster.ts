@@ -8,7 +8,10 @@ export type { BroadcasterFeeLock, SignedBroadcasterFeeLock } from "./fee-lock";
 import { provenanceIntentHash } from "@invisi-labs/primitives";
 import type { ProofSidecar } from "@invisi-labs/protocol/provenance";
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
-import { AbiCoder, getAddress, Interface, keccak256, verifyTypedData } from "ethers";
+import { AbiCoder, Interface } from "ethers/abi";
+import { getAddress } from "ethers/address";
+import { keccak256 } from "ethers/crypto";
+import { verifyTypedData } from "ethers/hash";
 
 export const broadcasterQuoteTypes = {
     Quote: [

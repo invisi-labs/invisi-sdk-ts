@@ -26,7 +26,7 @@ export type {
     BroadcasterTransport,
     BroadcasterConfiguration,
 } from "@invisi-labs/rpc/broadcaster";
-import { keccak256 } from "ethers";
+import { keccak256 } from "ethers/crypto";
 import {
     BroadcasterClient as RpcBroadcasterClient,
     verifyBroadcasterQuote,

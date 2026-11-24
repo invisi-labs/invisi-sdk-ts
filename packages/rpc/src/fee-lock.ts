@@ -1,4 +1,5 @@
-import { getAddress, verifyTypedData } from "ethers";
+import { getAddress } from "ethers/address";
+import { verifyTypedData } from "ethers/hash";
 import { broadcasterQuoteDomain, type BroadcasterTrust } from "./broadcaster";
 export const broadcasterFeeLockModel = "core-gas-v1.3.4";
 export const broadcasterFeeLockTypes = {

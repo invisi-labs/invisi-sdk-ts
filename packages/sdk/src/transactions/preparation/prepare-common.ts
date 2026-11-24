@@ -1,7 +1,7 @@
 import { normalizeNoteOwner, noteOwnerAddress } from "../../notes/note-owner";
 import { mapPreparation } from "./parallel";
 import type { Hex } from "@invisi-labs/protocol/contracts";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import { InvisiError } from "../../errors";
 import { NoteOutput, materializeNoteOutput } from "../../notes/NoteOutput";
 import { recipientLookup } from "../../notes/recipient-infrastructure";

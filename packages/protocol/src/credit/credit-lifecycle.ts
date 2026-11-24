@@ -1,5 +1,6 @@
 import { normalizeFee } from "../fees/fee";
-import { Interface, getAddress } from "ethers";
+import { Interface } from "ethers/abi";
+import { getAddress } from "ethers/address";
 import {
     creditPeriods,
     walletAuthorizationTypedData,

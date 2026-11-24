@@ -1,6 +1,8 @@
 import { sha256 } from "@noble/hashes/sha256";
 import { ed25519 } from "@noble/curves/ed25519";
-import { AbiCoder, keccak256, getBytes, hexlify, concat } from "ethers";
+import { AbiCoder } from "ethers/abi";
+import { keccak256 } from "ethers/crypto";
+import { getBytes, hexlify, concat } from "ethers/utils";
 import { poseidonHash } from "@invisi-labs/primitives";
 export const DEFAULT_PROVENANCE_ENDPOINT = "https://provenance.invisipay.fi";
 

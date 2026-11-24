@@ -10,6 +10,13 @@ export default defineConfig({
         ethers: "src/integrations/ethers.ts",
     },
     format: ["esm", "cjs"],
+    // Compact published code; retain source maps for debugging.
+    esbuildOptions(options) {
+        options.minifyWhitespace = true;
+        options.minifySyntax = true;
+        options.minifyIdentifiers = true;
+        options.keepNames = true;
+    },
     splitting: true,
     dts: true,
     sourcemap: true,

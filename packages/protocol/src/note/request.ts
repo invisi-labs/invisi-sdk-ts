@@ -1,4 +1,4 @@
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import type { Hex } from "../contracts/index";
 import { type CrossTreeTransactParams, type Delivery } from "../contracts/index";
 import {

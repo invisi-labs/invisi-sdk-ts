@@ -1,5 +1,7 @@
 import type { Wallet } from "@invisi-labs/primitives";
-import { Interface, getBytes, hexlify, verifyTypedData } from "ethers";
+import { Interface } from "ethers/abi";
+import { getBytes, hexlify } from "ethers/utils";
+import { verifyTypedData } from "ethers/hash";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
 
 import { ReceivingAddress, createSigningRequest } from "@invisi-labs/primitives";

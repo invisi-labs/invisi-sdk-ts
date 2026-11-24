@@ -10,8 +10,8 @@ import {
 import type { CanonicalBlock, ChainReader, Membership } from "@invisi-labs/protocol";
 import type { Protocol } from "@invisi-labs/rpc";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
-import { getAddress, type Provider } from "ethers";
-import { EthersChainReader } from "../integrations/ethers";
+import { getAddress } from "ethers/address";
+import { type Provider } from "ethers";
 import type { NoteInput } from "../transactions/explicit-types";
 import type { PaymentNoteData } from "./types";
 
@@ -76,7 +76,9 @@ export async function verifyPaymentNote(
     const finality = options.finality ?? "finalized";
     if (!["latest", "safe", "finalized"].includes(finality))
         throw new RangeError("Invalid finality tag");
-    const reader = options.chainReader ?? new EthersChainReader(options.provider!);
+    const reader =
+        options.chainReader ??
+        new (await import("../integrations/ethers")).EthersChainReader(options.provider!);
     await protocol.validateDeployment(reader);
     if (wallet && getAddress(wallet.ownerAddress) !== getAddress(data.ownerAddress))
         throw new Error("Payment note owner mismatch");

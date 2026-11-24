@@ -1,4 +1,4 @@
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import type { Address } from "../contracts/index";
 import { uint, ZERO_ADDRESS } from "../validation";
 /** Canonical optional public fee. Omitting both fields explicitly selects zero fee. */

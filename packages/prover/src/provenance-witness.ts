@@ -1,5 +1,5 @@
 import { sha256 } from "@noble/hashes/sha256";
-import { hexlify } from "ethers";
+import { hexlify } from "ethers/utils";
 import { poseidonHash } from "@invisi-labs/primitives";
 import {
     CAPACITIES,

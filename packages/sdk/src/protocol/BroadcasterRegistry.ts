@@ -1,6 +1,9 @@
 import type { TransactionCall } from "@invisi-labs/protocol";
 import { broadcasterRegistryAbi, type Address, type Hex } from "@invisi-labs/protocol/contracts";
-import { getAddress, Interface, keccak256, type Provider } from "ethers";
+import { getAddress } from "ethers/address";
+import { Interface } from "ethers/abi";
+import { keccak256 } from "ethers/crypto";
+import { type Provider } from "ethers";
 
 export interface BroadcasterRegistration {
     endpoint: string;

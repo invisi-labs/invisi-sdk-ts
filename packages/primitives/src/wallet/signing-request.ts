@@ -1,4 +1,5 @@
-import { TypedDataEncoder, type TypedDataDomain, type TypedDataField } from "ethers";
+import { TypedDataEncoder } from "ethers/hash";
+import { type TypedDataDomain, type TypedDataField } from "ethers";
 
 /** JSON-safe EIP-712 data, directly consumable by an external signing tool. */
 export interface SigningRequest {

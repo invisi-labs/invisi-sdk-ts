@@ -1,5 +1,7 @@
 import { computeNoteCommitment } from "@invisi-labs/primitives";
-import { AbiCoder, getAddress, Interface, keccak256, ParamType } from "ethers";
+import { AbiCoder, Interface, ParamType } from "ethers/abi";
+import { getAddress } from "ethers/address";
+import { keccak256 } from "ethers/crypto";
 import type { Address, Hex } from "../contracts/index";
 import {
     invisiCoreAbi,

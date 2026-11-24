@@ -7,7 +7,7 @@ import {
 } from "@invisi-labs/protocol";
 import { WitnessBuilder } from "@invisi-labs/prover";
 import type { Hex } from "@invisi-labs/protocol/contracts";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import { NoteOutput, resolvedOutputSnapshot } from "../../notes/NoteOutput";
 import type {
     RevokeCreditPreparation,

@@ -1,4 +1,4 @@
-import { keccak256 } from "ethers";
+import { keccak256 } from "ethers/crypto";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import { MissingCapabilityError } from "@invisi-labs/primitives";

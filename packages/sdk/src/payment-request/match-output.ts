@@ -1,5 +1,5 @@
 import { ReceivingAddress } from "@invisi-labs/primitives";
-import { hexlify } from "ethers";
+import { hexlify } from "ethers/utils";
 import type { PreparedOutput } from "../transactions/operation-types";
 import { decodePaymentRequest } from "./codec";
 

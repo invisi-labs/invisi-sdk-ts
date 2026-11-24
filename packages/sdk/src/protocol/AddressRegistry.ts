@@ -1,7 +1,6 @@
 import { AddressRegistry as Registry, type RegistrationPreparation } from "@invisi-labs/rpc";
 import type { Provider } from "ethers";
 import { prepareWithErrors } from "../errors";
-import { EthersChainReader } from "../integrations/ethers";
 
 /** Registry operations accept the application's existing ethers provider. */
 export class AddressRegistry extends Registry {
@@ -12,6 +11,7 @@ export class AddressRegistry extends Registry {
     ) {
         return prepareWithErrors("prepareRegistration", async () => {
             if ("provider" in options) {
+                const { EthersChainReader } = await import("../integrations/ethers");
                 const { provider, ...preparation } = options;
                 return super.prepareRegistration({
                     ...preparation,

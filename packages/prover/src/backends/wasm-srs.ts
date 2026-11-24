@@ -1,4 +1,4 @@
-import { hexlify } from "ethers";
+import { hexlify } from "ethers/utils";
 
 // Barretenberg 6.0 decompresses BN254 G1 points in 4 MiB batches of 32-byte points.
 const POINTS_PER_BATCH = 131_072;

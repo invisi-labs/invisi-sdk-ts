@@ -4,7 +4,7 @@ import {
     type TrustedNoteLookup,
 } from "../validation/note-confirmation";
 import { checkedFinality } from "../validation/finality";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import type { Address, Hex } from "@invisi-labs/primitives";
 import { poseidonHash, TREE_DEPTH } from "@invisi-labs/primitives";
 import { MAX_UPDATE_BLOCKS } from "../constants";

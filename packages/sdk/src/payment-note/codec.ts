@@ -1,5 +1,6 @@
 import { FIELD_MODULUS } from "@invisi-labs/primitives";
-import { decodeBase64, encodeBase64, getAddress, getBytes, hexlify, concat } from "ethers";
+import { decodeBase64, encodeBase64, getBytes, hexlify, concat } from "ethers/utils";
+import { getAddress } from "ethers/address";
 import type { PaymentNoteData } from "./types";
 
 function uint(value: bigint, bytes: number): Uint8Array {

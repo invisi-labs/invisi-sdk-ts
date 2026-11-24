@@ -1,4 +1,4 @@
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import type { BroadcasterConfiguration, SignedBroadcasterQuote } from "./broadcaster";
 
 type ReadService = (method: string, params: unknown, signal?: AbortSignal) => Promise<unknown>;

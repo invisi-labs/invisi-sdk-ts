@@ -1,4 +1,4 @@
-import { Interface } from "ethers";
+import { Interface } from "ethers/abi";
 import type { Address, Hex } from "../contracts/index";
 import { invisiCoreAbi, type Delivery, type TransactRequest } from "../contracts/index";
 import {

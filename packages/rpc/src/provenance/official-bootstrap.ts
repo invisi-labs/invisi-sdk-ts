@@ -1,4 +1,4 @@
-import { getBytes, hexlify } from "ethers";
+import { getBytes, hexlify } from "ethers/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import {
     DEFAULT_PROVENANCE_ENDPOINT,

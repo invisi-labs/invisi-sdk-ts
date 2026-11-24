@@ -1,4 +1,5 @@
-import { getBytes, type BytesLike } from "ethers";
+import { getBytes } from "ethers/utils";
+import { type BytesLike } from "ethers";
 import { creditEnvelopeV4, fundsEnvelopeV1 } from "./note-payload";
 
 /** Stable transport resource bound; applications do not select the SDK envelope version. */

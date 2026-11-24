@@ -1,6 +1,6 @@
 import { normalizeNoteOwner, noteOwnerAddress } from "../../notes/note-owner";
 import { PreparationReads } from "./preparation-reads";
-import { getAddress } from "ethers";
+import { getAddress } from "ethers/address";
 import { PreparedTransaction } from "../execution/PreparedTransaction";
 import type { CreditInput, NoteInput } from "../explicit-types";
 import type { PreparationInventory, TransactionInfrastructure } from "../operation-types";

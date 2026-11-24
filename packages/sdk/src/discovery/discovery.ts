@@ -2,7 +2,7 @@ import { extractNoteOutputs } from "./note-operations";
 import { DeliveryAuthenticationError, validateDeliveryCiphertext } from "@invisi-labs/primitives";
 import type { authenticatedDecryptor } from "@invisi-labs/primitives";
 import type { Address, Hex } from "@invisi-labs/protocol/contracts";
-import { isAddress } from "ethers";
+import { isAddress } from "ethers/address";
 
 import {
     decodeAddress,

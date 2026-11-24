@@ -1,6 +1,6 @@
 import type { Hex } from "@invisi-labs/primitives";
 import { ReceivingAddress } from "@invisi-labs/primitives";
-import { getBytes } from "ethers";
+import { getBytes } from "ethers/utils";
 import { type ProtocolDeployment } from "../deployment/deployment";
 import { invalid } from "../transport/errors";
 import type { CanonicalBlock, RegisteredReceivingAddress } from "../types";

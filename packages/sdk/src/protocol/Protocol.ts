@@ -1,7 +1,8 @@
 import { rememberProtocolConnection } from "./connections";
 import { Protocol as BaseProtocol } from "@invisi-labs/rpc";
 import type { ProtocolRpcClient } from "@invisi-labs/rpc";
-import { getAddress, type Provider } from "ethers";
+import { getAddress } from "ethers/address";
+import { type Provider } from "ethers";
 import { BroadcasterClient } from "../broadcaster/index";
 
 const sources = new WeakMap<Protocol, Pick<ProtocolRpcClient, "getBroadcasters">>();

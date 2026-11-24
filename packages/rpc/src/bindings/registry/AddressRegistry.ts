@@ -1,4 +1,5 @@
-import { getAddress, keccak256 } from "ethers";
+import { getAddress } from "ethers/address";
+import { keccak256 } from "ethers/crypto";
 import type { Hex } from "@invisi-labs/protocol/contracts";
 
 import {

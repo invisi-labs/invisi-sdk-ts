@@ -1,7 +1,7 @@
 import type { ProofBundle, ProofStatement } from "@invisi-labs/prover";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
-import { getBytes } from "ethers";
+import { getBytes } from "ethers/utils";
 function check(ok: unknown, message: string): asserts ok {
     if (!ok) throw new Error(message);
 }

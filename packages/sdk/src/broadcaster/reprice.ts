@@ -16,7 +16,7 @@ import {
 } from "@invisi-labs/protocol";
 import { WitnessBuilder } from "@invisi-labs/prover";
 import type { Hex } from "@invisi-labs/protocol/contracts";
-import { hexlify } from "ethers";
+import { hexlify } from "ethers/utils";
 import { InvisiError } from "../errors";
 import type { OperationPlan, PreparedOutput } from "../transactions/operation-types";
 import type { BroadcasterFeeSource } from "./broadcaster-preparation";

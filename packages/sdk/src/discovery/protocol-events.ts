@@ -1,5 +1,6 @@
 import { invisiCoreAbi } from "@invisi-labs/protocol/contracts";
-import { Interface, type ParamType } from "ethers";
+import { Interface } from "ethers/abi";
+import { type ParamType } from "ethers";
 
 const protocolInterface = new Interface(invisiCoreAbi);
 

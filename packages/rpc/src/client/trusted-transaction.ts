@@ -1,4 +1,7 @@
-import { Transaction, Signature, getAddress, toBeHex } from "ethers";
+import { Transaction } from "ethers/transaction";
+import { Signature } from "ethers/crypto";
+import { getAddress } from "ethers/address";
+import { toBeHex } from "ethers/utils";
 import type { Address, Hex } from "@invisi-labs/primitives";
 function check(value: unknown, message: string): asserts value {
     if (!value) throw Error(message);

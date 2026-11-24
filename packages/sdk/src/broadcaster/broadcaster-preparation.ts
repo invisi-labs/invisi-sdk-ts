@@ -7,7 +7,9 @@ import {
 } from "./index";
 import type { SavedOperation } from "../transactions/operation-types";
 import { assertCreditUpdatePlan } from "../credit/state";
-import { getAddress, randomBytes, hexlify, keccak256 } from "ethers";
+import { getAddress } from "ethers/address";
+import { randomBytes, keccak256 } from "ethers/crypto";
+import { hexlify } from "ethers/utils";
 import type {
     RevokeCreditPreparation,
     CreateCreditPreparation,

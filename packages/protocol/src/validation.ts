@@ -1,14 +1,9 @@
 import { MAX_CIPHERTEXT_BYTES } from "@invisi-labs/primitives";
 import type { DeploymentContext } from "./rpc-types";
-import {
-    AbiCoder,
-    dataLength,
-    getAddress,
-    isHexString,
-    keccak256,
-    ParamType,
-    toBeHex,
-} from "ethers";
+import { AbiCoder, ParamType } from "ethers/abi";
+import { dataLength, isHexString, toBeHex } from "ethers/utils";
+import { getAddress } from "ethers/address";
+import { keccak256 } from "ethers/crypto";
 import type { Address, Delivery, FundingParams, Hex, InputSource } from "./contracts/index";
 
 export type { DeploymentContext } from "./rpc-types";

@@ -1,5 +1,7 @@
 import { normalizeFee } from "../fees/fee";
-import { AbiCoder, Interface, getAddress, isHexString, dataLength } from "ethers";
+import { AbiCoder, Interface } from "ethers/abi";
+import { getAddress } from "ethers/address";
+import { isHexString, dataLength } from "ethers/utils";
 import {
     computeWalletAuthorizationDigest,
     creditPeriods,

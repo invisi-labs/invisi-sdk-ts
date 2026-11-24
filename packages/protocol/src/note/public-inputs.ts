@@ -1,4 +1,4 @@
-import { TypedDataEncoder } from "ethers";
+import { TypedDataEncoder } from "ethers/hash";
 import { type Delivery } from "../contracts/index";
 import { word, type FundingInput, type TransactionContext } from "../validation";
 import { encodeTransactTypedData } from "./funding";

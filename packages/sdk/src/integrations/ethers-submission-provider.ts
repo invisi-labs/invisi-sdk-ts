@@ -1,12 +1,6 @@
-import {
-    AbstractProvider,
-    BrowserProvider,
-    JsonRpcProvider,
-    Network,
-    type JsonRpcApiProvider,
-    type PerformActionRequest,
-    toQuantity,
-} from "ethers";
+import { AbstractProvider, BrowserProvider, JsonRpcProvider, Network } from "ethers/providers";
+import { type JsonRpcApiProvider, type PerformActionRequest } from "ethers";
+import { toQuantity } from "ethers/utils";
 import type { CanonicalBlock } from "@invisi-labs/protocol";
 
 export interface SubmissionNetworkGuard {

@@ -7,7 +7,9 @@ import {
 } from "@invisi-labs/primitives";
 import { WitnessBuilder } from "@invisi-labs/prover";
 import type { Prover } from "@invisi-labs/prover";
-import { Signature, SigningKey, concat, getBytes, verifyTypedData } from "ethers";
+import { Signature, SigningKey } from "ethers/crypto";
+import { concat, getBytes } from "ethers/utils";
+import { verifyTypedData } from "ethers/hash";
 import type {
     FundingAuthorizationVerifier,
     FundingSigner,

@@ -6,14 +6,8 @@ import {
     UnsupportedSubmissionHash,
     type SubmissionNetworkGuard,
 } from "./ethers-submission-provider";
-import {
-    AbstractProvider,
-    BrowserProvider,
-    JsonRpcApiProvider,
-    type BrowserProviderOptions,
-    type Eip1193Provider,
-    type Networkish,
-} from "ethers";
+import { AbstractProvider, BrowserProvider, JsonRpcApiProvider } from "ethers/providers";
+import { type BrowserProviderOptions, type Eip1193Provider, type Networkish } from "ethers";
 import {
     FinalityUnsupportedError,
     FinalityInconsistentError,
@@ -35,19 +29,13 @@ import {
     invisiCoreFactoryAbi,
     invisiCoreAbi,
 } from "@invisi-labs/protocol/contracts";
-import {
-    Contract,
-    getAddress as ethersAddress,
-    getBytes,
-    Interface,
-    isError,
-    keccak256,
-    TypedDataEncoder,
-    verifyTypedData,
-    zeroPadValue,
-    type Provider,
-    type Signer,
-} from "ethers";
+import { Contract } from "ethers/contract";
+import { getAddress as ethersAddress } from "ethers/address";
+import { getBytes, isError, zeroPadValue } from "ethers/utils";
+import { Interface } from "ethers/abi";
+import { keccak256 } from "ethers/crypto";
+import { TypedDataEncoder, verifyTypedData } from "ethers/hash";
+import { type Provider, type Signer } from "ethers";
 import type {
     FundingAuthorizationVerifier,
     FundingSigner,

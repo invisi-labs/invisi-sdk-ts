@@ -6,7 +6,8 @@ import type {
     Hex,
     InputSource,
 } from "@invisi-labs/protocol/contracts";
-import { getAddress, toBeHex } from "ethers";
+import { getAddress } from "ethers/address";
+import { toBeHex } from "ethers/utils";
 import { recipientLookup } from "../notes/recipient-infrastructure";
 import { resolveRecipient } from "../notes/resolve-recipient";
 

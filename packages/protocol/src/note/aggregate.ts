@@ -1,5 +1,6 @@
 import { selectAggregateRoute } from "./aggregate-routes";
-import { AbiCoder, Interface, keccak256, ParamType } from "ethers";
+import { AbiCoder, Interface, ParamType } from "ethers/abi";
+import { keccak256 } from "ethers/crypto";
 import type { Address, Hex } from "../contracts/index";
 import { invisiCoreAbi, type TransactRequest } from "../contracts/index";
 import {
