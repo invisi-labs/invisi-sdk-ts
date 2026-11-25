@@ -103,10 +103,10 @@ try {
         caller: account.address,
         deadline,
     });
+    console.log("Persisted Credit operation:", operation.id);
 
     // The owner must submit this call; no wallet.authorize request or ZK proof is needed.
     const ready = await operation.ready();
-    console.log("Persisted Credit operation:", ready.id);
     console.log("Unsigned owner revocation:", json(await ready.exportTransaction()));
     console.log("Recover this ID with example:session:4 using the same SESSION_ACCOUNT and store.");
 } finally {

@@ -70,6 +70,7 @@ try {
         tokenAddress,
         outputs: [output],
     });
+    console.log("Operation ID:", prepared.id);
     console.log("Local gas estimate:", prepared.estimateGas());
 
     // 3. Authorize and prove the main payment; no transaction has been sent.

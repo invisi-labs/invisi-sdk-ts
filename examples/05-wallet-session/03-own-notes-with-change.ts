@@ -82,6 +82,7 @@ try {
         outputs: [output],
         deadline: BigInt(Math.floor(Date.now() / 1000)) + 3600n,
     });
+    console.log("Persisted operation:", operation.id);
     console.log("Automatic note selection and change:", operation.preview());
     console.log(
         "Balance after reserving inputs:",
@@ -99,7 +100,6 @@ try {
     );
     const authorized = await operation.withWalletSignature(signature);
     const ready = await authorized.prove();
-    console.log("Persisted operation:", ready.id);
     // Export may run offline. Before an ethers send, call ready.validateSubmission();
     // session.sendTransaction(ready) runs that live gate automatically.
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));

@@ -75,6 +75,8 @@ try {
         outputs: [output],
         deadline: publishAfter + 600n,
     });
+    const operationId = prepared.id;
+    console.log("Operation ID:", operationId);
     const clients = await protocol.getBroadcasters({ tokenAddress });
     const client = clients[0];
     if (!client) throw Error("No broadcaster supports this token");
@@ -90,7 +92,6 @@ try {
         authorization.message
     );
     const ready = await (await (await quoted.withWalletSignature(signature)).prove()).ready();
-    const operationId = ready.id;
     const submitted = await client.submit(ready);
     console.log("Scheduled payment:", json(submitted));
 

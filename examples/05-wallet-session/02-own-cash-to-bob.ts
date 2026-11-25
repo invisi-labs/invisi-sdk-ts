@@ -83,8 +83,8 @@ try {
         outputs: [output],
         funding: { payer: alice.address, amount, authorization: "caller" },
     });
+    console.log("Persisted operation:", operation.id);
     const ready = await operation.ready();
-    console.log("Persisted operation:", ready.id);
     console.log("Unsigned transaction for host submission:", json(await ready.exportTransaction()));
     console.log(
         "Retain the operation ID and use recovery after host submission; do not create a replacement payment."

@@ -78,6 +78,7 @@ try {
             tokenAddress: settings.tokenAddress,
             outputs: [output],
         });
+        console.log("Saved operation ID:", prepared.id);
         const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
         if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase())
             throw Error("ALICE_PRIVATE_KEY must match Alice's Note owner");
@@ -92,7 +93,6 @@ try {
 
         // 3. The encrypted journal already retains openings, main proof and exact calldata, not a ready instance.
         // No Source proof has been generated, and this phase makes no Provenance requests.
-        console.log("Saved operation ID:", ready.id);
         const call = await ready.exportTransaction();
         const transaction = await signer.sendTransaction({ ...call, chainId: settings.chainId });
         console.log("Main transaction:", transaction.hash);

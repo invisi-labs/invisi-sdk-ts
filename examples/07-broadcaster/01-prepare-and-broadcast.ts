@@ -76,6 +76,7 @@ try {
         tokenAddress,
         outputs: [output],
     });
+    console.log("Operation ID:", prepared.id);
     console.log("Local gas estimate:", prepared.estimateGas());
 
     // 3. Obtain the final fee quote before signing the payment.
