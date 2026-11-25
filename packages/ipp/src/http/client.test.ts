@@ -50,8 +50,7 @@ it("reads, confirms and resumes a selected request via server links without chan
     expect(JSON.stringify(client)).not.toContain(token);
 });
 it("treats null and omitted session descriptions equivalently across reads", async () => {
-    const omitted = session();
-    delete omitted.description;
+    const { description: _description, ...omitted } = session();
     const withoutDescription = { ...omitted, description: null };
     const h = transport([json(withoutDescription), json(omitted), json(withoutDescription)]);
     const client = new IppClient({ sessionUrl, token, fetch: h.fetcher });
