@@ -73,12 +73,21 @@ try {
         // Restore the original relay binding and cancellation capability from encrypted storage.
         // No current registry discovery or relay status request is needed to retry a saved acknowledgement.
         const snapshot = await store.readSnapshot(session.scope);
-        const saved = snapshot.operations[recoveryId]?.payload as
+        if (snapshot.invalidated) throw Error("Wallet requires canonical resync");
+        const record = snapshot.operations[recoveryId];
+        const saved = record?.payload as
             | {
                   broadcasterBinding?: { configuration: BroadcasterConfiguration };
+                  broadcasterCancelled?: boolean;
               }
             | undefined;
         if (!saved?.broadcasterBinding) throw Error("Saved scheduled broadcaster binding missing");
+        if (saved.broadcasterCancelled && ["failed", "expired"].includes(record!.status)) {
+            // A completed local cancellation still depends on its canonical input observation.
+            const point = snapshot.observedThrough;
+            if (!point || (await provider.getBlock(point.number))?.hash !== point.hash)
+                throw Error("Cancellation checkpoint changed; wallet requires canonical resync");
+        }
         const recovered = await session.resume(recoveryId);
         const handle = recovered.broadcasterScheduleHandle();
         if (!handle) throw Error("Stored schedule capability missing");

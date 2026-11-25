@@ -194,6 +194,7 @@ async function runMain(
     class Empty {}
     class Provider {
         getNetwork = async () => ({ chainId: 97n });
+        getBlock = (number: bigint) => h.reader.getBlock(number);
         destroy() {
             closed++;
         }
@@ -550,6 +551,24 @@ test("scheduled restart in another wallet scope does not touch the original jour
         { operationId: h.ready.id }
     );
     assert.match(String(result.error), /binding missing/);
+    assert.equal(h.calls.length, calls);
+    assert.deepEqual(await h.store.readSnapshot(h.session.scope), before);
+});
+
+test("completed scheduled recovery rejects an orphaned wallet resolution checkpoint", async () => {
+    const h = await scheduledRecoveryFixture();
+    await h.client.submit(h.ready);
+    const first = await runMain("04-scheduled-cancel-recovery.ts", h, { operationId: h.ready.id });
+    assert.equal(first.error, undefined);
+    const before = await h.store.readSnapshot(h.session.scope);
+    const getBlock = h.reader.getBlock;
+    h.reader.getBlock = async (number: bigint) => ({
+        ...(await getBlock(number)),
+        hash: word(999n),
+    });
+    const calls = h.calls.length;
+    const result = await runMain("04-scheduled-cancel-recovery.ts", h, { operationId: h.ready.id });
+    assert.match(String(result.error), /canonical|resync/i);
     assert.equal(h.calls.length, calls);
     assert.deepEqual(await h.store.readSnapshot(h.session.scope), before);
 });
