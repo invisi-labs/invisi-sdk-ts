@@ -74,10 +74,22 @@ try {
     const outgoing = (await session.getHistory()).outgoing;
     for (const entry of outgoing) {
         let operation = await session.resume(entry.id);
-        if (hostTransactions[entry.id] !== undefined) {
-            operation = await operation.trackTransaction(hostTransactions[entry.id]);
+        const hostHash: unknown = hostTransactions[entry.id];
+        let transactionHash: `0x${string}` | undefined;
+        if (hostHash !== undefined) {
+            if (typeof hostHash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(hostHash))
+                throw Error("invalid transaction hash");
+            transactionHash = hostHash.toLowerCase() as `0x${string}`;
+            if (operation.status === "confirmed") {
+                if (entry.transactionHash?.toLowerCase() !== transactionHash)
+                    throw Error("Host transaction hash differs from the confirmed operation");
+            } else {
+                operation = await operation.trackTransaction(transactionHash);
+            }
         }
-        const reconciled = await operation.reconcile();
+        const reconciled = await operation.reconcile(
+            transactionHash === undefined ? {} : { transactionHash }
+        );
         console.log("Recovered operation:", entry.id, reconciled.status);
     }
     console.log("No request was signed again and no transaction was submitted.");
