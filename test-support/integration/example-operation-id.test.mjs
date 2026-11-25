@@ -107,6 +107,7 @@ async function runMain(path, fault) {
         resume: async () => operation,
     };
     const client = {
+        configuration: { feeRecipient: address },
         async quote() {
             inject("quote");
             return operation;

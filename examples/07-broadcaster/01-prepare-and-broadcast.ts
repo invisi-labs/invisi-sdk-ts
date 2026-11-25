@@ -72,20 +72,24 @@ try {
         amount: balance.availableKnown / 2n,
         recipient: { type: "invisi", address: bob.receivingAddress },
     });
-    const prepared = await session.prepareTransfer({
-        tokenAddress,
-        outputs: [output],
-    });
-    console.log("Operation ID:", prepared.id);
-    console.log("Local gas estimate:", prepared.estimateGas());
-
-    // 3. Obtain the final fee quote before signing the payment.
+    // Reserve the bounded fee before selecting private inputs. Quotation lowers it to the exact fee.
     const clients = await protocol.getBroadcasters({ tokenAddress });
     const client = clients[0];
     if (!client) {
         throw Error("No broadcaster supports this token");
     }
+    const prepared = await session.prepareTransfer({
+        tokenAddress,
+        outputs: [output],
+        fee: {
+            recipient: client.configuration.feeRecipient as `0x${string}`,
+            amount: settings.broadcasterMaxFeeAmount,
+        },
+    });
+    console.log("Operation ID:", prepared.id);
+    console.log("Local gas estimate:", prepared.estimateGas());
 
+    // 3. Obtain the final fee quote before signing the payment.
     // The signed quote freezes fees and execution. A quiet service may choose direct execution.
     const quoted = await client.quote(prepared, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,

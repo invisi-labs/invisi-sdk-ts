@@ -70,16 +70,22 @@ try {
         recipient: { type: "invisi", address: bob.receivingAddress },
     });
     const publishAfter = BigInt(Math.floor(Date.now() / 1000) + 600);
+    // Reserve the bounded fee before selecting private inputs. Quotation lowers it to the exact fee.
+    const clients = await protocol.getBroadcasters({ tokenAddress });
+    const client = clients[0];
+    if (!client) throw Error("No broadcaster supports this token");
     const prepared = await session.prepareTransfer({
         tokenAddress,
         outputs: [output],
+        fee: {
+            recipient: client.configuration.feeRecipient as `0x${string}`,
+            amount: settings.broadcasterMaxFeeAmount,
+        },
         deadline: publishAfter + 600n,
     });
     const operationId = prepared.id;
     console.log("Operation ID:", operationId);
-    const clients = await protocol.getBroadcasters({ tokenAddress });
-    const client = clients[0];
-    if (!client) throw Error("No broadcaster supports this token");
+
     // Managed quotation atomically stores its scoped cancellation capability before returning.
     const quoted = await client.quote(prepared, {
         maxFeeAmount: settings.broadcasterMaxFeeAmount,
