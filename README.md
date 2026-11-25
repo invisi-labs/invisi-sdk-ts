@@ -1,6 +1,6 @@
 # Invisi TypeScript SDK
 
-Workspace manifests currently use `1.3.3`. The Payment Router package follows the same fixed release group; see [local package verification](RELEASE.md).
+Workspace manifests currently use `1.3.6`. The Payment Router package follows the same fixed release group; see [local package verification](RELEASE.md).
 
 A capability SDK for ordinary private Notes and deferred Credit grants. Workspace packages keep cryptography, protocol codecs, proving, RPC transport, stateless preparation, managed sessions and UI bindings separate. Applications select their deployment, infrastructure, storage and signing capabilities explicitly.
 

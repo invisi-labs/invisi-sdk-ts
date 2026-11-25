@@ -1,5 +1,9 @@
 # @invisi-labs/session
 
+## 1.3.6
+
+- Reject abandonment while the wallet requires canonical resynchronization, preserving the original operation and all input reservations. Update the official recovery examples to reconcile frozen payments without rescanning, signing or sending replacements.
+
 ## 1.3.5
 
 - Preserve atomic frozen-packet storage and failed-send recovery. Recheck network and wallet authority after durable writes, reject concurrent state changes, and keep Source preparation out of submit.

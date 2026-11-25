@@ -1,5 +1,9 @@
 # @invisi-labs/primitives
 
+## 1.3.6
+
+- Release with the fixed SDK 1.3.6 package group. Receiving-signature v1 address derivation, wallet identities and cryptographic formats are unchanged.
+
 ## 1.3.5
 
 - Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.

@@ -1,5 +1,9 @@
 # @invisi-labs/protocol
 
+## 1.3.6
+
+- Align the exact primitives dependency with the 1.3.6 release group. Contract interfaces, protocol version, circuit statements and measured gas model pins are unchanged.
+
 ## 1.3.5
 
 - Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.

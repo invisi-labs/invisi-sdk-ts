@@ -1,5 +1,9 @@
 # @invisi-labs/ipp
 
+## 1.3.6
+
+- Normalize null session descriptions to the same representation as omitted descriptions so authenticated session reads remain stable across retries. Align exact primitives and SDK dependencies with the 1.3.6 release group.
+
 ## 1.3.5
 
 - Release with exact 1.3.5 primitives and SDK dependencies for receiving-signature v1 and streamlined payment preparation; public IPP schemas are unchanged.

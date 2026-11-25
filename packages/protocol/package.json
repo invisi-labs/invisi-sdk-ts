@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/protocol",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "Pure Invisi public ABIs, types, strict codecs, statements, signatures, capacities and gas references",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -40,7 +40,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi-labs/primitives": "workspace:1.3.5",
+    "@invisi-labs/primitives": "workspace:1.3.6",
     "ethers": "^6.17.0",
     "@noble/hashes": "1.8.0",
     "@noble/curves": "1.9.1"

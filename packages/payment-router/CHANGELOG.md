@@ -1,5 +1,9 @@
 # @invisi-labs/payment-router
 
+## 1.3.6
+
+- Align exact SDK, protocol and primitives dependencies with the 1.3.6 release group. Canonical Router, EIP-7702 and swap host interfaces are unchanged; unsigned host integrations retain responsibility for durable submission recovery.
+
 ## 1.3.5
 
 - Release with exact 1.3.5 dependencies for new v1 receiving material and the streamlined proving lifecycle. Router intent identity and deployed ABI remain unchanged.

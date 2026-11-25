@@ -1,6 +1,6 @@
 {
   "name": "@invisi-labs/rpc",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "Typed Protocol RPC, Broadcaster and Provenance clients, response validation and transport errors",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,9 +35,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@invisi-labs/primitives": "workspace:1.3.5",
+    "@invisi-labs/primitives": "workspace:1.3.6",
     "ethers": "^6.17.0",
-    "@invisi-labs/protocol": "workspace:1.3.5",
+    "@invisi-labs/protocol": "workspace:1.3.6",
     "@noble/hashes": "1.8.0"
   },
   "devDependencies": {

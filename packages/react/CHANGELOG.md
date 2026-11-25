@@ -1,5 +1,9 @@
 # @invisi-labs/react
 
+## 1.3.6
+
+- Align exact SDK and session dependencies with the 1.3.6 recovery-fix release group. React integration APIs are unchanged.
+
 ## 1.3.5
 
 - Release with exact SDK/session 1.3.5 dependencies for receiving-signature v1 and atomic submit recovery; adapter APIs are unchanged.

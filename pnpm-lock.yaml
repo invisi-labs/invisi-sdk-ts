@@ -27,22 +27,22 @@ importers:
   examples:
     dependencies:
       '@invisi-labs/payment-router':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../packages/payment-router
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../packages/primitives
       '@invisi-labs/protocol':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../packages/protocol
       '@invisi-labs/prover':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../packages/prover
       '@invisi-labs/sdk':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../packages/sdk
       '@invisi-labs/session':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../packages/session
       ethers:
         specifier: 6.17.0
@@ -61,11 +61,11 @@ importers:
   packages/ipp:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
     devDependencies:
       '@invisi-labs/sdk':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../sdk
       '@types/node':
         specifier: ^20.0.0
@@ -83,13 +83,13 @@ importers:
   packages/payment-router:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
       '@invisi-labs/protocol':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../protocol
       '@invisi-labs/sdk':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../sdk
       ethers:
         specifier: ^6.17.0
@@ -133,7 +133,7 @@ importers:
   packages/protocol:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
       '@noble/curves':
         specifier: 1.9.1
@@ -158,10 +158,10 @@ importers:
   packages/prover:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
       '@invisi-labs/protocol':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../protocol
       '@noble/hashes':
         specifier: 1.8.0
@@ -193,10 +193,10 @@ importers:
   packages/react:
     dependencies:
       '@invisi-labs/sdk':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../sdk
       '@invisi-labs/session':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../session
     devDependencies:
       '@testing-library/react':
@@ -230,10 +230,10 @@ importers:
   packages/rpc:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
       '@invisi-labs/protocol':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../protocol
       '@noble/hashes':
         specifier: 1.8.0
@@ -261,16 +261,16 @@ importers:
   packages/sdk:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
       '@invisi-labs/protocol':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../protocol
       '@invisi-labs/prover':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../prover
       '@invisi-labs/rpc':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../rpc
       '@noble/hashes':
         specifier: 1.8.0
@@ -298,16 +298,16 @@ importers:
   packages/session:
     dependencies:
       '@invisi-labs/primitives':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../primitives
       '@invisi-labs/protocol':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../protocol
       '@invisi-labs/rpc':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../rpc
       '@invisi-labs/sdk':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../sdk
       '@noble/hashes':
         specifier: 1.8.0
@@ -332,10 +332,10 @@ importers:
   packages/vue:
     dependencies:
       '@invisi-labs/sdk':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../sdk
       '@invisi-labs/session':
-        specifier: workspace:1.3.5
+        specifier: workspace:1.3.6
         version: link:../session
     devDependencies:
       tsup:

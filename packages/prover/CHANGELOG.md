@@ -1,5 +1,9 @@
 # @invisi-labs/prover
 
+## 1.3.6
+
+- Align exact primitives and protocol dependencies with the 1.3.6 release group. Native/WASM proving interfaces, Barretenberg version and authenticated Core and Provenance resource pins are unchanged.
+
 ## 1.3.5
 
 - Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.

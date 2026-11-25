@@ -1,5 +1,9 @@
 # @invisi-labs/sdk
 
+## 1.3.6
+
+- Align the fixed package group with session recovery fences and corrected official payment examples. Examples preserve operation IDs before fallible stages, validate original transaction hashes, reserve private relay fees, and recover scheduled cancellation from encrypted journals without creating another payment.
+
 ## 1.3.5
 
 - Reduce browser startup code using public ethers subpaths, lazy provider integration and compact published output; retain public ESM/CommonJS exports and source maps where configured.
