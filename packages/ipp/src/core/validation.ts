@@ -67,7 +67,7 @@ export function parsePaymentSession(value: unknown, origin?: string): PaymentSes
     text(s.sessionId);
     status(s, true);
     text(object(s.merchant, ["name"]).name);
-    if (s.description !== undefined) text(s.description);
+    if (s.description !== null && s.description !== undefined) text(s.description);
     options(s.options, s.mode);
     if (timestamp(s.expiresAt) <= timestamp(s.createdAt)) return invalid();
     const links = object(s.links, ["confirm", "request"]);
@@ -88,7 +88,9 @@ export function parsePaymentSession(value: unknown, origin?: string): PaymentSes
     const e = object(s.exceptionSummary, ["count", "unresolvedCount"]);
     number(e.count, Number.MAX_SAFE_INTEGER);
     if (number(e.unresolvedCount, Number.MAX_SAFE_INTEGER) > (e.count as number)) return invalid();
-    return structuredClone(s) as unknown as PaymentSession;
+    const session = structuredClone(s);
+    if (session.description === null) delete session.description;
+    return session as unknown as PaymentSession;
 }
 
 export function parsePaymentRequest(value: unknown, origin?: string): Request {
