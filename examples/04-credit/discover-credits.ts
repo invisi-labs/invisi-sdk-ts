@@ -109,16 +109,28 @@ export async function discoverCredits({
         (indexed) => BigInt(indexed.tokenAddress) === BigInt(tokenAddress)
     );
     for (const indexed of states) {
-        const state = await viewing.decryptCredit(
-            indexed.deliveries[role === "owner" ? 0 : 1].ciphertext,
+        const delivery = indexed.deliveries[role === "owner" ? 0 : 1];
+        const [detection] = await viewing.detectCandidates([
             {
                 chainId: protocol.context.chainId,
                 protocolAddress: BigInt(protocol.context.protocolAddress),
                 tokenAddress: BigInt(tokenAddress),
                 outputCommitment: indexed.commitment,
+                ownerAddress: wallet.ownerAddress,
                 role,
-            }
-        );
+                clue: delivery.clue,
+                ciphertext: delivery.ciphertext,
+            },
+        ]);
+        if (detection === "not-recipient") continue;
+        if (detection === "unresolved") throw Error("Credit detection remains unresolved");
+        const state = await viewing.decryptCredit(delivery.ciphertext, {
+            chainId: protocol.context.chainId,
+            protocolAddress: BigInt(protocol.context.protocolAddress),
+            tokenAddress: BigInt(tokenAddress),
+            outputCommitment: indexed.commitment,
+            role,
+        });
         if (state === null) continue;
         const reference: DisclosureReference = {
             transactionHash: indexed.transactionHash,

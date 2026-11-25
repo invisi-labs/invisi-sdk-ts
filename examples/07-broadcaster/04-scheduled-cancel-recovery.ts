@@ -12,6 +12,10 @@ import { decryptor } from "../app-decryptor.js";
 
 // One flow: submit a scheduled payment, recover it from the Session store, then cancel before publication.
 // Use the encrypted persistent adapter from 05-wallet-session; the cancellation token stays inside wallet storage.
+if (!process.argv.includes("--execute")) {
+    console.log("Review the scheduled cancellation scenario, then pass --execute");
+    process.exit(0);
+}
 const storageKey = getBytes(process.env.STORE_ENCRYPTION_KEY_HEX ?? "0x");
 if (storageKey.length !== 32)
     throw Error("Supply a dedicated host-managed 32-byte store encryption key");

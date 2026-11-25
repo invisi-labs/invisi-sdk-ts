@@ -92,6 +92,20 @@ export async function discoverCandidates({
             return BigInt(output.tokenAddress) === BigInt(tokenAddress);
         });
         for (const output of outputs) {
+            const [detection] = await viewing.detectCandidates([
+                {
+                    chainId: protocol.context.chainId,
+                    protocolAddress: BigInt(protocol.context.protocolAddress),
+                    tokenAddress: BigInt(tokenAddress),
+                    outputCommitment: output.commitment,
+                    ownerAddress: wallet.ownerAddress,
+                    role: "funds",
+                    clue: output.clue,
+                    ciphertext: output.ciphertext,
+                },
+            ]);
+            if (detection === "not-recipient") continue;
+            if (detection === "unresolved") throw Error("Note detection remains unresolved");
             const note = await viewing.decryptNote(output.ciphertext, {
                 chainId: protocol.context.chainId,
                 protocolAddress: BigInt(protocol.context.protocolAddress),
