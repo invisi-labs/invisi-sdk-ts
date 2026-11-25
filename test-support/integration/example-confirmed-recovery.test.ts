@@ -13,9 +13,10 @@ const mainFile = new URL(
     "../../examples/05-wallet-session/04-recover-operations.ts",
     import.meta.url
 );
-const source = ts.transpileModule(readFileSync(mainFile, "utf8"), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
-}).outputText;
+const provenanceFile = new URL(
+    "../../examples/07-broadcaster/03-recover-and-submit-provenance.ts",
+    import.meta.url
+);
 const originalHash = `0x${"a6".repeat(32)}` as const;
 const otherHash = `0x${"77".repeat(32)}` as const;
 
@@ -141,7 +142,16 @@ async function recoveryFixture(confirmed: boolean) {
     return { ...h, ready, reads, control };
 }
 
-async function runMain(h: Awaited<ReturnType<typeof recoveryFixture>>, hostHash?: unknown) {
+async function runMain(
+    h: Awaited<ReturnType<typeof recoveryFixture>>,
+    hostHash?: unknown,
+    entry = mainFile,
+    sourceFailure = false,
+    discoveryFailure = false
+) {
+    const source = ts.transpileModule(readFileSync(entry, "utf8"), {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
+    }).outputText;
     const events: string[] = [],
         logs: unknown[][] = [];
     let closed = 0;
@@ -160,7 +170,11 @@ async function runMain(h: Awaited<ReturnType<typeof recoveryFixture>>, hostHash?
     });
     const session = {
         getHistory: () => h.session.getHistory(),
-        refresh: async () => ({ async decrypt() {} }),
+        refresh: async () => {
+            if (discoveryFailure)
+                throw Error("Recovery must use the frozen journal without a discovery scan");
+            return { async decrypt() {} };
+        },
         resume: async (id: string) => operation(await h.session.resume(id)),
     };
     class Empty {}
@@ -181,18 +195,43 @@ async function runMain(h: Awaited<ReturnType<typeof recoveryFixture>>, hostHash?
                 },
             }),
         },
-        ethers: { JsonRpcProvider: Provider, getBytes: () => new Uint8Array(32) },
+        ethers: { JsonRpcProvider: Provider, Wallet: Empty, getBytes: () => new Uint8Array(32) },
         "@invisi-labs/session": {
             WalletSession: { connect: async () => session },
             EncryptedWalletCodec: { fromBytes: async () => ({}) },
         },
         "@invisi-labs/session/sqlite": { SQLiteWalletStore: Empty },
         "@invisi-labs/sdk": {
+            NoteOutput,
             Invisi: Empty,
             Protocol: { fromRpc: async () => h.protocol },
             ProtocolRpcClient: Empty,
         },
         "@invisi-labs/prover/native": { NativeProver: Empty },
+        "@invisi-labs/sdk/provenance": {
+            Provenance: class {
+                async prove(value: { status: string }) {
+                    assert.equal(value.status, "confirmed");
+                    events.push("source:prove");
+                    if (sourceFailure) throw Error("Source unavailable after payment confirmation");
+                    return { operationDigest: "original-digest", context: h.context };
+                }
+                async submit() {
+                    events.push("source:submit");
+                    return {
+                        tracking: { id: "source-tracking", operationDigest: "original-digest" },
+                    };
+                }
+            },
+            officialProvenanceClient: async () => ({
+                async waitTracking(id: string) {
+                    assert.equal(id, "source-tracking");
+                    events.push("source:wait");
+                    return { status: "recognized" };
+                },
+            }),
+        },
+        "../example-io.js": { json: JSON.stringify },
         "../settings.js": {
             settings: {
                 chainId: h.context.chainId,
@@ -209,8 +248,10 @@ async function runMain(h: Awaited<ReturnType<typeof recoveryFixture>>, hostHash?
         URL,
         console: { log: (...args: unknown[]) => logs.push(args) },
         process: {
-            argv: ["node", "recovery", "--execute"],
+            argv: ["node", "recovery", "--execute", "--resume"],
             env: {
+                OPERATION_ID: h.ready.id,
+                ...(hostHash === undefined ? {} : { TRANSACTION_HASH: hostHash }),
                 HOST_TRANSACTIONS_JSON: JSON.stringify(
                     hostHash === undefined ? {} : { [h.ready.id]: hostHash }
                 ),
@@ -219,9 +260,9 @@ async function runMain(h: Awaited<ReturnType<typeof recoveryFixture>>, hostHash?
     });
     const main = new SourceTextModule(source, {
         context,
-        identifier: mainFile.href,
+        identifier: entry.href,
         initializeImportMeta: (meta) => {
-            meta.url = mainFile.href;
+            meta.url = entry.href;
         },
     });
     await main.link((specifier) => {
@@ -330,9 +371,86 @@ test("actual recovery main uses the journal hash when no host hash is supplied",
     assert.deepEqual(h.reads, [originalHash]);
 });
 
-for (const invalidHash of [null, "not-a-hash", 123])
+for (const invalidHash of [null, "not-a-hash", 123, `0x${"00".repeat(32)}`])
     test(`actual confirmed recovery rejects invalid host hash ${JSON.stringify(invalidHash)}`, async () => {
         const h = await recoveryFixture(true);
         await assert.rejects(runMain(h, invalidHash), /invalid transaction hash/);
         assert.deepEqual(h.reads, []);
     });
+
+for (const hostHash of [undefined, originalHash, "0x" + originalHash.slice(2).toUpperCase()])
+    test(`Source recovery can repeat confirmed payment ${hostHash ?? "using saved hash"}`, async () => {
+        const h = await recoveryFixture(true);
+        for (let repeat = 0; repeat < 2; repeat++) {
+            const result = await runMain(h, hostHash, provenanceFile);
+            assert.deepEqual(result.events, [
+                `reconcile:${hostHash === undefined ? "journal" : originalHash}`,
+                "source:prove",
+                "source:submit",
+                "source:wait",
+            ]);
+        }
+        assert.deepEqual(h.reads, [originalHash, originalHash]);
+    });
+
+for (const invalidHash of [otherHash, "bad-hash"])
+    test(`Source recovery rejects conflicting or malformed hash ${invalidHash}`, async () => {
+        const h = await recoveryFixture(true);
+        await assert.rejects(runMain(h, invalidHash, provenanceFile), /hash/i);
+        assert.deepEqual(h.reads, []);
+        const record = (await h.store.readSnapshot(h.scope)).operations[h.ready.id]!;
+        assert.equal(record.status, "confirmed");
+        assert.equal(record.transactionHash, originalHash);
+    });
+
+test("Source outage retries evidence for the same confirmed operation without paying again", async () => {
+    const h = await recoveryFixture(true);
+    await assert.rejects(runMain(h, originalHash, provenanceFile, true), /Source unavailable/);
+    const result = await runMain(h, originalHash, provenanceFile);
+    assert.deepEqual(result.events, [
+        `reconcile:${originalHash}`,
+        "source:prove",
+        "source:submit",
+        "source:wait",
+    ]);
+    assert.equal((await h.session.getHistory()).outgoing.length, 1);
+});
+
+test("Source confirmed recovery still authenticates frozen canonical calldata", async () => {
+    const h = await recoveryFixture(true);
+    h.control.corruptOriginal = true;
+    await assert.rejects(runMain(h, originalHash, provenanceFile), /frozen operation/);
+});
+
+test("Source recovery records the original crash hash before canonical reconciliation", async () => {
+    const h = await recoveryFixture(false);
+    const result = await runMain(h, originalHash, provenanceFile);
+    assert.deepEqual(result.events, [
+        `track:${originalHash}`,
+        `reconcile:${originalHash}`,
+        "source:prove",
+        "source:submit",
+        "source:wait",
+    ]);
+});
+
+for (const entry of [mainFile, provenanceFile])
+    test(`${entry.pathname}: a pending saved hash is not replaced during original-payment recovery`, async () => {
+        const h = await recoveryFixture(false);
+        await h.ready.trackTransaction(originalHash);
+        await assert.rejects(
+            runMain(h, otherHash, entry),
+            /hash differs from (the confirmed|the original|the saved) operation/i
+        );
+        const record = (await h.store.readSnapshot(h.scope)).operations[h.ready.id]!;
+        assert.equal(record.transactionHash, originalHash);
+        assert.equal(record.status, "uncertain");
+        assert.deepEqual(h.reads, []);
+    });
+
+test("wallet recovery uses the frozen journal without rescanning inventory", async () => {
+    const h = await recoveryFixture(true);
+    const result = await runMain(h, originalHash, mainFile, false, true);
+    assert.deepEqual(result.events, [`reconcile:${originalHash}`]);
+    assert.deepEqual(h.reads, [originalHash]);
+});

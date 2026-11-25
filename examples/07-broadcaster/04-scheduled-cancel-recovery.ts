@@ -1,7 +1,14 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { JsonRpcProvider, Wallet as EthersWallet, getBytes } from "ethers";
-import { Invisi, Protocol, ProtocolRpcClient, NoteOutput } from "@invisi-labs/sdk";
+import {
+    BroadcasterClient,
+    Invisi,
+    Protocol,
+    ProtocolRpcClient,
+    NoteOutput,
+    type BroadcasterConfiguration,
+} from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { WalletSession, EncryptedWalletCodec } from "@invisi-labs/session";
 import { SQLiteWalletStore, type SQLiteConnection } from "@invisi-labs/session/sqlite";
@@ -16,6 +23,10 @@ if (!process.argv.includes("--execute")) {
     console.log("Review the scheduled cancellation scenario, then pass --execute");
     process.exit(0);
 }
+const recoveryId = process.env.OPERATION_ID;
+if (process.argv.includes("--recover-submit-id") && !recoveryId)
+    throw Error("--recover-submit-id requires the original OPERATION_ID");
+if (recoveryId !== undefined && !recoveryId) throw Error("OPERATION_ID must not be empty");
 const storageKey = getBytes(process.env.STORE_ENCRYPTION_KEY_HEX ?? "0x");
 if (storageKey.length !== 32)
     throw Error("Supply a dedicated host-managed 32-byte store encryption key");
@@ -35,90 +46,125 @@ try {
     const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const [alice, bob] = getAccounts();
-    const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
-    if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase())
-        throw Error("ALICE_PRIVATE_KEY must match Alice's Note owner");
     const invisi = new Invisi({
         provider,
         protocolRpc,
-        prover: new NativeProver({
-            bbBin: settings.bbBin,
-            threads: 4,
-            ...(process.env.INVISI_CRS_PATH ? { crsPath: process.env.INVISI_CRS_PATH } : {}),
-        }),
+        ...(recoveryId
+            ? {}
+            : {
+                  prover: new NativeProver({
+                      bbBin: settings.bbBin,
+                      threads: 4,
+                      ...(process.env.INVISI_CRS_PATH
+                          ? { crsPath: process.env.INVISI_CRS_PATH }
+                          : {}),
+                  }),
+              }),
     });
+    const store = new SQLiteWalletStore(database, codec);
     const session = await WalletSession.connect({
         invisi,
         wallet: alice.publicWallet,
         protocol,
-        store: new SQLiteWalletStore(database, codec),
+        store,
         namespace: "alice-local-experiments",
     });
-    const pending = await session.refresh({ fromBlock: protocol.deployment.protocol.fromBlock });
-    await pending.decrypt(decryptor);
-    const tokenAddress = settings.tokenAddress;
-    const balance = await session.balance(tokenAddress);
-    if (
-        balance.availableKnown === null ||
-        balance.availableKnown <= settings.broadcasterMaxFeeAmount * 2n
-    )
-        throw Error("Fund and recognize Alice's Notes; leave enough balance for the fee");
-    const output = await NoteOutput.create({
-        ...protocol.context,
-        tokenAddress,
-        amount: balance.availableKnown / 2n,
-        recipient: { type: "invisi", address: bob.receivingAddress },
-    });
-    const publishAfter = BigInt(Math.floor(Date.now() / 1000) + 600);
-    // Reserve the bounded fee before selecting private inputs. Quotation lowers it to the exact fee.
-    const clients = await protocol.getBroadcasters({ tokenAddress });
-    const client = clients[0];
-    if (!client) throw Error("No broadcaster supports this token");
-    const prepared = await session.prepareTransfer({
-        tokenAddress,
-        outputs: [output],
-        fee: {
-            recipient: client.configuration.feeRecipient as `0x${string}`,
-            amount: settings.broadcasterMaxFeeAmount,
-        },
-        deadline: publishAfter + 600n,
-    });
-    const operationId = prepared.id;
-    console.log("Operation ID:", operationId);
+    if (recoveryId) {
+        // Restore the original relay binding and cancellation capability from encrypted storage.
+        // No current registry discovery or relay status request is needed to retry a saved acknowledgement.
+        const snapshot = await store.readSnapshot(session.scope);
+        const saved = snapshot.operations[recoveryId]?.payload as
+            | {
+                  broadcasterBinding?: { configuration: BroadcasterConfiguration };
+              }
+            | undefined;
+        if (!saved?.broadcasterBinding) throw Error("Saved scheduled broadcaster binding missing");
+        const recovered = await session.resume(recoveryId);
+        const handle = recovered.broadcasterScheduleHandle();
+        if (!handle) throw Error("Stored schedule capability missing");
+        const client = new BroadcasterClient(saved.broadcasterBinding.configuration);
+        if (!handle.id) {
+            if (!handle.submission)
+                throw Error(
+                    "Scheduled operation has not been submitted; abandon it locally instead"
+                );
+            if (!process.argv.includes("--recover-submit-id"))
+                throw Error(
+                    "Missing relay ID; add --recover-submit-id to replay only the original frozen submission"
+                );
+            await client.submit(recovered);
+        }
+        console.log(
+            "Cancellation:",
+            json({ operationId: recoveryId, relay: await client.cancel(recovered) })
+        );
+    } else {
+        const signer = new EthersWallet(process.env.ALICE_PRIVATE_KEY!, provider);
+        if (signer.address.toLowerCase() !== alice.publicWallet.ownerAddress.toLowerCase())
+            throw Error("ALICE_PRIVATE_KEY must match Alice's Note owner");
+        const pending = await session.refresh({
+            fromBlock: protocol.deployment.protocol.fromBlock,
+        });
+        await pending.decrypt(decryptor);
+        const tokenAddress = settings.tokenAddress;
+        const balance = await session.balance(tokenAddress);
+        if (
+            balance.availableKnown === null ||
+            balance.availableKnown <= settings.broadcasterMaxFeeAmount * 2n
+        )
+            throw Error("Fund and recognize Alice's Notes; leave enough balance for the fee");
+        const output = await NoteOutput.create({
+            ...protocol.context,
+            tokenAddress,
+            amount: balance.availableKnown / 2n,
+            recipient: { type: "invisi", address: bob.receivingAddress },
+        });
+        const publishAfter = BigInt(Math.floor(Date.now() / 1000) + 600);
+        // Reserve the bounded fee before selecting private inputs. Quotation lowers it to the exact fee.
+        const clients = await protocol.getBroadcasters({ tokenAddress });
+        const client = clients[0];
+        if (!client) throw Error("No broadcaster supports this token");
+        const prepared = await session.prepareTransfer({
+            tokenAddress,
+            outputs: [output],
+            fee: {
+                recipient: client.configuration.feeRecipient as `0x${string}`,
+                amount: settings.broadcasterMaxFeeAmount,
+            },
+            deadline: publishAfter + 600n,
+        });
+        const operationId = prepared.id;
+        console.log("Operation ID:", operationId);
 
-    // Managed quotation atomically stores its scoped cancellation capability before returning.
-    const quoted = await client.quote(prepared, {
-        maxFeeAmount: settings.broadcasterMaxFeeAmount,
-        schedule: { publishAfter },
-    });
-    const authorization = await quoted.exportWalletAuthorization();
-    const signature = await signer.signTypedData(
-        authorization.domain,
-        authorization.types,
-        authorization.message
-    );
-    const ready = await (await (await quoted.withWalletSignature(signature)).prove()).ready();
-    const submitted = await client.submit(ready);
-    console.log("Scheduled payment:", json(submitted));
+        // Managed quotation atomically stores its scoped cancellation capability before returning.
+        const quoted = await client.quote(prepared, {
+            maxFeeAmount: settings.broadcasterMaxFeeAmount,
+            schedule: { publishAfter },
+        });
+        const authorization = await quoted.exportWalletAuthorization();
+        const signature = await signer.signTypedData(
+            authorization.domain,
+            authorization.types,
+            authorization.message
+        );
+        const ready = await (await (await quoted.withWalletSignature(signature)).prove()).ready();
+        const submitted = await client.submit(ready);
+        console.log("Scheduled payment:", json(submitted));
 
-    // Resume uses the local operation ID; remote status uses the ID returned by the Broadcaster.
-    const recovered = await session.resume(operationId);
-    const handle = recovered.broadcasterScheduleHandle();
-    if (!handle) throw Error("Stored schedule capability missing");
-    const context = {
-        chainId: protocol.context.chainId,
-        protocol: protocol.context.protocolAddress,
-    };
-    console.log("Recovered relay status:", json(await client.recoverScheduled(handle, context)));
-    // Uncertain cancellation keeps reservations; acknowledgement is followed by canonical input checks.
-    const cancelled = await client.cancel(recovered);
-    console.log(
-        "Cancellation:",
-        json({
-            operationId,
-            relay: cancelled,
-        })
-    );
+        // Resume uses the local operation ID; remote status uses the ID returned by the Broadcaster.
+        const recovered = await session.resume(operationId);
+        const handle = recovered.broadcasterScheduleHandle();
+        if (!handle) throw Error("Stored schedule capability missing");
+        // Uncertain cancellation keeps reservations; acknowledgement is followed by canonical input checks.
+        const cancelled = await client.cancel(recovered);
+        console.log(
+            "Cancellation:",
+            json({
+                operationId,
+                relay: cancelled,
+            })
+        );
+    }
 } finally {
     provider.destroy();
     database.close();

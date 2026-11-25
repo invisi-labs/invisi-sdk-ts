@@ -7,7 +7,6 @@ import { Invisi, Protocol, ProtocolRpcClient } from "@invisi-labs/sdk";
 import { NativeProver } from "@invisi-labs/prover/native";
 import { settings } from "../settings.js";
 import { getAccounts } from "../accounts.js";
-import { decryptor } from "../app-decryptor.js";
 
 // Reopen the selected account's Note and Credit journal after external submission.
 // Recovery never signs or sends again; a timeout does not justify a replacement payment.
@@ -61,15 +60,8 @@ try {
         namespace: `${account.name}-local-experiments`,
     });
 
-    // 2. Revisit the saved checkpoint to detect reorgs before using inventory.
-    const history = await session.getHistory();
-    const pending = await session.refresh({
-        fromBlock: history.checkedThrough?.number ?? protocol.deployment.protocol.fromBlock,
-    });
-    // A malformed batch or operational error must not advance the persisted checkpoint.
-    await pending.decrypt(decryptor);
-
-    // 3. Attach host submission hashes to existing operations, then verify canonical receipts.
+    // 2. Recover frozen operations directly; reconciliation authenticates canonical checkpoints,
+    // exact calldata and receipts without a new inventory scan or App decryption capability.
     const hostTransactions = JSON.parse(process.env.HOST_TRANSACTIONS_JSON ?? "{}");
     const outgoing = (await session.getHistory()).outgoing;
     for (const entry of outgoing) {
@@ -77,9 +69,17 @@ try {
         const hostHash: unknown = hostTransactions[entry.id];
         let transactionHash: `0x${string}` | undefined;
         if (hostHash !== undefined) {
-            if (typeof hostHash !== "string" || !/^0x[a-fA-F0-9]{64}$/.test(hostHash))
+            if (
+                typeof hostHash !== "string" ||
+                !/^0x[a-fA-F0-9]{64}$/.test(hostHash) ||
+                /^0x0{64}$/.test(hostHash)
+            )
                 throw Error("invalid transaction hash");
             transactionHash = hostHash.toLowerCase() as `0x${string}`;
+            if (entry.transactionHash && entry.transactionHash.toLowerCase() !== transactionHash)
+                throw Error(
+                    `Host transaction hash differs from the ${operation.status === "confirmed" ? "confirmed" : "original"} operation`
+                );
             if (operation.status === "confirmed") {
                 if (entry.transactionHash?.toLowerCase() !== transactionHash)
                     throw Error("Host transaction hash differs from the confirmed operation");

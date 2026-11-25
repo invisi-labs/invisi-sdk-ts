@@ -4,8 +4,15 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
 import ts from "typescript";
+import { createHash } from "node:crypto";
 import { keccak256 } from "ethers";
-import { Invisi, NoteOutput, Protocol, Wallet } from "../../packages/sdk/dist/index.js";
+import {
+    BroadcasterClient,
+    Invisi,
+    NoteOutput,
+    Protocol,
+    Wallet,
+} from "../../packages/sdk/dist/index.js";
 import { MemoryWalletStore, WalletSession } from "../../packages/session/dist/index.js";
 import { MerkleFixture } from "../merkle-fixture.js";
 import { quoteClient } from "../broadcaster-fixture.js";
@@ -80,7 +87,23 @@ async function fixture(fee = unit / 10n) {
     });
     const store = new MemoryWalletStore();
     const session = new WalletSession({
-        invisi: new Invisi({ chainReader: reader, protocolRpc: membership }),
+        invisi: new Invisi({
+            chainReader: reader,
+            protocolRpc: membership,
+            prover: {
+                prove: async (request: any) => ({
+                    ...structuredClone(request),
+                    formatVersion: 1,
+                    bbVersion: "6.0.0",
+                    proofHex: "0x00",
+                    proofSha256: createHash("sha256")
+                        .update(new Uint8Array([0]))
+                        .digest("hex"),
+                    publicInputs: [...request.expectedPublicInputs],
+                }),
+                verify: async () => true,
+            },
+        }),
         wallet,
         protocol,
         store,
@@ -104,6 +127,8 @@ async function fixture(fee = unit / 10n) {
         wallet,
         bob,
         context,
+        reader,
+        membership,
         protocol,
         store,
         session,
@@ -132,10 +157,15 @@ test("real SDK reproduces exact single-Note selection without a prepared fee bud
     );
 });
 
-async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
+async function runMain(
+    file: string,
+    h: Awaited<ReturnType<typeof fixture>>,
+    recovery?: { operationId: string; recoverSubmitId?: boolean }
+) {
     const logs: unknown[][] = [];
     let signed = 0,
         closed = 0,
+        prepared = 0,
         quoted: any;
     const quote = h.client.quote.bind(h.client);
     h.client.quote = async (...args: Parameters<typeof quote>) => {
@@ -145,12 +175,21 @@ async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
     const session = {
         refresh: async () => ({ decrypt: async () => {} }),
         balance: h.session.balance.bind(h.session),
-        prepareTransfer: h.session.prepareTransfer.bind(h.session),
+        scope: h.session.scope,
+        resume: h.session.resume.bind(h.session),
+        prepareTransfer: (...args: Parameters<typeof h.session.prepareTransfer>) => {
+            prepared++;
+            if (recovery) throw Error("Recovery must not prepare a new payment");
+            return h.session.prepareTransfer(...args);
+        },
     };
     const protocol = {
         context: h.protocol.context,
         deployment: h.protocol.deployment,
-        getBroadcasters: async () => [h.client],
+        getBroadcasters: async () => {
+            if (recovery) throw Error("Recovery must use its saved broadcaster configuration");
+            return [h.client];
+        },
     };
     class Empty {}
     class Provider {
@@ -160,6 +199,9 @@ async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
         }
     }
     class Signer {
+        constructor() {
+            if (recovery) throw Error("Recovery must not open an account signing key");
+        }
         address = h.wallet.ownerAddress;
         async signTypedData() {
             signed++;
@@ -180,6 +222,12 @@ async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
         ethers: { JsonRpcProvider: Provider, Wallet: Signer, getBytes: () => new Uint8Array(32) },
         "@invisi-labs/sdk/ethers": { EthersChainReader: Empty },
         "@invisi-labs/sdk": {
+            BroadcasterClient: class {
+                constructor(configuration: unknown) {
+                    assert.deepEqual(configuration, h.client.configuration);
+                    return h.client;
+                }
+            },
             Invisi: Empty,
             Protocol: { fromRpc: async () => protocol },
             ProtocolRpcClient: Empty,
@@ -194,7 +242,11 @@ async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
             EncryptedWalletCodec: { fromBytes: async () => ({}) },
         },
         "@invisi-labs/session/memory": { MemoryWalletStore: Empty },
-        "@invisi-labs/session/sqlite": { SQLiteWalletStore: Empty },
+        "@invisi-labs/session/sqlite": {
+            SQLiteWalletStore: class {
+                readSnapshot = h.store.readSnapshot.bind(h.store);
+            },
+        },
         "../settings.js": { settings: { ...h.context, broadcasterMaxFeeAmount: unit } },
         "../accounts.js": {
             getAccounts: () => [
@@ -212,7 +264,15 @@ async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
     const context = createContext({
         URL,
         console: { log: (...args: unknown[]) => logs.push(args) },
-        process: { argv: ["node", "example", "--execute"], env: {} },
+        process: {
+            argv: [
+                "node",
+                "example",
+                "--execute",
+                ...(recovery?.recoverSubmitId ? ["--recover-submit-id"] : []),
+            ],
+            env: recovery ? { OPERATION_ID: recovery.operationId } : {},
+        },
     });
     const main = new SourceTextModule(source, {
         context,
@@ -239,7 +299,7 @@ async function runMain(file: string, h: Awaited<ReturnType<typeof fixture>>) {
         error = e;
     }
     assert.equal(closed, file.startsWith("04") ? 2 : 1);
-    return { logs, signed, quoted, error };
+    return { logs, signed, prepared, quoted, error };
 }
 
 for (const file of ["01-prepare-and-broadcast.ts", "04-scheduled-cancel-recovery.ts"]) {
@@ -304,4 +364,192 @@ test("real SDK refuses a prepared private fee budget beyond available inputs", a
         /insufficient/i
     );
     assert.equal(Object.keys((await h.store.readSnapshot(h.session.scope)).operations).length, 0);
+});
+
+async function scheduledRecoveryFixture() {
+    const h = await fixture();
+    const base = h.client;
+    const calls: { method: string; params: unknown }[] = [];
+    const service = { lose: false, offline: false };
+    h.client = new BroadcasterClient(base.configuration, async (request) => {
+        calls.push({ method: request.method, params: structuredClone(request.params) });
+        if (service.offline) throw Error("Relay offline");
+        if (
+            [
+                "broadcaster_submitTransaction",
+                "broadcaster_cancelTransaction",
+                "broadcaster_getTransactionStatus",
+            ].includes(request.method)
+        ) {
+            if (request.method === "broadcaster_submitTransaction" && service.lose) {
+                service.lose = false;
+                throw Error("Submission acknowledgement lost");
+            }
+            return {
+                jsonrpc: "2.0",
+                id: request.id,
+                result: {
+                    id: "saved-scheduled-job",
+                    state:
+                        request.method === "broadcaster_cancelTransaction"
+                            ? "cancelled"
+                            : "scheduled",
+                    publishAfter: String(Math.floor(Date.now() / 1000) + 60),
+                    executeBefore: String(Math.floor(Date.now() / 1000) + 360),
+                },
+            };
+        }
+        return base.transport(request);
+    });
+    const output = await NoteOutput.create({
+        ...h.context,
+        amount: 10n * unit,
+        recipient: { type: "invisi", address: h.bob.getAddress() },
+    });
+    const prepared = await h.session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [output],
+        fee: { recipient: h.client.configuration.feeRecipient as `0x${string}`, amount: unit },
+        deadline: BigInt(Math.floor(Date.now() / 1000) + 1200),
+    });
+    const quoted = await h.client.quote(prepared, {
+        maxFeeAmount: unit,
+        schedule: { publishAfter: BigInt(Math.floor(Date.now() / 1000) + 60) },
+    });
+    const authorization = await quoted.exportWalletAuthorization();
+    const { Wallet: EvmWallet } = await import("ethers");
+    // The receiving-address fixture uses public test account scalar one.
+    const signer = new EvmWallet("0x" + "1".padStart(64, "0"));
+    const signature = await signer.signTypedData(
+        authorization.domain,
+        authorization.types,
+        authorization.message
+    );
+    const ready = await (await quoted.withWalletSignature(signature)).prove();
+    return { ...h, ready, calls, service };
+}
+
+test("scheduled example resumes the original ID keylessly and cancels without a status prerequisite", async () => {
+    const h = await scheduledRecoveryFixture();
+    await h.client.submit(h.ready);
+    const before = h.calls.length;
+    const result = await runMain("04-scheduled-cancel-recovery.ts", h, { operationId: h.ready.id });
+    assert.equal(result.error, undefined);
+    assert.equal(result.signed, 0);
+    assert.equal(result.prepared, 0);
+    assert.deepEqual(
+        h.calls.slice(before).map((c) => c.method),
+        ["broadcaster_cancelTransaction"]
+    );
+    const snapshot = await h.store.readSnapshot(h.session.scope);
+    assert.equal(Object.keys(snapshot.operations).length, 1);
+    assert.deepEqual(snapshot.reservations, {});
+});
+
+test("scheduled example replays an unknown acknowledgement only with an explicit recovery switch", async () => {
+    const h = await scheduledRecoveryFixture();
+    h.service.lose = true;
+    await assert.rejects(h.client.submit(h.ready), /acknowledgement lost/);
+    const before = h.calls.length;
+    const refusal = await runMain("04-scheduled-cancel-recovery.ts", h, {
+        operationId: h.ready.id,
+    });
+    assert.match(String(refusal.error), /recover-submit-id/);
+    assert.equal(h.calls.length, before);
+    assert.equal(Object.keys((await h.store.readSnapshot(h.session.scope)).reservations).length, 2);
+    const result = await runMain("04-scheduled-cancel-recovery.ts", h, {
+        operationId: h.ready.id,
+        recoverSubmitId: true,
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.signed, 0);
+    assert.equal(result.prepared, 0);
+    const submissions = h.calls.filter((c) => c.method === "broadcaster_submitTransaction");
+    assert.equal(submissions.length, 2);
+    assert.deepEqual(submissions[0]!.params, submissions[1]!.params);
+    assert.equal(Object.keys((await h.store.readSnapshot(h.session.scope)).operations).length, 1);
+});
+
+test("scheduled example retries a journaled cancellation while the relay is offline", async () => {
+    const h = await scheduledRecoveryFixture();
+    await h.client.submit(h.ready);
+    const getBlock = h.reader.getBlock;
+    h.reader.getBlock = async () => {
+        throw Error("Canonical RPC offline");
+    };
+    const failed = await runMain("04-scheduled-cancel-recovery.ts", h, { operationId: h.ready.id });
+    assert.match(String(failed.error), /Canonical RPC offline/);
+    assert.equal(Object.keys((await h.store.readSnapshot(h.session.scope)).reservations).length, 2);
+    h.reader.getBlock = getBlock;
+    h.service.offline = true;
+    const before = h.calls.length;
+    const result = await runMain("04-scheduled-cancel-recovery.ts", h, { operationId: h.ready.id });
+    assert.equal(result.error, undefined);
+    assert.equal(h.calls.length, before);
+    assert.deepEqual((await h.store.readSnapshot(h.session.scope)).reservations, {});
+    const repeated = await runMain("04-scheduled-cancel-recovery.ts", h, {
+        operationId: h.ready.id,
+    });
+    assert.equal(repeated.error, undefined);
+    assert.equal(h.calls.length, before);
+});
+
+test("scheduled recovery never submits an operation that was only quoted locally", async () => {
+    const h = await scheduledRecoveryFixture();
+    const before = h.calls.length;
+    const result = await runMain("04-scheduled-cancel-recovery.ts", h, {
+        operationId: h.ready.id,
+        recoverSubmitId: true,
+    });
+    assert.match(String(result.error), /not been submitted|not attempted/i);
+    assert.equal(h.calls.length, before);
+    assert.equal(Object.keys((await h.store.readSnapshot(h.session.scope)).reservations).length, 2);
+});
+
+test("scheduled restart reopens a fresh session without a prover or account signer", async () => {
+    const h = await scheduledRecoveryFixture();
+    await h.client.submit(h.ready);
+    const session = new WalletSession({
+        invisi: new Invisi({ chainReader: h.reader, protocolRpc: h.membership }),
+        wallet: h.wallet,
+        protocol: h.protocol,
+        store: h.store,
+        namespace: "budget-test",
+    });
+    const before = h.calls.length;
+    const result = await runMain(
+        "04-scheduled-cancel-recovery.ts",
+        { ...h, session },
+        { operationId: h.ready.id }
+    );
+    assert.equal(result.error, undefined);
+    assert.equal(result.signed, 0);
+    assert.equal(result.prepared, 0);
+    assert.deepEqual(
+        h.calls.slice(before).map((call) => call.method),
+        ["broadcaster_cancelTransaction"]
+    );
+    assert.deepEqual((await h.store.readSnapshot(h.session.scope)).reservations, {});
+});
+
+test("scheduled restart in another wallet scope does not touch the original journal or relay", async () => {
+    const h = await scheduledRecoveryFixture();
+    await h.client.submit(h.ready);
+    const session = new WalletSession({
+        invisi: new Invisi({ chainReader: h.reader, protocolRpc: h.membership }),
+        wallet: h.bob,
+        protocol: h.protocol,
+        store: h.store,
+        namespace: "budget-test",
+    });
+    const before = await h.store.readSnapshot(h.session.scope);
+    const calls = h.calls.length;
+    const result = await runMain(
+        "04-scheduled-cancel-recovery.ts",
+        { ...h, session },
+        { operationId: h.ready.id }
+    );
+    assert.match(String(result.error), /binding missing/);
+    assert.equal(h.calls.length, calls);
+    assert.deepEqual(await h.store.readSnapshot(h.session.scope), before);
 });

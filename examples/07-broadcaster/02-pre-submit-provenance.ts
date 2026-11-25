@@ -14,6 +14,10 @@ if (!process.argv.includes("--execute")) {
     console.log("Review this pre-submission scenario, then pass --execute");
     process.exit(0);
 }
+if (process.env.OPERATION_ID !== undefined || process.env.TRANSACTION_HASH !== undefined)
+    throw Error(
+        "Use the durable recover-and-submit-provenance example to recover the original payment"
+    );
 
 const provider = new JsonRpcProvider(settings.chainRpcUrl);
 try {

@@ -19,6 +19,13 @@ if (!process.argv.includes("--execute")) {
     );
     process.exit(0);
 }
+if (
+    !process.argv.includes("--resume") &&
+    (process.env.OPERATION_ID !== undefined || process.env.TRANSACTION_HASH !== undefined)
+)
+    throw Error("Use --resume with the original OPERATION_ID to recover a payment");
+if (process.argv.includes("--resume") && !process.env.OPERATION_ID)
+    throw Error("Set the original OPERATION_ID for --resume");
 
 // 1. Encrypt original input openings and the frozen operation with an App-owned storage key.
 const storageKey = getBytes(process.env.STORE_ENCRYPTION_KEY_HEX ?? "0x");
@@ -105,9 +112,29 @@ try {
         if (!operationId) throw Error("Set OPERATION_ID from the saved local transaction history");
         let restored = await session.resume(operationId);
         // Only needed if a crash occurred after sending but before its hash was journaled.
-        if (process.env.TRANSACTION_HASH)
-            restored = await restored.trackTransaction(process.env.TRANSACTION_HASH);
-        const confirmed = await restored.reconcile();
+        const hostHash = process.env.TRANSACTION_HASH;
+        let transactionHash: `0x${string}` | undefined;
+        if (hostHash !== undefined) {
+            if (!/^0x[a-fA-F0-9]{64}$/.test(hostHash) || /^0x0{64}$/.test(hostHash))
+                throw Error("invalid transaction hash");
+            transactionHash = hostHash.toLowerCase() as `0x${string}`;
+            const entry = (await session.getHistory()).outgoing.find(
+                (item) => item.id === operationId
+            );
+            if (entry?.transactionHash && entry.transactionHash.toLowerCase() !== transactionHash)
+                throw Error(
+                    `Host transaction hash differs from the ${restored.status === "confirmed" ? "confirmed" : "original"} operation`
+                );
+            if (restored.status === "confirmed") {
+                if (entry?.transactionHash?.toLowerCase() !== transactionHash)
+                    throw Error("Host transaction hash differs from the confirmed operation");
+            } else {
+                restored = await restored.trackTransaction(transactionHash);
+            }
+        }
+        const confirmed = await restored.reconcile(
+            transactionHash === undefined ? {} : { transactionHash }
+        );
         if (confirmed.status !== "confirmed")
             throw Error(
                 "Main transaction is not canonically confirmed; resume the same operation later"

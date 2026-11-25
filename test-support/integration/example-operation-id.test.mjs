@@ -21,7 +21,7 @@ const sources = new Map();
 
 // Execute each actual main, replacing only its external capabilities. No SDK,
 // wallet key, filesystem-backed database, proof backend or RPC is opened by it.
-async function runMain(path, fault) {
+async function runMain(path, fault, environment = {}, preflightError) {
     const id = "original-persisted-operation";
     const records = new Map();
     const logs = [];
@@ -182,6 +182,7 @@ async function runMain(path, fault) {
         "@invisi-labs/session/sqlite": { SQLiteWalletStore: Store },
         "@invisi-labs/session/memory": { MemoryWalletStore: Empty },
         "@invisi-labs/sdk": {
+            BroadcasterClient: Empty,
             Invisi: Empty,
             Protocol: { fromRpc: async () => protocol },
             ProtocolRpcClient: Empty,
@@ -212,7 +213,7 @@ async function runMain(path, fault) {
         console: { log: (...args) => logs.push(args) },
         process: {
             argv: ["node", path, "--execute"],
-            env: {},
+            env: environment,
             exit: () => {
                 throw Error("unexpected early exit");
             },
@@ -244,6 +245,13 @@ async function runMain(path, fault) {
             { context }
         );
     });
+    if (preflightError) {
+        await assert.rejects(main.evaluate(), preflightError);
+        assert.equal(prepares, 0, "recovery arguments must not create another intent");
+        assert.equal(sends, 0);
+        assert.equal(exports, 0);
+        return;
+    }
     if (fault) await assert.rejects(main.evaluate(), { message: `injected ${fault} failure` });
     else await main.evaluate();
     assert.equal(failedAt, fault);
@@ -267,3 +275,14 @@ for (const [path, faults] of scenarios) {
         test(`${path}: retains the original ID after ${fault} failure`, () => runMain(path, fault));
     test(`${path}: logs the prepared ID exactly once on success`, () => runMain(path));
 }
+
+for (const path of [
+    "07-broadcaster/02-pre-submit-provenance.ts",
+    "07-broadcaster/03-recover-and-submit-provenance.ts",
+])
+    for (const environment of [
+        { OPERATION_ID: "saved-payment" },
+        { TRANSACTION_HASH: "0x" + "12".repeat(32) },
+    ])
+        test(`${path}: recovery arguments never silently create another payment`, () =>
+            runMain(path, undefined, environment, /recover|resume/i));
