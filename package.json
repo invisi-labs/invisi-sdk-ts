@@ -24,7 +24,7 @@
     "check:ipp": "node scripts/check-ipp-package.mjs",
     "sync:payment-router-abis": "node scripts/sync-payment-router-abis.mjs",
     "check:payment-router": "node scripts/check-payment-router-package.mjs",
-    "test:examples": "node --experimental-vm-modules --test test-support/integration/example-operation-id.test.mjs && node --test test-support/integration/example-default-exit.test.mjs && pnpm --dir examples exec tsx --test ../test-support/integration/example-discovery-detection.test.ts"
+    "test:examples": "node --experimental-vm-modules --test test-support/integration/example-operation-id.test.mjs test-support/integration/example-restore-binding.test.mjs && node --test test-support/integration/example-default-exit.test.mjs && pnpm --dir examples exec tsx --test ../test-support/integration/example-discovery-detection.test.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

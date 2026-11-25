@@ -46,7 +46,7 @@ try {
     if ((await provider.getNetwork()).chainId !== settings.chainId) {
         throw Error("Configured chain mismatch");
     }
-    const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl);
+    const protocolRpc = new ProtocolRpcClient(settings.protocolRpcUrl).withProvider(provider);
     const protocol = await Protocol.fromRpc(protocolRpc, provider);
     const chainReader = new EthersChainReader(provider);
     const publicHistory = new PublicHistory({
