@@ -890,6 +890,7 @@ export class Operation {
 
     async abandon(): Promise<Operation> {
         const saved = await this.#runtime.store.transaction(this.#runtime.scope, (state) => {
+            check(!state.invalidated, "wallet requires canonical resync");
             const record = state.operations[this.id];
             const current = this.current(record);
             check(

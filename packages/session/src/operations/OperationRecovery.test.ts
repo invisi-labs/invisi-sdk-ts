@@ -186,3 +186,20 @@ it("keeps scheduled reservations on cancellation uncertainty and releases after 
     expect((await h.store.readSnapshot(h.scope)).reservations[h.leaf]).toBeUndefined();
     expect((await h.store.readSnapshot(h.scope)).observedThrough!.number).toBe(12n);
 });
+
+it("retains reservations when abandoning an operation from an invalidated wallet", async () => {
+    const h = await fixture();
+    const session = new WalletSession(sessionOptions({ ...h.options, prover: prover() }));
+    const operation = await session.prepareTransfer({
+        tokenAddress: h.context.tokenAddress,
+        outputs: [],
+        withdrawal: { to: h.bob.ownerAddress, amount: 100n },
+    });
+    await h.store.transaction(h.scope, (state) => {
+        state.invalidated = "Canonical checkpoint changed; full resync required";
+    });
+    const before = await h.store.readSnapshot(h.scope);
+    await expect(operation.abandon()).rejects.toThrow(/canonical resync/);
+    expect(await h.store.readSnapshot(h.scope)).toEqual(before);
+    expect(before.reservations[h.leaf]).toBe(operation.id);
+});
